@@ -274,6 +274,8 @@ async def update_store(
     db: Session = Depends(get_db),
 ):
     """更新店家資料"""
+    from app.services.upload_service import upload_image
+    
     user = await get_admin_user(request, db)
     
     store = db.query(Store).filter(Store.id == store_id).first()
@@ -283,28 +285,11 @@ async def update_store(
     store.name = name
     store.category = CategoryType(category)
     
-    # 處理 Logo 上傳
+    # 處理 Logo 上傳 (使用 Cloudinary)
     if logo_file and logo_file.filename:
-        import os
-        import uuid
-        
-        # 確保目錄存在
-        upload_dir = "app/static/uploads/stores"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # 產生檔名
-        ext = os.path.splitext(logo_file.filename)[1].lower()
-        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            ext = '.png'
-        filename = f"store_{store_id}_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = os.path.join(upload_dir, filename)
-        
-        # 儲存檔案
-        content = await logo_file.read()
-        with open(filepath, "wb") as f:
-            f.write(content)
-        
-        store.logo_url = f"/static/uploads/stores/{filename}"
+        logo_url = await upload_image(logo_file, folder="sela/stores")
+        if logo_url:
+            store.logo_url = logo_url
     
     db.commit()
     

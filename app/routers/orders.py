@@ -443,8 +443,9 @@ async def follow_item(
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
     
+    # 如果已結單，自動進入編輯模式
     if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先進入修改模式")
+        order.status = OrderStatus.EDITING
     
     # 複製品項
     order_item = OrderItem(

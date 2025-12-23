@@ -1,7 +1,7 @@
 {% if submitted_orders %}
 <div class="bg-white rounded-lg shadow-sm p-4">
     <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-        📋 已結單
+        已結單
         <span class="text-sm font-normal text-gray-500">({{ submitted_orders|length }} 人)</span>
     </h2>
     
@@ -32,7 +32,7 @@
                         <span class="text-xs bg-gray-100 px-1 rounded">{{ opt.option_name }}</span>
                         {% endfor %}
                         {% if item.note %}
-                        <span class="text-xs text-amber-600">📝 {{ item.note }}</span>
+                        <span class="text-xs text-amber-600">{{ item.note }}</span>
                         {% endif %}
                     </span>
                     <span class="text-gray-400">x{{ item.quantity }}</span>
@@ -41,9 +41,18 @@
                     <button hx-post="/groups/{{ group_id }}/orders/follow/{{ item.id }}"
                             hx-target="#my-order"
                             hx-swap="innerHTML"
-                            @htmx:after-request="$dispatch('orderUpdated')"
+                            hx-on::after-request="
+                                this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
+                                if (window.Alpine) {
+                                    const comp = Alpine.$data(document.querySelector('[x-data]'));
+                                    if (comp) {
+                                        comp.orderStatus = 'draft';
+                                        comp.updateCartCount();
+                                    }
+                                }
+                            "
                             class="text-xs text-orange-600 hover:text-orange-700 px-2 py-0.5 border border-orange-200 rounded hover:bg-orange-50">
-                        +跟點
+                        +跟
                     </button>
                 </div>
                 {% endfor %}

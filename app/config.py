@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # Base URL (for QR code)
     base_url: str = "http://localhost:8000"
     
+    # Cloudinary
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    
     class Config:
         env_file = ".env"
 
