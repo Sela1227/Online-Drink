@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}開新團 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-sm p-4">
+    <h1 class="text-xl font-bold text-gray-800 mb-4">
+        {% if copy_from %}複製開團{% else %}開新團{% endif %}
+    </h1>
+    
+    <form action="/groups" method="post" class="space-y-4">
+        <!-- 店家選擇 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家</label>
+            <select name="store_id" id="store_id" required onchange="onStoreChange()"
+                    class="w-full border rounded-lg px-3 py-2">
+                <option value="">請選擇...</option>
+                {% for store in stores %}
+                <option value="{{ store.id }}" 
+                        data-category="{{ store.category.value }}"
+                        {% if copy_from and copy_from.store_id == store.id %}selected{% endif %}>
+                    {{ store.name }} ({{ '飲料' if store.category.value == 'drink' else '餐點' }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- 團名 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">團名</label>
+            <input type="text" name="name" required placeholder="例：下午茶團"
+                   class="w-full border rounded-lg px-3 py-2"
+                   value="{% if copy_from %}{{ copy_from.name }}{% endif %}">
+        </div>
+        
+        <!-- 截止時間 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">截止時間</label>
+            <div class="flex flex-wrap gap-2 mb-2">
+                <button type="button" onclick="setDeadline('30m')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    30分鐘後
+                </button>
+                <button type="button" onclick="setDeadline('1h')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    1小時後
+                </button>
+                <button type="button" onclick="setDeadline('12:00')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    今天 12:00
+                </button>
+                <button type="button" onclick="setDeadline('17:00')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    今天 17:00
+                </button>
+                <button type="button" onclick="setDeadline('tomorrow')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    明天 12:00
+                </button>
+            </div>
+            <input type="datetime-local" name="deadline" id="deadline" required
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 飲料團設定 -->
+        <div id="drink-options" class="space-y-4 p-4 bg-gray-50 rounded-lg" style="display: none;">
+            <h3 class="font-medium text-gray-700">飲料團設定</h3>
+            
+            <!-- 預設甜度 -->
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">預設甜度</label>
+                <select name="default_sugar" class="w-full border rounded px-3 py-2">
+                    <option value="">不指定</option>
+                    <option value="正常糖">正常糖</option>
+                    <option value="少糖">少糖</option>
+                    <option value="半糖">半糖</option>
+                    <option value="微糖">微糖</option>
+                    <option value="無糖">無糖</option>
+                </select>
+            </div>
+            
+            <!-- 預設冰塊 -->
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">預設冰塊</label>
+                <select name="default_ice" class="w-full border rounded px-3 py-2">
+                    <option value="">不指定</option>
+                    <option value="正常冰">正常冰</option>
+                    <option value="少冰">少冰</option>
+                    <option value="微冰">微冰</option>
+                    <option value="去冰">去冰</option>
+                    <option value="熱">熱</option>
+                </select>
+            </div>
+            
+            <!-- 鎖定選項 -->
+            <div class="flex gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="lock_sugar" value="true">
+                    <span class="text-sm text-gray-600">鎖定甜度</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="lock_ice" value="true">
+                    <span class="text-sm text-gray-600">鎖定冰塊</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- 送出按鈕 -->
+        <div class="flex gap-2 pt-4">
+            <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+                取消
+            </a>
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                開團！
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+// 店家變更時顯示/隱藏飲料設定
+function onStoreChange() {
+    const select = document.getElementById('store_id');
+    const option = select.options[select.selectedIndex];
+    const category = option.dataset.category || '';
+    const drinkOptions = document.getElementById('drink-options');
+    
+    if (category === 'drink') {
+        drinkOptions.style.display = 'block';
+    } else {
+        drinkOptions.style.display = 'none';
+    }
+}
+
+// 設定截止時間
+function setDeadline(preset) {
+    const now = new Date();
+    let target;
+    
+    if (preset === '30m') {
+        target = new Date(now.getTime() + 30 * 60000);
+    } else if (preset === '1h') {
+        target = new Date(now.getTime() + 60 * 60000);
+    } else if (preset === '12:00') {
+        target = new Date(now);
+        target.setHours(12, 0, 0, 0);
+        if (target <= now) {
+            target.setDate(target.getDate() + 1);
+        }
+    } else if (preset === '17:00') {
+        target = new Date(now);
+        target.setHours(17, 0, 0, 0);
+        if (target <= now) {
+            target.setDate(target.getDate() + 1);
+        }
+    } else if (preset === 'tomorrow') {
+        target = new Date(now);
+        target.setDate(target.getDate() + 1);
+        target.setHours(12, 0, 0, 0);
+    }
+    
+    if (target) {
+        const year = target.getFullYear();
+        const month = String(target.getMonth() + 1).padStart(2, '0');
+        const day = String(target.getDate()).padStart(2, '0');
+        const hours = String(target.getHours()).padStart(2, '0');
+        const minutes = String(target.getMinutes()).padStart(2, '0');
+        document.getElementById('deadline').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+}
+
+// 頁面載入時檢查初始狀態
+document.addEventListener('DOMContentLoaded', function() {
+    onStoreChange();
+});
+</script>
+{% endblock %}
