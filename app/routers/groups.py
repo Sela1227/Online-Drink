@@ -135,6 +135,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "my_order": my_order,
         "pending_count": pending_count,
         "is_owner": group.owner_id == user.id,
+        "is_admin": user.is_admin,
         "is_open": group.is_open,
     })
 
@@ -155,6 +156,34 @@ async def close_group(group_id: int, request: Request, db: Session = Depends(get
     db.commit()
     
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.post("/{group_id}/delete")
+async def delete_group(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """刪除團單"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主或管理員可以刪除團單")
+    
+    # 刪除相關訂單和訂單項目
+    orders = db.query(Order).filter(Order.group_id == group_id).all()
+    for order in orders:
+        for item in order.items:
+            # 刪除訂單項目的選項
+            for opt in item.selected_options:
+                db.delete(opt)
+            db.delete(item)
+        db.delete(order)
+    
+    db.delete(group)
+    db.commit()
+    
+    return RedirectResponse(url="/home", status_code=302)
 
 
 @router.get("/{group_id}/qrcode")
