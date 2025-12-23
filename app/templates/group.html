@@ -6,82 +6,59 @@
 <div class="space-y-4" x-data="orderPage()">
     <!-- Header -->
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <!-- 返回按鈕 -->
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-block">← 返回首頁</a>
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
         
-        <div class="flex gap-3">
-            <!-- Logo -->
-            <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <!-- 簡潔的團單資訊 -->
+        <div class="flex items-center gap-3 mt-2">
+            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-14 h-14 object-contain">
+                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-10 h-10 object-contain">
                 {% else %}
-                <span class="text-3xl">
-                    {% if group.category.value == 'drink' %}🧋{% else %}🍱{% endif %}
-                </span>
+                <span class="text-2xl">{% if group.category.value == 'drink' %}🧋{% else %}🍱{% endif %}</span>
                 {% endif %}
             </div>
-            
-            <!-- 資訊 -->
-            <div class="flex-1">
-                <h1 class="font-bold text-lg text-gray-900">{{ group.name }}</h1>
-                <div class="text-sm text-gray-500">{{ store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">團主：{{ group.owner.display_name }}</div>
+            <div class="flex-1 min-w-0">
+                <h1 class="font-bold text-lg text-gray-900 truncate">{{ group.name }}</h1>
+                <div class="text-sm text-gray-500">{{ store.name }} · {{ group.owner.display_name }}</div>
             </div>
-        </div>
-        
-        <!-- 狀態與操作 -->
-        <div class="mt-4 flex items-center justify-between">
-            <div>
+            <div class="text-right">
                 {% if is_open %}
-                <span class="text-sm text-orange-600 font-medium"
-                      x-data="countdown('{{ group.deadline.isoformat() }}')"
-                      x-text="'⏰ ' + display">
-                </span>
+                <div class="text-orange-600 font-medium"
+                     x-data="countdown('{{ group.deadline.isoformat() }}')"
+                     x-text="display"></div>
                 {% else %}
-                <span class="text-sm text-gray-500">🔒 已截止</span>
+                <div class="text-gray-500">已截止</div>
                 {% endif %}
             </div>
-            
-            <div class="flex gap-2">
-                <button @click="copyLink()" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition">
-                    📋 複製連結
-                </button>
-                <button @click="showQR = true" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition">
-                    📱 QR Code
-                </button>
+        </div>
+        
+        <!-- 操作按鈕 -->
+        <div class="flex items-center justify-between mt-3 pt-3 border-t">
+            <div class="flex gap-3">
+                <button @click="copyLink()" class="text-xs text-gray-600 hover:text-gray-800">📋 複製連結</button>
+                <button @click="showQR = true" class="text-xs text-gray-600 hover:text-gray-800">📱 QR Code</button>
             </div>
-        </div>
-        
-        <!-- 催單提醒 -->
-        {% if pending_count > 0 %}
-        <div class="mt-3 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded">
-            ⚠️ {{ pending_count }} 人尚未結單
-        </div>
-        {% endif %}
-        
-        <!-- 團主操作 -->
-        {% if is_owner or is_admin %}
-        <div class="mt-3 pt-3 border-t flex flex-wrap gap-2">
-            {% if is_open %}
-            <form action="/groups/{{ group.id }}/close" method="post" class="inline"
-                  onsubmit="return confirm('確定要提前截止嗎？')">
-                <button type="submit" class="text-xs text-orange-600 hover:text-orange-700">
-                    🛑 提前截止
-                </button>
-            </form>
+            {% if is_owner or is_admin %}
+            <div class="flex gap-3">
+                {% if is_open %}
+                <form action="/groups/{{ group.id }}/close" method="post" class="inline"
+                      onsubmit="return confirm('確定要提前截止嗎？')">
+                    <button type="submit" class="text-xs text-orange-600">🛑 截止</button>
+                </form>
+                {% endif %}
+                <a href="/groups/{{ group.id }}/export/order" class="text-xs text-gray-600">📝 點餐</a>
+                <a href="/groups/{{ group.id }}/export/payment" class="text-xs text-gray-600">💰 收款</a>
+                <form action="/groups/{{ group.id }}/delete" method="post" class="inline"
+                      onsubmit="return confirm('確定要刪除這個團嗎？')">
+                    <button type="submit" class="text-xs text-red-500">🗑️ 刪除</button>
+                </form>
+            </div>
             {% endif %}
-            <a href="/groups/{{ group.id }}/export/order" class="text-xs text-gray-600 hover:text-gray-700">
-                📝 點餐文字
-            </a>
-            <a href="/groups/{{ group.id }}/export/payment" class="text-xs text-gray-600 hover:text-gray-700">
-                💰 收款文字
-            </a>
-            <form action="/groups/{{ group.id }}/delete" method="post" class="inline"
-                  onsubmit="return confirm('確定要刪除這個團嗎？此操作無法復原！')">
-                <button type="submit" class="text-xs text-red-500 hover:text-red-700">
-                    🗑️ 刪除團單
-                </button>
-            </form>
+        </div>
+        
+        {% if pending_count > 0 %}
+        <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded">
+            ⚠️ {{ pending_count }} 人尚未結單
         </div>
         {% endif %}
     </div>
@@ -91,17 +68,18 @@
         {% include "partials/order_wall.html" %}
     </div>
 
-    <!-- 我的訂單 -->
+    <!-- 我的訂單（已結單時顯示） -->
+    {% if my_order and my_order.status.value == 'submitted' %}
     <div id="my-order" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
         {% include "partials/my_order.html" %}
     </div>
+    {% endif %}
 
     <!-- 菜單 -->
     {% if is_open %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-lg shadow-sm p-4 pb-24">
         <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
         
-        <!-- 分類品項 -->
         {% for category in menu.categories %}
         <div class="mb-4">
             <h3 class="text-sm font-medium text-gray-600 mb-2">{{ category.name }}</h3>
@@ -113,7 +91,6 @@
         </div>
         {% endfor %}
         
-        <!-- 無分類品項 -->
         {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
         {% if uncategorized %}
         <div class="space-y-2">
@@ -122,6 +99,52 @@
             {% endfor %}
         </div>
         {% endif %}
+    </div>
+    
+    <!-- 懸浮購物車按鈕 -->
+    <button @click="showCart = true"
+            class="fixed bottom-4 right-4 z-40 bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center">
+        <span class="text-xl">🛒</span>
+        <span x-show="cartCount > 0"
+              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+              x-text="cartCount"></span>
+    </button>
+    
+    <!-- 購物車側欄 -->
+    <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/30" @click="showCart = false"></div>
+        <div class="absolute right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-xl flex flex-col"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full">
+            
+            <!-- 購物車標題 -->
+            <div class="p-4 border-b flex items-center justify-between bg-orange-500 text-white">
+                <h3 class="font-semibold text-lg">🛒 我的購物車</h3>
+                <button @click="showCart = false" class="text-white/80 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <!-- 購物車內容 -->
+            <div class="flex-1 overflow-y-auto" id="cart-content"
+                 hx-get="/groups/{{ group.id }}/orders/mine" 
+                 hx-trigger="load, orderUpdated from:body"
+                 hx-swap="innerHTML">
+                {% include "partials/my_order.html" %}
+            </div>
+            
+            <!-- 購物車底部 -->
+            <div class="p-4 border-t bg-gray-50">
+                <div class="flex gap-2">
+                    <button @click="showCart = false" 
+                            class="flex-1 py-2.5 rounded-lg border hover:bg-gray-100 font-medium">
+                        繼續點餐
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
     {% endif %}
 
@@ -142,17 +165,17 @@
     <div x-show="showAddItem" x-cloak
          class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
          @click.self="showAddItem = false">
-        <div class="bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-lg">
+        <div class="bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
             <h3 class="font-semibold text-lg mb-4" x-text="selectedItem?.name"></h3>
             
             <form hx-post="/groups/{{ group.id }}/orders/items" 
-                  hx-target="#my-order"
+                  hx-target="#cart-content"
                   hx-swap="innerHTML"
-                  @htmx:after-request="showAddItem = false; $dispatch('orderUpdated')">
+                  @htmx:after-request="showAddItem = false; updateCartCount(); $dispatch('orderUpdated')">
                 
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
-                <!-- 尺寸選擇 (有 L 價格時顯示) -->
+                <!-- 尺寸選擇 -->
                 <div x-show="selectedItem?.price_l" class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">尺寸</label>
                     <div class="flex gap-2">
@@ -171,7 +194,7 @@
                     </div>
                 </div>
                 
-                <!-- 甜度 (飲料團) -->
+                <!-- 甜度 -->
                 {% if group.category.value == 'drink' %}
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">甜度</label>
@@ -215,13 +238,13 @@
                 </div>
                 {% endif %}
                 
-                <!-- 品項選項 (訂餐) -->
+                <!-- 加購選項 -->
                 <div x-show="selectedItem?.options?.length > 0" class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">加購選項</label>
                     <div class="space-y-2" x-html="renderOptions()"></div>
                 </div>
                 
-                <!-- 杯數 -->
+                <!-- 數量 -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">數量</label>
                     <div class="flex items-center gap-3">
@@ -237,7 +260,7 @@
                 <!-- 備註 -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">備註</label>
-                    <input type="text" name="note" placeholder="例：少冰、去冰..." 
+                    <input type="text" name="note" placeholder="特殊需求..." 
                            class="w-full border rounded px-3 py-2">
                 </div>
                 
@@ -262,15 +285,23 @@ function orderPage() {
     return {
         showQR: false,
         showAddItem: false,
+        showCart: false,
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
+        cartCount: {{ my_order.items|length if my_order else 0 }},
         
         openAddItem(item) {
             this.selectedItem = item;
             this.selectedSize = 'M';
             this.quantity = 1;
             this.showAddItem = true;
+        },
+        
+        updateCartCount() {
+            // 從 DOM 計算數量
+            const items = document.querySelectorAll('#cart-content [data-item-id]');
+            this.cartCount = items.length;
         },
         
         copyLink() {
@@ -310,15 +341,27 @@ function countdown(deadline) {
             
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
             
             if (hours > 0) {
-                this.display = `${hours}h ${minutes}m`;
+                this.display = `⏰ ${hours}h ${minutes}m`;
             } else {
-                this.display = `${minutes}m ${seconds}s`;
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                this.display = `⏰ ${minutes}m ${seconds}s`;
             }
         }
     }
 }
+
+// 監聽訂單更新事件
+document.body.addEventListener('orderUpdated', function() {
+    // 更新購物車數量
+    setTimeout(() => {
+        const items = document.querySelectorAll('#cart-content [data-item-id]');
+        const countEl = document.querySelector('[x-text="cartCount"]');
+        if (countEl) {
+            countEl.textContent = items.length;
+        }
+    }, 100);
+});
 </script>
 {% endblock %}
