@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}編輯店家 - 團購系統{% endblock %}
+{% block title %}編輯店家 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">編輯店家</h1>
-        <a href="/admin/stores" class="text-sm text-gray-500 hover:text-gray-700">← 返回</a>
+        <div>
+            <a href="/admin/stores" class="text-sm text-gray-500 hover:text-gray-700">← 返回店家列表</a>
+            <h1 class="text-xl font-bold text-gray-800">編輯店家</h1>
+        </div>
     </div>
     
     <div class="bg-white rounded-lg shadow-sm p-4 space-y-4">
@@ -44,19 +46,29 @@
             </div>
             
             <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">類型</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="drink" 
+                               {% if store.category.value == 'drink' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🧋 飲料店</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="meal" 
+                               {% if store.category.value == 'meal' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🍱 餐廳</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Logo 網址</label>
                 <input type="text" name="logo_url" id="logo-url-input" 
                        value="{{ store.logo_url or '' }}" placeholder="https://..."
                        class="w-full border rounded-lg px-3 py-2">
                 <p class="text-xs text-gray-400 mt-1">可直接貼上圖片網址，或使用上方上傳功能</p>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">類型</label>
-                <div class="text-gray-600">
-                    {{ '飲料店' if store.category.value == 'drink' else '餐點店' }}
-                    <span class="text-xs text-gray-400">（無法修改）</span>
-                </div>
             </div>
             
             <!-- 飲料店甜度/冰塊選項 -->

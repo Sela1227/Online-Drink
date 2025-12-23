@@ -115,21 +115,18 @@ async def import_page(request: Request, db: Session = Depends(get_db)):
 @router.post("/import/preview")
 async def import_preview(
     request: Request,
-    json_text: str = Form(None),
-    json_file: UploadFile = File(None),
+    json_file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
     """匯入預覽"""
     user = await get_admin_user(request, db)
     
     # 取得 JSON 內容
-    if json_file and json_file.filename:
-        content = await json_file.read()
-        json_str = content.decode("utf-8")
-    elif json_text:
-        json_str = json_text
-    else:
-        raise HTTPException(status_code=400, detail="請提供 JSON 內容")
+    if not json_file or not json_file.filename:
+        raise HTTPException(status_code=400, detail="請上傳 JSON 檔案")
+    
+    content = await json_file.read()
+    json_str = content.decode("utf-8")
     
     try:
         data = json.loads(json_str)
@@ -188,11 +185,10 @@ async def do_import(
         if is_full_import:
             validated = FullImport(**data)
             store = import_store_and_menu(db, validated)
-            return RedirectResponse(url=f"/admin/stores/{store.id}/menus", status_code=302)
         else:
             validated = MenuImport(**data)
             menu = import_menu(db, validated)
-            return RedirectResponse(url=f"/admin/stores/{validated.store_id}/menus", status_code=302)
+        return RedirectResponse(url="/admin", status_code=302)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
 
@@ -278,6 +274,7 @@ async def update_store(
     store_id: int,
     request: Request,
     name: str = Form(...),
+    category: str = Form(...),
     logo_url: str = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -289,6 +286,7 @@ async def update_store(
         raise HTTPException(status_code=404, detail="店家不存在")
     
     store.name = name
+    store.category = CategoryType(category)
     if logo_url:
         store.logo_url = logo_url
     
