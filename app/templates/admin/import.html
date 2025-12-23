@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}匯入店家/菜單 - 團購系統{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
+        <a href="/admin" class="text-gray-500 hover:text-gray-700">← 返回</a>
+    </div>
+    
+    <!-- 說明 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+        <div class="font-medium mb-2">📝 匯入格式說明</div>
+        <p class="mb-2">支援兩種匯入方式：</p>
+        <ol class="list-decimal list-inside space-y-1">
+            <li><strong>完整匯入</strong>：店家 + 菜單一起建立（包含 <code>store</code> 欄位）</li>
+            <li><strong>菜單匯入</strong>：僅匯入菜單到既有店家（包含 <code>store_id</code> 欄位）</li>
+        </ol>
+    </div>
+    
+    <!-- 範例格式 -->
+    <details class="bg-white rounded-lg shadow-sm">
+        <summary class="p-4 cursor-pointer font-medium text-gray-700">📋 查看範例格式</summary>
+        <div class="px-4 pb-4 space-y-4">
+            <!-- 完整匯入範例 -->
+            <div>
+                <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+  "store": {
+    "name": "可不可熟成紅茶",
+    "category": "drink",
+    "logo_url": null,
+    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
+    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]
+  },
+  "menu": {
+    "categories": [
+      {
+        "name": "熟成紅茶",
+        "items": [
+          { "name": "熟成紅茶", "price": 30 },
+          { "name": "熟成冷露", "price": 35 }
+        ]
+      }
+    ]
+  }
+}</pre>
+            </div>
+            
+            <!-- 菜單匯入範例 -->
+            <div>
+                <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+  "store_id": 1,
+  "mode": "new",
+  "menu": {
+    "categories": [
+      {
+        "name": "便當類",
+        "items": [
+          {
+            "name": "雞腿便當",
+            "price": 100,
+            "options": [
+              { "name": "加飯", "price_diff": 10 },
+              { "name": "不要香菜", "price_diff": 0 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}</pre>
+            </div>
+        </div>
+    </details>
+    
+    <!-- 匯入表單 -->
+    <form action="/admin/import/preview" method="post" enctype="multipart/form-data" 
+          class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+        
+        <!-- 文字輸入 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">貼上 JSON</label>
+            <textarea name="json_text" rows="10" 
+                      placeholder="貼上 JSON 格式內容..."
+                      class="w-full border rounded-lg px-3 py-2 font-mono text-sm"></textarea>
+        </div>
+        
+        <div class="text-center text-gray-500 text-sm">或</div>
+        
+        <!-- 檔案上傳 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">上傳 JSON 檔案</label>
+            <input type="file" name="json_file" accept=".json"
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <button type="submit" class="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
+            預覽匯入內容
+        </button>
+    </form>
+</div>
+{% endblock %}

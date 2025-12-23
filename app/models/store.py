@@ -1,0 +1,49 @@
+from datetime import datetime
+from typing import TYPE_CHECKING
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.database import Base
+import enum
+
+if TYPE_CHECKING:
+    from app.models.menu import Menu
+    from app.models.group import Group
+
+
+class CategoryType(str, enum.Enum):
+    DRINK = "drink"
+    MEAL = "meal"
+
+
+class OptionType(str, enum.Enum):
+    SUGAR = "sugar"
+    ICE = "ice"
+
+
+class Store(Base):
+    __tablename__ = "stores"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    options: Mapped[list["StoreOption"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+    menus: Mapped[list["Menu"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+    groups: Mapped[list["Group"]] = relationship(back_populates="store")
+
+
+class StoreOption(Base):
+    __tablename__ = "store_options"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
+    option_type: Mapped[OptionType] = mapped_column(Enum(OptionType))
+    option_value: Mapped[str] = mapped_column(String(50))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Relationships
+    store: Mapped["Store"] = relationship(back_populates="options")

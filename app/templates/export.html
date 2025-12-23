@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">{{ title }}</h1>
+        <a href="/groups/{{ group.id }}" class="text-indigo-600 hover:text-indigo-700">← 返回團單</a>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex justify-end mb-3">
+            <button onclick="copyText()" 
+                    class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg">
+                📋 複製文字
+            </button>
+        </div>
+        
+        <pre id="export-text" class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded-lg overflow-x-auto">{{ text }}</pre>
+    </div>
+</div>
+
+<script>
+function copyText() {
+    const text = document.getElementById('export-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('已複製到剪貼簿！');
+    });
+}
+</script>
+{% endblock %}

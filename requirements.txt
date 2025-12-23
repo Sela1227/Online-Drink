@@ -1,0 +1,28 @@
+# FastAPI
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# Templates
+jinja2>=3.1.4
+
+# Database
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+psycopg2-binary>=2.9.9
+
+# Auth
+httpx>=0.27.0
+python-jose[cryptography]>=3.3.0
+
+# Utils
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.1
+qrcode[pil]>=8.0
+cloudinary>=1.41.0
+
+# Dev
+pytest>=8.3.0
+
+# PostgreSQL (部署到 Railway 時需要)
+# pip install psycopg2-binary

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}後台管理 - 團購系統{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <h1 class="text-xl font-bold text-gray-800">後台管理</h1>
+    
+    <!-- 統計 -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="bg-white rounded-lg shadow-sm p-4 text-center">
+            <div class="text-2xl font-bold text-indigo-600">{{ store_count }}</div>
+            <div class="text-xs text-gray-500">店家</div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm p-4 text-center">
+            <div class="text-2xl font-bold text-indigo-600">{{ group_count }}</div>
+            <div class="text-xs text-gray-500">團單</div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm p-4 text-center">
+            <div class="text-2xl font-bold text-indigo-600">{{ user_count }}</div>
+            <div class="text-xs text-gray-500">使用者</div>
+        </div>
+    </div>
+    
+    <!-- 功能列表 -->
+    <div class="bg-white rounded-lg shadow-sm divide-y">
+        <a href="/admin/stores" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🏪</span>
+                <span class="font-medium">店家管理</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+        <a href="/admin/import" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📥</span>
+                <span class="font-medium">匯入店家/菜單</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+        <a href="/admin/groups" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📋</span>
+                <span class="font-medium">所有團單</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+        <a href="/admin/users" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">👥</span>
+                <span class="font-medium">使用者管理</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}所有團單 - 團購系統{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">所有團單</h1>
+        <a href="/admin" class="text-gray-500 hover:text-gray-700">← 返回</a>
+    </div>
+    
+    {% if groups %}
+    <div class="bg-white rounded-lg shadow-sm divide-y">
+        {% for group in groups %}
+        <a href="/groups/{{ group.id }}" class="block p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <!-- Logo -->
+                <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {% if group.store.logo_url %}
+                    <img src="{{ group.store.logo_url }}" alt="{{ group.store.name }}" class="w-8 h-8 object-contain">
+                    {% else %}
+                    <span class="text-xl">
+                        {% if group.category.value == 'drink' %}🧋{% else %}🍱{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <!-- 內容 -->
+                <div class="flex-1 min-w-0">
+                    <div class="font-medium text-gray-900 truncate">{{ group.name }}</div>
+                    <div class="text-sm text-gray-500">
+                        {{ group.store.name }} ・ {{ group.owner.display_name }}
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已結單
+                    </div>
+                </div>
+                
+                <!-- 狀態 -->
+                {% if group.is_closed or group.is_expired %}
+                <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">已截止</span>
+                {% else %}
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">進行中</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
+        <div class="text-4xl mb-2">📋</div>
+        <p>還沒有任何團單</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
