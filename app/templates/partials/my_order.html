@@ -1,6 +1,6 @@
 <div class="bg-white rounded-lg shadow-sm p-4">
     <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-        🛒 我的訂單
+        我的訂單
         {% if order and order.items %}
         <span class="text-sm font-normal text-orange-600 font-medium">${{ order.total_amount }}</span>
         {% endif %}
@@ -31,7 +31,7 @@
                     {% endfor %}
                 </div>
                 {% if item.note %}
-                <div class="text-xs text-amber-600">📝 {{ item.note }}</div>
+                <div class="text-xs text-amber-600">{{ item.note }}</div>
                 {% endif %}
             </div>
             
@@ -77,15 +77,15 @@
         <button hx-post="/groups/{{ group.id }}/orders/submit"
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
-                @htmx:after-request="$dispatch('orderUpdated')"
+                @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
                 class="flex-1 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
-            ✓ 確定結單
+            確定結單
         </button>
         {% if order.status.value == 'editing' %}
         <button hx-post="/groups/{{ group.id }}/orders/cancel"
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
-                @htmx:after-request="$dispatch('orderUpdated')"
+                @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
                 class="py-2.5 px-4 rounded-lg border hover:bg-gray-50">
             取消
         </button>
@@ -95,9 +95,9 @@
         <button hx-post="/groups/{{ group.id }}/orders/edit"
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
-                @htmx:after-request="$dispatch('orderUpdated')"
+                @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
                 class="flex-1 py-2.5 rounded-lg border hover:bg-gray-50">
-            ✏️ 修改訂單
+            修改訂單
         </button>
         {% endif %}
         
@@ -105,9 +105,9 @@
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
                 hx-confirm="確定要刪除整張訂單嗎？"
-                @htmx:after-request="$dispatch('orderUpdated')"
+                @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
                 class="py-2.5 px-3 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
-            🗑️
+            刪除
         </button>
     </div>
     {% endif %}
@@ -115,7 +115,6 @@
     {% else %}
     <!-- 空訂單 -->
     <div class="text-center py-8 text-gray-400">
-        <div class="text-3xl mb-2">🛒</div>
         <p>購物車是空的</p>
         <p class="text-sm">從菜單選擇品項加入</p>
     </div>

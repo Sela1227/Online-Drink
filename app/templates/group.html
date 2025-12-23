@@ -33,24 +33,24 @@
         </div>
         
         <!-- 操作按鈕 -->
-        <div class="flex items-center justify-between mt-3 pt-3 border-t">
+        <div class="flex items-center justify-between mt-3 pt-3 border-t text-xs">
             <div class="flex gap-3">
-                <button @click="copyLink()" class="text-xs text-gray-600 hover:text-gray-800">📋 複製連結</button>
-                <button @click="showQR = true" class="text-xs text-gray-600 hover:text-gray-800">📱 QR Code</button>
+                <button @click="copyLink()" class="text-gray-600 hover:text-gray-800">複製連結</button>
+                <button @click="showQR = true" class="text-gray-600 hover:text-gray-800">QR Code</button>
             </div>
             {% if is_owner or is_admin %}
-            <div class="flex gap-3">
+            <div class="flex gap-3 items-center">
                 {% if is_open %}
                 <form action="/groups/{{ group.id }}/close" method="post" class="inline"
-                      onsubmit="return confirm('確定要提前截止嗎？')">
-                    <button type="submit" class="text-xs text-orange-600">🛑 截止</button>
+                      onsubmit="return confirm('確定要關團嗎？')">
+                    <button type="submit" class="text-orange-600 hover:text-orange-700">關團</button>
                 </form>
                 {% endif %}
-                <a href="/groups/{{ group.id }}/export/order" class="text-xs text-gray-600">📝 點餐</a>
-                <a href="/groups/{{ group.id }}/export/payment" class="text-xs text-gray-600">💰 收款</a>
+                <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
+                <a href="/groups/{{ group.id }}/export/payment" class="text-gray-600 hover:text-gray-800">個人點餐明細</a>
                 <form action="/groups/{{ group.id }}/delete" method="post" class="inline"
                       onsubmit="return confirm('確定要刪除這個團嗎？')">
-                    <button type="submit" class="text-xs text-red-500">🗑️ 刪除</button>
+                    <button type="submit" class="text-red-500 hover:text-red-700">刪除</button>
                 </form>
             </div>
             {% endif %}
@@ -58,7 +58,7 @@
         
         {% if pending_count > 0 %}
         <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded">
-            ⚠️ {{ pending_count }} 人尚未結單
+            {{ pending_count }} 人尚未結單
         </div>
         {% endif %}
     </div>
@@ -68,12 +68,18 @@
         {% include "partials/order_wall.html" %}
     </div>
 
-    <!-- 我的訂單（已結單時顯示） -->
-    {% if my_order and my_order.status.value == 'submitted' %}
-    <div id="my-order" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
-        {% include "partials/my_order.html" %}
+    <!-- 我的訂單（已結單時顯示在頁面上） -->
+    <div id="my-order-display" x-show="orderStatus === 'submitted'">
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                我的訂單
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">已結單</span>
+            </h2>
+            <div id="my-order-content" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
+                {% include "partials/my_order.html" %}
+            </div>
+        </div>
     </div>
-    {% endif %}
 
     <!-- 菜單 -->
     {% if is_open %}
@@ -101,8 +107,9 @@
         {% endif %}
     </div>
     
-    <!-- 懸浮購物車按鈕 -->
+    <!-- 懸浮購物車按鈕（只有未結單時顯示） -->
     <button @click="showCart = true"
+            x-show="orderStatus !== 'submitted'"
             class="fixed bottom-4 right-4 z-40 bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center">
         <span class="text-xl">🛒</span>
         <span x-show="cartCount > 0"
@@ -110,7 +117,7 @@
               x-text="cartCount"></span>
     </button>
     
-    <!-- 購物車側欄 -->
+    <!-- 購物車側欄（只有未結單時使用） -->
     <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
         <div class="absolute inset-0 bg-black/30" @click="showCart = false"></div>
         <div class="absolute right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-xl flex flex-col"
@@ -123,7 +130,7 @@
             
             <!-- 購物車標題 -->
             <div class="p-4 border-b flex items-center justify-between bg-orange-500 text-white">
-                <h3 class="font-semibold text-lg">🛒 我的購物車</h3>
+                <h3 class="font-semibold text-lg">購物車</h3>
                 <button @click="showCart = false" class="text-white/80 hover:text-white text-2xl">&times;</button>
             </div>
             
@@ -171,7 +178,7 @@
             <form hx-post="/groups/{{ group.id }}/orders/items" 
                   hx-target="#cart-content"
                   hx-swap="innerHTML"
-                  @htmx:after-request="showAddItem = false; updateCartCount(); $dispatch('orderUpdated')">
+                  @htmx:after-request="afterAddItem()">
                 
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
@@ -289,19 +296,39 @@ function orderPage() {
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
-        cartCount: {{ my_order.items|length if my_order else 0 }},
+        cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
+        orderStatus: '{{ my_order.status.value if my_order else "none" }}',
         
-        openAddItem(item) {
+        async openAddItem(item) {
+            // 如果已結單，先問是否要加點
+            if (this.orderStatus === 'submitted') {
+                if (!confirm('您已結單，是否要加點？\n\n選「確定」將修改訂單並加點\n選「取消」則不加點')) {
+                    return;
+                }
+                // 先調用修改訂單 API
+                await fetch('/groups/{{ group.id }}/orders/edit', { method: 'POST' });
+                this.orderStatus = 'editing';
+                document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+            }
+            
             this.selectedItem = item;
             this.selectedSize = 'M';
             this.quantity = 1;
             this.showAddItem = true;
         },
         
+        afterAddItem() {
+            this.showAddItem = false;
+            this.updateCartCount();
+            this.orderStatus = 'draft';
+            document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+        },
+        
         updateCartCount() {
-            // 從 DOM 計算數量
-            const items = document.querySelectorAll('#cart-content [data-item-id]');
-            this.cartCount = items.length;
+            setTimeout(() => {
+                const items = document.querySelectorAll('#cart-content [data-item-id]');
+                this.cartCount = items.length;
+            }, 100);
         },
         
         copyLink() {
@@ -354,7 +381,6 @@ function countdown(deadline) {
 
 // 監聽訂單更新事件
 document.body.addEventListener('orderUpdated', function() {
-    // 更新購物車數量
     setTimeout(() => {
         const items = document.querySelectorAll('#cart-content [data-item-id]');
         const countEl = document.querySelector('[x-text="cartCount"]');
