@@ -33,9 +33,12 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("order_items", "size", "VARCHAR(10)")
     add_column_if_not_exists("order_items", "created_at", "TIMESTAMP DEFAULT NOW()")
     add_column_if_not_exists("menu_items", "price_l", "NUMERIC(10,2)")
+    add_column_if_not_exists("stores", "phone", "VARCHAR(50)")
+    add_column_if_not_exists("stores", "branch", "VARCHAR(100)")
     
-    # 確保 static 目錄存在
+    # 確保目錄存在
     os.makedirs("app/static/images", exist_ok=True)
+    os.makedirs("app/static/uploads/stores", exist_ok=True)
     
     yield
     # Shutdown

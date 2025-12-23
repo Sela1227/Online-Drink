@@ -19,11 +19,6 @@ class Settings(BaseSettings):
     # Admin
     admin_line_user_id: str = ""
     
-    # Cloudinary
-    cloudinary_cloud_name: str = ""
-    cloudinary_api_key: str = ""
-    cloudinary_api_secret: str = ""
-    
     # Base URL (for QR code)
     base_url: str = "http://localhost:8000"
     

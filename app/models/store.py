@@ -27,6 +27,8 @@ class Store(Base):
     name: Mapped[str] = mapped_column(String(100))
     category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     

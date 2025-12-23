@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 import json
-import cloudinary
-import cloudinary.uploader
 
 from app.database import get_db
 from app.config import get_settings
@@ -19,14 +17,6 @@ from app.services.import_service import import_store_and_menu, import_menu
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
-
-# 設定 Cloudinary
-if settings.cloudinary_cloud_name:
-    cloudinary.config(
-        cloud_name=settings.cloudinary_cloud_name,
-        api_key=settings.cloudinary_api_key,
-        api_secret=settings.cloudinary_api_secret,
-    )
 
 
 @router.get("")
@@ -275,7 +265,9 @@ async def update_store(
     request: Request,
     name: str = Form(...),
     category: str = Form(...),
-    logo_url: str = Form(None),
+    branch: str = Form(None),
+    phone: str = Form(None),
+    logo_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
     """更新店家資料"""
@@ -287,60 +279,35 @@ async def update_store(
     
     store.name = name
     store.category = CategoryType(category)
-    if logo_url:
-        store.logo_url = logo_url
+    store.branch = branch if branch else None
+    store.phone = phone if phone else None
+    
+    # 處理 Logo 上傳
+    if logo_file and logo_file.filename:
+        import os
+        import uuid
+        
+        # 確保目錄存在
+        upload_dir = "app/static/uploads/stores"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # 產生檔名
+        ext = os.path.splitext(logo_file.filename)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            ext = '.png'
+        filename = f"store_{store_id}_{uuid.uuid4().hex[:8]}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        
+        # 儲存檔案
+        content = await logo_file.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+        
+        store.logo_url = f"/static/uploads/stores/{filename}"
     
     db.commit()
     
     return RedirectResponse(url="/admin/stores", status_code=302)
-
-
-@router.post("/stores/{store_id}/logo")
-async def upload_store_logo(
-    store_id: int,
-    request: Request,
-    logo: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
-    """上傳店家 Logo"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 檢查是否有設定 Cloudinary
-    if not settings.cloudinary_cloud_name:
-        raise HTTPException(status_code=400, detail="尚未設定 Cloudinary")
-    
-    # 檢查檔案類型
-    if not logo.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="只能上傳圖片")
-    
-    try:
-        # 上傳到 Cloudinary
-        result = cloudinary.uploader.upload(
-            logo.file,
-            folder="group-buy/stores",
-            public_id=f"store_{store_id}",
-            overwrite=True,
-            transformation=[
-                {"width": 200, "height": 200, "crop": "fill"},
-                {"quality": "auto"},
-                {"format": "webp"}
-            ]
-        )
-        
-        # 更新店家 Logo URL
-        store.logo_url = result['secure_url']
-        db.commit()
-        
-        return JSONResponse({
-            "success": True,
-            "url": result['secure_url']
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"上傳失敗: {str(e)}")
 
 
 @router.get("/users")
