@@ -10,8 +10,7 @@ class ItemOptionImport(BaseModel):
 
 class MenuItemImport(BaseModel):
     name: str
-    price: Decimal  # M 價格或單一價格
-    price_l: Decimal | None = None  # L 價格（可選）
+    price: Decimal
     options: list[ItemOptionImport] | None = None
 
 

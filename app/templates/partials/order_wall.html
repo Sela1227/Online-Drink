@@ -22,7 +22,7 @@
                 {% for item in order.items %}
                 <div class="flex items-center gap-2 text-gray-600">
                     <span class="flex-1">
-                        {{ item.item_name }}{% if item.size %}({{ item.size }}){% endif %}
+                        {{ item.item_name }}
                         {% if item.sugar or item.ice %}
                         <span class="text-gray-400">
                             ({% if item.sugar %}{{ item.sugar }}{% endif %}{% if item.sugar and item.ice %}/{% endif %}{% if item.ice %}{{ item.ice }}{% endif %})
@@ -42,7 +42,7 @@
                             hx-target="#my-order"
                             hx-swap="innerHTML"
                             @htmx:after-request="$dispatch('orderUpdated')"
-                            class="text-xs text-orange-600 hover:text-orange-700 px-2 py-0.5 border border-orange-200 rounded hover:bg-orange-50">
+                            class="text-xs text-indigo-600 hover:text-indigo-700 px-2 py-0.5 border border-indigo-200 rounded hover:bg-indigo-50">
                         +跟點
                     </button>
                 </div>

@@ -56,13 +56,14 @@ async def callback(code: str, state: str, db: Session = Depends(get_db)):
         token = create_access_token({"user_id": user.id})
         
         # 設定 cookie 並導向首頁
-        response = RedirectResponse(url="/home?toast=login_success", status_code=302)
+        response = RedirectResponse(url="/home", status_code=302)
         response.set_cookie(
             key="access_token",
             value=token,
             httponly=True,
             max_age=30 * 24 * 60 * 60,  # 30 days
             samesite="lax",
+            secure=True,  # HTTPS 環境必須
         )
         return response
         

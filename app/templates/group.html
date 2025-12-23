@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ group.name }} - SELA 快點來點餐{% endblock %}
+{% block title %}{{ group.name }} - 團購系統{% endblock %}
 
 {% block content %}
 <div class="space-y-4" x-data="orderPage()">
@@ -90,60 +90,6 @@
     <div class="bg-white rounded-lg shadow-sm p-4">
         <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
         
-        <!-- 快選品項 -->
-        {% if quick_selections.my_frequent or quick_selections.my_recent or quick_selections.store_popular %}
-        <div class="mb-4 space-y-3">
-            <!-- 我的常點 -->
-            {% if quick_selections.my_frequent %}
-            <div>
-                <h3 class="text-xs font-medium text-gray-500 mb-2">⭐ 我的常點</h3>
-                <div class="flex flex-wrap gap-2">
-                    {% for item in quick_selections.my_frequent %}
-                    <button type="button"
-                            class="text-sm px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition"
-                            @click="quickAdd({{ item.id }}, '{{ item.name }}', {{ item.price }})">
-                        {{ item.name }} ${{ item.price }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- 最近點過 -->
-            {% if quick_selections.my_recent %}
-            <div>
-                <h3 class="text-xs font-medium text-gray-500 mb-2">🕐 最近點過</h3>
-                <div class="flex flex-wrap gap-2">
-                    {% for item in quick_selections.my_recent %}
-                    <button type="button"
-                            class="text-sm px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition"
-                            @click="quickAdd({{ item.id }}, '{{ item.name }}', {{ item.price }})">
-                        {{ item.name }} ${{ item.price }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- 店家熱門 -->
-            {% if quick_selections.store_popular %}
-            <div>
-                <h3 class="text-xs font-medium text-gray-500 mb-2">🔥 店家熱門</h3>
-                <div class="flex flex-wrap gap-2">
-                    {% for item in quick_selections.store_popular %}
-                    <button type="button"
-                            class="text-sm px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition"
-                            @click="quickAdd({{ item.id }}, '{{ item.name }}', {{ item.price }})">
-                        {{ item.name }} ${{ item.price }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-        <hr class="my-4">
-        {% endif %}
-        
         <!-- 分類品項 -->
         {% for category in menu.categories %}
         <div class="mb-4">
@@ -195,27 +141,8 @@
                 
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
-                <!-- 尺寸選擇 (飲料團且有雙價格) -->
+                <!-- 甜度 (飲料團) -->
                 {% if group.category.value == 'drink' %}
-                <div x-show="selectedItem?.has_sizes" class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">尺寸</label>
-                    <div class="flex gap-2">
-                        <label class="cursor-pointer flex-1">
-                            <input type="radio" name="size" value="M" x-model="selectedSize" class="peer hidden" checked>
-                            <span class="block text-center px-4 py-2 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
-                                M <span class="text-sm" x-text="'$' + selectedItem?.price"></span>
-                            </span>
-                        </label>
-                        <label class="cursor-pointer flex-1">
-                            <input type="radio" name="size" value="L" x-model="selectedSize" class="peer hidden">
-                            <span class="block text-center px-4 py-2 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
-                                L <span class="text-sm" x-text="'$' + selectedItem?.price_l"></span>
-                            </span>
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- 甜度 -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">甜度</label>
                     {% if group.lock_sugar %}
@@ -227,7 +154,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="sugar" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_sugar %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -248,7 +175,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="ice" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_ice %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -291,7 +218,7 @@
                         取消
                     </button>
                     <button type="submit"
-                            class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                            class="flex-1 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
                         加入購物車
                     </button>
                 </div>
@@ -306,37 +233,17 @@ function orderPage() {
         showQR: false,
         showAddItem: false,
         selectedItem: null,
-        selectedSize: 'M',
         quantity: 1,
         
         openAddItem(item) {
             this.selectedItem = item;
-            this.selectedSize = 'M';
-            this.quantity = 1;
-            this.showAddItem = true;
-        },
-        
-        quickAdd(itemId, itemName, itemPrice, itemPriceL = null) {
-            // 快選品項：直接打開 modal 並預設資料
-            this.selectedItem = {
-                id: itemId,
-                name: itemName,
-                price: itemPrice,
-                price_l: itemPriceL,
-                has_sizes: itemPriceL !== null,
-                options: []
-            };
-            this.selectedSize = 'M';
             this.quantity = 1;
             this.showAddItem = true;
         },
         
         copyLink() {
-            navigator.clipboard.writeText(window.location.href).then(() => {
-                showToast('連結已複製！', 'success');
-            }).catch(() => {
-                showToast('複製失敗', 'error');
-            });
+            navigator.clipboard.writeText(window.location.href);
+            alert('連結已複製！');
         },
         
         renderOptions() {
@@ -351,21 +258,6 @@ function orderPage() {
         }
     }
 }
-
-// HTMX 事件監聽：顯示成功/錯誤訊息
-document.body.addEventListener('htmx:afterRequest', function(evt) {
-    if (evt.detail.successful) {
-        if (evt.detail.pathInfo.requestPath.includes('/orders/items')) {
-            showToast('已加入購物車', 'success');
-        } else if (evt.detail.pathInfo.requestPath.includes('/orders/submit')) {
-            showToast('訂單已送出！', 'success');
-        }
-    }
-});
-
-document.body.addEventListener('htmx:responseError', function(evt) {
-    showToast('操作失敗，請重試', 'error');
-});
 
 function countdown(deadline) {
     return {

@@ -29,10 +29,8 @@ def generate_order_text(db: Session, group: Group) -> str:
     
     for order in orders:
         for item in order.items:
-            # 產生品項 key（品名 + 尺寸 + 客製化）
+            # 產生品項 key（品名 + 客製化）
             key_parts = [item.item_name]
-            if item.size:
-                key_parts[0] = f"{item.item_name}({item.size})"
             if item.sugar:
                 key_parts.append(item.sugar)
             if item.ice:

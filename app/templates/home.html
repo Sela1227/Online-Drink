@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}首頁 - SELA 快點來點餐{% endblock %}
+{% block title %}首頁 - 團購系統{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -65,19 +65,4 @@
     </section>
     {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const toast = urlParams.get('toast');
-    
-    if (toast === 'login_success') {
-        showToast('登入成功！', 'success');
-        // 清除 URL 參數
-        window.history.replaceState({}, '', window.location.pathname);
-    }
-});
-</script>
 {% endblock %}

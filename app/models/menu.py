@@ -41,8 +41,7 @@ class MenuItem(Base):
     menu_id: Mapped[int] = mapped_column(ForeignKey("menus.id"))
     category_id: Mapped[int | None] = mapped_column(ForeignKey("menu_categories.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100))
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 單一價格或 M 價格
-    price_l: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # L 價格（飲料用）
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     
     # Relationships
@@ -50,17 +49,6 @@ class MenuItem(Base):
     category: Mapped["MenuCategory | None"] = relationship(back_populates="items")
     options: Mapped[list["ItemOption"]] = relationship(back_populates="menu_item", cascade="all, delete-orphan")
     order_items: Mapped[list["OrderItem"]] = relationship(back_populates="menu_item")
-    
-    @property
-    def has_sizes(self) -> bool:
-        """是否有多種尺寸"""
-        return self.price_l is not None
-    
-    def get_price(self, size: str = "M") -> Decimal:
-        """取得指定尺寸的價格"""
-        if size == "L" and self.price_l:
-            return self.price_l
-        return self.price
 
 
 class ItemOption(Base):

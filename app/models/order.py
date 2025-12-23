@@ -44,13 +44,11 @@ class OrderItem(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     menu_item_id: Mapped[int] = mapped_column(ForeignKey("menu_items.id"))
     item_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲
-    size: Mapped[str | None] = mapped_column(String(10), nullable=True)  # M / L
     sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     order: Mapped["Order"] = relationship(back_populates="items")
@@ -64,13 +62,6 @@ class OrderItem(Base):
     @property
     def subtotal(self) -> Decimal:
         return (self.unit_price + self.options_total) * self.quantity
-    
-    @property
-    def display_name(self) -> str:
-        """顯示名稱（含尺寸）"""
-        if self.size:
-            return f"{self.item_name}({self.size})"
-        return self.item_name
 
 
 class OrderItemOption(Base):

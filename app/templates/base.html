@@ -9,104 +9,35 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: block; }
-        .htmx-request.htmx-indicator { display: block; }
     </style>
-    {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <!-- 全域載入指示器 -->
-    <div class="htmx-indicator fixed top-0 left-0 right-0 z-[100]">
-        <div class="h-1 bg-orange-500 animate-pulse"></div>
-    </div>
-    
     <!-- Header -->
-    <header class="bg-white shadow-sm sticky top-0 z-50">
+    <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <a href="/home" class="flex items-center gap-2">
-                <img src="/static/images/sela-logo.svg" alt="SELA" class="w-8 h-8">
-                <span class="text-xl font-bold text-orange-500">快點來點餐</span>
+                <img src="/static/images/sela-logo.svg" alt="SELA" class="h-8 w-8">
+                <span class="font-bold text-orange-600">快點來點餐</span>
             </a>
-            {% if user %}
-            <div class="flex items-center gap-3">
-                <span class="text-sm text-gray-600">{{ user.display_name }}</span>
-                {% if user.is_admin %}
-                <a href="/admin" class="text-xs bg-gray-200 px-2 py-1 rounded">管理</a>
+            <div class="flex items-center gap-2">
+                {% if user and user.is_admin %}
+                <a href="/admin" class="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">
+                    管理
+                </a>
                 {% endif %}
+                {% if user %}
+                <span class="text-sm text-gray-600">{{ user.display_name }}</span>
                 <a href="/auth/logout" class="text-sm text-gray-500 hover:text-gray-700">登出</a>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-lg mx-auto px-4 py-4">
+    <main class="max-w-lg mx-auto px-4 py-6">
         {% block content %}{% endblock %}
     </main>
-
-    <!-- Toast Container -->
-    <div id="toast-container" class="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-2 max-w-lg mx-auto"
-         x-data="toastManager()" @show-toast.window="addToast($event.detail)">
-        <template x-for="toast in toasts" :key="toast.id">
-            <div x-show="toast.show" 
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 transform translate-y-2"
-                 x-transition:enter-end="opacity-100 transform translate-y-0"
-                 x-transition:leave="transition ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 :class="{
-                     'bg-green-600': toast.type === 'success',
-                     'bg-red-600': toast.type === 'error',
-                     'bg-amber-600': toast.type === 'warning',
-                     'bg-gray-700': toast.type === 'info'
-                 }"
-                 class="text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
-                <span x-show="toast.type === 'success'">✓</span>
-                <span x-show="toast.type === 'error'">✕</span>
-                <span x-show="toast.type === 'warning'">⚠</span>
-                <span x-show="toast.type === 'info'">ℹ</span>
-                <span x-text="toast.message" class="flex-1"></span>
-                <button @click="removeToast(toast.id)" class="opacity-70 hover:opacity-100">×</button>
-            </div>
-        </template>
-    </div>
-
-    <script>
-    function toastManager() {
-        return {
-            toasts: [],
-            addToast(detail) {
-                const id = Date.now();
-                this.toasts.push({
-                    id,
-                    message: detail.message,
-                    type: detail.type || 'info',
-                    show: true
-                });
-                setTimeout(() => this.removeToast(id), detail.duration || 3000);
-            },
-            removeToast(id) {
-                const toast = this.toasts.find(t => t.id === id);
-                if (toast) {
-                    toast.show = false;
-                    setTimeout(() => {
-                        this.toasts = this.toasts.filter(t => t.id !== id);
-                    }, 200);
-                }
-            }
-        }
-    }
     
-    // 全域 Toast 函數
-    function showToast(message, type = 'info', duration = 3000) {
-        window.dispatchEvent(new CustomEvent('show-toast', {
-            detail: { message, type, duration }
-        }));
-    }
-    </script>
-
     {% block scripts %}{% endblock %}
 </body>
 </html>

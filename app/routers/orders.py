@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from decimal import Decimal
 
 from app.database import get_db
@@ -39,10 +39,7 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
     """訂單牆片段（HTMX）"""
     user = await get_current_user(request, db)
     
-    submitted_orders = db.query(Order).options(
-        joinedload(Order.user),
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
-    ).filter(
+    submitted_orders = db.query(Order).filter(
         Order.group_id == group_id,
         Order.status == OrderStatus.SUBMITTED,
     ).all()
@@ -60,9 +57,7 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
-    order = db.query(Order).options(
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
-    ).filter(
+    order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user.id,
     ).first()
@@ -80,7 +75,6 @@ async def add_item(
     group_id: int,
     request: Request,
     menu_item_id: int = Form(...),
-    size: str = Form(None),
     sugar: str = Form(None),
     ice: str = Form(None),
     quantity: int = Form(1),
@@ -108,14 +102,10 @@ async def add_item(
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="請先進入修改模式")
     
-    # 決定單價（根據 size）
-    unit_price = menu_item.get_price(size) if size else menu_item.price
-    
     # 檢查是否有相同品項+設定，有的話合併杯數
     existing_item = None
     for item in order.items:
         if (item.menu_item_id == menu_item_id and 
-            item.size == size and
             item.sugar == sugar and 
             item.ice == ice and
             item.note == note):
@@ -133,11 +123,10 @@ async def add_item(
             order_id=order.id,
             menu_item_id=menu_item_id,
             item_name=menu_item.name,
-            size=size,
             sugar=sugar,
             ice=ice,
             quantity=quantity,
-            unit_price=unit_price,
+            unit_price=menu_item.price,
             note=note,
         )
         db.add(order_item)
@@ -292,7 +281,6 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
             {
                 "menu_item_id": item.menu_item_id,
                 "item_name": item.item_name,
-                "size": item.size,
                 "sugar": item.sugar,
                 "ice": item.ice,
                 "quantity": item.quantity,
@@ -353,7 +341,6 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
             order_id=order.id,
             menu_item_id=item_data["menu_item_id"],
             item_name=item_data["item_name"],
-            size=item_data.get("size"),
             sugar=item_data["sugar"],
             ice=item_data["ice"],
             quantity=item_data["quantity"],
@@ -446,7 +433,6 @@ async def follow_item(
         order_id=order.id,
         menu_item_id=source_item.menu_item_id,
         item_name=source_item.item_name,
-        size=source_item.size,
         sugar=source_item.sugar,
         ice=source_item.ice,
         quantity=1,

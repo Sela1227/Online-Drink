@@ -4,8 +4,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-import os
 
 from app.config import get_settings
 from app.database import engine, Base, get_db
@@ -19,21 +17,6 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Startup: create tables
     Base.metadata.create_all(bind=engine)
-    
-    # 新增缺失欄位
-    def add_column_if_not_exists(table: str, column: str, column_type: str):
-        try:
-            with engine.begin() as conn:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
-            print(f"Added column: {table}.{column}")
-        except Exception as e:
-            # 欄位已存在，忽略錯誤
-            print(f"Column {table}.{column} check: OK")
-    
-    add_column_if_not_exists("order_items", "size", "VARCHAR(10)")
-    add_column_if_not_exists("order_items", "created_at", "TIMESTAMP DEFAULT NOW()")
-    add_column_if_not_exists("menu_items", "price_l", "NUMERIC(10,2)")
-    
     yield
     # Shutdown
 
@@ -42,9 +25,6 @@ app = FastAPI(
     title=settings.app_name,
     lifespan=lifespan,
 )
-
-# 確保 static 目錄存在
-os.makedirs("app/static/images", exist_ok=True)
 
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
