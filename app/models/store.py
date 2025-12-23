@@ -36,6 +36,22 @@ class Store(Base):
     options: Mapped[list["StoreOption"]] = relationship(back_populates="store", cascade="all, delete-orphan")
     menus: Mapped[list["Menu"]] = relationship(back_populates="store", cascade="all, delete-orphan")
     groups: Mapped[list["Group"]] = relationship(back_populates="store")
+    branches: Mapped[list["StoreBranch"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+
+
+class StoreBranch(Base):
+    """店家分店"""
+    __tablename__ = "store_branches"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
+    name: Mapped[str] = mapped_column(String(100))  # 分店名稱
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Relationships
+    store: Mapped["Store"] = relationship(back_populates="branches")
 
 
 class StoreOption(Base):

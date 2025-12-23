@@ -29,13 +29,10 @@
             
             <!-- 資訊 -->
             <div class="flex-1 min-w-0">
-                <div class="font-medium text-gray-900">
-                    {{ store.name }}
-                    {% if store.branch %}<span class="text-gray-500 font-normal">（{{ store.branch }}）</span>{% endif %}
-                </div>
+                <div class="font-medium text-gray-900">{{ store.name }}</div>
                 <div class="text-sm text-gray-500">
                     {{ '飲料店' if store.category.value == 'drink' else '餐廳' }}
-                    {% if store.phone %}· {{ store.phone }}{% endif %}
+                    {% if store.branches %}· {{ store.branches|length }} 間分店{% endif %}
                 </div>
             </div>
             

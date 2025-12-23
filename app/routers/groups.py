@@ -10,7 +10,7 @@ import base64
 from app.config import get_settings
 from app.database import get_db
 from app.models.group import Group
-from app.models.store import Store, CategoryType
+from app.models.store import Store, StoreBranch, CategoryType
 from app.models.menu import Menu
 from app.models.order import Order, OrderItem, OrderStatus
 from app.services.auth import get_current_user
@@ -26,8 +26,10 @@ async def new_group_page(request: Request, db: Session = Depends(get_db)):
     """開團頁面"""
     user = await get_current_user(request, db)
     
-    # 取得啟用中的店家
-    stores = db.query(Store).filter(Store.is_active == True).all()
+    # 取得啟用中的店家（含分店）
+    stores = db.query(Store).options(
+        joinedload(Store.branches)
+    ).filter(Store.is_active == True).all()
     
     return templates.TemplateResponse("group_new.html", {
         "request": request,
@@ -42,6 +44,7 @@ async def create_group(
     store_id: int = Form(...),
     name: str = Form(...),
     deadline: str = Form(...),
+    branch_id: int = Form(None),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
     lock_sugar: bool = Form(False),
@@ -75,6 +78,7 @@ async def create_group(
         store_id=store_id,
         menu_id=menu.id,
         owner_id=user.id,
+        branch_id=branch_id if branch_id else None,
         name=name,
         category=store.category,
         deadline=deadline_dt,

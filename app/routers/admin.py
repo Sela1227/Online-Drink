@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import ValidationError
 import json
 
@@ -43,7 +43,9 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
     """店家列表"""
     user = await get_admin_user(request, db)
     
-    stores = db.query(Store).order_by(Store.created_at.desc()).all()
+    stores = db.query(Store).options(
+        joinedload(Store.branches)
+    ).order_by(Store.created_at.desc()).all()
     
     return templates.TemplateResponse("admin/stores.html", {
         "request": request,
@@ -246,9 +248,12 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
 @router.get("/stores/{store_id}/edit")
 async def edit_store_page(store_id: int, request: Request, db: Session = Depends(get_db)):
     """編輯店家頁面"""
+    from app.models.store import StoreBranch
     user = await get_admin_user(request, db)
     
-    store = db.query(Store).filter(Store.id == store_id).first()
+    store = db.query(Store).options(
+        joinedload(Store.branches)
+    ).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
@@ -265,8 +270,6 @@ async def update_store(
     request: Request,
     name: str = Form(...),
     category: str = Form(...),
-    branch: str = Form(None),
-    phone: str = Form(None),
     logo_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -279,8 +282,6 @@ async def update_store(
     
     store.name = name
     store.category = CategoryType(category)
-    store.branch = branch if branch else None
-    store.phone = phone if phone else None
     
     # 處理 Logo 上傳
     if logo_file and logo_file.filename:
@@ -343,3 +344,53 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
     db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=302)
+
+
+@router.post("/stores/{store_id}/branches")
+async def add_branch(
+    store_id: int,
+    request: Request,
+    branch_name: str = Form(...),
+    branch_phone: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    """新增分店"""
+    from app.models.store import StoreBranch
+    user = await get_admin_user(request, db)
+    
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    branch = StoreBranch(
+        store_id=store_id,
+        name=branch_name,
+        phone=branch_phone if branch_phone else None,
+    )
+    db.add(branch)
+    db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+
+
+@router.post("/stores/{store_id}/branches/{branch_id}/delete")
+async def delete_branch(
+    store_id: int,
+    branch_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """刪除分店"""
+    from app.models.store import StoreBranch
+    user = await get_admin_user(request, db)
+    
+    branch = db.query(StoreBranch).filter(
+        StoreBranch.id == branch_id,
+        StoreBranch.store_id == store_id
+    ).first()
+    
+    if branch:
+        db.delete(branch)
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)

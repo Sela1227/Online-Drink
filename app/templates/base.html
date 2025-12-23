@@ -19,15 +19,20 @@
                 <img src="/static/images/sela-logo.svg" alt="SELA" class="h-8 w-8">
                 <span class="font-bold text-orange-600">快點來點餐</span>
             </a>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
+                {% if user %}
+                <a href="/groups/new" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded">
+                    開團
+                </a>
+                {% endif %}
                 {% if user and user.is_admin %}
-                <a href="/admin" class="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">
+                <a href="/admin" class="text-sm text-gray-600 hover:text-gray-800">
                     管理
                 </a>
                 {% endif %}
                 {% if user %}
-                <span class="text-sm text-gray-600">{{ user.display_name }}</span>
-                <a href="/auth/logout" class="text-sm text-gray-500 hover:text-gray-700">登出</a>
+                <span class="text-sm text-gray-500">{{ user.display_name }}</span>
+                <a href="/auth/logout" class="text-sm text-gray-400 hover:text-gray-600">登出</a>
                 {% endif %}
             </div>
         </div>
