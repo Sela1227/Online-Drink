@@ -42,6 +42,7 @@ class MenuItem(Base):
     category_id: Mapped[int | None] = mapped_column(ForeignKey("menu_categories.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100))
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    price_l: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # L 尺寸價格
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     
     # Relationships

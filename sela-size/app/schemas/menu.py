@@ -11,6 +11,7 @@ class ItemOptionImport(BaseModel):
 class MenuItemImport(BaseModel):
     name: str
     price: Decimal
+    price_l: Decimal | None = None  # L 尺寸價格
     options: list[ItemOptionImport] | None = None
 
 

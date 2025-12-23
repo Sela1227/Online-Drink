@@ -113,6 +113,7 @@ def _populate_menu(db: Session, menu: Menu, content: MenuContent):
                     category_id=category.id,
                     name=item_data.name,
                     price=item_data.price,
+                    price_l=item_data.price_l,
                     sort_order=item_sort,
                 )
                 db.add(item)
@@ -138,6 +139,7 @@ def _populate_menu(db: Session, menu: Menu, content: MenuContent):
                 category_id=None,
                 name=item_data.name,
                 price=item_data.price,
+                price_l=item_data.price_l,
                 sort_order=item_sort,
             )
             db.add(item)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 import qrcode
 import io
@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.group import Group
 from app.models.store import Store, CategoryType
 from app.models.menu import Menu
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderItem, OrderStatus
 from app.services.auth import get_current_user
 from app.services.export_service import generate_order_text, generate_payment_text
 
@@ -99,16 +99,21 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
     
-    # 取得已結單的訂單（訂單牆）
+    # 取得已結單的訂單（訂單牆）- 使用 eager loading
     submitted_orders = db.query(Order).filter(
         Order.group_id == group_id,
         Order.status == OrderStatus.SUBMITTED,
+    ).options(
+        joinedload(Order.user),
+        joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).all()
     
-    # 取得我的訂單
+    # 取得我的訂單 - 使用 eager loading
     my_order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user.id,
+    ).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).first()
     
     # 統計未結單人數

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 
 from app.database import get_db
@@ -42,6 +42,9 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
     submitted_orders = db.query(Order).filter(
         Order.group_id == group_id,
         Order.status == OrderStatus.SUBMITTED,
+    ).options(
+        joinedload(Order.user),
+        joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).all()
     
     return templates.TemplateResponse("partials/order_wall.html", {
@@ -60,6 +63,8 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
     order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user.id,
+    ).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
@@ -75,6 +80,7 @@ async def add_item(
     group_id: int,
     request: Request,
     menu_item_id: int = Form(...),
+    size: str = Form(None),
     sugar: str = Form(None),
     ice: str = Form(None),
     quantity: int = Form(1),
@@ -95,6 +101,14 @@ async def add_item(
     if not menu_item:
         raise HTTPException(status_code=404, detail="品項不存在")
     
+    # 決定單價（根據尺寸）
+    if size == 'L' and menu_item.price_l:
+        unit_price = menu_item.price_l
+    else:
+        unit_price = menu_item.price
+        if not menu_item.price_l:
+            size = None  # 沒有 L 價格就不記錄尺寸
+    
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
     
@@ -106,6 +120,7 @@ async def add_item(
     existing_item = None
     for item in order.items:
         if (item.menu_item_id == menu_item_id and 
+            item.size == size and
             item.sugar == sugar and 
             item.ice == ice and
             item.note == note):
@@ -123,10 +138,11 @@ async def add_item(
             order_id=order.id,
             menu_item_id=menu_item_id,
             item_name=menu_item.name,
+            size=size,
             sugar=sugar,
             ice=ice,
             quantity=quantity,
-            unit_price=menu_item.price,
+            unit_price=unit_price,
             note=note,
         )
         db.add(order_item)
@@ -281,6 +297,7 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
             {
                 "menu_item_id": item.menu_item_id,
                 "item_name": item.item_name,
+                "size": item.size,
                 "sugar": item.sugar,
                 "ice": item.ice,
                 "quantity": item.quantity,
@@ -341,6 +358,7 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
             order_id=order.id,
             menu_item_id=item_data["menu_item_id"],
             item_name=item_data["item_name"],
+            size=item_data.get("size"),
             sugar=item_data["sugar"],
             ice=item_data["ice"],
             quantity=item_data["quantity"],
@@ -433,6 +451,7 @@ async def follow_item(
         order_id=order.id,
         menu_item_id=source_item.menu_item_id,
         item_name=source_item.item_name,
+        size=source_item.size,
         sugar=source_item.sugar,
         ice=source_item.ice,
         quantity=1,
