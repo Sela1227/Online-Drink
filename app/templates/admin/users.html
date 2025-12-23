@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}使用者管理 - 團購系統{% endblock %}
+{% block title %}使用者管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">使用者管理</h1>
+        <div>
+            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+            <h1 class="text-xl font-bold text-gray-800">使用者管理</h1>
+        </div>
         <span class="text-sm text-gray-500">共 {{ users|length }} 人</span>
     </div>
     

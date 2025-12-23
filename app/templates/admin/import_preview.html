@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}匯入預覽 - 團購系統{% endblock %}
+{% block title %}匯入預覽 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
@@ -12,7 +12,7 @@
     <!-- 匯入類型 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
         {% if is_full_import %}
-        <div class="text-sm text-indigo-600 font-medium mb-2">📦 完整匯入（新店家 + 菜單）</div>
+        <div class="text-sm text-orange-600 font-medium mb-2">📦 完整匯入（新店家 + 菜單）</div>
         
         <!-- 店家資訊 -->
         <div class="border rounded-lg p-3 mb-4">
@@ -48,7 +48,7 @@
                     {% for item in category.items %}
                     <div class="flex items-center gap-2 py-1">
                         <span>{{ item.name }}</span>
-                        <span class="text-indigo-600">${{ item.price }}</span>
+                        <span class="text-orange-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
                         {% if item.options %}
                         <span class="text-xs text-gray-400">
                             ({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})
@@ -66,7 +66,7 @@
                 {% for item in data.menu.items %}
                 <div class="flex items-center gap-2 py-1">
                     <span>{{ item.name }}</span>
-                    <span class="text-indigo-600">${{ item.price }}</span>
+                    <span class="text-orange-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
                     {% if item.options %}
                     <span class="text-xs text-gray-400">
                         ({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})
@@ -87,7 +87,7 @@
             <a href="/admin/import" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
-            <button type="submit" class="flex-1 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
                 確認匯入
             </button>
         </div>

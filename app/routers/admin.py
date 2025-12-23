@@ -224,6 +224,39 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
     return RedirectResponse(url="/admin/stores", status_code=302)
 
 
+@router.post("/stores/{store_id}/delete")
+async def delete_store(store_id: int, request: Request, db: Session = Depends(get_db)):
+    """刪除店家"""
+    user = await get_admin_user(request, db)
+    
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    # 檢查是否有關聯的團單
+    group_count = db.query(Group).filter(Group.store_id == store_id).count()
+    if group_count > 0:
+        raise HTTPException(status_code=400, detail=f"無法刪除：此店家有 {group_count} 個團單")
+    
+    # 刪除相關資料（菜單、選項）
+    for menu in store.menus:
+        for item in menu.items:
+            for opt in item.options:
+                db.delete(opt)
+            db.delete(item)
+        for category in menu.categories:
+            db.delete(category)
+        db.delete(menu)
+    
+    for option in store.options:
+        db.delete(option)
+    
+    db.delete(store)
+    db.commit()
+    
+    return RedirectResponse(url="/admin/stores", status_code=302)
+
+
 @router.get("/stores/{store_id}/edit")
 async def edit_store_page(store_id: int, request: Request, db: Session = Depends(get_db)):
     """編輯店家頁面"""
