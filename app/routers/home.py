@@ -2,17 +2,40 @@ from fastapi import APIRouter, Request, Depends, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
-from datetime import datetime
+from sqlalchemy import or_, func
+from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models.group import Group
-from app.models.order import Order
-from app.models.store import CategoryType
+from app.models.order import Order, OrderItem, OrderStatus
+from app.models.store import CategoryType, Store
 from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+def get_hot_items(db: Session, limit: int = 10):
+    """取得全站熱門品項（最近 30 天）"""
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    hot_items = db.query(
+        OrderItem.item_name,
+        Store.name.label('store_name'),
+        Store.logo_url.label('store_logo'),
+        func.sum(OrderItem.quantity).label('total_qty'),
+    ).join(Order).join(Group).join(Store).filter(
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= thirty_days_ago,
+    ).group_by(
+        OrderItem.item_name,
+        Store.name,
+        Store.logo_url,
+    ).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(limit).all()
+    
+    return hot_items
 
 
 @router.get("/home")
@@ -67,6 +90,9 @@ async def home(request: Request, db: Session = Depends(get_db)):
         or_(Group.is_closed == True, Group.deadline <= now)
     ).order_by(Group.deadline.desc()).limit(10).all()
     
+    # 超夯清單（全站熱門）
+    hot_items = get_hot_items(db, limit=10)
+    
     return templates.TemplateResponse("home.html", {
         "request": request,
         "user": user,
@@ -74,6 +100,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "meal_groups": meal_groups,
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
+        "hot_items": hot_items,
         "now": now,
     })
 
@@ -130,6 +157,9 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         or_(Group.is_closed == True, Group.deadline <= now)
     ).order_by(Group.deadline.desc()).limit(10).all()
     
+    # 超夯清單
+    hot_items = get_hot_items(db, limit=10)
+    
     return templates.TemplateResponse("partials/home_groups.html", {
         "request": request,
         "user": user,
@@ -137,6 +167,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "meal_groups": meal_groups,
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
+        "hot_items": hot_items,
     })
 
 

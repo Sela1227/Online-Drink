@@ -39,6 +39,22 @@
         </div>
         {% endif %}
         
+        <!-- 外送費顯示 -->
+        {% if group.delivery_fee %}
+        <div class="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800 flex items-center justify-between">
+            <div>
+                🚗 外送費：${{ group.delivery_fee|int }}
+            </div>
+            <div class="text-blue-600">
+                {% if group.submitted_count > 0 %}
+                每人分攤 ${{ group.delivery_fee_per_person|int }}（{{ group.submitted_count }} 人）
+                {% else %}
+                等待結單後計算分攤
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- 操作按鈕 -->
         <div class="flex items-center justify-between mt-3 pt-3 border-t text-xs">
             <div class="flex gap-3">
@@ -97,7 +113,18 @@
                         <div>
                             <label class="block text-sm text-gray-600 mb-1">備註</label>
                             <textarea name="note" rows="2" class="w-full border rounded px-3 py-2 text-sm"
-                                      placeholder="取餐地點、外送費等">{{ group.note or '' }}</textarea>
+                                      placeholder="取餐地點等">{{ group.note or '' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">外送費</label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">$</span>
+                                <input type="number" name="delivery_fee" min="0" step="1"
+                                       value="{{ group.delivery_fee|int if group.delivery_fee else '' }}"
+                                       placeholder="0"
+                                       class="w-24 border rounded px-3 py-2 text-sm">
+                                <span class="text-xs text-gray-400">自動分攤</span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm text-gray-600 mb-1">截止時間</label>

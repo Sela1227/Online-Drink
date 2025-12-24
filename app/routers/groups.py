@@ -47,6 +47,7 @@ async def create_group(
     deadline: str = Form(...),
     note: str = Form(None),
     branch_id: int = Form(None),
+    delivery_fee: float = Form(None),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
     lock_sugar: bool = Form(False),
@@ -54,6 +55,8 @@ async def create_group(
     db: Session = Depends(get_db),
 ):
     """建立團單"""
+    from decimal import Decimal
+    
     user = await get_current_user(request, db)
     
     # 取得店家
@@ -85,6 +88,7 @@ async def create_group(
         note=note.strip() if note else None,
         category=store.category,
         deadline=deadline_dt,
+        delivery_fee=Decimal(str(delivery_fee)) if delivery_fee and delivery_fee > 0 else None,
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
         lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
@@ -423,9 +427,12 @@ async def edit_group(
     name: str = Form(...),
     note: str = Form(None),
     deadline: str = Form(None),
+    delivery_fee: float = Form(None),
     db: Session = Depends(get_db),
 ):
     """編輯團單"""
+    from decimal import Decimal
+    
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -439,6 +446,10 @@ async def edit_group(
     # 更新團名和備註（任何時候都可以改）
     group.name = name
     group.note = note.strip() if note else None
+    
+    # 更新外送費
+    if delivery_fee is not None:
+        group.delivery_fee = Decimal(str(delivery_fee)) if delivery_fee > 0 else None
     
     # 更新截止時間
     if deadline:

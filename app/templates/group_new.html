@@ -76,8 +76,20 @@
         <!-- 備註 -->
         <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">備註（選填）</label>
-            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間、外送費每人 $10"
+            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間"
                       class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
+        </div>
+        
+        <!-- 外送費 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">外送費（選填）</label>
+            <div class="flex items-center gap-2">
+                <span class="text-gray-500">$</span>
+                <input type="number" name="delivery_fee" min="0" step="1" placeholder="0"
+                       class="w-32 border rounded-lg px-3 py-2"
+                       value="{% if copy_from and copy_from.delivery_fee %}{{ copy_from.delivery_fee|int }}{% endif %}">
+                <span class="text-sm text-gray-500">會自動平均分攤給所有人</span>
+            </div>
         </div>
         
         <!-- 截止時間 -->

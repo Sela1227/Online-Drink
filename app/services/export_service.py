@@ -88,37 +88,55 @@ def generate_order_text(db: Session, group: Group) -> str:
 
 def generate_payment_text(db: Session, group: Group) -> str:
     """產生收款文字（個人點餐明細）"""
+    from decimal import Decimal
+    
     lines = []
     
     # 取得所有訂單
     orders = db.query(Order).filter(Order.group_id == group.id).all()
     
-    total_amount = 0
+    subtotal = Decimal("0")
     submitted_orders = []
     pending_users = []
     
     for order in orders:
         if order.status == OrderStatus.SUBMITTED:
             submitted_orders.append(order)
-            total_amount += order.total_amount
+            subtotal += order.total_amount
         else:
-            pending_users.append(order.user.display_name)
+            pending_users.append(order.user.show_name)
+    
+    # 外送費分攤計算
+    delivery_fee = group.delivery_fee or Decimal("0")
+    delivery_per_person = Decimal("0")
+    if delivery_fee > 0 and len(submitted_orders) > 0:
+        delivery_per_person = (delivery_fee / len(submitted_orders)).quantize(Decimal("1"))
+    
+    total_amount = subtotal + delivery_fee
     
     # 標題和總金額（先顯示）
     lines.append(f"【{group.name}】收款明細")
     lines.append(f"店家：{group.store.name}")
     lines.append("")
-    lines.append(f"💰 總金額：${total_amount}")
+    lines.append(f"💰 餐點小計：${subtotal}")
+    if delivery_fee > 0:
+        lines.append(f"🚗 外送費：${delivery_fee}（每人 ${delivery_per_person}）")
+        lines.append(f"💰 總金額：${total_amount}")
     lines.append(f"👥 {len(submitted_orders)} 人已結單")
     lines.append("")
     lines.append("=" * 30)
     lines.append("")
     
     # 每個人的細項
-    for order in sorted(submitted_orders, key=lambda x: x.user.display_name):
-        user_name = order.user.display_name
-        amount = order.total_amount
-        lines.append(f"☐ {user_name}：${amount}")
+    for order in sorted(submitted_orders, key=lambda x: x.user.show_name):
+        user_name = order.user.show_name
+        order_amount = order.total_amount
+        total_with_delivery = order_amount + delivery_per_person
+        
+        if delivery_fee > 0:
+            lines.append(f"☐ {user_name}：${total_with_delivery}（餐 ${order_amount} + 運 ${delivery_per_person}）")
+        else:
+            lines.append(f"☐ {user_name}：${order_amount}")
         
         # 顯示點餐細項
         for item in order.items:
