@@ -4,11 +4,13 @@
 
 {% block content %}
 <div class="space-y-4">
-    <!-- 標題 -->
+    <!-- 標題列 -->
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-gray-800">📜 歷史團單</h1>
-        <span class="text-sm text-gray-500">共 {{ total }} 筆</span>
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
     </div>
+    
+    <div class="text-sm text-gray-500">共 {{ total }} 筆</div>
     
     {% if groups %}
     <div class="space-y-3">

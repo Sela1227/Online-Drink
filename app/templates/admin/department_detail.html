@@ -4,6 +4,7 @@
 
 {% block content %}
 <div class="space-y-4">
+    <!-- 標題列 -->
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold text-gray-800">{{ department.name }}</h1>
@@ -11,7 +12,7 @@
             <p class="text-sm text-gray-500 mt-1">{{ department.description }}</p>
             {% endif %}
         </div>
-        <a href="/admin/departments" class="text-gray-500 hover:text-gray-700">← 返回</a>
+        <a href="/admin/departments" class="text-sm text-gray-500 hover:text-gray-700">← 返回</a>
     </div>
     
     <!-- 新增成員 -->

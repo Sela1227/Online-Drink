@@ -23,9 +23,10 @@
                     {{ store.name }} · {{ group.owner.show_name }}
                     <button onclick="toggleFavorite({{ store.id }})" 
                             id="fav-btn"
-                            class="ml-1 text-lg hover:scale-110 transition-transform"
+                            class="ml-2 flex items-center gap-0.5 hover:scale-105 transition-transform"
                             title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
-                        {% if is_favorited %}⭐{% else %}☆{% endif %}
+                        <span class="text-lg">{% if is_favorited %}⭐{% else %}☆{% endif %}</span>
+                        <span class="text-xs text-gray-400" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
                     </button>
                 </div>
             </div>
@@ -309,6 +310,14 @@
             </button>
             {% endif %}
             
+            <!-- 看別人點什麼 -->
+            {% if submitted_orders|length > 0 %}
+            <button @click="showOthersOrders = true"
+                    class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition">
+                👀 看別人點什麼
+            </button>
+            {% endif %}
+            
             <!-- 隨機選擇器 -->
             <button @click="randomPick()"
                     class="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition">
@@ -331,6 +340,42 @@
         </div>
         {% endif %}
     </div>
+    
+    <!-- 看別人點什麼 Modal -->
+    {% if submitted_orders|length > 0 %}
+    <div x-show="showOthersOrders" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+         @click.self="showOthersOrders = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="font-semibold text-gray-800">👀 大家都點什麼</h3>
+                <button @click="showOthersOrders = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-1">
+                <div class="space-y-3">
+                    {% for order in submitted_orders %}
+                    {% if order.user_id != user.id %}
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="font-medium text-gray-800 mb-2">{{ order.user.show_name }}</div>
+                        <div class="space-y-1">
+                            {% for item in order.items %}
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">{{ item.item_name }}</span>
+                                <span class="text-gray-400">×{{ item.quantity }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                
+                <p class="text-xs text-gray-400 text-center mt-4">點擊品項名稱可快速跳到菜單</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     
     <!-- 上次訂單 Modal -->
     {% if last_order and last_order_items %}
@@ -683,6 +728,7 @@ function orderPage() {
         showSettings: false,
         showReminder: false,
         showLastOrder: false,
+        showOthersOrders: false,
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
@@ -860,12 +906,15 @@ async function toggleFavorite(storeId) {
         const data = await response.json();
         
         const btn = document.getElementById('fav-btn');
+        const text = document.getElementById('fav-text');
         if (data.status === 'added') {
-            btn.textContent = '⭐';
+            btn.querySelector('span:first-child').textContent = '⭐';
             btn.title = '取消收藏';
+            if (text) text.textContent = '已收藏';
         } else {
-            btn.textContent = '☆';
+            btn.querySelector('span:first-child').textContent = '☆';
             btn.title = '收藏店家';
+            if (text) text.textContent = '收藏';
         }
     } catch (err) {
         console.error('Toggle favorite failed:', err);
