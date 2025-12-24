@@ -14,7 +14,7 @@
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-10 h-10 object-contain">
                 {% else %}
-                <span class="text-2xl">{% if group.category.value == 'drink' %}🧋{% else %}🍱{% endif %}</span>
+                <span class="text-2xl">{{ group.category_icon }}</span>
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">

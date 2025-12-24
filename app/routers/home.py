@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from datetime import datetime
 
@@ -22,22 +22,44 @@ async def home(request: Request, db: Session = Depends(get_db)):
     
     now = datetime.utcnow()
     
-    # 開放中的飲料團
-    drink_groups = db.query(Group).filter(
+    # 開放中的飲料團（eager load orders 和 store）
+    drink_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
     # 開放中的訂餐團
-    meal_groups = db.query(Group).filter(
+    meal_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
         Group.category == CategoryType.MEAL,
         Group.is_closed == False,
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
+    # 開放中的團購團
+    groupbuy_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
+        Group.category == CategoryType.GROUP_BUY,
+        Group.is_closed == False,
+        Group.deadline > now,
+    ).order_by(Group.deadline.asc()).all()
+    
     # 已截止的團（最近 10 個）
-    closed_groups = db.query(Group).filter(
+    closed_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner)
+    ).filter(
         or_(Group.is_closed == True, Group.deadline <= now)
     ).order_by(Group.deadline.desc()).limit(10).all()
     
@@ -46,6 +68,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "user": user,
         "drink_groups": drink_groups,
         "meal_groups": meal_groups,
+        "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "now": now,
     })

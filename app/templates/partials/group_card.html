@@ -1,69 +1,57 @@
-<a href="/groups/{{ group.id }}" class="block bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition">
-    <div class="flex gap-3">
-        <!-- Logo -->
-        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            {% if group.store.logo_url %}
-            <img src="{{ group.store.logo_url }}" alt="{{ group.store.name }}" class="w-10 h-10 object-contain">
-            {% else %}
-            <span class="text-2xl">
-                {% if group.category.value == 'drink' %}🧋{% else %}🍱{% endif %}
-            </span>
-            {% endif %}
-        </div>
-        
-        <!-- 內容 -->
+{# 便利貼卡片 - 用於首頁顯示團單 #}
+{% set bg_color = 'bg-amber-50' if group.category.value == 'drink' else ('bg-green-50' if group.category.value == 'meal' else 'bg-blue-50') %}
+{% set tape_color = 'bg-amber-200/70' if group.category.value == 'drink' else ('bg-green-200/70' if group.category.value == 'meal' else 'bg-blue-200/70') %}
+{% set note_color = 'text-amber-700' if group.category.value == 'drink' else ('text-green-700' if group.category.value == 'meal' else 'text-blue-700') %}
+
+<a href="/groups/{{ group.id }}" 
+   class="block {{ bg_color }} rounded-lg p-3 shadow hover:shadow-md transition relative"
+   style="min-height: 130px;">
+    <!-- 便利貼頂部膠帶效果 -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 {{ tape_color }} rounded"></div>
+    
+    <!-- 頂部：Logo + 團名 -->
+    <div class="flex items-start gap-2">
+        {% if group.store.logo_url %}
+        <img src="{{ group.store.logo_url }}" 
+             alt="{{ group.store.name }}" 
+             class="w-10 h-10 rounded object-contain bg-white flex-shrink-0 shadow-sm">
+        {% endif %}
         <div class="flex-1 min-w-0">
-            <div class="font-medium text-gray-900 truncate">{{ group.name }}</div>
-            <div class="text-sm text-gray-500">{{ group.store.name }}</div>
-            <div class="text-xs text-gray-400 mt-1">
-                團主：{{ group.owner.display_name }}
-            </div>
-        </div>
-        
-        <!-- 倒數 -->
-        <div class="text-right flex-shrink-0">
-            {% if group.is_closed or group.is_expired %}
-            <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">已截止</span>
-            {% else %}
-            <div class="text-sm font-medium text-indigo-600" 
-                 x-data="countdown('{{ group.deadline.isoformat() }}')"
-                 x-text="display">
-            </div>
-            {% endif %}
+            <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+            <div class="text-xs text-gray-500 truncate">{{ group.store.name }}</div>
         </div>
     </div>
+    
+    <!-- 團主 -->
+    <div class="text-xs text-gray-400 mt-1.5">{{ group.owner.show_name }}</div>
+    
+    <!-- 備註（簡短顯示） -->
+    {% if group.note %}
+    <div class="text-xs {{ note_color }} mt-1 line-clamp-1">📝 {{ group.note }}</div>
+    {% endif %}
+    
+    <!-- 底部：訂單統計 + 截止時間 -->
+    <div class="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+        <!-- 訂單統計 -->
+        <div class="flex items-center gap-2 text-xs">
+            {% if group.submitted_count > 0 %}
+            <span class="text-green-600" title="已結單">✓{{ group.submitted_count }}</span>
+            {% endif %}
+            {% if group.pending_count > 0 %}
+            <span class="text-orange-500" title="點餐中">🛒{{ group.pending_count }}</span>
+            {% endif %}
+            {% if group.submitted_count == 0 and group.pending_count == 0 %}
+            <span class="text-gray-400">尚無訂單</span>
+            {% endif %}
+        </div>
+        
+        <!-- 截止時間 -->
+        {% if group.is_open %}
+        <span class="text-xs text-orange-600 font-medium"
+              x-data="countdown('{{ group.deadline.isoformat() }}')"
+              x-text="display"></span>
+        {% else %}
+        <span class="text-xs text-gray-400">已截止</span>
+        {% endif %}
+    </div>
 </a>
-
-<script>
-function countdown(deadline) {
-    return {
-        display: '',
-        init() {
-            this.update();
-            setInterval(() => this.update(), 1000);
-        },
-        update() {
-            const now = new Date();
-            const end = new Date(deadline);
-            const diff = end - now;
-            
-            if (diff <= 0) {
-                this.display = '已截止';
-                return;
-            }
-            
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            
-            if (hours > 24) {
-                const days = Math.floor(hours / 24);
-                this.display = `${days} 天後`;
-            } else if (hours > 0) {
-                this.display = `${hours}h ${minutes}m`;
-            } else {
-                this.display = `${minutes} 分鐘`;
-            }
-        }
-    }
-}
-</script>

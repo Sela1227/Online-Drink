@@ -9,21 +9,49 @@
     </h1>
     
     <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()">
-        <!-- 店家選擇 -->
+        <!-- 分類選擇 -->
         <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇類型</label>
+            <div class="grid grid-cols-3 gap-2">
+                <button type="button" @click="selectCategory('drink')"
+                        :class="selectedCategory === 'drink' ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🧋</div>
+                    <div class="text-sm font-medium">飲料店</div>
+                </button>
+                <button type="button" @click="selectCategory('meal')"
+                        :class="selectedCategory === 'meal' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🍱</div>
+                    <div class="text-sm font-medium">餐廳</div>
+                </button>
+                <button type="button" @click="selectCategory('group_buy')"
+                        :class="selectedCategory === 'group_buy' ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🛒</div>
+                    <div class="text-sm font-medium">團購</div>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 店家選擇 -->
+        <div x-show="selectedCategory" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家</label>
             <select name="store_id" x-model="storeId" @change="onStoreChange()" required
                     class="w-full border rounded-lg px-3 py-2">
                 <option value="">請選擇...</option>
-                {% for store in stores %}
-                <option value="{{ store.id }}" 
-                        data-category="{{ store.category.value }}"
-                        data-branches='{{ store.branches | tojson if store.branches else "[]" }}'
-                        {% if copy_from and copy_from.store_id == store.id %}selected{% endif %}>
-                    {{ store.name }} ({{ '飲料' if store.category.value == 'drink' else '餐點' }})
-                </option>
-                {% endfor %}
+                <template x-for="store in filteredStores" :key="store.id">
+                    <option :value="store.id" 
+                            :data-category="store.category"
+                            :data-branches="JSON.stringify(store.branches)"
+                            :data-has-toppings="store.has_toppings"
+                            x-text="store.name">
+                    </option>
+                </template>
             </select>
+            <p class="text-xs text-gray-400 mt-1" x-show="filteredStores.length === 0">
+                此類型尚無店家，請先到後台新增
+            </p>
         </div>
         
         <!-- 分店選擇 -->
@@ -38,7 +66,7 @@
         </div>
         
         <!-- 團名 -->
-        <div>
+        <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">團名</label>
             <input type="text" name="name" required placeholder="例：下午茶團"
                    class="w-full border rounded-lg px-3 py-2"
@@ -46,14 +74,14 @@
         </div>
         
         <!-- 備註 -->
-        <div>
+        <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">備註（選填）</label>
             <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間、外送費每人 $10"
                       class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
         </div>
         
         <!-- 截止時間 -->
-        <div>
+        <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">截止時間</label>
             <div class="flex flex-wrap gap-2 mb-2">
                 <button type="button" @click="setDeadline('30m')"
@@ -78,7 +106,7 @@
         </div>
         
         <!-- 飲料團設定 -->
-        <div x-show="isDrink" x-cloak class="space-y-4 p-4 bg-gray-50 rounded-lg">
+        <div x-show="selectedCategory === 'drink' && storeId" x-cloak class="space-y-4 p-4 bg-amber-50 rounded-lg">
             <h3 class="font-medium text-gray-700">飲料團設定</h3>
             
             <!-- 預設甜度 -->
@@ -121,7 +149,7 @@
         </div>
         
         <!-- 送出按鈕 -->
-        <div class="flex gap-2 pt-4">
+        <div class="flex gap-2 pt-4" x-show="storeId" x-cloak>
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
@@ -134,29 +162,47 @@
 
 <script>
 function newGroupForm() {
+    // 從後端傳入的店家資料
+    const allStores = [
+        {% for store in stores %}
+        {
+            id: {{ store.id }},
+            name: "{{ store.name }}",
+            category: "{{ store.category.value }}",
+            branches: {{ store.branches | tojson if store.branches else "[]" }},
+            has_toppings: {{ 'true' if store.toppings else 'false' }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
     return {
+        selectedCategory: '{% if copy_from %}{{ copy_from.category.value }}{% endif %}',
         storeId: '{% if copy_from %}{{ copy_from.store_id }}{% endif %}',
         branchId: '',
-        isDrink: false,
         branches: [],
         
+        get filteredStores() {
+            return allStores.filter(s => s.category === this.selectedCategory);
+        },
+        
         init() {
-            this.onStoreChange();
+            if (this.storeId) {
+                this.onStoreChange();
+            }
+        },
+        
+        selectCategory(category) {
+            this.selectedCategory = category;
+            this.storeId = '';
+            this.branches = [];
+            this.branchId = '';
         },
         
         onStoreChange() {
-            const select = document.querySelector('select[name="store_id"]');
-            const option = select.options[select.selectedIndex];
-            
-            if (option && option.value) {
-                this.isDrink = option.dataset.category === 'drink';
-                try {
-                    this.branches = JSON.parse(option.dataset.branches || '[]');
-                } catch (e) {
-                    this.branches = [];
-                }
+            const store = allStores.find(s => s.id == this.storeId);
+            if (store) {
+                this.branches = store.branches || [];
             } else {
-                this.isDrink = false;
                 this.branches = [];
             }
             this.branchId = '';

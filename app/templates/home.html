@@ -7,34 +7,10 @@
     <!-- 訂飲料 -->
     {% if drink_groups %}
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">🧋 訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
         <div class="grid grid-cols-2 gap-3">
             {% for group in drink_groups %}
-            <a href="/groups/{{ group.id }}" 
-               class="block bg-amber-50 rounded-lg p-4 shadow hover:shadow-md transition relative"
-               style="min-height: 120px;">
-                <!-- 便利貼頂部膠帶效果 -->
-                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 bg-amber-200/70 rounded"></div>
-                
-                <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
-                <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
-                
-                <!-- 備註（簡短顯示） -->
-                {% if group.note %}
-                <div class="text-xs text-amber-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
-                {% endif %}
-                
-                <div class="absolute bottom-3 right-3">
-                    {% if group.is_open %}
-                    <span class="text-xs text-orange-600 font-medium"
-                          x-data="countdown('{{ group.deadline.isoformat() }}')"
-                          x-text="display"></span>
-                    {% else %}
-                    <span class="text-xs text-gray-400">已截止</span>
-                    {% endif %}
-                </div>
-            </a>
+            {% include "partials/group_card.html" with context %}
             {% endfor %}
         </div>
     </section>
@@ -43,41 +19,29 @@
     <!-- 訂餐 -->
     {% if meal_groups %}
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">🍱 訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
         <div class="grid grid-cols-2 gap-3">
             {% for group in meal_groups %}
-            <a href="/groups/{{ group.id }}" 
-               class="block bg-green-50 rounded-lg p-4 shadow hover:shadow-md transition relative"
-               style="min-height: 120px;">
-                <!-- 便利貼頂部膠帶效果 -->
-                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 bg-green-200/70 rounded"></div>
-                
-                <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
-                <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
-                
-                <!-- 備註（簡短顯示） -->
-                {% if group.note %}
-                <div class="text-xs text-green-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
-                {% endif %}
-                
-                <div class="absolute bottom-3 right-3">
-                    {% if group.is_open %}
-                    <span class="text-xs text-orange-600 font-medium"
-                          x-data="countdown('{{ group.deadline.isoformat() }}')"
-                          x-text="display"></span>
-                    {% else %}
-                    <span class="text-xs text-gray-400">已截止</span>
-                    {% endif %}
-                </div>
-            </a>
+            {% include "partials/group_card.html" with context %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    
+    <!-- 團購 -->
+    {% if groupbuy_groups %}
+    <section>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">🛒 團購 <span class="text-sm font-normal text-gray-500">({{ groupbuy_groups|length }})</span></h2>
+        <div class="grid grid-cols-2 gap-3">
+            {% for group in groupbuy_groups %}
+            {% include "partials/group_card.html" with context %}
             {% endfor %}
         </div>
     </section>
     {% endif %}
 
     <!-- 無開放中的團 -->
-    {% if not drink_groups and not meal_groups %}
+    {% if not drink_groups and not meal_groups and not groupbuy_groups %}
     <div class="text-center py-12 text-gray-500">
         <p>目前沒有開放中的團</p>
         <p class="text-sm mt-1">點擊上方「開團」按鈕開新團！</p>
@@ -86,19 +50,25 @@
 
     <!-- 已截止 -->
     {% if closed_groups %}
-    <section>
-        <h2 class="text-lg font-semibold text-gray-400 mb-3">已截止</h2>
-        <div class="grid grid-cols-2 gap-3 opacity-60">
+    <section x-data="{ showClosed: false }">
+        <h2 class="text-lg font-semibold text-gray-400 mb-3 cursor-pointer flex items-center gap-2" @click="showClosed = !showClosed">
+            <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
+            已截止 <span class="text-sm font-normal">({{ closed_groups|length }})</span>
+        </h2>
+        <div x-show="showClosed" x-collapse class="grid grid-cols-2 gap-3 opacity-60">
             {% for group in closed_groups %}
             <a href="/groups/{{ group.id }}" 
-               class="block bg-gray-100 rounded-lg p-4 shadow relative"
-               style="min-height: 120px;">
-                <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
-                <div class="absolute bottom-3 right-3">
-                    <span class="text-xs text-gray-400">已截止</span>
+               class="block bg-gray-100 rounded-lg p-3 shadow relative">
+                <div class="flex items-start gap-2">
+                    {% if group.store.logo_url %}
+                    <img src="{{ group.store.logo_url }}" class="w-8 h-8 rounded object-contain bg-white flex-shrink-0">
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
+                        <div class="text-xs text-gray-400">{{ group.store.name }}</div>
+                    </div>
                 </div>
+                <div class="text-xs text-gray-400 mt-2">{{ group.owner.show_name }} · 已截止</div>
             </a>
             {% endfor %}
         </div>

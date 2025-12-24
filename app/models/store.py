@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 class CategoryType(str, enum.Enum):
     DRINK = "drink"
     MEAL = "meal"
+    GROUP_BUY = "group_buy"
 
 
 class OptionType(str, enum.Enum):

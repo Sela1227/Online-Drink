@@ -42,10 +42,36 @@ class Group(Base):
         return not self.is_closed and not self.is_expired
     
     @property
-    def order_count(self) -> int:
-        """已結單的訂單數"""
+    def submitted_count(self) -> int:
+        """已結單的人數"""
         from app.models.order import OrderStatus
         return len([o for o in self.orders if o.status == OrderStatus.SUBMITTED])
+    
+    @property
+    def pending_count(self) -> int:
+        """正在點餐的人數（購物車有東西但未結單）"""
+        from app.models.order import OrderStatus
+        return len([o for o in self.orders if o.status in (OrderStatus.DRAFT, OrderStatus.EDITING) and len(o.items) > 0])
+    
+    @property
+    def category_icon(self) -> str:
+        """分類圖示"""
+        if self.category == CategoryType.DRINK:
+            return "🧋"
+        elif self.category == CategoryType.MEAL:
+            return "🍱"
+        else:
+            return "🛒"
+    
+    @property
+    def category_name(self) -> str:
+        """分類名稱"""
+        if self.category == CategoryType.DRINK:
+            return "飲料"
+        elif self.category == CategoryType.MEAL:
+            return "餐點"
+        else:
+            return "團購"
 
 
 # Avoid circular import

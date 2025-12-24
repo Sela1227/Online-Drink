@@ -39,13 +39,19 @@
                         <input type="radio" name="category" value="drink" 
                                {% if store.category.value == 'drink' %}checked{% endif %}
                                class="text-orange-500 focus:ring-orange-500">
-                        <span>飲料店</span>
+                        <span>🧋 飲料店</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="category" value="meal" 
                                {% if store.category.value == 'meal' %}checked{% endif %}
                                class="text-orange-500 focus:ring-orange-500">
-                        <span>餐廳</span>
+                        <span>🍱 餐廳</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="group_buy" 
+                               {% if store.category.value == 'group_buy' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🛒 團購</span>
                     </label>
                 </div>
             </div>

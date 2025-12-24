@@ -31,7 +31,9 @@
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900">{{ store.name }}</div>
                 <div class="text-sm text-gray-500">
-                    {{ '飲料店' if store.category.value == 'drink' else '餐廳' }}
+                    {% if store.category.value == 'drink' %}🧋 飲料店
+                    {% elif store.category.value == 'meal' %}🍱 餐廳
+                    {% else %}🛒 團購{% endif %}
                     {% if store.branches %}· {{ store.branches|length }} 間分店{% endif %}
                 </div>
             </div>
