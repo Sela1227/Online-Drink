@@ -1,52 +1,58 @@
 {% extends "base.html" %}
 
-{% block title %}歡迎加入 SELA{% endblock %}
+{% block title %}歡迎加入 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-b from-orange-50 to-white">
-    <div class="max-w-md w-full mx-4">
-        <div class="text-center mb-8">
-            <div class="text-6xl mb-4">🎉</div>
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">歡迎加入 SELA！</h1>
-            <p class="text-gray-500">首次登入，請確認您的暱稱</p>
+<div class="min-h-[70vh] flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+        <!-- Logo -->
+        <div class="mb-4">
+            <img src="/static/images/sela-logo.svg" alt="SELA" class="w-20 h-20 mx-auto">
         </div>
         
-        <div class="bg-white rounded-2xl shadow-lg p-6">
-            <form action="/auth/set-nickname" method="POST" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        顯示名稱
-                    </label>
-                    <input type="text" name="nickname" 
-                           value="{{ user.display_name }}"
-                           class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg
-                                  focus:border-orange-400 focus:outline-none transition"
-                           placeholder="輸入您的暱稱">
-                    <p class="text-xs text-gray-400 mt-1">
-                        預設為 LINE 名稱，您可以修改成其他名稱
-                    </p>
-                </div>
-                
-                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <img src="{{ user.picture_url or '/static/images/default-avatar.png' }}" 
-                         class="w-12 h-12 rounded-full">
-                    <div>
-                        <div class="text-sm text-gray-500">LINE 帳號</div>
-                        <div class="font-medium">{{ user.line_display_name or user.display_name }}</div>
-                    </div>
-                </div>
-                
-                <button type="submit" 
-                        class="w-full bg-orange-500 text-white py-3 rounded-xl font-medium
-                               hover:bg-orange-600 transition text-lg">
-                    開始使用
-                </button>
-                
-                <a href="/home" class="block text-center text-gray-500 text-sm hover:text-gray-700">
-                    略過，使用 LINE 名稱
-                </a>
-            </form>
+        <h1 class="text-xl font-bold text-gray-800 mb-2">歡迎加入！</h1>
+        <p class="text-gray-500 text-sm mb-6">設定你在系統中顯示的名稱</p>
+        
+        <!-- 頭像 -->
+        <div class="mb-6">
+            {% if user.picture_url %}
+            <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" 
+                 class="w-20 h-20 rounded-full mx-auto shadow">
+            {% else %}
+            <div class="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto text-3xl">
+                👤
+            </div>
+            {% endif %}
         </div>
+        
+        <form action="/welcome" method="post" class="space-y-4">
+            <div class="text-left">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    顯示名稱
+                </label>
+                <input type="text" name="nickname" 
+                       value="{{ user.display_name }}"
+                       placeholder="輸入你想顯示的名稱"
+                       class="w-full border rounded-lg px-4 py-3 text-center text-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                <p class="text-xs text-gray-400 mt-2 text-center">
+                    這個名稱會顯示在訂單和團單中<br>
+                    之後可以在「個人資料」修改
+                </p>
+            </div>
+            
+            <button type="submit" 
+                    class="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium text-lg transition">
+                開始使用 🎉
+            </button>
+        </form>
+        
+        <a href="/home" class="block mt-4 text-sm text-gray-400 hover:text-gray-600"
+           onclick="event.preventDefault(); document.getElementById('skip-form').submit();">
+            先跳過，使用 LINE 名稱
+        </a>
+        <form id="skip-form" action="/welcome" method="post" class="hidden">
+            <input type="hidden" name="nickname" value="">
+        </form>
     </div>
 </div>
 {% endblock %}

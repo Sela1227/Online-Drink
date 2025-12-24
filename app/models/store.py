@@ -1,6 +1,3 @@
-"""
-store.py - 店家模型
-"""
 from datetime import datetime
 from typing import TYPE_CHECKING
 from decimal import Decimal
@@ -45,34 +42,34 @@ class Store(Base):
     branches: Mapped[list["StoreBranch"]] = relationship(back_populates="store", cascade="all, delete-orphan")
 
 
-class StoreTopping(Base):
-    """店家加料選項（飲料用）"""
-    __tablename__ = "store_toppings"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
-    name: Mapped[str] = mapped_column(String(50))
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
-    # Relationships
-    store: Mapped["Store"] = relationship(back_populates="toppings")
-
-
 class StoreBranch(Base):
     """店家分店"""
     __tablename__ = "store_branches"
     
     id: Mapped[int] = mapped_column(primary_key=True)
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
-    name: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(100))  # 分店名稱
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     
     # Relationships
     store: Mapped["Store"] = relationship(back_populates="branches")
+
+
+class StoreTopping(Base):
+    """店家加料選項（飲料用）"""
+    __tablename__ = "store_toppings"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
+    name: Mapped[str] = mapped_column(String(50))  # 珍珠、椰果、布丁
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)  # 加價
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Relationships
+    store: Mapped["Store"] = relationship(back_populates="toppings")
 
 
 class StoreOption(Base):

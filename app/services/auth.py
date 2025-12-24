@@ -1,184 +1,225 @@
-"""
-auth.py - 認證服務（完整版）
-"""
 from datetime import datetime, timedelta
-from typing import Optional
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from jose import JWTError, jwt
+from jose import jwt, JWTError
+from fastapi import Request, HTTPException
 from sqlalchemy.orm import Session
 import httpx
+import secrets
+import logging
 
-from app.database import get_db
-from app.models.user import User
 from app.config import get_settings
+from app.models.user import User, SystemSetting
 
 settings = get_settings()
+logger = logging.getLogger("auth")
 
-SECRET_KEY = settings.secret_key
+# JWT settings
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 30
+ACCESS_TOKEN_EXPIRE_DAYS = 7  # 縮短到 7 天
+SESSION_TIMEOUT_MINUTES = 30  # 閒置超時時間
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """建立 JWT token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def get_system_token_version(db: Session) -> int:
+    """取得系統 token 版本"""
+    setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    return setting.token_version if setting else 1
 
 
-def verify_token(token: str) -> Optional[dict]:
-    """驗證 JWT token"""
+def create_access_token(user_id: int, line_user_id: str, token_version: int = 1) -> str:
+    """建立 JWT token，包含更多驗證資訊"""
+    now = datetime.utcnow()
+    to_encode = {
+        "user_id": user_id,
+        "line_user_id": line_user_id,  # 雙重驗證
+        "iat": now,  # 發行時間
+        "exp": now + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+        "last_active": now.isoformat(),  # 最後活動時間
+        "token_version": token_version,  # 系統 Token 版本
+    }
+    return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
+
+
+def decode_token(token: str) -> dict | None:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
         return payload
     except JWTError:
         return None
 
 
-async def exchange_line_token(code: str) -> Optional[dict]:
-    """用 authorization code 換取 LINE access token"""
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://api.line.me/oauth2/v2.1/token",
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": settings.line_redirect_uri,
-                    "client_id": settings.line_channel_id,
-                    "client_secret": settings.line_channel_secret,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"LINE token exchange failed: {response.text}")
-                return None
-        except Exception as e:
-            print(f"LINE token exchange error: {e}")
-            return None
-
-
-async def get_line_profile(access_token: str) -> Optional[dict]:
-    """取得 LINE 用戶資料"""
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(
-                "https://api.line.me/v2/profile",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"LINE profile fetch failed: {response.text}")
-                return None
-        except Exception as e:
-            print(f"LINE profile fetch error: {e}")
-            return None
-
-
-# 別名（兼容舊代碼）
-get_line_user_profile = get_line_profile
-
-
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    """取得當前登入用戶"""
-    token = request.cookies.get("access_token")
+def check_session_timeout(payload: dict) -> bool:
+    """檢查 session 是否已超時"""
+    last_active_str = payload.get("last_active")
+    if not last_active_str:
+        return True  # 舊版 token，視為超時
     
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_302_FOUND,
-            headers={"Location": "/auth/login"}
-        )
-    
-    # 移除 Bearer 前綴
-    if token.startswith("Bearer "):
-        token = token[7:]
-    
-    payload = verify_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_302_FOUND,
-            headers={"Location": "/auth/login"}
-        )
-    
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_302_FOUND,
-            headers={"Location": "/auth/login"}
-        )
-    
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_302_FOUND,
-            headers={"Location": "/auth/login"}
-        )
-    
-    # 更新最後活動時間
-    user.last_active_at = datetime.utcnow()
-    db.commit()
-    
-    return user
-
-
-def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
-    """取得當前用戶（可選，未登入返回 None）"""
     try:
-        return get_current_user(request, db)
-    except HTTPException:
+        last_active = datetime.fromisoformat(last_active_str)
+        timeout_delta = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+        return datetime.utcnow() - last_active > timeout_delta
+    except:
+        return True
+
+
+def refresh_token_if_needed(payload: dict) -> str | None:
+    """如果需要，刷新 token（更新 last_active）"""
+    last_active_str = payload.get("last_active")
+    if not last_active_str:
         return None
-
-
-def get_admin_user(request: Request, db: Session = Depends(get_db)) -> User:
-    """取得管理員用戶"""
-    user = get_current_user(request, db)
     
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要管理員權限"
+    try:
+        last_active = datetime.fromisoformat(last_active_str)
+        # 每 5 分鐘刷新一次
+        if datetime.utcnow() - last_active > timedelta(minutes=5):
+            payload["last_active"] = datetime.utcnow().isoformat()
+            return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    except:
+        pass
+    return None
+
+
+async def get_line_user_profile(access_token: str) -> dict:
+    """取得 LINE 使用者資料"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.line.me/v2/profile",
+            headers={"Authorization": f"Bearer {access_token}"}
         )
+        response.raise_for_status()
+        return response.json()
+
+
+async def exchange_line_token(code: str) -> str:
+    """用授權碼換取 access token"""
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.line.me/oauth2/v2.1/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.line_redirect_uri,
+                "client_id": settings.line_channel_id,
+                "client_secret": settings.line_channel_secret,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        response.raise_for_status()
+        return response.json()["access_token"]
+
+
+def get_or_create_user(db: Session, line_user_id: str, display_name: str, picture_url: str | None) -> User:
+    """取得或建立使用者"""
+    # 查詢用戶
+    user = db.query(User).filter(User.line_user_id == line_user_id).first()
     
-    return user
-
-
-def get_or_create_user(
-    db: Session,
-    line_id: str,
-    display_name: str,
-    picture_url: Optional[str] = None
-) -> User:
-    """取得或建立用戶"""
-    user = db.query(User).filter(User.line_id == line_id).first()
+    now = datetime.utcnow()
     
     if user:
-        # 更新用戶資料
+        logger.info(f"找到現有用戶：id={user.id}, line_user_id={line_user_id[:8]}..., 舊名={user.display_name}, 新名={display_name}")
+        
+        # 檢查：如果資料庫名稱和 LINE 回傳的不同，記錄警告
+        if user.display_name != display_name:
+            logger.warning(f"用戶名稱變更：{user.display_name} → {display_name}")
+        
+        # 更新資料
         user.display_name = display_name
-        if picture_url:
-            user.picture_url = picture_url
+        user.picture_url = picture_url
+        user.last_login_at = now
+        user.last_active_at = now
+        db.commit()
+    else:
+        logger.info(f"建立新用戶：line_user_id={line_user_id[:8]}..., name={display_name}")
+        
+        # 額外檢查：是否有相同 display_name 的用戶（可能是問題來源）
+        same_name_users = db.query(User).filter(User.display_name == display_name).all()
+        if same_name_users:
+            logger.warning(f"⚠️ 已存在相同名稱的用戶：{[u.id for u in same_name_users]}")
+        
+        # 建立新使用者
+        is_admin = line_user_id == settings.admin_line_user_id
+        user = User(
+            line_user_id=line_user_id,
+            display_name=display_name,
+            picture_url=picture_url,
+            is_admin=is_admin,
+            last_login_at=now,
+            last_active_at=now,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info(f"新用戶建立成功：id={user.id}")
+    
+    return user
+
+
+def update_user_activity(db: Session, user_id: int):
+    """更新用戶活動時間"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
         user.last_active_at = datetime.utcnow()
         db.commit()
-        return user
+
+
+async def get_current_user_optional(request: Request, db: Session) -> tuple[User | None, str | None]:
+    """取得目前使用者（可選）
     
-    # 建立新用戶
-    user = User(
-        line_id=line_id,
-        display_name=display_name,
-        picture_url=picture_url,
-        is_first_login=True,
-        last_active_at=datetime.utcnow()
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    Returns:
+        tuple: (user, new_token) - new_token 如果需要刷新則有值
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        return None, None
     
+    payload = decode_token(token)
+    if not payload:
+        return None, None
+    
+    # 檢查 token_version（一鍵登出機制）
+    token_version = payload.get("token_version", 0)
+    system_version = get_system_token_version(db)
+    if isinstance(token_version, int) and token_version < system_version:
+        logger.info(f"Token 版本過舊：{token_version} < {system_version}，需重新登入")
+        return None, None
+    
+    # 檢查 session 是否超時
+    if check_session_timeout(payload):
+        return None, None  # 超時，需重新登入
+    
+    user_id = payload.get("user_id")
+    line_user_id = payload.get("line_user_id")
+    
+    if not user_id:
+        return None, None
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    # 雙重驗證：確認 line_user_id 也匹配
+    if user and line_user_id and user.line_user_id != line_user_id:
+        # line_user_id 不匹配，可能是安全問題！
+        logger.warning(f"⚠️ 安全警告：user_id={user_id} 的 line_user_id 不匹配")
+        return None, None
+    
+    # 更新用戶活動時間（每次請求都更新）
+    if user:
+        update_user_activity(db, user.id)
+    
+    # 檢查是否需要刷新 token
+    new_token = refresh_token_if_needed(payload)
+    
+    return user, new_token
+
+
+async def get_current_user(request: Request, db: Session) -> User:
+    """取得目前使用者（必須登入）"""
+    user, _ = await get_current_user_optional(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="請先登入")
+    return user
+
+
+async def get_admin_user(request: Request, db: Session) -> User:
+    """取得管理者使用者"""
+    user = await get_current_user(request, db)
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="權限不足")
     return user
