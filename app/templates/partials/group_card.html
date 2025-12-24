@@ -1,57 +1,78 @@
 {# 便利貼卡片 - 用於首頁顯示團單 #}
 {% set bg_color = 'bg-amber-50' if group.category.value == 'drink' else ('bg-green-50' if group.category.value == 'meal' else 'bg-blue-50') %}
-{% set tape_color = 'bg-amber-200/70' if group.category.value == 'drink' else ('bg-green-200/70' if group.category.value == 'meal' else 'bg-blue-200/70') %}
+{% set tape_color = 'bg-amber-300/80' if group.category.value == 'drink' else ('bg-green-300/80' if group.category.value == 'meal' else 'bg-blue-300/80') %}
 {% set note_color = 'text-amber-700' if group.category.value == 'drink' else ('text-green-700' if group.category.value == 'meal' else 'text-blue-700') %}
+{% set border_color = 'border-amber-200' if group.category.value == 'drink' else ('border-green-200' if group.category.value == 'meal' else 'border-blue-200') %}
 
 <a href="/groups/{{ group.id }}" 
-   class="block {{ bg_color }} rounded-lg p-3 shadow hover:shadow-md transition relative"
-   style="min-height: 130px;">
-    <!-- 便利貼頂部膠帶效果 -->
-    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 {{ tape_color }} rounded"></div>
+   class="block {{ bg_color }} rounded-sm p-3 shadow-md hover:shadow-lg transition-all duration-200 relative border {{ border_color }} hover:-translate-y-1"
+   style="aspect-ratio: 1 / 1; min-width: 140px;">
     
-    <!-- 頂部：Logo + 團名 -->
-    <div class="flex items-start gap-2">
-        {% if group.store.logo_url %}
-        <img src="{{ group.store.logo_url }}" 
-             alt="{{ group.store.name }}" 
-             class="w-10 h-10 rounded object-contain bg-white flex-shrink-0 shadow-sm">
-        {% endif %}
-        <div class="flex-1 min-w-0">
-            <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
-            <div class="text-xs text-gray-500 truncate">{{ group.store.name }}</div>
+    <!-- 便利貼頂部膠帶效果 -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 {{ tape_color }} rounded-sm shadow-sm"
+         style="transform: translateX(-50%) translateY(-50%) rotate(-2deg);"></div>
+    
+    <!-- 紙張紋理效果 -->
+    <div class="absolute inset-0 opacity-30 pointer-events-none" 
+         style="background-image: repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.03) 24px);"></div>
+    
+    <!-- Logo 置中放大 -->
+    <div class="flex justify-center mb-2">
+        <div class="w-16 h-16 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
+            {% if group.store.logo_url %}
+            <img src="{{ group.store.logo_url }}" 
+                 alt="{{ group.store.name }}" 
+                 class="w-14 h-14 object-contain">
+            {% else %}
+            <span class="text-3xl">
+                {% if group.category.value == 'drink' %}🧋
+                {% elif group.category.value == 'meal' %}🍱
+                {% else %}🛒{% endif %}
+            </span>
+            {% endif %}
         </div>
     </div>
     
+    <!-- 團名 + 店家 -->
+    <div class="text-center mb-1">
+        <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+        <div class="text-xs text-gray-500 truncate">{{ group.store.name }}</div>
+    </div>
+    
     <!-- 團主 -->
-    <div class="text-xs text-gray-400 mt-1.5">{{ group.owner.show_name }}</div>
+    <div class="text-xs text-gray-400 text-center">{{ group.owner.show_name }}</div>
     
     <!-- 備註（簡短顯示） -->
     {% if group.note %}
-    <div class="text-xs {{ note_color }} mt-1 line-clamp-1">📝 {{ group.note }}</div>
+    <div class="text-xs {{ note_color }} mt-1 text-center line-clamp-1">📝 {{ group.note }}</div>
     {% endif %}
     
     <!-- 底部：訂單統計 + 截止時間 -->
-    <div class="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+    <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
         <!-- 訂單統計 -->
-        <div class="flex items-center gap-2 text-xs">
+        <div class="flex items-center gap-1.5 text-xs">
             {% if group.submitted_count > 0 %}
-            <span class="text-green-600" title="已結單">✓{{ group.submitted_count }}</span>
+            <span class="text-green-600 font-medium" title="已結單">✓{{ group.submitted_count }}</span>
             {% endif %}
             {% if group.pending_count > 0 %}
             <span class="text-orange-500" title="點餐中">🛒{{ group.pending_count }}</span>
             {% endif %}
             {% if group.submitted_count == 0 and group.pending_count == 0 %}
-            <span class="text-gray-400">尚無訂單</span>
+            <span class="text-gray-400 text-[10px]">尚無訂單</span>
             {% endif %}
         </div>
         
         <!-- 截止時間 -->
         {% if group.is_open %}
-        <span class="text-xs text-orange-600 font-medium"
+        <span class="text-xs text-orange-600 font-bold"
               x-data="countdown('{{ group.deadline.isoformat() }}')"
               x-text="display"></span>
         {% else %}
         <span class="text-xs text-gray-400">已截止</span>
         {% endif %}
     </div>
+    
+    <!-- 右下角捲曲效果 -->
+    <div class="absolute bottom-0 right-0 w-4 h-4 pointer-events-none"
+         style="background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.05) 50%);"></div>
 </a>

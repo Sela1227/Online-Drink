@@ -45,7 +45,7 @@
     {% if drink_groups %}
     <section>
         <h2 class="text-lg font-semibold text-gray-800 mb-3">🧋 訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-4 pt-2">
             {% for group in drink_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -57,7 +57,7 @@
     {% if meal_groups %}
     <section>
         <h2 class="text-lg font-semibold text-gray-800 mb-3">🍱 訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-4 pt-2">
             {% for group in meal_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -69,7 +69,7 @@
     {% if groupbuy_groups %}
     <section>
         <h2 class="text-lg font-semibold text-gray-800 mb-3">🛒 團購 <span class="text-sm font-normal text-gray-500">({{ groupbuy_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-4 pt-2">
             {% for group in groupbuy_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -93,24 +93,41 @@
             已截止 <span class="text-sm font-normal">({{ closed_groups|length }})</span>
         </h2>
         <div x-show="showClosed" x-collapse>
-            <div class="grid grid-cols-2 gap-3 opacity-60">
+            <div class="grid grid-cols-2 gap-4 pt-2">
                 {% for group in closed_groups %}
-                <a href="/groups/{{ group.id }}" 
-                   class="block bg-gray-100 rounded-lg p-3 shadow relative">
-                    <div class="flex items-start gap-2">
-                        {% if group.store.logo_url %}
-                        <img src="{{ group.store.logo_url }}" class="w-8 h-8 rounded object-contain bg-white flex-shrink-0">
-                        {% endif %}
-                        <div class="flex-1 min-w-0">
-                            <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
-                            <div class="text-xs text-gray-400">{{ group.store.name }}</div>
+                <div class="block bg-gray-100 rounded-sm p-3 shadow relative opacity-60 border border-gray-200"
+                     style="aspect-ratio: 1 / 1; min-width: 140px;">
+                    <!-- 膠帶 -->
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 bg-gray-300/80 rounded-sm shadow-sm"></div>
+                    
+                    <!-- Logo -->
+                    <a href="/groups/{{ group.id }}" class="block">
+                        <div class="flex justify-center mb-2">
+                            <div class="w-16 h-16 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
+                                {% if group.store.logo_url %}
+                                <img src="{{ group.store.logo_url }}" class="w-14 h-14 object-contain">
+                                {% else %}
+                                <span class="text-3xl">
+                                    {% if group.category.value == 'drink' %}🧋
+                                    {% elif group.category.value == 'meal' %}🍱
+                                    {% else %}🛒{% endif %}
+                                </span>
+                                {% endif %}
+                            </div>
                         </div>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-2">{{ group.owner.show_name }} · 已截止</div>
-                </a>
+                        <div class="text-center">
+                            <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
+                            <div class="text-xs text-gray-400 truncate">{{ group.store.name }}</div>
+                        </div>
+                        <div class="text-xs text-gray-400 text-center mt-1">{{ group.owner.show_name }}</div>
+                        <div class="absolute bottom-2 left-2 right-2 text-center">
+                            <span class="text-xs text-gray-400">已截止</span>
+                        </div>
+                    </a>
+                </div>
                 {% endfor %}
             </div>
-            <a href="/history" class="block text-center text-sm text-gray-500 mt-3 py-2 hover:text-orange-500">
+            <a href="/history" class="block text-center text-sm text-gray-500 mt-4 py-2 hover:text-orange-500">
                 查看全部歷史 →
             </a>
         </div>
