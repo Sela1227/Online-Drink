@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum, Integer, Text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from app.models.store import CategoryType
+from app.models.store import CategoryType, CategoryTypeEnum
 
 
 class Group(Base):
@@ -16,7 +16,7 @@ class Group(Base):
     branch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 分店 ID
     name: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, nullable=True)  # 團主備註
-    category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
+    category: Mapped[CategoryType] = mapped_column(CategoryTypeEnum)
     deadline: Mapped[datetime] = mapped_column(DateTime)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     
