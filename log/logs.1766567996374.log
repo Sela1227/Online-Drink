@@ -1,0 +1,764 @@
+2025-12-24T09:08:07.318227395Z [inf]  
+2025-12-24T09:08:09.600347179Z [inf]  [35m[Region: europe-west4][0m
+2025-12-24T09:08:09.603322916Z [inf]  [35m==============
+2025-12-24T09:08:09.603358639Z [inf]  Using Nixpacks
+2025-12-24T09:08:09.603364072Z [inf]  ==============
+2025-12-24T09:08:09.603370358Z [inf]  [0m
+2025-12-24T09:08:09.603443672Z [inf]  context: b7f8-
+2025-12-24T09:08:09.680165418Z [inf]  ╔══════════════════════════════ Nixpacks v1.38.0 ══════════════════════════════╗
+2025-12-24T09:08:09.680190734Z [inf]  ║ setup      │ python3, postgresql_16.dev, gcc                                 ║
+2025-12-24T09:08:09.680195565Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2025-12-24T09:08:09.680199761Z [inf]  ║ install    │ python -m venv --copies /opt/venv && . /opt/venv/bin/activate   ║
+2025-12-24T09:08:09.680204468Z [inf]  ║            │ && pip install -r requirements.txt                              ║
+2025-12-24T09:08:09.680207738Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2025-12-24T09:08:09.680211051Z [inf]  ║ start      │ uvicorn app.main:app --host 0.0.0.0 --port $PORT                ║
+2025-12-24T09:08:09.680214806Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2025-12-24T09:08:09.883295708Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T09:08:09.883338845Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T09:08:09.883357541Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T09:08:09.883368387Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T09:08:09.891094106Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T09:08:09.894319884Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-24T09:08:10.852427608Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-24T09:08:10.852615622Z [inf]  [internal] load .dockerignore
+2025-12-24T09:08:10.852651054Z [inf]  [internal] load .dockerignore
+2025-12-24T09:08:10.852745173Z [inf]  [internal] load .dockerignore
+2025-12-24T09:08:10.860778164Z [inf]  [internal] load .dockerignore
+2025-12-24T09:08:10.864955985Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T09:08:10.864983448Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T09:08:10.864993603Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T09:08:10.865001994Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T09:08:10.865014039Z [inf]  [stage-0 4/8] RUN nix-env -if .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix && nix-collect-garbage -d
+2025-12-24T09:08:10.865021248Z [inf]  [stage-0 3/8] COPY .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix
+2025-12-24T09:08:10.865027367Z [inf]  [internal] load build context
+2025-12-24T09:08:10.865033312Z [inf]  [stage-0 2/8] WORKDIR /app/
+2025-12-24T09:08:10.865040663Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.865051285Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.865060897Z [inf]  [internal] load build context
+2025-12-24T09:08:10.865070853Z [inf]  [internal] load build context
+2025-12-24T09:08:10.871329983Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.871539494Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.871639239Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.891986548Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.893117948Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-24T09:08:10.903938629Z [inf]  [internal] load build context
+2025-12-24T09:08:13.498895301Z [inf]  [stage-0 2/8] WORKDIR /app/
+2025-12-24T09:08:13.616486942Z [inf]  [stage-0 2/8] WORKDIR /app/
+2025-12-24T09:08:13.617438114Z [inf]  [stage-0 3/8] COPY .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix
+2025-12-24T09:08:13.627782627Z [inf]  [stage-0 3/8] COPY .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix
+2025-12-24T09:08:13.628520883Z [inf]  [stage-0 4/8] RUN nix-env -if .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix && nix-collect-garbage -d
+2025-12-24T09:08:13.73201009Z [inf]  unpacking 'https://github.com/NixOS/nixpkgs/archive/bc8f8d1be58e8c8383e683a06e1e1e57893fff87.tar.gz' into the Git cache...
+
+2025-12-24T09:08:37.845887681Z [inf]  installing 'bc8f8d1be58e8c8383e683a06e1e1e57893fff87-env'
+
+2025-12-24T09:08:39.602190543Z [inf]  these 3 derivations will be built:
+  /nix/store/w9wjpgsiwxjv9p6166ax2mns747lmv2c-libraries.drv
+  /nix/store/g3lchy17nx4gv4bw71jnpiinxs47bg4s-bc8f8d1be58e8c8383e683a06e1e1e57893fff87-env.drv
+  /nix/store/c3i4vpsp72rlp7n5izsab41x27zdlymq-bc8f8d1be58e8c8383e683a06e1e1e57893fff87-env.drv
+these 107 paths will be fetched (151.46 MiB download, 645.71 MiB unpacked):
+
+2025-12-24T09:08:39.60223871Z [inf]    /nix/store/0dglgnjm2s5qg4ar6m33lpclqig0kg2x-acl-2.3.2
+  /nix/store/j2v823114cc2dqfvprlcx9h7i941kknh-attr-2.5.2
+  /nix/store/515aba55q2b288xzamgb2xl1y1x4sk13-audit-4.0
+  /nix/store/mm0pa3z7kk6jh1i9rkxqxjqmd8h1qpxf-bash-5.2p37
+  /nix/store/pbixrqd120nnw8a0ygfpm3mnwlr1mbj7-binutils-2.43.1
+  /nix/store/ywxfq90ijq9kys4g5wzyrg2f4in0iphd-binutils-2.43.1-lib
+  /nix/store/l13l2ipc1xn5npjrw511y0yfh4ghinmf-binutils-wrapper-2.43.1
+  /nix/store/nzi7rdydpky7lxv6mlvgcdpvdasaxcmq-builder.pl
+  /nix/store/6amvjdayglsifq4lb2lrj4q5gwf4dicd-bzip2-1.0.8
+  /nix/store/0kxxaix9l5dbih90491mv96zajsac57q-bzip2-1.0.8-bin
+
+2025-12-24T09:08:39.602246785Z [inf]    /nix/store/sf6y4arqcm100rnnl3dhpg732i774zp6-coreutils-9.5
+  /nix/store/lbx3j21p2dsr1rc5j2s8zaprkkwlrq5x-db-4.8.30
+  /nix/store/alq4bqllykgwrif112yqgrn9g001kn7b-diffutils-3.10
+  /nix/store/b1rvxspjrw0f3y5iz4pcygams0n9yas4-ed-1.20.2
+  /nix/store/zx2bmicmgjh0inkgffd7agxz47j4xxql-expand-response-params
+  /nix/store/cnmw0v80xbp4ldc79an5kb2p8a3ia6k5-expat-2.6.3
+  /nix/store/vkv9a83hknlnr7p2z8mwl16j5pb502gp-file-5.45
+  /nix/store/pr8bhn9clls2jqqba5ypj683razy9kb0-find-xml-catalogs-hook
+  /nix/store/psjqqbj19n3fqssn38hgz4cv7b7a9alp-findutils-4.10.0
+  /nix/store/1cd3p3kjh9c209s7832z8i3b8qcqggca-gawk-5.3.1
+  /nix/store/v7dbfh5n7az2lcap0z1cv4jq0bikya8p-gcc-13.3.0
+  /nix/store/s94fwp43xhzkvw8l8nqslskib99yifzi-gcc-13.3.0-lib
+  /nix/store/c91k93z9yr1cpia2pf5dr226imglrkg5-gcc-13.3.0-libgcc
+  /nix/store/zls8qr49k7bkdfb9ncqz9w38q5m8zkld-gcc-13.3.0-man
+  /nix/store/hgw57m0jh2w10jsv8x86ng267pm5sla8-gcc-wrapper-13.3.0
+
+2025-12-24T09:08:39.602253411Z [inf]    /nix/store/bhd4nlz0993jcsmp7b4fpgjyc9knh1yx-gcc-wrapper-13.3.0-man
+  /nix/store/h9bcdwky1hznar341kl52g7hidcjxfdc-gdbm-1.24-lib
+  /nix/store/3bvxjkkmwlymr0fssczhgi39c3aj1l7i-glibc-2.40-36
+
+2025-12-24T09:08:39.602255859Z [inf]    /nix/store/5571d6dklkwfcp1812dj4lxb0gl3w1yw-glibc-2.40-36-bin
+  /nix/store/932dj5qwfzck90mnvqpd1f9hjqznaqdj-glibc-2.40-36-dev
+  /nix/store/fbir2hb0b8b9n9by2qkmr4sjscds5017-gmp-6.3.0
+
+2025-12-24T09:08:39.602258406Z [inf]    /nix/store/i2bs001zwvii9qbhk6mm291gqybpij87-gmp-with-cxx-6.3.0
+
+2025-12-24T09:08:39.602349164Z [inf]    /nix/store/vcwb5qr1yjn3pwbm9gnmvqmn1gwg9a1y-gnu-config-2024-01-01
+  /nix/store/nysgss3ggh3dv7mz08n28h29lazxhyc1-gnugrep-3.11
+  /nix/store/iyrpqn6ana7j804dzis338n74kzznmj0-gnumake-4.4.1
+  /nix/store/13wxcn0j2wk911ahfkbvdq241rkprsv8-gnused-4.9
+  /nix/store/cqyjb712c5q3axw9qjij05dnji2a7z48-gnutar-1.35
+  /nix/store/qfc6wq1wpxvkkjqa6xr5685ip97qc3sr-gzip-1.13
+  /nix/store/b8glv6c4m12ggixxbx98b38isssrwnnf-icu4c-74.2
+  /nix/store/lqafrbq3phvvvpw3fahzn7vbvl01xibw-icu4c-74.2-dev
+  /nix/store/1v4kdwh68m221n160qxy1dgw64mg5z30-isl-0.20
+  /nix/store/qzsiapz58wbfn8k3j7cbby6n1v0scd53-keyutils-1.6.3-lib
+  /nix/store/s2xcsy5qy1k1bhx856nrbha69k171pxl-krb5-1.21.3
+  /nix/store/3qsh70qa9mg8a5d7nngqv5608fxg654y-krb5-1.21.3-dev
+  /nix/store/nns4azjdb9ly7c4mjd5bhnj9zbr03fr0-krb5-1.21.3-lib
+  /nix/store/hzrdnkrq7c7x7hkafm1x9l60x9nf6llx-libbsd-0.12.2
+  /nix/store/ycavj0wxnz72h0n7csvplbgfcrq25x5f-libcap-2.70-lib
+  /nix/store/cvxvy9v7cdfmbxpbm0qapnq03s6wjcga-libcap-ng-0.8.5
+  /nix/store/k0bc02ihdd9g3qx4rdxphbghbrv7qsnc-libedit-20240808-3.1
+  /nix/store/0qiyy7llb8ldillvlvjz1pyawhs5cvpk-libffi-3.4.6
+  /nix/store/3wjcy2waiy7cr1v0kvi73aj6i90d878d-libidn2-2.3.7
+  /nix/store/xz5v04422rd567ska8n5wphzx80rh02s-libmd-1.1.0
+  /nix/store/wjvrhcaf0qjh4j463sz0fdday7qx8ga8-libmpc-1.3.1
+  /nix/store/7hpmrpicmvqgpnnj9i6470y1s7dh336z-libunistring-1.2
+  /nix/store/3nkb6rscay1w5ky9xziy7qnjl0i4dx25-libxcrypt-4.4.36
+  /nix/store/z89nbajs59f56zjmgpqfx9vczl96vj5j-libxml2-2.13.4
+  /nix/store/b7q2n60gmgmyhw8ix2pac682hghn2md3-libxml2-2.13.4-bin
+  /nix/store/pq8kkxv2r28my86g17d4xmlj30ibzdv8-libxml2-2.13.4-dev
+  /nix/store/h4xcr5vxpz2wj4igjwdw85vjcxicspbx-linux-headers-6.10
+  /nix/store/8b0f1lj164bzy7y36wxg57qfrb8yz742-linux-pam-1.6.1
+  /nix/store/d1hh5c7kz3b3djajclfw25bw6pcdsmcy-lz4-1.10.0
+  /nix/store/sj4wz8d69b76khsy7y3ddp759vb1w7ym-lz4-1.10.0-dev
+  /nix/store/ffddichm4vj28fqv02j4dm2nmz8415sw-lz4-1.10.0-lib
+  /nix/store/fj4kfzzrb0jjc2z96kcklas807r92qhg-mailcap-2.1.54
+  /nix/store/py23xbn1b57hzbzpsyyfkp1rv5mh5pwa-mpdecimal-4.0.0
+  /nix/store/k9s1aafqr83v8v4qv28px2i457dx6ix9-mpfr-4.2.1
+  /nix/store/c7qx9iq6lqfjd4dxrdd6723l6rvzsj5s-ncurses-6.4.20221231
+  /nix/store/kbwfxd5b17iy077yjvqdfrvwn0npp6vw-ncurses-6.4.20221231-dev
+  /nix/store/wz1262i1k6vdvwm6qvk2m7s692kfzp47-ncurses-6.4.20221231-man
+
+2025-12-24T09:08:39.602352261Z [inf]    /nix/store/m8gwqmn8k3jm0gbcia358mz4y00lgmbc-openssl-3.3.2
+  /nix/store/9x40a20if2q28m96hlw3q5z5q5ajgpgp-openssl-3.3.2-bin
+
+2025-12-24T09:08:39.602371447Z [inf]    /nix/store/xm6d1ig9ff7zkid1gvzsbig45m2pnlaz-openssl-3.3.2-dev
+  /nix/store/3yv1shg4kg4ifkxzg2jgjsrrrd8s1w08-patch-2.7.6
+  /nix/store/r9gxdanbg938b9vimis7akyawkyb0yax-patchelf-0.15.0
+  /nix/store/svlfxp9ips8gphsjz7ah2lsnirm2fhql-pcre2-10.44
+  /nix/store/pg37w2gymgf5rdlp00c3jn7hw37bnmyc-perl-5.40.0
+  /nix/store/wc1a06ip2fajrjkfbw7cvxzw1c949a6g-postgresql-16.4
+  /nix/store/a1y4jday73043sr9jdkl45x86fc4bz6b-postgresql-16.4-dev
+
+2025-12-24T09:08:39.602373861Z [inf]    /nix/store/aimqn571cc15g9dylir4sg9hddsx9vk4-postgresql-16.4-doc
+  /nix/store/y44iixsj2fd1pcy8ny66809z8r6zlxag-postgresql-16.4-lib
+
+2025-12-24T09:08:39.602400304Z [inf]    /nix/store/h2kawzk00cnmqvbp860hispl7rr8dyij-postgresql-16.4-man
+  /nix/store/901c80rlps5q05bnjk1sj4zaz5k736nc-python3-3.12.7
+  /nix/store/rf0rvd79mdhy427nv1wv9shkc9nglijz-readline-8.2p13
+  /nix/store/q7kklqkq2a8y0vpr9sdrzfx8d9n94ysa-readline-8.2p13-dev
+  /nix/store/cmmm1g8d3nyib4h9sy3qf9kg2ljzr789-shadow-4.16.0
+  /nix/store/b4cqpglpjvkjhb8l4dh1ammpg8gk6h9p-sqlite-3.46.1
+  /nix/store/1m9h3isxr4jh67yjjx540qf3sxwxhy3y-stdenv-linux
+  /nix/store/d6vkx8r7x989n00zk9i5yjdyhiypqgmv-systemd-minimal-libs-256.7
+  /nix/store/s94mkdlqznq2f8p8aqkvkpdp15hkx9jv-systemd-minimal-libs-256.7-dev
+
+2025-12-24T09:08:39.602407183Z [inf]    /nix/store/0v5xgyln9dcir7fkzjc2ag171qqd8kqr-tcb-1.2
+  /nix/store/5z7yfmp96ijpx0lhy5gpj65i38972330-tzdata-2024b
+  /nix/store/7hsml574k621n842nwnl8qhix3i2q6mv-update-autotools-gnu-config-scripts-hook
+  /nix/store/hnj9y6j24y8743wx3yah7fdw5fawjs9k-util-linux-minimal-2.39.4
+  /nix/store/h3zj66jqg5shcm0cgmz6z2x99kg4svxf-util-linux-minimal-2.39.4-bin
+
+2025-12-24T09:08:39.602418938Z [inf]    /nix/store/xj6ac9fw334zp0rbx932w36h4z8m7h6y-util-linux-minimal-2.39.4-dev
+  /nix/store/2qdrzz3izjbs5z0hk2ahj40fcmiybk6j-util-linux-minimal-2.39.4-lib
+  /nix/store/61m0ig5xdc23r78s9sj2g98wqrwcyvdn-util-linux-minimal-2.39.4-login
+
+2025-12-24T09:08:39.602421736Z [inf]    /nix/store/wkqaqjbf8dyz056qkqynx49cf7jbs55c-util-linux-minimal-2.39.4-mount
+  /nix/store/85jfmy6p9wl0rhsfmy6fr46jzplwmgx1-util-linux-minimal-2.39.4-swap
+  /nix/store/1hf92di50fsyqxcgsfi3z48hc05rm1a9-xgcc-13.3.0-libgcc
+
+2025-12-24T09:08:39.602443479Z [inf]    /nix/store/wp5xd6g6v3mafvdh2185v19diqqf0cm2-xz-5.6.3
+  /nix/store/g0ih6cb93dm4n18bah982gsmayah3amy-xz-5.6.3-bin
+  /nix/store/ncjma3lhr1sf6mqaczl9mfhjmp6ix58w-zlib-1.3.1
+  /nix/store/cir85maag3aj3sddq35y59m0wmcr50wk-zlib-1.3.1-dev
+  /nix/store/5hg6h4zjxc3ax7j4ywn6ksd509yl4pmd-zstd-1.5.6
+  /nix/store/ah32d19s3nfffv8hr7br48wj4q3r79d0-zstd-1.5.6-bin
+  /nix/store/h9185p3s0q345sd8m2vsgbhij7n74iif-zstd-1.5.6-dev
+
+2025-12-24T09:08:39.610534092Z [inf]  copying path '/nix/store/nzi7rdydpky7lxv6mlvgcdpvdasaxcmq-builder.pl' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.615736275Z [inf]  copying path '/nix/store/zls8qr49k7bkdfb9ncqz9w38q5m8zkld-gcc-13.3.0-man' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.616466912Z [inf]  copying path '/nix/store/fj4kfzzrb0jjc2z96kcklas807r92qhg-mailcap-2.1.54' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.616726295Z [inf]  copying path '/nix/store/aimqn571cc15g9dylir4sg9hddsx9vk4-postgresql-16.4-doc' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.616760047Z [inf]  copying path '/nix/store/h2kawzk00cnmqvbp860hispl7rr8dyij-postgresql-16.4-man' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.616933512Z [inf]  copying path '/nix/store/5z7yfmp96ijpx0lhy5gpj65i38972330-tzdata-2024b' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.617919674Z [inf]  copying path '/nix/store/pr8bhn9clls2jqqba5ypj683razy9kb0-find-xml-catalogs-hook' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.617928718Z [inf]  copying path '/nix/store/c91k93z9yr1cpia2pf5dr226imglrkg5-gcc-13.3.0-libgcc' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.617978749Z [inf]  copying path '/nix/store/vcwb5qr1yjn3pwbm9gnmvqmn1gwg9a1y-gnu-config-2024-01-01' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.618515606Z [inf]  copying path '/nix/store/h4xcr5vxpz2wj4igjwdw85vjcxicspbx-linux-headers-6.10' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.618544692Z [inf]  copying path '/nix/store/wz1262i1k6vdvwm6qvk2m7s692kfzp47-ncurses-6.4.20221231-man' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.618688188Z [inf]  copying path '/nix/store/hnj9y6j24y8743wx3yah7fdw5fawjs9k-util-linux-minimal-2.39.4' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.619070606Z [inf]  copying path '/nix/store/1hf92di50fsyqxcgsfi3z48hc05rm1a9-xgcc-13.3.0-libgcc' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.619531416Z [inf]  copying path '/nix/store/7hpmrpicmvqgpnnj9i6470y1s7dh336z-libunistring-1.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.633062767Z [inf]  copying path '/nix/store/7hsml574k621n842nwnl8qhix3i2q6mv-update-autotools-gnu-config-scripts-hook' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.645786548Z [inf]  copying path '/nix/store/bhd4nlz0993jcsmp7b4fpgjyc9knh1yx-gcc-wrapper-13.3.0-man' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.666875291Z [inf]  copying path '/nix/store/3wjcy2waiy7cr1v0kvi73aj6i90d878d-libidn2-2.3.7' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:39.683106299Z [inf]  copying path '/nix/store/3bvxjkkmwlymr0fssczhgi39c3aj1l7i-glibc-2.40-36' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.198801134Z [inf]  copying path '/nix/store/j2v823114cc2dqfvprlcx9h7i941kknh-attr-2.5.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/mm0pa3z7kk6jh1i9rkxqxjqmd8h1qpxf-bash-5.2p37' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.198956659Z [inf]  copying path '/nix/store/6amvjdayglsifq4lb2lrj4q5gwf4dicd-bzip2-1.0.8' from 'https://cache.nixos.org'...
+copying path '/nix/store/b1rvxspjrw0f3y5iz4pcygams0n9yas4-ed-1.20.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/zx2bmicmgjh0inkgffd7agxz47j4xxql-expand-response-params' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199289418Z [inf]  copying path '/nix/store/cnmw0v80xbp4ldc79an5kb2p8a3ia6k5-expat-2.6.3' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199300154Z [inf]  copying path '/nix/store/1cd3p3kjh9c209s7832z8i3b8qcqggca-gawk-5.3.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199363589Z [inf]  copying path '/nix/store/s94fwp43xhzkvw8l8nqslskib99yifzi-gcc-13.3.0-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199420575Z [inf]  copying path '/nix/store/h9bcdwky1hznar341kl52g7hidcjxfdc-gdbm-1.24-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199453178Z [inf]  copying path '/nix/store/fbir2hb0b8b9n9by2qkmr4sjscds5017-gmp-6.3.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/5571d6dklkwfcp1812dj4lxb0gl3w1yw-glibc-2.40-36-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.19950267Z [inf]  copying path '/nix/store/iyrpqn6ana7j804dzis338n74kzznmj0-gnumake-4.4.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199514386Z [inf]  copying path '/nix/store/13wxcn0j2wk911ahfkbvdq241rkprsv8-gnused-4.9' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199591515Z [inf]  copying path '/nix/store/qzsiapz58wbfn8k3j7cbby6n1v0scd53-keyutils-1.6.3-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199601359Z [inf]  copying path '/nix/store/ycavj0wxnz72h0n7csvplbgfcrq25x5f-libcap-2.70-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.199753747Z [inf]  copying path '/nix/store/cvxvy9v7cdfmbxpbm0qapnq03s6wjcga-libcap-ng-0.8.5' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.230388034Z [inf]  copying path '/nix/store/0qiyy7llb8ldillvlvjz1pyawhs5cvpk-libffi-3.4.6' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.231453478Z [inf]  copying path '/nix/store/xz5v04422rd567ska8n5wphzx80rh02s-libmd-1.1.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.232414969Z [inf]  copying path '/nix/store/0kxxaix9l5dbih90491mv96zajsac57q-bzip2-1.0.8-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.233063965Z [inf]  copying path '/nix/store/3nkb6rscay1w5ky9xziy7qnjl0i4dx25-libxcrypt-4.4.36' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.234946981Z [inf]  copying path '/nix/store/0dglgnjm2s5qg4ar6m33lpclqig0kg2x-acl-2.3.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.237346153Z [inf]  copying path '/nix/store/z89nbajs59f56zjmgpqfx9vczl96vj5j-libxml2-2.13.4' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.237801534Z [inf]  copying path '/nix/store/d1hh5c7kz3b3djajclfw25bw6pcdsmcy-lz4-1.10.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.238014792Z [inf]  copying path '/nix/store/ffddichm4vj28fqv02j4dm2nmz8415sw-lz4-1.10.0-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.24130931Z [inf]  copying path '/nix/store/py23xbn1b57hzbzpsyyfkp1rv5mh5pwa-mpdecimal-4.0.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.241702396Z [inf]  copying path '/nix/store/c7qx9iq6lqfjd4dxrdd6723l6rvzsj5s-ncurses-6.4.20221231' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.244269352Z [inf]  copying path '/nix/store/m8gwqmn8k3jm0gbcia358mz4y00lgmbc-openssl-3.3.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.245439465Z [inf]  copying path '/nix/store/3yv1shg4kg4ifkxzg2jgjsrrrd8s1w08-patch-2.7.6' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.247047237Z [inf]  copying path '/nix/store/cqyjb712c5q3axw9qjij05dnji2a7z48-gnutar-1.35' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.252916761Z [inf]  copying path '/nix/store/svlfxp9ips8gphsjz7ah2lsnirm2fhql-pcre2-10.44' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.253384387Z [inf]  copying path '/nix/store/1v4kdwh68m221n160qxy1dgw64mg5z30-isl-0.20' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.254715952Z [inf]  copying path '/nix/store/hzrdnkrq7c7x7hkafm1x9l60x9nf6llx-libbsd-0.12.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.255160604Z [inf]  copying path '/nix/store/k9s1aafqr83v8v4qv28px2i457dx6ix9-mpfr-4.2.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.255225259Z [inf]  copying path '/nix/store/d6vkx8r7x989n00zk9i5yjdyhiypqgmv-systemd-minimal-libs-256.7' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.256837256Z [inf]  copying path '/nix/store/2qdrzz3izjbs5z0hk2ahj40fcmiybk6j-util-linux-minimal-2.39.4-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.257885364Z [inf]  copying path '/nix/store/sj4wz8d69b76khsy7y3ddp759vb1w7ym-lz4-1.10.0-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.261010723Z [inf]  copying path '/nix/store/61m0ig5xdc23r78s9sj2g98wqrwcyvdn-util-linux-minimal-2.39.4-login' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.263462833Z [inf]  copying path '/nix/store/515aba55q2b288xzamgb2xl1y1x4sk13-audit-4.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.266489349Z [inf]  copying path '/nix/store/qfc6wq1wpxvkkjqa6xr5685ip97qc3sr-gzip-1.13' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.268732745Z [inf]  copying path '/nix/store/wp5xd6g6v3mafvdh2185v19diqqf0cm2-xz-5.6.3' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.269344786Z [inf]  copying path '/nix/store/ncjma3lhr1sf6mqaczl9mfhjmp6ix58w-zlib-1.3.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.278280011Z [inf]  copying path '/nix/store/ywxfq90ijq9kys4g5wzyrg2f4in0iphd-binutils-2.43.1-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/vkv9a83hknlnr7p2z8mwl16j5pb502gp-file-5.45' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.280255188Z [inf]  copying path '/nix/store/b4cqpglpjvkjhb8l4dh1ammpg8gk6h9p-sqlite-3.46.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.286268981Z [inf]  copying path '/nix/store/wjvrhcaf0qjh4j463sz0fdday7qx8ga8-libmpc-1.3.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.286798659Z [inf]  copying path '/nix/store/932dj5qwfzck90mnvqpd1f9hjqznaqdj-glibc-2.40-36-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.292454043Z [inf]  copying path '/nix/store/cir85maag3aj3sddq35y59m0wmcr50wk-zlib-1.3.1-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.292818834Z [inf]  copying path '/nix/store/s94mkdlqznq2f8p8aqkvkpdp15hkx9jv-systemd-minimal-libs-256.7-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.292866148Z [inf]  copying path '/nix/store/b7q2n60gmgmyhw8ix2pac682hghn2md3-libxml2-2.13.4-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.292968641Z [inf]  copying path '/nix/store/nysgss3ggh3dv7mz08n28h29lazxhyc1-gnugrep-3.11' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.298663673Z [inf]  copying path '/nix/store/g0ih6cb93dm4n18bah982gsmayah3amy-xz-5.6.3-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.303096269Z [inf]  copying path '/nix/store/pq8kkxv2r28my86g17d4xmlj30ibzdv8-libxml2-2.13.4-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.311899869Z [inf]  copying path '/nix/store/wkqaqjbf8dyz056qkqynx49cf7jbs55c-util-linux-minimal-2.39.4-mount' from 'https://cache.nixos.org'...
+copying path '/nix/store/85jfmy6p9wl0rhsfmy6fr46jzplwmgx1-util-linux-minimal-2.39.4-swap' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.379040724Z [inf]  copying path '/nix/store/pbixrqd120nnw8a0ygfpm3mnwlr1mbj7-binutils-2.43.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/lbx3j21p2dsr1rc5j2s8zaprkkwlrq5x-db-4.8.30' from 'https://cache.nixos.org'...
+copying path '/nix/store/v7dbfh5n7az2lcap0z1cv4jq0bikya8p-gcc-13.3.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.379055671Z [inf]  copying path '/nix/store/i2bs001zwvii9qbhk6mm291gqybpij87-gmp-with-cxx-6.3.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.379101766Z [inf]  copying path '/nix/store/b8glv6c4m12ggixxbx98b38isssrwnnf-icu4c-74.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.379537682Z [inf]  copying path '/nix/store/r9gxdanbg938b9vimis7akyawkyb0yax-patchelf-0.15.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/5hg6h4zjxc3ax7j4ywn6ksd509yl4pmd-zstd-1.5.6' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.392924639Z [inf]  copying path '/nix/store/nns4azjdb9ly7c4mjd5bhnj9zbr03fr0-krb5-1.21.3-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/9x40a20if2q28m96hlw3q5z5q5ajgpgp-openssl-3.3.2-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.408788743Z [inf]  copying path '/nix/store/sf6y4arqcm100rnnl3dhpg732i774zp6-coreutils-9.5' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.409793704Z [inf]  copying path '/nix/store/ah32d19s3nfffv8hr7br48wj4q3r79d0-zstd-1.5.6-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.437585872Z [inf]  copying path '/nix/store/xm6d1ig9ff7zkid1gvzsbig45m2pnlaz-openssl-3.3.2-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.439190343Z [inf]  copying path '/nix/store/8b0f1lj164bzy7y36wxg57qfrb8yz742-linux-pam-1.6.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.44265362Z [inf]  copying path '/nix/store/h9185p3s0q345sd8m2vsgbhij7n74iif-zstd-1.5.6-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.472406585Z [inf]  copying path '/nix/store/alq4bqllykgwrif112yqgrn9g001kn7b-diffutils-3.10' from 'https://cache.nixos.org'...
+copying path '/nix/store/psjqqbj19n3fqssn38hgz4cv7b7a9alp-findutils-4.10.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/pg37w2gymgf5rdlp00c3jn7hw37bnmyc-perl-5.40.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.473207285Z [inf]  copying path '/nix/store/y44iixsj2fd1pcy8ny66809z8r6zlxag-postgresql-16.4-lib' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.507189387Z [inf]  copying path '/nix/store/0v5xgyln9dcir7fkzjc2ag171qqd8kqr-tcb-1.2' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.512538785Z [inf]  copying path '/nix/store/1m9h3isxr4jh67yjjx540qf3sxwxhy3y-stdenv-linux' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.518338985Z [inf]  copying path '/nix/store/cmmm1g8d3nyib4h9sy3qf9kg2ljzr789-shadow-4.16.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.533111502Z [inf]  building '/nix/store/w9wjpgsiwxjv9p6166ax2mns747lmv2c-libraries.drv'...
+
+2025-12-24T09:08:40.5624946Z [inf]  copying path '/nix/store/k0bc02ihdd9g3qx4rdxphbghbrv7qsnc-libedit-20240808-3.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/kbwfxd5b17iy077yjvqdfrvwn0npp6vw-ncurses-6.4.20221231-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.562930148Z [inf]  copying path '/nix/store/rf0rvd79mdhy427nv1wv9shkc9nglijz-readline-8.2p13' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.618249555Z [inf]  building '/nix/store/g3lchy17nx4gv4bw71jnpiinxs47bg4s-bc8f8d1be58e8c8383e683a06e1e1e57893fff87-env.drv'...
+
+2025-12-24T09:08:40.620516495Z [inf]  copying path '/nix/store/s2xcsy5qy1k1bhx856nrbha69k171pxl-krb5-1.21.3' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.620906067Z [inf]  copying path '/nix/store/901c80rlps5q05bnjk1sj4zaz5k736nc-python3-3.12.7' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.620915187Z [inf]  copying path '/nix/store/q7kklqkq2a8y0vpr9sdrzfx8d9n94ysa-readline-8.2p13-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.663404879Z [inf]  copying path '/nix/store/3qsh70qa9mg8a5d7nngqv5608fxg654y-krb5-1.21.3-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/h3zj66jqg5shcm0cgmz6z2x99kg4svxf-util-linux-minimal-2.39.4-bin' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.796023431Z [inf]  copying path '/nix/store/xj6ac9fw334zp0rbx932w36h4z8m7h6y-util-linux-minimal-2.39.4-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:40.865045333Z [inf]  copying path '/nix/store/l13l2ipc1xn5npjrw511y0yfh4ghinmf-binutils-wrapper-2.43.1' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:41.090839068Z [inf]  copying path '/nix/store/lqafrbq3phvvvpw3fahzn7vbvl01xibw-icu4c-74.2-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/wc1a06ip2fajrjkfbw7cvxzw1c949a6g-postgresql-16.4' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:41.479797392Z [inf]  copying path '/nix/store/a1y4jday73043sr9jdkl45x86fc4bz6b-postgresql-16.4-dev' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:43.956603056Z [inf]  copying path '/nix/store/hgw57m0jh2w10jsv8x86ng267pm5sla8-gcc-wrapper-13.3.0' from 'https://cache.nixos.org'...
+
+2025-12-24T09:08:43.978548813Z [inf]  building '/nix/store/c3i4vpsp72rlp7n5izsab41x27zdlymq-bc8f8d1be58e8c8383e683a06e1e1e57893fff87-env.drv'...
+
+2025-12-24T09:08:44.03716706Z [inf]  created 100 symlinks in user environment
+
+2025-12-24T09:08:44.186842245Z [inf]  building '/nix/store/vj6biwyra8r82krq0cmg825mqdib8kic-user-environment.drv'...
+
+2025-12-24T09:08:44.326089591Z [inf]  removing old generations of profile /nix/var/nix/profiles/per-user/root/profile
+
+2025-12-24T09:08:44.326149554Z [inf]  removing profile version 1
+
+2025-12-24T09:08:44.326222502Z [inf]  removing old generations of profile /nix/var/nix/profiles/per-user/root/channels
+
+2025-12-24T09:08:44.326307792Z [inf]  removing old generations of profile /nix/var/nix/profiles/per-user/root/profile
+
+2025-12-24T09:08:44.326368156Z [inf]  removing old generations of profile /nix/var/nix/profiles/per-user/root/channels
+
+2025-12-24T09:08:44.327927205Z [inf]  finding garbage collector roots...
+
+2025-12-24T09:08:44.327999571Z [inf]  removing stale link from '/nix/var/nix/gcroots/auto/lzjbmb2ry0z7lma2fvpqprb12921pnb5' to '/nix/var/nix/profiles/per-user/root/profile-1-link'
+
+2025-12-24T09:08:44.331807501Z [inf]  deleting garbage...
+
+2025-12-24T09:08:44.334905828Z [inf]  deleting '/nix/store/a9qf4wwhympzs35ncp80r185j6a21w07-user-environment'
+
+2025-12-24T09:08:44.335350653Z [inf]  deleting '/nix/store/253kwn1730vnay87xkjgxa2v97w3y079-user-environment.drv'
+
+2025-12-24T09:08:44.335714947Z [inf]  deleting '/nix/store/hn5mrh362n52x8wwab9s1v6bgn4n5c94-env-manifest.nix'
+
+2025-12-24T09:08:44.370983082Z [inf]  deleting '/nix/store/1m9h3isxr4jh67yjjx540qf3sxwxhy3y-stdenv-linux'
+
+2025-12-24T09:08:44.371124263Z [inf]  deleting '/nix/store/r9gxdanbg938b9vimis7akyawkyb0yax-patchelf-0.15.0'
+
+2025-12-24T09:08:44.371445185Z [inf]  deleting '/nix/store/13wxcn0j2wk911ahfkbvdq241rkprsv8-gnused-4.9'
+
+2025-12-24T09:08:44.37319889Z [inf]  deleting '/nix/store/vkv9a83hknlnr7p2z8mwl16j5pb502gp-file-5.45'
+
+2025-12-24T09:08:44.374214927Z [inf]  deleting '/nix/store/g0ih6cb93dm4n18bah982gsmayah3amy-xz-5.6.3-bin'
+
+2025-12-24T09:08:44.374630333Z [inf]  deleting '/nix/store/7hsml574k621n842nwnl8qhix3i2q6mv-update-autotools-gnu-config-scripts-hook'
+
+2025-12-24T09:08:44.374710521Z [inf]  deleting '/nix/store/vcwb5qr1yjn3pwbm9gnmvqmn1gwg9a1y-gnu-config-2024-01-01'
+
+2025-12-24T09:08:44.375417123Z [inf]  deleting '/nix/store/y0fjd2rszhr48f61350q7ym16c1naizn-libraries'
+
+2025-12-24T09:08:44.375546267Z [inf]  deleting '/nix/store/nzi7rdydpky7lxv6mlvgcdpvdasaxcmq-builder.pl'
+
+2025-12-24T09:08:44.376102401Z [inf]  deleting '/nix/store/alq4bqllykgwrif112yqgrn9g001kn7b-diffutils-3.10'
+
+2025-12-24T09:08:44.378063731Z [inf]  deleting '/nix/store/iyrpqn6ana7j804dzis338n74kzznmj0-gnumake-4.4.1'
+
+2025-12-24T09:08:44.379279605Z [inf]  deleting '/nix/store/yfvhrcz7h68gxk06hfgq78din42454ha-source'
+
+2025-12-24T09:08:45.100331953Z [inf]  deleting '/nix/store/3yv1shg4kg4ifkxzg2jgjsrrrd8s1w08-patch-2.7.6'
+
+2025-12-24T09:08:45.100588897Z [inf]  deleting '/nix/store/b1rvxspjrw0f3y5iz4pcygams0n9yas4-ed-1.20.2'
+
+2025-12-24T09:08:45.101075224Z [inf]  deleting '/nix/store/psjqqbj19n3fqssn38hgz4cv7b7a9alp-findutils-4.10.0'
+
+2025-12-24T09:08:45.102795235Z [inf]  deleting '/nix/store/qfc6wq1wpxvkkjqa6xr5685ip97qc3sr-gzip-1.13'
+
+2025-12-24T09:08:45.103120167Z [inf]  deleting '/nix/store/pg37w2gymgf5rdlp00c3jn7hw37bnmyc-perl-5.40.0'
+
+2025-12-24T09:08:45.118809855Z [inf]  deleting '/nix/store/1cd3p3kjh9c209s7832z8i3b8qcqggca-gawk-5.3.1'
+
+2025-12-24T09:08:45.120215698Z [inf]  deleting '/nix/store/0kxxaix9l5dbih90491mv96zajsac57q-bzip2-1.0.8-bin'
+
+2025-12-24T09:08:45.120503167Z [inf]  deleting unused links...
+
+2025-12-24T09:08:46.108923935Z [inf]  note: currently hard linking saves 3.93 MiB
+
+2025-12-24T09:08:46.153069312Z [inf]  22 store paths deleted, 242.42 MiB freed
+
+2025-12-24T09:08:46.389769742Z [inf]  [stage-0 4/8] RUN nix-env -if .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix && nix-collect-garbage -d
+2025-12-24T09:08:46.393530152Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T09:08:46.533507500Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T09:08:46.534374578Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T09:08:49.188458458Z [inf]  Collecting fastapi>=0.104.0 (from -r requirements.txt (line 1))
+
+2025-12-24T09:08:49.219517729Z [inf]    Downloading fastapi-0.127.0-py3-none-any.whl.metadata (30 kB)
+
+2025-12-24T09:08:49.260323509Z [inf]  Collecting uvicorn>=0.24.0 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:49.2663501Z [inf]    Downloading uvicorn-0.40.0-py3-none-any.whl.metadata (6.7 kB)
+
+2025-12-24T09:08:49.647002413Z [inf]  Collecting sqlalchemy>=2.0.0 (from -r requirements.txt (line 3))
+
+2025-12-24T09:08:49.653534993Z [inf]    Downloading sqlalchemy-2.0.45-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+
+2025-12-24T09:08:49.679370447Z [inf]  Collecting pydantic-settings>=2.0.0 (from -r requirements.txt (line 4))
+
+2025-12-24T09:08:49.68541344Z [inf]    Downloading pydantic_settings-2.12.0-py3-none-any.whl.metadata (3.4 kB)
+
+2025-12-24T09:08:49.700055653Z [inf]  Collecting python-multipart>=0.0.6 (from -r requirements.txt (line 5))
+
+2025-12-24T09:08:49.705895331Z [inf]    Downloading python_multipart-0.0.21-py3-none-any.whl.metadata (1.8 kB)
+
+2025-12-24T09:08:49.72438552Z [inf]  Collecting jinja2>=3.1.2 (from -r requirements.txt (line 6))
+
+2025-12-24T09:08:49.730505888Z [inf]    Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+
+2025-12-24T09:08:49.756510031Z [inf]  Collecting httpx>=0.25.0 (from -r requirements.txt (line 7))
+
+2025-12-24T09:08:49.762343334Z [inf]    Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+
+2025-12-24T09:08:49.775287797Z [inf]  Collecting python-jose>=3.3.0 (from python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:49.781262017Z [inf]    Downloading python_jose-3.5.0-py2.py3-none-any.whl.metadata (5.5 kB)
+
+2025-12-24T09:08:49.795378402Z [inf]  Collecting qrcode>=7.4 (from qrcode[pil]>=7.4->-r requirements.txt (line 9))
+
+2025-12-24T09:08:49.801433651Z [inf]    Downloading qrcode-8.2-py3-none-any.whl.metadata (17 kB)
+
+2025-12-24T09:08:49.871425295Z [inf]  Collecting psycopg2-binary>=2.9.9 (from -r requirements.txt (line 10))
+
+2025-12-24T09:08:49.877884546Z [inf]    Downloading psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T09:08:49.893752507Z [inf]  Collecting cloudinary>=1.36.0 (from -r requirements.txt (line 11))
+
+2025-12-24T09:08:49.900469867Z [inf]    Downloading cloudinary-1.44.1-py3-none-any.whl.metadata (8.0 kB)
+
+2025-12-24T09:08:49.943471209Z [inf]  Collecting starlette<0.51.0,>=0.40.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:49.949461518Z [inf]    Downloading starlette-0.50.0-py3-none-any.whl.metadata (6.3 kB)
+
+2025-12-24T09:08:50.092215849Z [inf]  Collecting pydantic>=2.7.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:50.098392395Z [inf]    Downloading pydantic-2.12.5-py3-none-any.whl.metadata (90 kB)
+
+2025-12-24T09:08:50.125521236Z [inf]  Collecting typing-extensions>=4.8.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:50.131370066Z [inf]    Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+
+2025-12-24T09:08:50.140228507Z [inf]  Collecting annotated-doc>=0.0.2 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:50.146179917Z [inf]    Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+
+2025-12-24T09:08:50.167921291Z [inf]  Collecting click>=7.0 (from uvicorn>=0.24.0->uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:50.173808188Z [inf]    Downloading click-8.3.1-py3-none-any.whl.metadata (2.6 kB)
+
+2025-12-24T09:08:50.184093111Z [inf]  Collecting h11>=0.8 (from uvicorn>=0.24.0->uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:50.190204191Z [inf]    Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+
+2025-12-24T09:08:50.327354495Z [inf]  Collecting greenlet>=1 (from sqlalchemy>=2.0.0->-r requirements.txt (line 3))
+
+2025-12-24T09:08:50.333607641Z [inf]    Downloading greenlet-3.3.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (4.1 kB)
+
+2025-12-24T09:08:50.355107745Z [inf]  Collecting python-dotenv>=0.21.0 (from pydantic-settings>=2.0.0->-r requirements.txt (line 4))
+
+2025-12-24T09:08:50.361196347Z [inf]    Downloading python_dotenv-1.2.1-py3-none-any.whl.metadata (25 kB)
+
+2025-12-24T09:08:50.372533063Z [inf]  Collecting typing-inspection>=0.4.0 (from pydantic-settings>=2.0.0->-r requirements.txt (line 4))
+
+2025-12-24T09:08:50.378394713Z [inf]    Downloading typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+
+2025-12-24T09:08:50.45535801Z [inf]  Collecting MarkupSafe>=2.0 (from jinja2>=3.1.2->-r requirements.txt (line 6))
+
+2025-12-24T09:08:50.461688552Z [inf]    Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+
+2025-12-24T09:08:50.48618885Z [inf]  Collecting anyio (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T09:08:50.49229949Z [inf]    Downloading anyio-4.12.0-py3-none-any.whl.metadata (4.3 kB)
+
+2025-12-24T09:08:50.51288737Z [inf]  Collecting certifi (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T09:08:50.518763569Z [inf]    Downloading certifi-2025.11.12-py3-none-any.whl.metadata (2.5 kB)
+
+2025-12-24T09:08:50.542931151Z [inf]  Collecting httpcore==1.* (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T09:08:50.548878112Z [inf]    Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+
+2025-12-24T09:08:50.563963339Z [inf]  Collecting idna (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T09:08:50.569742367Z [inf]    Downloading idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+
+2025-12-24T09:08:50.58902094Z [inf]  Collecting ecdsa!=0.15 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:50.594863461Z [inf]    Downloading ecdsa-0.19.1-py2.py3-none-any.whl.metadata (29 kB)
+
+2025-12-24T09:08:50.61420502Z [inf]  Collecting rsa!=4.1.1,!=4.4,<5.0,>=4.0 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:50.620304156Z [inf]    Downloading rsa-4.9.1-py3-none-any.whl.metadata (5.6 kB)
+
+2025-12-24T09:08:50.644954098Z [inf]  Collecting pyasn1>=0.5.0 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:50.651116036Z [inf]    Downloading pyasn1-0.6.1-py3-none-any.whl.metadata (8.4 kB)
+
+2025-12-24T09:08:50.666347555Z [inf]  Collecting six (from cloudinary>=1.36.0->-r requirements.txt (line 11))
+
+2025-12-24T09:08:50.672476803Z [inf]    Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+
+2025-12-24T09:08:50.713675926Z [inf]  Collecting urllib3>=1.26.5 (from cloudinary>=1.36.0->-r requirements.txt (line 11))
+
+2025-12-24T09:08:50.719592207Z [inf]    Downloading urllib3-2.6.2-py3-none-any.whl.metadata (6.6 kB)
+
+2025-12-24T09:08:50.949456103Z [inf]  Collecting cryptography>=3.4.0 (from python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:50.955775391Z [inf]    Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (5.7 kB)
+
+2025-12-24T09:08:51.145398591Z [inf]  Collecting pillow>=9.1.0 (from qrcode[pil]>=7.4->-r requirements.txt (line 9))
+
+2025-12-24T09:08:51.151593215Z [inf]    Downloading pillow-12.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.8 kB)
+
+2025-12-24T09:08:51.189090904Z [inf]  Collecting httptools>=0.6.3 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:51.19519927Z [inf]    Downloading httptools-0.7.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+
+2025-12-24T09:08:51.237776883Z [inf]  Collecting pyyaml>=5.1 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:51.24430902Z [inf]    Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+
+2025-12-24T09:08:51.286500325Z [inf]  Collecting uvloop>=0.15.1 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:51.292957671Z [inf]    Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T09:08:51.374377401Z [inf]  Collecting watchfiles>=0.13 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:51.380405812Z [inf]    Downloading watchfiles-1.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T09:08:51.505321679Z [inf]  Collecting websockets>=10.4 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T09:08:51.51139226Z [inf]    Downloading websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+
+2025-12-24T09:08:51.622692355Z [inf]  Collecting cffi>=2.0.0 (from cryptography>=3.4.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:51.628763678Z [inf]    Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
+
+2025-12-24T09:08:51.649279267Z [inf]  Collecting annotated-types>=0.6.0 (from pydantic>=2.7.0->fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:51.655219753Z [inf]    Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+
+2025-12-24T09:08:52.407542199Z [inf]  Collecting pydantic-core==2.41.5 (from pydantic>=2.7.0->fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T09:08:52.413796192Z [inf]    Downloading pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.3 kB)
+
+2025-12-24T09:08:52.476306794Z [inf]  Collecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T09:08:52.482400018Z [inf]    Downloading pycparser-2.23-py3-none-any.whl.metadata (993 bytes)
+
+2025-12-24T09:08:52.492417894Z [inf]  Downloading fastapi-0.127.0-py3-none-any.whl (112 kB)
+
+2025-12-24T09:08:52.499114348Z [inf]  Downloading uvicorn-0.40.0-py3-none-any.whl (68 kB)
+
+2025-12-24T09:08:52.505459021Z [inf]  Downloading sqlalchemy-2.0.45-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.3 MB)
+
+2025-12-24T09:08:52.524680449Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 249.8 MB/s eta 0:00:00
+2025-12-24T09:08:52.524812673Z [inf]  
+
+2025-12-24T09:08:52.530684944Z [inf]  Downloading pydantic_settings-2.12.0-py3-none-any.whl (51 kB)
+
+2025-12-24T09:08:52.537041974Z [inf]  Downloading python_multipart-0.0.21-py3-none-any.whl (24 kB)
+
+2025-12-24T09:08:52.543056984Z [inf]  Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+
+2025-12-24T09:08:52.549037357Z [inf]  Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+
+2025-12-24T09:08:52.555258657Z [inf]  Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+
+2025-12-24T09:08:52.561734597Z [inf]  Downloading python_jose-3.5.0-py2.py3-none-any.whl (34 kB)
+
+2025-12-24T09:08:52.567913022Z [inf]  Downloading qrcode-8.2-py3-none-any.whl (45 kB)
+
+2025-12-24T09:08:52.575334974Z [inf]  Downloading psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.2 MB)
+
+2025-12-24T09:08:52.592670431Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.2/4.2 MB 263.9 MB/s eta 0:00:00
+2025-12-24T09:08:52.592809719Z [inf]  
+
+2025-12-24T09:08:52.599566299Z [inf]  Downloading cloudinary-1.44.1-py3-none-any.whl (147 kB)
+
+2025-12-24T09:08:52.605850427Z [inf]  Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+
+2025-12-24T09:08:52.611668912Z [inf]  Downloading click-8.3.1-py3-none-any.whl (108 kB)
+
+2025-12-24T09:08:52.618033991Z [inf]  Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl (4.5 MB)
+
+2025-12-24T09:08:52.627667031Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 559.3 MB/s eta 0:00:00
+2025-12-24T09:08:52.627787051Z [inf]  
+
+2025-12-24T09:08:52.63350304Z [inf]  Downloading ecdsa-0.19.1-py2.py3-none-any.whl (150 kB)
+
+2025-12-24T09:08:52.639602632Z [inf]  Downloading greenlet-3.3.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (609 kB)
+
+2025-12-24T09:08:52.643707108Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 609.9/609.9 kB 259.9 MB/s eta 0:00:00
+2025-12-24T09:08:52.643829689Z [inf]  
+
+2025-12-24T09:08:52.649655203Z [inf]  Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+
+2025-12-24T09:08:52.65567203Z [inf]  Downloading httptools-0.7.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (517 kB)
+
+2025-12-24T09:08:52.664032836Z [inf]  Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+
+2025-12-24T09:08:52.670124381Z [inf]  Downloading pillow-12.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.0 MB)
+
+2025-12-24T09:08:52.684666101Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.0/7.0 MB 548.1 MB/s eta 0:00:00
+2025-12-24T09:08:52.684776563Z [inf]  
+
+2025-12-24T09:08:52.690501413Z [inf]  Downloading pyasn1-0.6.1-py3-none-any.whl (83 kB)
+
+2025-12-24T09:08:52.696555455Z [inf]  Downloading pydantic-2.12.5-py3-none-any.whl (463 kB)
+
+2025-12-24T09:08:52.703242904Z [inf]  Downloading pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+
+2025-12-24T09:08:52.707620943Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 731.9 MB/s eta 0:00:00
+2025-12-24T09:08:52.707750623Z [inf]  
+
+2025-12-24T09:08:52.713805947Z [inf]  Downloading python_dotenv-1.2.1-py3-none-any.whl (21 kB)
+
+2025-12-24T09:08:52.719626829Z [inf]  Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+
+2025-12-24T09:08:52.722549376Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 769.4 MB/s eta 0:00:00
+2025-12-24T09:08:52.722681844Z [inf]  
+
+2025-12-24T09:08:52.72862565Z [inf]  Downloading rsa-4.9.1-py3-none-any.whl (34 kB)
+
+2025-12-24T09:08:52.734510452Z [inf]  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+
+2025-12-24T09:08:52.740498887Z [inf]  Downloading starlette-0.50.0-py3-none-any.whl (74 kB)
+
+2025-12-24T09:08:52.746461927Z [inf]  Downloading anyio-4.12.0-py3-none-any.whl (113 kB)
+
+2025-12-24T09:08:52.752439606Z [inf]  Downloading idna-3.11-py3-none-any.whl (71 kB)
+
+2025-12-24T09:08:52.758517817Z [inf]  Downloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+
+2025-12-24T09:08:52.764477137Z [inf]  Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+
+2025-12-24T09:08:52.770373183Z [inf]  Downloading urllib3-2.6.2-py3-none-any.whl (131 kB)
+
+2025-12-24T09:08:52.776672862Z [inf]  Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+
+2025-12-24T09:08:52.79145042Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 334.3 MB/s eta 0:00:00
+2025-12-24T09:08:52.791519243Z [inf]  
+
+2025-12-24T09:08:52.797338741Z [inf]  Downloading watchfiles-1.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (456 kB)
+
+2025-12-24T09:08:52.804083559Z [inf]  Downloading websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (182 kB)
+
+2025-12-24T09:08:52.811029934Z [inf]  Downloading certifi-2025.11.12-py3-none-any.whl (159 kB)
+
+2025-12-24T09:08:52.817438713Z [inf]  Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+
+2025-12-24T09:08:52.823419719Z [inf]  Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (219 kB)
+
+2025-12-24T09:08:52.829427915Z [inf]  Downloading pycparser-2.23-py3-none-any.whl (118 kB)
+
+2025-12-24T09:08:53.006826497Z [inf]  Installing collected packages: websockets, uvloop, urllib3, typing-extensions, six, qrcode, pyyaml, python-multipart, python-dotenv, pycparser, pyasn1, psycopg2-binary, pillow, MarkupSafe, idna, httptools, h11, greenlet, click, certifi, annotated-types, annotated-doc, uvicorn, typing-inspection, sqlalchemy, rsa, pydantic-core, jinja2, httpcore, ecdsa, cloudinary, cffi, anyio, watchfiles, starlette, python-jose, pydantic, httpx, cryptography, pydantic-settings, fastapi
+
+2025-12-24T09:08:56.565721053Z [inf]  Successfully installed MarkupSafe-3.0.3 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.12.0 certifi-2025.11.12 cffi-2.0.0 click-8.3.1 cloudinary-1.44.1 cryptography-46.0.3 ecdsa-0.19.1 fastapi-0.127.0 greenlet-3.3.0 h11-0.16.0 httpcore-1.0.9 httptools-0.7.1 httpx-0.28.1 idna-3.11 jinja2-3.1.6 pillow-12.0.0 psycopg2-binary-2.9.11 pyasn1-0.6.1 pycparser-2.23 pydantic-2.12.5 pydantic-core-2.41.5 pydantic-settings-2.12.0 python-dotenv-1.2.1 python-jose-3.5.0 python-multipart-0.0.21 pyyaml-6.0.3 qrcode-8.2 rsa-4.9.1 six-1.17.0 sqlalchemy-2.0.45 starlette-0.50.0 typing-extensions-4.15.0 typing-inspection-0.4.2 urllib3-2.6.2 uvicorn-0.40.0 uvloop-0.22.1 watchfiles-1.1.1 websockets-15.0.1
+
+2025-12-24T09:08:56.996509062Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T09:08:56.997645519Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T09:08:57.101522904Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T09:08:57.102527672Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T09:08:57.229090076Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T09:09:03.279972614Z [inf]  [auth] sharing credentials for production-europe-west4-drams3a.railway-registry.com
+2025-12-24T09:09:03.280038162Z [inf]  [auth] sharing credentials for production-europe-west4-drams3a.railway-registry.com
+2025-12-24T09:09:04.445557074Z [inf]  importing to docker
+2025-12-24T09:09:15.141924522Z [inf]  importing to docker
+2025-12-24T09:09:30.914160912Z [inf]  === Successfully Built! ===
+2025-12-24T09:09:30.914191252Z [inf]  Run:
+2025-12-24T09:09:30.914195869Z [inf]  docker run -it production-europe-west4-drams3a.railway-registry.com/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a:61627b2c-862f-4f23-ace1-21e2b31a6293
+2025-12-24T09:09:31.055961145Z [inf]  [92mBuild time: 81.45 seconds[0m
+2025-12-24T09:09:48.492721314Z [inf]  
+2025-12-24T09:09:48.492794825Z [inf]  [35m====================
+Starting Healthcheck
+====================
+[0m
+2025-12-24T09:09:48.492798359Z [inf]  [37mPath: /[0m
+2025-12-24T09:09:48.492799876Z [inf]  [37mRetry window: 1m40s[0m
+2025-12-24T09:09:48.492800866Z [inf]  
+2025-12-24T09:09:58.681312737Z [inf]  [93mAttempt #1 failed with service unavailable. Continuing to retry for 1m29s[0m
+2025-12-24T09:09:59.831674553Z [inf]  [93mAttempt #2 failed with service unavailable. Continuing to retry for 1m28s[0m
+2025-12-24T09:10:02.021986370Z [inf]  [93mAttempt #3 failed with service unavailable. Continuing to retry for 1m26s[0m
+2025-12-24T09:10:06.179322639Z [inf]  [93mAttempt #4 failed with service unavailable. Continuing to retry for 1m22s[0m
+2025-12-24T09:10:14.332208012Z [inf]  [93mAttempt #5 failed with service unavailable. Continuing to retry for 1m14s[0m
+2025-12-24T09:10:30.500682629Z [inf]  [93mAttempt #6 failed with service unavailable. Continuing to retry for 58s[0m
+2025-12-24T09:11:00.656910550Z [inf]  [93mAttempt #7 failed with service unavailable. Continuing to retry for 27s[0m
+2025-12-24T09:11:00.731671147Z [inf]  
+2025-12-24T09:11:00.731761378Z [inf]  [91m1/1 replicas never became healthy![0m
+2025-12-24T09:11:00.731764427Z [inf]  [91mHealthcheck failed![0m

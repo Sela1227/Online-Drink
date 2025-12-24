@@ -118,15 +118,15 @@ templates.env.filters['taipei'] = to_taipei_time
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(home.router, tags=["home"])
+app.include_router(home.router, prefix="", tags=["home"])
 app.include_router(groups.router, prefix="/groups", tags=["groups"])
-app.include_router(orders.router, tags=["orders"])
+app.include_router(orders.router, prefix="", tags=["orders"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 # 開發模式路由
 if settings.debug:
     from app.routers import dev
-    app.include_router(dev.router, tags=["dev"])
+    app.include_router(dev.router, prefix="", tags=["dev"])
 
 
 @app.get("/")
