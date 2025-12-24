@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
+from urllib.parse import quote
 import qrcode
 import io
 import base64
@@ -13,7 +14,7 @@ from app.models.group import Group
 from app.models.store import Store, StoreBranch, CategoryType
 from app.models.menu import Menu
 from app.models.order import Order, OrderItem, OrderStatus
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_user_optional
 from app.services.export_service import generate_order_text, generate_payment_text
 
 router = APIRouter()
@@ -97,7 +98,15 @@ async def create_group(
 @router.get("/{group_id}")
 async def group_page(group_id: int, request: Request, db: Session = Depends(get_db)):
     """團單頁面"""
-    user = await get_current_user(request, db)
+    user, new_token = await get_current_user_optional(request, db)
+    
+    # 未登入：導向登入頁面，登入後回來
+    if not user:
+        next_url = f"/groups/{group_id}"
+        return RedirectResponse(
+            url=f"/auth/login?next={quote(next_url)}", 
+            status_code=302
+        )
     
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:

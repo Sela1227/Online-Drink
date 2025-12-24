@@ -18,7 +18,7 @@ settings = get_settings()
 
 
 @router.get("/login")
-async def login():
+async def login(request: Request, next: str = None):
     """導向 LINE 登入頁面"""
     state = secrets.token_urlsafe(32)  # 加長 state
     
@@ -42,6 +42,18 @@ async def login():
         samesite="lax",
         secure=True,
     )
+    
+    # 儲存 next URL（登入後要跳轉的頁面）
+    if next:
+        response.set_cookie(
+            key="login_next",
+            value=next,
+            httponly=True,
+            max_age=600,
+            samesite="lax",
+            secure=True,
+        )
+    
     return response
 
 
@@ -108,8 +120,16 @@ async def callback(request: Request, code: str, state: str, db: Session = Depend
         logger.info(f"[{request_id}] Token 建立成功，導向首頁")
         logger.info(f"[{request_id}] === 登入完成：{display_name} (id={user.id}) ===")
         
-        # 設定 cookie 並導向首頁
-        response = RedirectResponse(url="/home", status_code=302)
+        # 取得登入後要跳轉的頁面
+        next_url = request.cookies.get("login_next") or "/home"
+        # 安全檢查：只允許相對路徑
+        if not next_url.startswith("/") or next_url.startswith("//"):
+            next_url = "/home"
+        
+        logger.info(f"[{request_id}] 導向到: {next_url}")
+        
+        # 設定 cookie 並導向
+        response = RedirectResponse(url=next_url, status_code=302)
         response.set_cookie(
             key="access_token",
             value=token,
@@ -118,8 +138,9 @@ async def callback(request: Request, code: str, state: str, db: Session = Depend
             samesite="lax",
             secure=True,
         )
-        # 清除 oauth_state cookie
+        # 清除 oauth_state 和 login_next cookie
         response.delete_cookie("oauth_state")
+        response.delete_cookie("login_next")
         return response
         
     except Exception as e:
