@@ -355,6 +355,42 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
     return RedirectResponse(url="/admin/users", status_code=302)
 
 
+@router.get("/users/{user_id}")
+async def user_detail(user_id: int, request: Request, db: Session = Depends(get_db)):
+    """使用者詳細資訊頁面"""
+    admin = await get_admin_user(request, db)
+    
+    from app.models.user import User
+    from app.models.order import Order
+    from app.models.group import Group
+    
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="使用者不存在")
+    
+    # 取得該用戶的訂單
+    orders = db.query(Order).options(
+        joinedload(Order.group)
+    ).filter(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(20).all()
+    
+    # 取得該用戶開的團
+    groups = db.query(Group).filter(Group.owner_id == user_id).order_by(Group.created_at.desc()).limit(20).all()
+    
+    # 統計
+    order_count = db.query(Order).filter(Order.user_id == user_id).count()
+    group_count = db.query(Group).filter(Group.owner_id == user_id).count()
+    
+    return templates.TemplateResponse("admin/user_detail.html", {
+        "request": request,
+        "user": admin,
+        "target_user": target_user,
+        "orders": orders,
+        "groups": groups,
+        "order_count": order_count,
+        "group_count": group_count,
+    })
+
+
 @router.post("/users/logout-all")
 async def logout_all_users(request: Request, db: Session = Depends(get_db)):
     """一鍵登出所有用戶"""

@@ -40,9 +40,9 @@
     {% if users %}
     <div class="bg-white rounded-lg shadow-sm divide-y">
         {% for u in users %}
-        <div class="p-4 flex items-center gap-3">
-            <!-- 頭像 + 在線狀態 -->
-            <div class="relative w-10 h-10 flex-shrink-0">
+        <div class="p-4 flex items-center gap-3 hover:bg-gray-50 transition">
+            <!-- 頭像 + 在線狀態（可點擊） -->
+            <a href="/admin/users/{{ u.id }}" class="relative w-10 h-10 flex-shrink-0">
                 <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
                     {% if u.picture_url %}
                     <img src="{{ u.picture_url }}" alt="{{ u.display_name }}" class="w-full h-full object-cover">
@@ -54,12 +54,15 @@
                 {% if u.is_online %}
                 <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
                 {% endif %}
-            </div>
+            </a>
             
-            <!-- 資訊 -->
-            <div class="flex-1 min-w-0">
+            <!-- 資訊（可點擊） -->
+            <a href="/admin/users/{{ u.id }}" class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900 truncate">
-                    {{ u.display_name }}
+                    {{ u.show_name }}
+                    {% if u.nickname %}
+                    <span class="text-xs text-gray-400 font-normal">({{ u.display_name }})</span>
+                    {% endif %}
                     {% if u.is_admin %}
                     <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
                     {% endif %}
@@ -76,7 +79,7 @@
                     ・加入 {{ u.created_at.strftime('%Y-%m-%d') }}
                     ・{{ u.orders|length }} 筆訂單
                 </div>
-            </div>
+            </a>
             
             <!-- 操作 -->
             <div class="flex-shrink-0">

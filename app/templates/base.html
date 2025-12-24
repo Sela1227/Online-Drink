@@ -31,8 +31,12 @@
                 </a>
                 {% endif %}
                 {% if user %}
-                <span class="text-sm text-gray-500">{{ user.display_name }}</span>
-                <a href="/auth/logout" class="text-sm text-gray-400 hover:text-gray-600">登出</a>
+                <a href="/profile" class="text-sm text-gray-600 hover:text-orange-600 flex items-center gap-1">
+                    {% if user.picture_url %}
+                    <img src="{{ user.picture_url }}" class="w-6 h-6 rounded-full">
+                    {% endif %}
+                    <span>{{ user.show_name }}</span>
+                </a>
                 {% endif %}
             </div>
         </div>

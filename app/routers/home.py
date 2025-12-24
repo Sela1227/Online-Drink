@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, Form
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime
@@ -70,3 +71,38 @@ async def my_groups(request: Request, db: Session = Depends(get_db)):
         "user": user,
         "groups": groups,
     })
+
+
+@router.get("/profile")
+async def profile_page(request: Request, db: Session = Depends(get_db)):
+    """個人資料頁面"""
+    user = await get_current_user(request, db)
+    
+    # 統計資料
+    order_count = db.query(Order).filter(Order.user_id == user.id).count()
+    group_count = db.query(Group).filter(Group.owner_id == user.id).count()
+    
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "user": user,
+        "order_count": order_count,
+        "group_count": group_count,
+    })
+
+
+@router.post("/profile")
+async def update_profile(
+    request: Request,
+    nickname: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """更新個人資料"""
+    from app.models.user import User
+    
+    user = await get_current_user(request, db)
+    
+    # 更新暱稱（系統顯示名）
+    user.nickname = nickname.strip() if nickname else None
+    db.commit()
+    
+    return RedirectResponse(url="/profile?success=1", status_code=302)

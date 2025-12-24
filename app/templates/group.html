@@ -19,7 +19,7 @@
             </div>
             <div class="flex-1 min-w-0">
                 <h1 class="font-bold text-lg text-gray-900 truncate">{{ group.name }}</h1>
-                <div class="text-sm text-gray-500">{{ store.name }} · {{ group.owner.display_name }}</div>
+                <div class="text-sm text-gray-500">{{ store.name }} · {{ group.owner.show_name }}</div>
             </div>
             <div class="text-right">
                 {% if is_open %}
@@ -47,11 +47,11 @@
             </div>
             {% if is_owner or is_admin %}
             <div class="flex gap-3 items-center">
-                <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">設定</button>
+                <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">修改</button>
                 {% if is_open %}
                 <form action="/groups/{{ group.id }}/close" method="post" class="inline"
-                      onsubmit="return confirm('確定要關團嗎？')">
-                    <button type="submit" class="text-orange-600 hover:text-orange-700">關團</button>
+                      onsubmit="return confirm('確定要提早結單嗎？結單後將無法再點餐。')">
+                    <button type="submit" class="text-orange-600 hover:text-orange-700">提早結單</button>
                 </form>
                 {% endif %}
                 <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
@@ -116,7 +116,7 @@
                                 <option value="">請選擇...</option>
                                 {% for u in all_users %}
                                 {% if u.id != group.owner_id %}
-                                <option value="{{ u.id }}">{{ u.display_name }}</option>
+                                <option value="{{ u.id }}">{{ u.show_name }}</option>
                                 {% endif %}
                                 {% endfor %}
                             </select>
@@ -172,8 +172,20 @@
     <div class="bg-white rounded-lg shadow-sm p-4 pb-24">
         <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
         
+        <!-- 分類快速導覽 -->
+        {% if menu.categories|length > 1 %}
+        <div class="flex flex-wrap gap-2 mb-4 sticky top-0 bg-white py-2 -mx-4 px-4 border-b z-10">
+            {% for category in menu.categories %}
+            <button onclick="document.getElementById('category-{{ category.id }}').scrollIntoView({behavior: 'smooth', block: 'start'})"
+                    class="text-xs px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition">
+                {{ category.name }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
         {% for category in menu.categories %}
-        <div class="mb-4">
+        <div id="category-{{ category.id }}" class="mb-4 scroll-mt-16">
             <h3 class="text-sm font-medium text-gray-600 mb-2">{{ category.name }}</h3>
             <div class="space-y-2">
                 {% for item in category.items %}

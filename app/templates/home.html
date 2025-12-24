@@ -18,7 +18,12 @@
                 
                 <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
                 <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.display_name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
+                
+                <!-- 備註（簡短顯示） -->
+                {% if group.note %}
+                <div class="text-xs text-amber-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
+                {% endif %}
                 
                 <div class="absolute bottom-3 right-3">
                     {% if group.is_open %}
@@ -49,7 +54,12 @@
                 
                 <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
                 <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.display_name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
+                
+                <!-- 備註（簡短顯示） -->
+                {% if group.note %}
+                <div class="text-xs text-green-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
+                {% endif %}
                 
                 <div class="absolute bottom-3 right-3">
                     {% if group.is_open %}
@@ -85,7 +95,7 @@
                style="min-height: 120px;">
                 <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
                 <div class="text-xs text-gray-400 mt-1">{{ group.store.name }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ group.owner.display_name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
                 <div class="absolute bottom-3 right-3">
                     <span class="text-xs text-gray-400">已截止</span>
                 </div>

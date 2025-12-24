@@ -14,7 +14,8 @@ class User(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     line_user_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    display_name: Mapped[str] = mapped_column(String(100))
+    display_name: Mapped[str] = mapped_column(String(100))  # LINE 原始名稱
+    nickname: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 自訂暱稱
     picture_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -25,6 +26,11 @@ class User(Base):
     preset: Mapped["UserPreset | None"] = relationship(back_populates="user", uselist=False)
     groups: Mapped[list["Group"]] = relationship(back_populates="owner")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+    
+    @property
+    def show_name(self) -> str:
+        """顯示名稱（優先使用暱稱）"""
+        return self.nickname or self.display_name
     
     @property
     def is_online(self) -> bool:
