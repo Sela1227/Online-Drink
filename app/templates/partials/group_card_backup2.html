@@ -1,0 +1,68 @@
+<!-- 團單便利貼卡片 -->
+<a href="/groups/{{ group.id }}" 
+   class="block rounded-lg p-4 shadow hover:shadow-md transition relative
+          {% if group.category.value == 'drink' %}bg-amber-50
+          {% elif group.category.value == 'meal' %}bg-green-50
+          {% else %}bg-blue-50{% endif %}"
+   style="min-height: 130px;">
+    
+    <!-- 便利貼頂部膠帶效果 -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 rounded
+                {% if group.category.value == 'drink' %}bg-amber-200/70
+                {% elif group.category.value == 'meal' %}bg-green-200/70
+                {% else %}bg-blue-200/70{% endif %}"></div>
+    
+    <!-- Logo + 團名 -->
+    <div class="flex items-start gap-2">
+        {% if group.store.logo_url %}
+        <img src="{{ group.store.logo_url }}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0">
+        {% endif %}
+        <div class="flex-1 min-w-0">
+            <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+            <div class="text-xs text-gray-500">{{ group.store.name }}</div>
+        </div>
+    </div>
+    
+    <!-- 團主 -->
+    <div class="text-xs text-gray-400 mt-1">{{ group.owner.display_name }}</div>
+    
+    <!-- 備註 -->
+    {% if group.note %}
+    <div class="text-xs mt-1 truncate
+                {% if group.category.value == 'drink' %}text-amber-700
+                {% elif group.category.value == 'meal' %}text-green-700
+                {% else %}text-blue-700{% endif %}">
+        📝 {{ group.note }}
+    </div>
+    {% endif %}
+    
+    <!-- 底部：訂單統計 + 倒數 -->
+    <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+        <!-- 訂單統計 -->
+        <div class="text-xs text-gray-500">
+            {% set submitted_count = namespace(value=0) %}
+            {% set pending_count = namespace(value=0) %}
+            {% for order in group.orders %}
+                {% if order.status.value == 'submitted' %}
+                    {% set submitted_count.value = submitted_count.value + 1 %}
+                {% elif order.status.value in ['draft', 'editing'] %}
+                    {% set pending_count.value = pending_count.value + 1 %}
+                {% endif %}
+            {% endfor %}
+            {% if submitted_count.value > 0 %}
+            <span class="text-green-600">✓{{ submitted_count.value }}</span>
+            {% endif %}
+            {% if pending_count.value > 0 %}
+            <span class="text-orange-500 ml-1">🛒{{ pending_count.value }}</span>
+            {% endif %}
+        </div>
+        
+        <!-- 倒數計時 -->
+        <span class="text-xs font-medium
+                     {% if group.category.value == 'drink' %}text-orange-600
+                     {% elif group.category.value == 'meal' %}text-green-600
+                     {% else %}text-blue-600{% endif %}"
+              x-data="countdown('{{ group.deadline.isoformat() }}')"
+              x-text="display"></span>
+    </div>
+</a>

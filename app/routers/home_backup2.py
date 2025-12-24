@@ -1,6 +1,9 @@
 """
-home.py - 首頁路由
-修復版 2024/12/24
+home.py 修復版 v2
+
+修復問題：
+1. 時間到的團單移到已截止區（不管 is_closed 狀態）
+2. taipei filter 註冊
 """
 from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
@@ -17,7 +20,6 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
 
 # ===== 註冊台北時區過濾器 =====
 def to_taipei_time(dt):
@@ -43,7 +45,6 @@ async def home(
     one_week_ago = now - timedelta(days=7)
     
     # ===== 開放中的飲料團 =====
-    # 條件：未手動關閉 AND 未過期
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -80,7 +81,6 @@ async def home(
         groupbuy_groups = []
     
     # ===== 已截止區（最近一週） =====
-    # 條件：(手動關閉 OR 已過期) AND 最近一週內
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),

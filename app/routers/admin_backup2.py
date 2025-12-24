@@ -1,6 +1,14 @@
 """
+<<<<<<< HEAD
 admin.py - 管理後台路由
 修復版 2024/12/24
+=======
+admin.py 修復版
+
+修復問題：
+1. taipei filter 未註冊 - 使用者頁面黑屏
+2. 店家分類更新錯誤 - 大小寫轉換
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
 """
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.templating import Jinja2Templates
@@ -29,9 +37,15 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
 
+<<<<<<< HEAD
 
 # ===== 註冊台北時區過濾器 =====
 def to_taipei_time(dt):
+=======
+# ===== 重要：註冊台北時區過濾器 =====
+def to_taipei_time(dt):
+    """將 UTC 時間轉換為台北時間"""
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     if dt is None:
         return None
     taipei_tz = timezone(timedelta(hours=8))
@@ -51,6 +65,10 @@ async def admin_index(
     db: Session = Depends(get_db),
     user = Depends(get_admin_user)
 ):
+<<<<<<< HEAD
+=======
+    # 統計數據
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     stats = {
         "total_users": db.query(User).count(),
         "total_stores": db.query(Store).filter(Store.is_active == True).count(),
@@ -61,6 +79,10 @@ async def admin_index(
         ).count(),
     }
     
+<<<<<<< HEAD
+=======
+    # 在線人數
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
     try:
         online_count = db.query(User).filter(
@@ -87,6 +109,10 @@ async def store_list(
 ):
     query = db.query(Store).filter(Store.is_active == True)
     
+<<<<<<< HEAD
+=======
+    # 分類篩選
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     if category:
         try:
             cat_type = CategoryType(category.lower())
@@ -145,17 +171,32 @@ async def update_store(
     
     # ===== 修復：分類大小寫轉換 =====
     try:
+<<<<<<< HEAD
+=======
+        # 先嘗試小寫（PostgreSQL enum 是小寫）
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
         category_lower = category.lower()
         store.category = CategoryType(category_lower)
     except ValueError:
         try:
+<<<<<<< HEAD
             store.category = CategoryType[category.upper()]
         except KeyError:
+=======
+            # 如果失敗，嘗試用 name 取得
+            store.category = CategoryType[category.upper()]
+        except KeyError:
+            # 保持原值
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
             pass
     
     if phone:
         store.phone = phone
     
+<<<<<<< HEAD
+=======
+    # 上傳 Logo
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     if logo and logo.filename and upload_image:
         try:
             logo_url = await upload_image(logo, folder="store_logos")
@@ -177,6 +218,10 @@ async def delete_store(
 ):
     store = db.query(Store).filter(Store.id == store_id).first()
     if store:
+<<<<<<< HEAD
+=======
+        # 軟刪除
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
         store.is_active = False
         db.commit()
     
@@ -237,6 +282,10 @@ async def user_list(
 ):
     users = db.query(User).order_by(User.created_at.desc()).all()
     
+<<<<<<< HEAD
+=======
+    # 計算在線人數
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
     try:
         online_count = db.query(User).filter(
@@ -265,11 +314,19 @@ async def user_detail(
     if not target_user:
         raise HTTPException(status_code=404, detail="用戶不存在")
     
+<<<<<<< HEAD
+=======
+    # 取得該用戶的訂單統計
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     order_count = db.query(Order).filter(
         Order.user_id == user_id,
         Order.status == OrderStatus.SUBMITTED
     ).count()
     
+<<<<<<< HEAD
+=======
+    # 取得該用戶開過的團
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     group_count = db.query(Group).filter(Group.owner_id == user_id).count()
     
     return templates.TemplateResponse("admin/user_detail.html", {
@@ -301,8 +358,15 @@ async def force_logout_user(
     db: Session = Depends(get_db),
     admin = Depends(get_admin_user)
 ):
+<<<<<<< HEAD
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
+=======
+    """強制登出特定用戶"""
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        # 清除活動時間，讓 token 驗證失敗
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
         target_user.last_active_at = None
         db.commit()
     
@@ -314,6 +378,11 @@ async def logout_all_users(
     db: Session = Depends(get_db),
     admin = Depends(get_admin_user)
 ):
+<<<<<<< HEAD
+=======
+    """一鍵登出所有用戶"""
+    # 更新系統 token 版本
+>>>>>>> 4b452d7a8c1a7e6d24fe5ae82e5328c0a33453d5
     try:
         from app.models.system import SystemSetting
         setting = db.query(SystemSetting).filter(
