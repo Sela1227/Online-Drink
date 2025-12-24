@@ -1,51 +1,42 @@
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.store import CategoryType, Store
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_user_optional
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+# 加入台北時區過濾器
+def to_taipei_time(dt):
+    """將 UTC 時間轉換為台北時間 (UTC+8)"""
+    if dt is None:
+        return None
+    taipei_tz = timezone(timedelta(hours=8))
+    utc_dt = dt.replace(tzinfo=timezone.utc)
+    return utc_dt.astimezone(taipei_tz)
 
-def get_hot_items(db: Session, limit: int = 10):
-    """取得全站熱門品項（最近 30 天）"""
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    
-    hot_items = db.query(
-        OrderItem.item_name,
-        Store.name.label('store_name'),
-        Store.logo_url.label('store_logo'),
-        func.sum(OrderItem.quantity).label('total_qty'),
-    ).join(Order).join(Group).join(Store).filter(
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= thirty_days_ago,
-    ).group_by(
-        OrderItem.item_name,
-        Store.name,
-        Store.logo_url,
-    ).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(limit).all()
-    
-    return hot_items
+templates.env.filters['taipei'] = to_taipei_time
 
 
-@router.get("/home")
-async def home(request: Request, db: Session = Depends(get_db)):
-    """首頁 - 團列表"""
-    user = await get_current_user(request, db)
-    
+@router.get("")
+async def home(
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
     now = datetime.utcnow()
+    one_week_ago = now - timedelta(days=7)
     
-    # 開放中的飲料團（eager load orders 和 store）
+    # ===== 開放中的飲料團 =====
+    # 必須未關團 AND 未截止
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -53,10 +44,10 @@ async def home(request: Request, db: Session = Depends(get_db)):
     ).filter(
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
-        Group.deadline > now,
+        Group.deadline > now,  # 未截止
     ).order_by(Group.deadline.asc()).all()
     
-    # 開放中的訂餐團
+    # ===== 開放中的餐點團 =====
     meal_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -64,10 +55,10 @@ async def home(request: Request, db: Session = Depends(get_db)):
     ).filter(
         Group.category == CategoryType.MEAL,
         Group.is_closed == False,
-        Group.deadline > now,
+        Group.deadline > now,  # 未截止
     ).order_by(Group.deadline.asc()).all()
     
-    # 開放中的團購團（新類型，可能不存在）
+    # ===== 開放中的團購團 =====
     try:
         groupbuy_groups = db.query(Group).options(
             joinedload(Group.store),
@@ -76,22 +67,45 @@ async def home(request: Request, db: Session = Depends(get_db)):
         ).filter(
             Group.category == CategoryType.GROUP_BUY,
             Group.is_closed == False,
-            Group.deadline > now,
+            Group.deadline > now,  # 未截止
         ).order_by(Group.deadline.asc()).all()
     except Exception:
-        db.rollback()
         groupbuy_groups = []
     
-    # 已截止的團（最近 10 個）
+    # ===== 已截止區（最近一週內） =====
+    # 截止條件：已關團 OR 已過 deadline
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
-        joinedload(Group.owner)
+        joinedload(Group.owner),
+        joinedload(Group.orders)
     ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
-    ).order_by(Group.deadline.desc()).limit(10).all()
+        or_(
+            Group.is_closed == True,
+            Group.deadline <= now
+        ),
+        # 最近一週內
+        or_(
+            Group.deadline >= one_week_ago,
+            Group.updated_at >= one_week_ago
+        )
+    ).order_by(Group.deadline.desc()).limit(20).all()
     
-    # 超夯清單（全站熱門）
-    hot_items = get_hot_items(db, limit=10)
+    # ===== 歷史區（超過一週，只有管理員能看） =====
+    history_groups = []
+    if user.is_admin:
+        history_groups = db.query(Group).options(
+            joinedload(Group.store),
+            joinedload(Group.owner),
+            joinedload(Group.orders)
+        ).filter(
+            or_(
+                Group.is_closed == True,
+                Group.deadline <= now
+            ),
+            # 超過一週
+            Group.deadline < one_week_ago,
+            Group.updated_at < one_week_ago
+        ).order_by(Group.deadline.desc()).limit(30).all()
     
     return templates.TemplateResponse("home.html", {
         "request": request,
@@ -100,19 +114,21 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "meal_groups": meal_groups,
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
-        "hot_items": hot_items,
-        "now": now,
+        "history_groups": history_groups,
     })
 
 
-@router.get("/home/groups")
-async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
-    """首頁團單列表（HTMX partial）"""
-    user = await get_current_user(request, db)
-    
+@router.get("/groups")
+async def home_groups(
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    """HTMX: 刷新首頁團單列表"""
     now = datetime.utcnow()
+    one_week_ago = now - timedelta(days=7)
     
-    # 開放中的飲料團
+    # ===== 開放中的飲料團 =====
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -123,7 +139,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
-    # 開放中的訂餐團
+    # ===== 開放中的餐點團 =====
     meal_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -134,7 +150,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
-    # 開放中的團購團
+    # ===== 開放中的團購團 =====
     try:
         groupbuy_groups = db.query(Group).options(
             joinedload(Group.store),
@@ -146,19 +162,39 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
             Group.deadline > now,
         ).order_by(Group.deadline.asc()).all()
     except Exception:
-        db.rollback()
         groupbuy_groups = []
     
-    # 已截止的團（最近 10 個）
+    # ===== 已截止區（最近一週內） =====
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
-        joinedload(Group.owner)
+        joinedload(Group.owner),
+        joinedload(Group.orders)
     ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
-    ).order_by(Group.deadline.desc()).limit(10).all()
+        or_(
+            Group.is_closed == True,
+            Group.deadline <= now
+        ),
+        or_(
+            Group.deadline >= one_week_ago,
+            Group.updated_at >= one_week_ago
+        )
+    ).order_by(Group.deadline.desc()).limit(20).all()
     
-    # 超夯清單
-    hot_items = get_hot_items(db, limit=10)
+    # ===== 歷史區（超過一週，只有管理員能看） =====
+    history_groups = []
+    if user.is_admin:
+        history_groups = db.query(Group).options(
+            joinedload(Group.store),
+            joinedload(Group.owner),
+            joinedload(Group.orders)
+        ).filter(
+            or_(
+                Group.is_closed == True,
+                Group.deadline <= now
+            ),
+            Group.deadline < one_week_ago,
+            Group.updated_at < one_week_ago
+        ).order_by(Group.deadline.desc()).limit(30).all()
     
     return templates.TemplateResponse("partials/home_groups.html", {
         "request": request,
@@ -167,95 +203,26 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "meal_groups": meal_groups,
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
-        "hot_items": hot_items,
+        "history_groups": history_groups,
     })
 
 
-@router.get("/my/groups")
-async def my_groups(request: Request, db: Session = Depends(get_db)):
-    """我參與過的團單"""
-    user = await get_current_user(request, db)
-    
-    # 我開的團 + 我有下單的團
-    my_group_ids = db.query(Order.group_id).filter(Order.user_id == user.id).distinct()
-    
-    groups = db.query(Group).filter(
-        or_(
-            Group.owner_id == user.id,
-            Group.id.in_(my_group_ids)
-        )
-    ).order_by(Group.created_at.desc()).all()
-    
-    return templates.TemplateResponse("my_groups.html", {
-        "request": request,
-        "user": user,
-        "groups": groups,
-    })
-
-
-@router.get("/profile")
-async def profile_page(request: Request, db: Session = Depends(get_db)):
-    """個人資料頁面"""
-    user = await get_current_user(request, db)
-    
-    # 統計資料
-    order_count = db.query(Order).filter(Order.user_id == user.id).count()
-    group_count = db.query(Group).filter(Group.owner_id == user.id).count()
-    
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
-        "user": user,
-        "order_count": order_count,
-        "group_count": group_count,
-    })
-
-
-@router.get("/welcome")
-async def welcome_page(request: Request, db: Session = Depends(get_db)):
-    """首次登入歡迎頁面"""
-    user = await get_current_user(request, db)
-    
-    return templates.TemplateResponse("welcome.html", {
-        "request": request,
-        "user": user,
-    })
-
-
-@router.post("/welcome")
-async def complete_welcome(
+@router.get("/my-orders")
+async def my_orders(
     request: Request,
-    nickname: str = Form(""),
     db: Session = Depends(get_db),
+    user = Depends(get_current_user)
 ):
-    """完成首次設定"""
-    user = await get_current_user(request, db)
+    """我的訂單列表"""
+    orders = db.query(Order).options(
+        joinedload(Order.group).joinedload(Group.store),
+        joinedload(Order.items).joinedload(OrderItem.menu_item)
+    ).filter(
+        Order.user_id == user.id
+    ).order_by(Order.created_at.desc()).limit(50).all()
     
-    # 設定暱稱（空白則用 LINE 名稱，但標記為已設定）
-    nickname = nickname.strip()
-    if nickname:
-        user.nickname = nickname
-    else:
-        # 使用 LINE 名稱，但設定為相同值表示已完成設定
-        user.nickname = user.display_name
-    
-    db.commit()
-    
-    return RedirectResponse(url="/home", status_code=302)
-
-
-@router.post("/profile")
-async def update_profile(
-    request: Request,
-    nickname: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    """更新個人資料"""
-    from app.models.user import User
-    
-    user = await get_current_user(request, db)
-    
-    # 更新暱稱（系統顯示名）
-    user.nickname = nickname.strip() if nickname else None
-    db.commit()
-    
-    return RedirectResponse(url="/profile?success=1", status_code=302)
+    return templates.TemplateResponse("my_orders.html", {
+        "request": request,
+        "user": user,
+        "orders": orders,
+    })
