@@ -25,9 +25,18 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     user = await get_admin_user(request, db)
     
     from app.models.user import User
+    from datetime import datetime, timedelta
+    
     store_count = db.query(Store).count()
     group_count = db.query(Group).count()
     user_count = db.query(User).count()
+    
+    # 計算在線人數
+    online_threshold = datetime.utcnow() - timedelta(minutes=30)
+    online_count = db.query(User).filter(
+        User.last_active_at != None,
+        User.last_active_at > online_threshold
+    ).count()
     
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
@@ -35,6 +44,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "store_count": store_count,
         "group_count": group_count,
         "user_count": user_count,
+        "online_count": online_count,
     })
 
 
@@ -301,13 +311,27 @@ async def user_list(request: Request, db: Session = Depends(get_db)):
     """使用者列表"""
     user = await get_admin_user(request, db)
     
-    from app.models.user import User
+    from app.models.user import User, SystemSetting
+    from datetime import datetime, timedelta
+    
     users = db.query(User).order_by(User.created_at.desc()).all()
+    
+    # 計算在線人數（30分鐘內有活動）
+    online_threshold = datetime.utcnow() - timedelta(minutes=30)
+    online_count = db.query(User).filter(
+        User.last_active_at != None,
+        User.last_active_at > online_threshold
+    ).count()
+    
+    # 取得系統設定
+    system_setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
     
     return templates.TemplateResponse("admin/users.html", {
         "request": request,
         "user": user,
         "users": users,
+        "online_count": online_count,
+        "system_setting": system_setting,
     })
 
 
@@ -329,6 +353,26 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
     db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=302)
+
+
+@router.post("/users/logout-all")
+async def logout_all_users(request: Request, db: Session = Depends(get_db)):
+    """一鍵登出所有用戶"""
+    admin = await get_admin_user(request, db)
+    
+    from app.models.user import SystemSetting
+    import logging
+    logger = logging.getLogger("admin")
+    
+    # 增加 token_version，讓所有舊 token 失效
+    system_setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    if system_setting:
+        old_version = system_setting.token_version
+        system_setting.token_version += 1
+        db.commit()
+        logger.info(f"管理員 {admin.display_name} 執行一鍵登出，token_version: {old_version} → {system_setting.token_version}")
+    
+    return RedirectResponse(url="/admin/users?logout_all=success", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches")

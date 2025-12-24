@@ -44,6 +44,16 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("stores", "phone", "VARCHAR(50)")
     add_column_if_not_exists("stores", "branch", "VARCHAR(100)")
     add_column_if_not_exists("groups", "branch_id", "INTEGER")
+    add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
+    add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
+    
+    # 確保 system_settings 有初始資料
+    from app.models.user import SystemSetting
+    with engine.begin() as conn:
+        result = conn.execute(text("SELECT COUNT(*) FROM system_settings"))
+        if result.scalar() == 0:
+            conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
+            print("Created initial system_settings")
     
     # 確保目錄存在
     os.makedirs("app/static/images", exist_ok=True)

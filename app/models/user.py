@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, JSON, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, JSON, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -18,11 +18,21 @@ class User(Base):
     picture_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     
     # Relationships
     preset: Mapped["UserPreset | None"] = relationship(back_populates="user", uselist=False)
     groups: Mapped[list["Group"]] = relationship(back_populates="owner")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+    
+    @property
+    def is_online(self) -> bool:
+        """判斷用戶是否在線（30分鐘內有活動）"""
+        if not self.last_active_at:
+            return False
+        from datetime import timedelta
+        return (datetime.utcnow() - self.last_active_at) < timedelta(minutes=30)
 
 
 class UserPreset(Base):
@@ -35,3 +45,13 @@ class UserPreset(Base):
     
     # Relationships
     user: Mapped["User"] = relationship(back_populates="preset")
+
+
+class SystemSetting(Base):
+    """系統設定（單一 row）"""
+    __tablename__ = "system_settings"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_version: Mapped[int] = mapped_column(Integer, default=1)
+    announcement: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -111,13 +111,18 @@ async def callback(request: Request, code: str, state: str, db: Session = Depend
             logger.error(f"[{request_id}] DB 記錄: {user.line_user_id}")
             return RedirectResponse(url="/?error=user_mismatch", status_code=302)
         
+        # 取得系統 token 版本
+        from app.services.auth import get_system_token_version
+        token_version = get_system_token_version(db)
+        
         # 建立 JWT token（包含更多驗證資訊）
         token = create_access_token(
             user_id=user.id,
-            line_user_id=line_user_id
+            line_user_id=line_user_id,
+            token_version=token_version
         )
         
-        logger.info(f"[{request_id}] Token 建立成功，導向首頁")
+        logger.info(f"[{request_id}] Token 建立成功（版本：{token_version}）")
         logger.info(f"[{request_id}] === 登入完成：{display_name} (id={user.id}) ===")
         
         # 取得登入後要跳轉的頁面
