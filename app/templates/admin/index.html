@@ -26,6 +26,21 @@
         </a>
     </div>
     
+    <!-- 公告設定 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">📢 首頁公告</h2>
+        <form action="/admin/announcement" method="POST">
+            <textarea name="announcement" rows="3" 
+                      class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="輸入公告內容（留空則不顯示）">{{ announcement or '' }}</textarea>
+            <div class="flex justify-end mt-2">
+                <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                    儲存公告
+                </button>
+            </div>
+        </form>
+    </div>
+    
     <!-- 快捷功能 -->
     <div class="bg-white rounded-lg shadow-sm divide-y">
         <a href="/admin/import" class="flex items-center justify-between p-4 hover:bg-gray-50">

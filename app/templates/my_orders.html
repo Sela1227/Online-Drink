@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}我的訂單 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- 標題 -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">📋 我的訂單</h1>
+        <span class="text-sm text-gray-500">共 {{ total }} 筆</span>
+    </div>
+    
+    {% if orders %}
+    <div class="space-y-3">
+        {% for order in orders %}
+        <a href="/groups/{{ order.group.id }}" class="block bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div class="flex items-start gap-3">
+                <!-- Logo -->
+                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {% if order.group.store.logo_url %}
+                    <img src="{{ order.group.store.logo_url }}" alt="{{ order.group.store.name }}" class="w-full h-full object-contain">
+                    {% else %}
+                    <span class="text-2xl">
+                        {% if order.group.category.value == 'drink' %}🧋
+                        {% elif order.group.category.value == 'meal' %}🍱
+                        {% else %}🛒{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <!-- 資訊 -->
+                <div class="flex-1 min-w-0">
+                    <div class="font-medium text-gray-800 truncate">{{ order.group.name }}</div>
+                    <div class="text-sm text-gray-500">{{ order.group.store.name }}</div>
+                    <div class="text-xs text-gray-400 mt-1">
+                        {{ order.created_at.strftime('%Y/%m/%d %H:%M') }}
+                    </div>
+                    <!-- 訂單內容摘要 -->
+                    <div class="text-sm text-gray-600 mt-2">
+                        {% for item in order.items[:3] %}
+                        <span class="inline-block bg-gray-100 px-2 py-0.5 rounded text-xs mr-1 mb-1">
+                            {{ item.item_name }}{% if item.quantity > 1 %} ×{{ item.quantity }}{% endif %}
+                        </span>
+                        {% endfor %}
+                        {% if order.items|length > 3 %}
+                        <span class="text-xs text-gray-400">+{{ order.items|length - 3 }} 項</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- 狀態與金額 -->
+                <div class="flex-shrink-0 text-right">
+                    {% if order.status.value == 'submitted' %}
+                    <span class="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">已送出</span>
+                    {% elif order.status.value == 'draft' %}
+                    <span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">草稿</span>
+                    {% else %}
+                    <span class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">編輯中</span>
+                    {% endif %}
+                    <div class="text-sm font-medium text-orange-500 mt-1">${{ order.total_amount|int }}</div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    
+    <!-- 分頁 -->
+    {% if total_pages > 1 %}
+    <div class="flex justify-center gap-2 py-4">
+        {% if page > 1 %}
+        <a href="/my-orders?page={{ page - 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">上一頁</a>
+        {% endif %}
+        
+        <span class="px-3 py-1 text-sm text-gray-600">{{ page }} / {{ total_pages }}</span>
+        
+        {% if page < total_pages %}
+        <a href="/my-orders?page={{ page + 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">下一頁</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="text-center py-12 text-gray-500">
+        <p>還沒有訂單記錄</p>
+        <a href="/home" class="text-orange-500 text-sm mt-2 inline-block">去看看有什麼團 →</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

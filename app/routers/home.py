@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.store import CategoryType, Store
+from app.models.user import SystemSetting
 from app.services.auth import get_current_user
 
 router = APIRouter()
@@ -108,6 +109,10 @@ async def home(request: Request, db: Session = Depends(get_db)):
     # 超夯清單（全站熱門）
     hot_items = get_hot_items(db, limit=10)
     
+    # 公告
+    settings = db.query(SystemSetting).first()
+    announcement = settings.announcement if settings else None
+    
     return templates.TemplateResponse("home.html", {
         "request": request,
         "user": user,
@@ -116,6 +121,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
+        "announcement": announcement,
         "now": now,
     })
 
@@ -177,6 +183,10 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     # 超夯清單
     hot_items = get_hot_items(db, limit=10)
     
+    # 公告
+    settings = db.query(SystemSetting).first()
+    announcement = settings.announcement if settings else None
+    
     return templates.TemplateResponse("partials/home_groups.html", {
         "request": request,
         "user": user,
@@ -185,6 +195,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
+        "announcement": announcement,
     })
 
 
@@ -276,3 +287,70 @@ async def update_profile(
     db.commit()
     
     return RedirectResponse(url="/profile?success=1", status_code=302)
+
+
+@router.get("/history")
+async def history(request: Request, page: int = 1, db: Session = Depends(get_db)):
+    """歷史團單列表"""
+    user = await get_current_user(request, db)
+    
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz).replace(tzinfo=None)
+    
+    per_page = 20
+    offset = (page - 1) * per_page
+    
+    # 總數
+    total = db.query(Group).filter(
+        or_(Group.is_closed == True, Group.deadline <= now)
+    ).count()
+    
+    # 分頁查詢
+    closed_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
+        or_(Group.is_closed == True, Group.deadline <= now)
+    ).order_by(Group.deadline.desc()).offset(offset).limit(per_page).all()
+    
+    total_pages = (total + per_page - 1) // per_page
+    
+    return templates.TemplateResponse("history.html", {
+        "request": request,
+        "user": user,
+        "groups": closed_groups,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
+    })
+
+
+@router.get("/my-orders")
+async def my_orders(request: Request, page: int = 1, db: Session = Depends(get_db)):
+    """我的訂單歷史"""
+    user = await get_current_user(request, db)
+    
+    per_page = 20
+    offset = (page - 1) * per_page
+    
+    # 總數
+    total = db.query(Order).filter(Order.user_id == user.id).count()
+    
+    # 分頁查詢
+    orders = db.query(Order).options(
+        joinedload(Order.group).joinedload(Group.store)
+    ).filter(
+        Order.user_id == user.id
+    ).order_by(Order.created_at.desc()).offset(offset).limit(per_page).all()
+    
+    total_pages = (total + per_page - 1) // per_page
+    
+    return templates.TemplateResponse("my_orders.html", {
+        "request": request,
+        "user": user,
+        "orders": orders,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
+    })

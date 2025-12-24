@@ -1,4 +1,17 @@
 <div class="space-y-6">
+    <!-- 公告 -->
+    {% if announcement %}
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-start gap-2">
+            <span class="text-xl">📢</span>
+            <div class="flex-1">
+                <div class="font-medium text-blue-800 mb-1">公告</div>
+                <div class="text-sm text-blue-700 whitespace-pre-line">{{ announcement }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- 超夯清單 -->
     {% if hot_items %}
     <section x-data="{ showHot: false }">
@@ -79,22 +92,27 @@
             <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
             已截止 <span class="text-sm font-normal">({{ closed_groups|length }})</span>
         </h2>
-        <div x-show="showClosed" x-collapse class="grid grid-cols-2 gap-3 opacity-60">
-            {% for group in closed_groups %}
-            <a href="/groups/{{ group.id }}" 
-               class="block bg-gray-100 rounded-lg p-3 shadow relative">
-                <div class="flex items-start gap-2">
-                    {% if group.store.logo_url %}
-                    <img src="{{ group.store.logo_url }}" class="w-8 h-8 rounded object-contain bg-white flex-shrink-0">
-                    {% endif %}
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
-                        <div class="text-xs text-gray-400">{{ group.store.name }}</div>
+        <div x-show="showClosed" x-collapse>
+            <div class="grid grid-cols-2 gap-3 opacity-60">
+                {% for group in closed_groups %}
+                <a href="/groups/{{ group.id }}" 
+                   class="block bg-gray-100 rounded-lg p-3 shadow relative">
+                    <div class="flex items-start gap-2">
+                        {% if group.store.logo_url %}
+                        <img src="{{ group.store.logo_url }}" class="w-8 h-8 rounded object-contain bg-white flex-shrink-0">
+                        {% endif %}
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
+                            <div class="text-xs text-gray-400">{{ group.store.name }}</div>
+                        </div>
                     </div>
-                </div>
-                <div class="text-xs text-gray-400 mt-2">{{ group.owner.show_name }} · 已截止</div>
+                    <div class="text-xs text-gray-400 mt-2">{{ group.owner.show_name }} · 已截止</div>
+                </a>
+                {% endfor %}
+            </div>
+            <a href="/history" class="block text-center text-sm text-gray-500 mt-3 py-2 hover:text-orange-500">
+                查看全部歷史 →
             </a>
-            {% endfor %}
         </div>
     </section>
     {% endif %}

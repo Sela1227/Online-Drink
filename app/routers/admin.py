@@ -52,6 +52,11 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         User.last_active_at > online_threshold
     ).count()
     
+    # 取得公告
+    from app.models.user import SystemSetting
+    settings_row = db.query(SystemSetting).first()
+    announcement = settings_row.announcement if settings_row else None
+    
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
         "user": user,
@@ -59,6 +64,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "group_count": group_count,
         "user_count": user_count,
         "online_count": online_count,
+        "announcement": announcement,
     })
 
 
@@ -485,3 +491,27 @@ async def delete_branch(
         db.commit()
     
     return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+
+
+@router.post("/announcement")
+async def update_announcement(
+    request: Request,
+    announcement: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """更新首頁公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import SystemSetting
+    
+    settings = db.query(SystemSetting).first()
+    if settings:
+        settings.announcement = announcement.strip() if announcement.strip() else None
+        settings.updated_at = datetime.utcnow()
+    else:
+        settings = SystemSetting(announcement=announcement.strip() if announcement.strip() else None)
+        db.add(settings)
+    
+    db.commit()
+    
+    return RedirectResponse(url="/admin", status_code=302)
