@@ -44,16 +44,19 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
-    # 開放中的團購團
-    groupbuy_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        Group.category == CategoryType.GROUP_BUY,
-        Group.is_closed == False,
-        Group.deadline > now,
-    ).order_by(Group.deadline.asc()).all()
+    # 開放中的團購團（新類型，可能不存在）
+    try:
+        groupbuy_groups = db.query(Group).options(
+            joinedload(Group.store),
+            joinedload(Group.owner),
+            joinedload(Group.orders)
+        ).filter(
+            Group.category == CategoryType.GROUP_BUY,
+            Group.is_closed == False,
+            Group.deadline > now,
+        ).order_by(Group.deadline.asc()).all()
+    except Exception:
+        groupbuy_groups = []
     
     # 已截止的團（最近 10 個）
     closed_groups = db.query(Group).options(

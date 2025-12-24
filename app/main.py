@@ -49,6 +49,22 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
     
+    # 添加新的 enum 值（團購類型）
+    def add_enum_value_if_not_exists(enum_name: str, new_value: str):
+        try:
+            with engine.begin() as conn:
+                # 檢查值是否已存在
+                result = conn.execute(text(f"SELECT 1 FROM pg_enum WHERE enumlabel = '{new_value}' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = '{enum_name}')"))
+                if result.fetchone() is None:
+                    conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{new_value}'"))
+                    print(f"Added enum value: {enum_name}.{new_value}")
+                else:
+                    print(f"Enum value {enum_name}.{new_value} check: OK")
+        except Exception as e:
+            print(f"Enum {enum_name}.{new_value} check: {e}")
+    
+    add_enum_value_if_not_exists("categorytype", "group_buy")
+    
     # 確保 system_settings 有初始資料
     from app.models.user import SystemSetting
     try:
