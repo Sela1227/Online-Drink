@@ -49,11 +49,20 @@ async def lifespan(app: FastAPI):
     
     # 確保 system_settings 有初始資料
     from app.models.user import SystemSetting
-    with engine.begin() as conn:
-        result = conn.execute(text("SELECT COUNT(*) FROM system_settings"))
-        if result.scalar() == 0:
-            conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
-            print("Created initial system_settings")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM system_settings"))
+            count = result.scalar()
+            if count == 0:
+                conn.execute(text("INSERT INTO system_settings (id, token_version, updated_at) VALUES (1, 1, NOW())"))
+                print("Created initial system_settings")
+            else:
+                # 修復可能的 NULL updated_at
+                conn.execute(text("UPDATE system_settings SET updated_at = NOW() WHERE updated_at IS NULL"))
+                print("system_settings check: OK")
+    except Exception as e:
+        # 表可能不存在，SQLAlchemy 會自動建立
+        print(f"system_settings check: {e}")
     
     # 確保目錄存在
     os.makedirs("app/static/images", exist_ok=True)
