@@ -308,12 +308,13 @@ async def update_store(
     
     store.name = name
     
-    # 安全轉換分類
-    try:
-        store.category = CategoryType(category)
-    except ValueError:
-        # 如果轉換失敗，保持原來的分類
-        pass
+    # 安全轉換分類 - 使用 raw SQL 避免 enum 大小寫問題
+    if category in ('drink', 'meal', 'group_buy'):
+        from sqlalchemy import text
+        db.execute(
+            text("UPDATE stores SET category = :cat WHERE id = :id"),
+            {"cat": category, "id": store_id}
+        )
     
     # 處理 Logo 上傳 (使用 Cloudinary)
     if logo_file and logo_file.filename:
