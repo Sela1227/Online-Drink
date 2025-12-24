@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}我的部門 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">👥 我的部門</h1>
+        <a href="/profile" class="text-gray-500 hover:text-gray-700">← 返回</a>
+    </div>
+    
+    {% if request.query_params.get('success') %}
+    <div class="bg-green-50 text-green-700 px-4 py-3 rounded-lg">
+        ✅ 已更新部門設定
+    </div>
+    {% endif %}
+    
+    <!-- 已加入的部門 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">已加入的部門</h2>
+        
+        {% if my_departments %}
+        <div class="space-y-2">
+            {% for ud in my_departments %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                    <span class="font-medium text-gray-800">{{ ud.department.name }}</span>
+                    {% if ud.role.value == 'leader' %}
+                    <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded ml-2">小組長</span>
+                    {% endif %}
+                </div>
+                <form action="/my-departments/{{ ud.department_id }}/leave" method="POST"
+                      onsubmit="return confirm('確定要離開此部門？')">
+                    <button type="submit" class="text-sm text-red-500 hover:text-red-600">退出</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">尚未加入任何部門</p>
+        {% endif %}
+    </div>
+    
+    <!-- 可加入的部門 -->
+    {% if available_departments %}
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">可加入的部門</h2>
+        <div class="space-y-2">
+            {% for dept in available_departments %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                    <span class="font-medium text-gray-800">{{ dept.name }}</span>
+                    {% if dept.description %}
+                    <p class="text-xs text-gray-500 mt-1">{{ dept.description }}</p>
+                    {% endif %}
+                    <p class="text-xs text-gray-400 mt-1">{{ dept.member_count }} 位成員</p>
+                </div>
+                <form action="/my-departments/{{ dept.id }}/join" method="POST">
+                    <button type="submit" class="text-sm bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">
+                        加入
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="text-center text-sm text-gray-400 py-4">
+        💡 部門功能可讓團單只顯示給特定部門的人
+    </div>
+</div>
+{% endblock %}

@@ -45,10 +45,15 @@ async def new_group_page(request: Request, db: Session = Depends(get_db)):
         joinedload(Store.branches)
     ).filter(Store.is_active == True).all()
     
+    # 取得啟用中的部門
+    from app.models.department import Department
+    departments = db.query(Department).filter(Department.is_active == True).all()
+    
     return templates.TemplateResponse("group_new.html", {
         "request": request,
         "user": user,
         "stores": stores,
+        "departments": departments,
     })
 
 
@@ -61,6 +66,7 @@ async def create_group(
     note: str = Form(None),
     branch_id: int = Form(None),
     delivery_fee: float = Form(None),
+    visibility: str = Form("public"),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
     lock_sugar: bool = Form(False),
@@ -71,6 +77,10 @@ async def create_group(
     from decimal import Decimal
     
     user = await get_current_user(request, db)
+    
+    # 取得 department_ids（多選）
+    form_data = await request.form()
+    department_ids = form_data.getlist("department_ids")
     
     # 取得店家
     store = db.query(Store).filter(Store.id == store_id).first()
@@ -91,6 +101,9 @@ async def create_group(
     except ValueError:
         raise HTTPException(status_code=400, detail="截止時間格式錯誤")
     
+    # 判斷是否公開
+    is_public = visibility == "public"
+    
     # 建立團單
     group = Group(
         store_id=store_id,
@@ -101,6 +114,7 @@ async def create_group(
         note=note.strip() if note else None,
         category=store.category,
         deadline=deadline_dt,
+        is_public=is_public,
         delivery_fee=Decimal(str(delivery_fee)) if delivery_fee and delivery_fee > 0 else None,
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
@@ -108,6 +122,15 @@ async def create_group(
         lock_ice=lock_ice if store.category == CategoryType.DRINK else False,
     )
     db.add(group)
+    db.flush()  # 取得 group.id
+    
+    # 如果選擇限定部門，建立關聯
+    if not is_public and department_ids:
+        from app.models.department import GroupDepartment
+        for dept_id in department_ids:
+            gd = GroupDepartment(group_id=group.id, department_id=int(dept_id))
+            db.add(gd)
+    
     db.commit()
     db.refresh(group)
     
@@ -385,10 +408,15 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
     # 取得店家選項
     stores = db.query(Store).filter(Store.is_active == True).all()
     
+    # 取得啟用中的部門
+    from app.models.department import Department
+    departments = db.query(Department).filter(Department.is_active == True).all()
+    
     return templates.TemplateResponse("group_new.html", {
         "request": request,
         "user": user,
         "stores": stores,
+        "departments": departments,
         "copy_from": group,  # 帶入預設值
     })
 
@@ -554,3 +582,126 @@ async def export_excel(request: Request, group_id: int, db: Session = Depends(ge
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )
+
+
+# ============ 訪客模式 ============
+
+@router.post("/{group_id}/guest-link")
+async def generate_guest_link(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """產生訪客連結"""
+    import secrets
+    import hashlib
+    
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 只有團主或管理員可以產生
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以產生訪客連結")
+    
+    # 產生一個基於 group_id 和時間的 token（簡單版）
+    # 實際上可以存到資料庫，這裡用 hash 簡化
+    secret = settings.secret_key or "default-secret"
+    raw = f"{group_id}-{secret}-guest"
+    token = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    
+    base_url = str(request.base_url).rstrip("/")
+    link = f"{base_url}/groups/{group_id}/guest?token={token}"
+    
+    return {"link": link}
+
+
+@router.get("/{group_id}/guest")
+async def guest_access(group_id: int, token: str, request: Request, db: Session = Depends(get_db)):
+    """訪客存取團單"""
+    import hashlib
+    from fastapi.responses import Response
+    
+    group = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner)
+    ).filter(Group.id == group_id).first()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 驗證 token
+    secret = settings.secret_key or "default-secret"
+    raw = f"{group_id}-{secret}-guest"
+    expected_token = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    
+    if token != expected_token:
+        raise HTTPException(status_code=403, detail="無效的訪客連結")
+    
+    # 檢查是否已登入
+    from app.services.auth import get_current_user_optional
+    user, _ = await get_current_user_optional(request, db)
+    
+    if user:
+        # 已登入，直接導向團單頁面
+        return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+    
+    # 未登入，顯示訪客進入頁面
+    return templates.TemplateResponse("guest_entry.html", {
+        "request": request,
+        "group": group,
+        "store": group.store,
+        "token": token,
+    })
+
+
+@router.post("/{group_id}/guest")
+async def guest_enter(
+    group_id: int,
+    token: str = Form(...),
+    guest_name: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """訪客輸入名字進入團單"""
+    import hashlib
+    import secrets
+    from app.models.user import User
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 驗證 token
+    secret = settings.secret_key or "default-secret"
+    raw = f"{group_id}-{secret}-guest"
+    expected_token = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    
+    if token != expected_token:
+        raise HTTPException(status_code=403, detail="無效的訪客連結")
+    
+    # 建立訪客帳號
+    guest_line_id = f"guest_{secrets.token_hex(8)}"
+    guest_user = User(
+        line_user_id=guest_line_id,
+        display_name=guest_name.strip(),
+        nickname=guest_name.strip(),
+        is_guest=True,
+    )
+    db.add(guest_user)
+    db.commit()
+    db.refresh(guest_user)
+    
+    # 建立 JWT token
+    from app.services.auth import create_access_token
+    access_token = create_access_token(data={"sub": guest_line_id})
+    
+    response = RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=86400  # 24 小時
+    )
+    
+    return response

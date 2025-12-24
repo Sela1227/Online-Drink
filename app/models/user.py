@@ -19,6 +19,7 @@ class User(Base):
     nickname: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 自訂暱稱
     picture_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False)  # 訪客模式
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -40,6 +41,20 @@ class User(Base):
             return False
         from datetime import timedelta
         return (datetime.utcnow() - self.last_active_at) < timedelta(minutes=30)
+    
+    def get_departments(self, db):
+        """取得用戶所屬的部門"""
+        from app.models.department import UserDepartment
+        return db.query(UserDepartment).filter(UserDepartment.user_id == self.id).all()
+    
+    def is_leader_of(self, department_id: int, db) -> bool:
+        """檢查是否為該部門的小組長"""
+        from app.models.department import UserDepartment, DeptRole
+        ud = db.query(UserDepartment).filter(
+            UserDepartment.user_id == self.id,
+            UserDepartment.department_id == department_id
+        ).first()
+        return ud and ud.role == DeptRole.LEADER
 
 
 class UserPreset(Base):

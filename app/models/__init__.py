@@ -3,6 +3,7 @@ from app.models.store import Store, StoreOption
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderItemOption
+from app.models.department import Department, UserDepartment, GroupDepartment, DeptRole
 
 __all__ = [
     "User",
@@ -17,4 +18,8 @@ __all__ = [
     "Order",
     "OrderItem",
     "OrderItemOption",
+    "Department",
+    "UserDepartment",
+    "GroupDepartment",
+    "DeptRole",
 ]

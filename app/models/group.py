@@ -19,6 +19,7 @@ class Group(Base):
     category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
     deadline: Mapped[datetime] = mapped_column(DateTime)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否公開（所有人可見）
     
     # 外送費
     delivery_fee: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -96,6 +97,32 @@ class Group(Base):
             return "餐點"
         else:
             return "團購"
+    
+    def get_departments(self, db):
+        """取得團單顯示給哪些部門"""
+        from app.models.department import GroupDepartment
+        return db.query(GroupDepartment).filter(GroupDepartment.group_id == self.id).all()
+    
+    def is_visible_to(self, user, db) -> bool:
+        """檢查用戶是否可以看到此團單"""
+        # 公開團，所有人可見
+        if self.is_public:
+            return True
+        
+        # 團主自己可見
+        if self.owner_id == user.id:
+            return True
+        
+        # 管理員可見
+        if user.is_admin:
+            return True
+        
+        # 檢查部門是否交集
+        from app.models.department import GroupDepartment, UserDepartment
+        group_dept_ids = {gd.department_id for gd in db.query(GroupDepartment).filter(GroupDepartment.group_id == self.id).all()}
+        user_dept_ids = {ud.department_id for ud in db.query(UserDepartment).filter(UserDepartment.user_id == user.id).all()}
+        
+        return bool(group_dept_ids & user_dept_ids)
 
 
 # Avoid circular import

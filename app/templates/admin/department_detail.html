@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ department.name }} - 部門管理{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800">{{ department.name }}</h1>
+            {% if department.description %}
+            <p class="text-sm text-gray-500 mt-1">{{ department.description }}</p>
+            {% endif %}
+        </div>
+        <a href="/admin/departments" class="text-gray-500 hover:text-gray-700">← 返回</a>
+    </div>
+    
+    <!-- 新增成員 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">➕ 新增成員</h2>
+        <form action="/admin/departments/{{ department.id }}/members" method="POST" class="flex gap-2">
+            <select name="user_id" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">選擇用戶</option>
+                {% for user in available_users %}
+                <option value="{{ user.id }}">{{ user.show_name }}</option>
+                {% endfor %}
+            </select>
+            <select name="role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="member">成員</option>
+                <option value="leader">小組長</option>
+            </select>
+            <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                新增
+            </button>
+        </form>
+    </div>
+    
+    <!-- 成員列表 -->
+    {% if members %}
+    <div class="bg-white rounded-lg shadow-sm divide-y">
+        {% for m in members %}
+        <div class="p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                {% if m.user.picture_url %}
+                <img src="{{ m.user.picture_url }}" class="w-10 h-10 rounded-full">
+                {% else %}
+                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">👤</div>
+                {% endif %}
+                <div>
+                    <div class="font-medium text-gray-800">{{ m.user.show_name }}</div>
+                    <div class="text-xs text-gray-400">
+                        {% if m.role.value == 'leader' %}
+                        <span class="text-orange-500">⭐ 小組長</span>
+                        {% else %}
+                        成員
+                        {% endif %}
+                        · 加入於 {{ m.joined_at.strftime('%Y/%m/%d') }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- 切換角色 -->
+                <form action="/admin/departments/{{ department.id }}/members/{{ m.id }}/toggle-role" method="POST" class="inline">
+                    <button type="submit" class="text-sm text-blue-500 hover:text-blue-600">
+                        {% if m.role.value == 'leader' %}降為成員{% else %}升為小組長{% endif %}
+                    </button>
+                </form>
+                
+                <!-- 移除 -->
+                <form action="/admin/departments/{{ department.id }}/members/{{ m.id }}/remove" method="POST" class="inline"
+                      onsubmit="return confirm('確定要移除此成員？')">
+                    <button type="submit" class="text-sm text-red-500 hover:text-red-600">移除</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-500">
+        <p>還沒有成員</p>
+    </div>
+    {% endif %}
+    
+    <!-- 部門設定 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">⚙️ 部門設定</h2>
+        <form action="/admin/departments/{{ department.id }}/update" method="POST" class="space-y-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">部門名稱</label>
+                <input type="text" name="name" value="{{ department.name }}" required
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">說明</label>
+                <input type="text" name="description" value="{{ department.description or '' }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" name="is_public" id="is_public" value="1"
+                       {% if department.is_public %}checked{% endif %}>
+                <label for="is_public" class="text-sm text-gray-600">公開部門（所有人都可加入）</label>
+            </div>
+            <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                儲存
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

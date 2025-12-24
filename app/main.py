@@ -26,6 +26,9 @@ logger = logging.getLogger("main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create tables
+    # Import all models to ensure tables are created
+    from app.models import department  # noqa: F401
+    
     Base.metadata.create_all(bind=engine)
     
     # 自動新增欄位（如果不存在）
@@ -46,9 +49,11 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "branch_id", "INTEGER")
     add_column_if_not_exists("groups", "note", "TEXT")
     add_column_if_not_exists("groups", "delivery_fee", "NUMERIC(10,2)")
+    add_column_if_not_exists("groups", "is_public", "BOOLEAN DEFAULT TRUE")
     add_column_if_not_exists("users", "nickname", "VARCHAR(100)")
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
+    add_column_if_not_exists("users", "is_guest", "BOOLEAN DEFAULT FALSE")
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):

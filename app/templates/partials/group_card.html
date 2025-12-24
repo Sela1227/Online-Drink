@@ -12,6 +12,13 @@
     <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 {{ tape_color }} rounded-sm shadow-sm"
          style="transform: translateX(-50%) translateY(-50%) rotate(-2deg);"></div>
     
+    <!-- 部門限定標示 -->
+    {% if not group.is_public %}
+    <div class="absolute top-1 right-1 text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded" title="限定部門">
+        👥
+    </div>
+    {% endif %}
+    
     <!-- 紙張紋理效果 -->
     <div class="absolute inset-0 opacity-30 pointer-events-none" 
          style="background-image: repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.03) 24px);"></div>

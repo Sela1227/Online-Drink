@@ -92,6 +92,40 @@
             </div>
         </div>
         
+        <!-- 可見範圍 -->
+        <div x-show="storeId" x-cloak x-data="{ isPublic: true }">
+            <label class="block text-sm font-medium text-gray-700 mb-2">可見範圍</label>
+            <div class="space-y-2">
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="visibility" value="public" checked
+                           @change="isPublic = true">
+                    <span class="text-sm">🌐 公開（所有人可見）</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="visibility" value="departments"
+                           @change="isPublic = false">
+                    <span class="text-sm">👥 限定部門</span>
+                </label>
+            </div>
+            
+            <!-- 部門選擇 -->
+            <div x-show="!isPublic" x-cloak class="mt-3 p-3 bg-gray-50 rounded-lg">
+                {% if departments %}
+                <div class="space-y-2">
+                    {% for dept in departments %}
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="department_ids" value="{{ dept.id }}">
+                        <span class="text-sm">{{ dept.name }}</span>
+                        <span class="text-xs text-gray-400">({{ dept.member_count }}人)</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">尚未建立部門，請至後台建立</p>
+                {% endif %}
+            </div>
+        </div>
+        
         <!-- 截止時間 -->
         <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">截止時間</label>

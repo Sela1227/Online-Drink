@@ -60,6 +60,10 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     # 待處理的問題回報數
     feedback_count = db.query(Feedback).filter(Feedback.status == "pending").count()
     
+    # 部門數量
+    from app.models.department import Department
+    department_count = db.query(Department).filter(Department.is_active == True).count()
+    
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
         "user": user,
@@ -69,6 +73,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "online_count": online_count,
         "announcement": announcement,
         "feedback_count": feedback_count,
+        "department_count": department_count,
     })
 
 
@@ -560,3 +565,184 @@ async def resolve_feedback(
         db.commit()
     
     return RedirectResponse(url="/admin/feedbacks", status_code=302)
+
+
+# ============ 部門管理 ============
+
+@router.get("/departments")
+async def department_list(request: Request, db: Session = Depends(get_db)):
+    """部門列表"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import Department
+    
+    departments = db.query(Department).order_by(Department.created_at.desc()).all()
+    
+    return templates.TemplateResponse("admin/departments.html", {
+        "request": request,
+        "user": user,
+        "departments": departments,
+    })
+
+
+@router.post("/departments")
+async def create_department(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """新增部門"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import Department
+    
+    dept = Department(
+        name=name.strip(),
+        description=description.strip() if description else None
+    )
+    db.add(dept)
+    db.commit()
+    
+    return RedirectResponse(url="/admin/departments", status_code=302)
+
+
+@router.get("/departments/{dept_id}")
+async def department_detail(request: Request, dept_id: int, db: Session = Depends(get_db)):
+    """部門詳情"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import Department, UserDepartment
+    from app.models.user import User
+    
+    department = db.query(Department).filter(Department.id == dept_id).first()
+    if not department:
+        raise HTTPException(status_code=404, detail="部門不存在")
+    
+    members = db.query(UserDepartment).filter(
+        UserDepartment.department_id == dept_id
+    ).all()
+    
+    # 取得尚未加入此部門的用戶
+    member_ids = [m.user_id for m in members]
+    available_users = db.query(User).filter(
+        ~User.id.in_(member_ids) if member_ids else True
+    ).order_by(User.display_name).all()
+    
+    return templates.TemplateResponse("admin/department_detail.html", {
+        "request": request,
+        "user": user,
+        "department": department,
+        "members": members,
+        "available_users": available_users,
+    })
+
+
+@router.post("/departments/{dept_id}/toggle")
+async def toggle_department(request: Request, dept_id: int, db: Session = Depends(get_db)):
+    """啟用/停用部門"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import Department
+    
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if dept:
+        dept.is_active = not dept.is_active
+        db.commit()
+    
+    return RedirectResponse(url="/admin/departments", status_code=302)
+
+
+@router.post("/departments/{dept_id}/update")
+async def update_department(
+    request: Request,
+    dept_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    is_public: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """更新部門"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import Department
+    
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if dept:
+        dept.name = name.strip()
+        dept.description = description.strip() if description else None
+        dept.is_public = is_public == "1"
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
+
+
+@router.post("/departments/{dept_id}/members")
+async def add_department_member(
+    request: Request,
+    dept_id: int,
+    user_id: int = Form(...),
+    role: str = Form("member"),
+    db: Session = Depends(get_db)
+):
+    """新增部門成員"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import UserDepartment, DeptRole
+    
+    # 檢查是否已存在
+    existing = db.query(UserDepartment).filter(
+        UserDepartment.user_id == user_id,
+        UserDepartment.department_id == dept_id
+    ).first()
+    
+    if not existing:
+        ud = UserDepartment(
+            user_id=user_id,
+            department_id=dept_id,
+            role=DeptRole.LEADER if role == "leader" else DeptRole.MEMBER
+        )
+        db.add(ud)
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
+
+
+@router.post("/departments/{dept_id}/members/{member_id}/toggle-role")
+async def toggle_member_role(
+    request: Request,
+    dept_id: int,
+    member_id: int,
+    db: Session = Depends(get_db)
+):
+    """切換成員角色"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import UserDepartment, DeptRole
+    
+    ud = db.query(UserDepartment).filter(UserDepartment.id == member_id).first()
+    if ud:
+        ud.role = DeptRole.MEMBER if ud.role == DeptRole.LEADER else DeptRole.LEADER
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
+
+
+@router.post("/departments/{dept_id}/members/{member_id}/remove")
+async def remove_department_member(
+    request: Request,
+    dept_id: int,
+    member_id: int,
+    db: Session = Depends(get_db)
+):
+    """移除部門成員"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.department import UserDepartment
+    
+    ud = db.query(UserDepartment).filter(UserDepartment.id == member_id).first()
+    if ud:
+        db.delete(ud)
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)

@@ -43,6 +43,16 @@
     
     <!-- 快捷功能 -->
     <div class="bg-white rounded-lg shadow-sm divide-y">
+        <a href="/admin/departments" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">👥</span>
+                <span class="font-medium">部門管理</span>
+                {% if department_count > 0 %}
+                <span class="text-sm text-gray-400">{{ department_count }} 個</span>
+                {% endif %}
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
         <a href="/admin/import" class="flex items-center justify-between p-4 hover:bg-gray-50">
             <div class="flex items-center gap-3">
                 <span class="text-xl">📥</span>

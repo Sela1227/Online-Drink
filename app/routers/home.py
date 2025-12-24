@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Form
+from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
@@ -61,8 +61,38 @@ async def home(request: Request, db: Session = Depends(get_db)):
     taipei_tz = timezone(timedelta(hours=8))
     now = datetime.now(taipei_tz).replace(tzinfo=None)
     
+    # 取得用戶的部門 IDs
+    from app.models.department import UserDepartment, GroupDepartment
+    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()]
+    
+    def filter_visible_groups(groups):
+        """過濾用戶可見的團單"""
+        visible = []
+        for g in groups:
+            # 公開團：所有人可見
+            if g.is_public:
+                visible.append(g)
+                continue
+            # 團主自己可見
+            if g.owner_id == user.id:
+                visible.append(g)
+                continue
+            # 管理員可見
+            if user.is_admin:
+                visible.append(g)
+                continue
+            # 部門交集
+            group_dept_ids = {gd.department_id for gd in db.query(GroupDepartment).filter(
+                GroupDepartment.group_id == g.id
+            ).all()}
+            if group_dept_ids & set(user_dept_ids):
+                visible.append(g)
+        return visible
+    
     # 開放中的飲料團（eager load orders 和 store）
-    drink_groups = db.query(Group).options(
+    drink_groups_raw = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
         joinedload(Group.orders)
@@ -71,9 +101,10 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Group.is_closed == False,
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
+    drink_groups = filter_visible_groups(drink_groups_raw)
     
     # 開放中的訂餐團
-    meal_groups = db.query(Group).options(
+    meal_groups_raw = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
         joinedload(Group.orders)
@@ -82,10 +113,11 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Group.is_closed == False,
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
+    meal_groups = filter_visible_groups(meal_groups_raw)
     
     # 開放中的團購團（新類型，可能不存在）
     try:
-        groupbuy_groups = db.query(Group).options(
+        groupbuy_groups_raw = db.query(Group).options(
             joinedload(Group.store),
             joinedload(Group.owner),
             joinedload(Group.orders)
@@ -94,17 +126,19 @@ async def home(request: Request, db: Session = Depends(get_db)):
             Group.is_closed == False,
             Group.deadline > now,
         ).order_by(Group.deadline.asc()).all()
+        groupbuy_groups = filter_visible_groups(groupbuy_groups_raw)
     except Exception:
         db.rollback()
         groupbuy_groups = []
     
     # 已截止的團（最近 10 個）
-    closed_groups = db.query(Group).options(
+    closed_groups_raw = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner)
     ).filter(
         or_(Group.is_closed == True, Group.deadline <= now)
-    ).order_by(Group.deadline.desc()).limit(10).all()
+    ).order_by(Group.deadline.desc()).limit(20).all()
+    closed_groups = filter_visible_groups(closed_groups_raw)[:10]
     
     # 超夯清單（全站熱門）
     hot_items = get_hot_items(db, limit=10)
@@ -442,3 +476,87 @@ async def toggle_favorite(
         db.add(favorite)
         db.commit()
         return {"status": "added"}
+
+
+# ============ 用戶部門管理 ============
+
+@router.get("/my-departments")
+async def my_departments_page(request: Request, db: Session = Depends(get_db)):
+    """我的部門頁面"""
+    user = await get_current_user(request, db)
+    
+    from app.models.department import Department, UserDepartment
+    
+    # 已加入的部門
+    my_departments = db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()
+    
+    my_dept_ids = [ud.department_id for ud in my_departments]
+    
+    # 可加入的部門（公開且未加入）
+    available_departments = db.query(Department).filter(
+        Department.is_active == True,
+        Department.is_public == True,
+        ~Department.id.in_(my_dept_ids) if my_dept_ids else True
+    ).all()
+    
+    return templates.TemplateResponse("my_departments.html", {
+        "request": request,
+        "user": user,
+        "my_departments": my_departments,
+        "available_departments": available_departments,
+    })
+
+
+@router.post("/my-departments/{dept_id}/join")
+async def join_department(request: Request, dept_id: int, db: Session = Depends(get_db)):
+    """加入部門"""
+    user = await get_current_user(request, db)
+    
+    from app.models.department import Department, UserDepartment, DeptRole
+    
+    dept = db.query(Department).filter(
+        Department.id == dept_id,
+        Department.is_active == True,
+        Department.is_public == True
+    ).first()
+    
+    if not dept:
+        raise HTTPException(status_code=404, detail="部門不存在或不開放加入")
+    
+    # 檢查是否已加入
+    existing = db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id,
+        UserDepartment.department_id == dept_id
+    ).first()
+    
+    if not existing:
+        ud = UserDepartment(
+            user_id=user.id,
+            department_id=dept_id,
+            role=DeptRole.MEMBER
+        )
+        db.add(ud)
+        db.commit()
+    
+    return RedirectResponse(url="/my-departments?success=1", status_code=302)
+
+
+@router.post("/my-departments/{dept_id}/leave")
+async def leave_department(request: Request, dept_id: int, db: Session = Depends(get_db)):
+    """離開部門"""
+    user = await get_current_user(request, db)
+    
+    from app.models.department import UserDepartment
+    
+    ud = db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id,
+        UserDepartment.department_id == dept_id
+    ).first()
+    
+    if ud:
+        db.delete(ud)
+        db.commit()
+    
+    return RedirectResponse(url="/my-departments?success=1", status_code=302)
