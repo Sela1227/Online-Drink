@@ -56,7 +56,9 @@ async def home(request: Request, db: Session = Depends(get_db)):
     """首頁 - 團列表"""
     user = await get_current_user(request, db)
     
-    now = datetime.utcnow()
+    # 使用台北時間（因為 deadline 存的是台北時間）
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz).replace(tzinfo=None)
     
     # 開放中的飲料團（eager load orders 和 store）
     drink_groups = db.query(Group).options(
@@ -123,7 +125,9 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     """首頁團單列表（HTMX partial）"""
     user = await get_current_user(request, db)
     
-    now = datetime.utcnow()
+    # 使用台北時間（因為 deadline 存的是台北時間）
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz).replace(tzinfo=None)
     
     # 開放中的飲料團
     drink_groups = db.query(Group).options(

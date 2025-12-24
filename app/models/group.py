@@ -39,7 +39,10 @@ class Group(Base):
     
     @property
     def is_expired(self) -> bool:
-        return datetime.utcnow() > self.deadline
+        from datetime import timezone, timedelta
+        taipei_tz = timezone(timedelta(hours=8))
+        now = datetime.now(taipei_tz).replace(tzinfo=None)
+        return now > self.deadline
     
     @property
     def is_open(self) -> bool:
