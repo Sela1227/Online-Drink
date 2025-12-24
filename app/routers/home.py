@@ -56,6 +56,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
             Group.deadline > now,
         ).order_by(Group.deadline.asc()).all()
     except Exception:
+        db.rollback()
         groupbuy_groups = []
     
     # 已截止的團（最近 10 個）
