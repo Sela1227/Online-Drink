@@ -71,7 +71,19 @@ if settings.debug:
 
 @app.get("/")
 async def root(request: Request, db: Session = Depends(get_db)):
-    user = await get_current_user_optional(request, db)
+    user, new_token = await get_current_user_optional(request, db)
     if not user:
         return templates.TemplateResponse("login.html", {"request": request})
-    return RedirectResponse(url="/home", status_code=302)
+    
+    response = RedirectResponse(url="/home", status_code=302)
+    # 如果需要刷新 token
+    if new_token:
+        response.set_cookie(
+            key="access_token",
+            value=new_token,
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            samesite="lax",
+            secure=True,
+        )
+    return response
