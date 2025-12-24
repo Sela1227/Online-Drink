@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
@@ -205,6 +205,13 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     if group.owner_id == user.id or user.is_admin:
         all_users = db.query(User).order_by(User.display_name).all()
     
+    # 檢查是否已收藏此店家
+    from app.models.user import UserFavorite
+    is_favorited = db.query(UserFavorite).filter(
+        UserFavorite.user_id == user.id,
+        UserFavorite.store_id == group.store_id
+    ).first() is not None
+    
     return templates.TemplateResponse("group.html", {
         "request": request,
         "user": user,
@@ -222,6 +229,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "is_admin": user.is_admin,
         "is_open": group.is_open,
         "all_users": all_users,
+        "is_favorited": is_favorited,
     })
 
 
@@ -511,3 +519,38 @@ async def transfer_group(
     logger.info(f"團單 {group_id} 團主從 {old_owner_name} 轉移到 {new_owner.display_name}")
     
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.get("/{group_id}/export/excel")
+async def export_excel(request: Request, group_id: int, db: Session = Depends(get_db)):
+    """匯出訂單為 Excel"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.orders).joinedload(Order.user),
+        joinedload(Group.orders).joinedload(Order.items)
+    ).filter(Group.id == group_id).first()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 只有團主或管理員可以匯出
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    
+    from app.services.excel_service import export_orders_to_excel
+    
+    excel_file = export_orders_to_excel(group, group.orders)
+    
+    # 檔名
+    filename = f"{group.name}_{group.deadline.strftime('%Y%m%d')}.xlsx"
+    encoded_filename = quote(filename)
+    
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+    )

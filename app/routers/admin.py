@@ -53,9 +53,12 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     ).count()
     
     # 取得公告
-    from app.models.user import SystemSetting
+    from app.models.user import SystemSetting, Feedback
     settings_row = db.query(SystemSetting).first()
     announcement = settings_row.announcement if settings_row else None
+    
+    # 待處理的問題回報數
+    feedback_count = db.query(Feedback).filter(Feedback.status == "pending").count()
     
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
@@ -65,6 +68,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "user_count": user_count,
         "online_count": online_count,
         "announcement": announcement,
+        "feedback_count": feedback_count,
     })
 
 
@@ -515,3 +519,44 @@ async def update_announcement(
     db.commit()
     
     return RedirectResponse(url="/admin", status_code=302)
+
+
+@router.get("/feedbacks")
+async def feedback_list(request: Request, db: Session = Depends(get_db)):
+    """問題回報列表"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Feedback, User
+    
+    feedbacks = db.query(Feedback).options(
+        joinedload(Feedback.user)
+    ).order_by(
+        Feedback.status.asc(),  # pending 排前面
+        Feedback.created_at.desc()
+    ).all()
+    
+    return templates.TemplateResponse("admin/feedbacks.html", {
+        "request": request,
+        "user": user,
+        "feedbacks": feedbacks,
+    })
+
+
+@router.post("/feedbacks/{feedback_id}/resolve")
+async def resolve_feedback(
+    request: Request,
+    feedback_id: int,
+    db: Session = Depends(get_db)
+):
+    """標記問題已處理"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Feedback
+    
+    feedback = db.query(Feedback).filter(Feedback.id == feedback_id).first()
+    if feedback:
+        feedback.status = "resolved"
+        feedback.resolved_at = datetime.utcnow()
+        db.commit()
+    
+    return RedirectResponse(url="/admin/feedbacks", status_code=302)

@@ -354,3 +354,91 @@ async def my_orders(request: Request, page: int = 1, db: Session = Depends(get_d
         "total_pages": total_pages,
         "total": total,
     })
+
+
+@router.get("/feedback")
+async def feedback_page(request: Request, db: Session = Depends(get_db)):
+    """問題回報頁面"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import Feedback
+    
+    # 取得用戶的回報記錄
+    feedbacks = db.query(Feedback).filter(
+        Feedback.user_id == user.id
+    ).order_by(Feedback.created_at.desc()).limit(10).all()
+    
+    return templates.TemplateResponse("feedback.html", {
+        "request": request,
+        "user": user,
+        "feedbacks": feedbacks,
+    })
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    request: Request,
+    content: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """提交問題回報"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import Feedback
+    
+    feedback = Feedback(
+        user_id=user.id,
+        content=content.strip()[:1000]  # 限制 1000 字
+    )
+    db.add(feedback)
+    db.commit()
+    
+    return RedirectResponse(url="/feedback?success=1", status_code=302)
+
+
+@router.get("/favorites")
+async def favorites_page(request: Request, db: Session = Depends(get_db)):
+    """收藏店家頁面"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import UserFavorite
+    
+    favorites = db.query(UserFavorite).options(
+        joinedload(UserFavorite.store)
+    ).filter(
+        UserFavorite.user_id == user.id
+    ).order_by(UserFavorite.created_at.desc()).all()
+    
+    return templates.TemplateResponse("favorites.html", {
+        "request": request,
+        "user": user,
+        "favorites": favorites,
+    })
+
+
+@router.post("/favorites/{store_id}")
+async def toggle_favorite(
+    request: Request,
+    store_id: int,
+    db: Session = Depends(get_db)
+):
+    """切換收藏狀態"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import UserFavorite
+    
+    # 檢查是否已收藏
+    existing = db.query(UserFavorite).filter(
+        UserFavorite.user_id == user.id,
+        UserFavorite.store_id == store_id
+    ).first()
+    
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"status": "removed"}
+    else:
+        favorite = UserFavorite(user_id=user.id, store_id=store_id)
+        db.add(favorite)
+        db.commit()
+        return {"status": "added"}

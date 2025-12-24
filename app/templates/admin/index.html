@@ -50,6 +50,16 @@
             </div>
             <span class="text-gray-400">→</span>
         </a>
+        <a href="/admin/feedbacks" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">📮</span>
+                <span class="font-medium">問題回報</span>
+                {% if feedback_count > 0 %}
+                <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{{ feedback_count }}</span>
+                {% endif %}
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
     </div>
 </div>
 {% endblock %}

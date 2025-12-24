@@ -7,6 +7,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.group import Group
     from app.models.order import Order
+    from app.models.store import Store
 
 
 class User(Base):
@@ -61,3 +62,32 @@ class SystemSetting(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=1)
     announcement: Mapped[str | None] = mapped_column(String(500), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Feedback(Base):
+    """問題回報"""
+    __tablename__ = "feedbacks"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(String(1000))
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, resolved
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    
+    # Relationships
+    user: Mapped["User"] = relationship()
+
+
+class UserFavorite(Base):
+    """用戶收藏店家"""
+    __tablename__ = "user_favorites"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user: Mapped["User"] = relationship()
+    store: Mapped["Store"] = relationship()

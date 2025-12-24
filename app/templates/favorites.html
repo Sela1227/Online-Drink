@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}收藏店家 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <h1 class="text-xl font-bold text-gray-800">⭐ 收藏店家</h1>
+    
+    {% if favorites %}
+    <div class="space-y-3">
+        {% for fav in favorites %}
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <div class="flex items-center gap-3">
+                <!-- Logo -->
+                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {% if fav.store.logo_url %}
+                    <img src="{{ fav.store.logo_url }}" alt="{{ fav.store.name }}" class="w-full h-full object-contain">
+                    {% else %}
+                    <span class="text-2xl">
+                        {% if fav.store.category and fav.store.category.value == 'drink' %}🧋
+                        {% elif fav.store.category and fav.store.category.value == 'meal' %}🍱
+                        {% else %}🛒{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <!-- 資訊 -->
+                <div class="flex-1 min-w-0">
+                    <div class="font-medium text-gray-800">{{ fav.store.name }}</div>
+                    <div class="text-sm text-gray-500">
+                        {% if fav.store.category and fav.store.category.value == 'drink' %}飲料店
+                        {% elif fav.store.category and fav.store.category.value == 'meal' %}餐廳
+                        {% else %}團購{% endif %}
+                    </div>
+                </div>
+                
+                <!-- 取消收藏按鈕 -->
+                <button onclick="toggleFavorite({{ fav.store.id }}, this)"
+                        class="text-yellow-500 hover:text-gray-400 text-2xl">
+                    ⭐
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-500">
+        <p class="text-4xl mb-4">⭐</p>
+        <p>還沒有收藏的店家</p>
+        <p class="text-sm mt-1">在開團時點擊星星即可收藏！</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function toggleFavorite(storeId, btn) {
+    try {
+        const response = await fetch(`/favorites/${storeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'removed') {
+            // 移除整個卡片
+            btn.closest('.bg-white').remove();
+        }
+    } catch (err) {
+        console.error('Toggle favorite failed:', err);
+    }
+}
+</script>
+{% endblock %}

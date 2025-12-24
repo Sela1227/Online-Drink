@@ -9,3 +9,4 @@ python-jose[cryptography]>=3.3.0
 qrcode[pil]>=7.4
 psycopg2-binary>=2.9.9
 cloudinary>=1.36.0
+openpyxl>=3.1.0

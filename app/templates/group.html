@@ -19,7 +19,15 @@
             </div>
             <div class="flex-1 min-w-0">
                 <h1 class="font-bold text-lg text-gray-900 truncate">{{ group.name }}</h1>
-                <div class="text-sm text-gray-500">{{ store.name }} · {{ group.owner.show_name }}</div>
+                <div class="text-sm text-gray-500 flex items-center gap-1">
+                    {{ store.name }} · {{ group.owner.show_name }}
+                    <button onclick="toggleFavorite({{ store.id }})" 
+                            id="fav-btn"
+                            class="ml-1 text-lg hover:scale-110 transition-transform"
+                            title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
+                        {% if is_favorited %}⭐{% else %}☆{% endif %}
+                    </button>
+                </div>
             </div>
             <div class="text-right">
                 {% if is_open %}
@@ -75,6 +83,7 @@
                 {% endif %}
                 <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
                 <a href="/groups/{{ group.id }}/export/payment" class="text-gray-600 hover:text-gray-800">個人明細</a>
+                <a href="/groups/{{ group.id }}/export/excel" class="text-green-600 hover:text-green-700">📥 Excel</a>
             </div>
             {% endif %}
         </div>
@@ -818,6 +827,28 @@ function menuNav() {
                 this.activeCategory = id;
             }
         }
+    }
+}
+
+// 收藏店家切換
+async function toggleFavorite(storeId) {
+    try {
+        const response = await fetch(`/favorites/${storeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        const btn = document.getElementById('fav-btn');
+        if (data.status === 'added') {
+            btn.textContent = '⭐';
+            btn.title = '取消收藏';
+        } else {
+            btn.textContent = '☆';
+            btn.title = '收藏店家';
+        }
+    } catch (err) {
+        console.error('Toggle favorite failed:', err);
     }
 }
 </script>
