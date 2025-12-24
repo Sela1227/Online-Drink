@@ -383,24 +383,27 @@
 
     <!-- 菜單 -->
     {% if is_open %}
-    <div class="bg-white rounded-lg shadow-sm p-4 pb-24">
+    <div class="bg-white rounded-lg shadow-sm p-4 pb-24" x-data="menuNav()">
         <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
         
-        <!-- 分類快速導覽 -->
+        <!-- 分類快速導覽（固定在頂部） -->
         {% if menu.categories|length > 1 %}
-        <div class="flex flex-wrap gap-2 mb-4 sticky top-0 bg-white py-2 -mx-4 px-4 border-b z-10">
-            {% for category in menu.categories %}
-            <button onclick="document.getElementById('category-{{ category.id }}').scrollIntoView({behavior: 'smooth', block: 'start'})"
-                    class="text-xs px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition">
-                {{ category.name }}
-            </button>
-            {% endfor %}
+        <div class="sticky top-12 bg-white py-2 -mx-4 px-4 border-b z-10 overflow-x-auto">
+            <div class="flex gap-2 min-w-max">
+                {% for category in menu.categories %}
+                <button @click="scrollToCategory('category-{{ category.id }}')"
+                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-orange-500 text-white border-orange-500' : 'border-orange-200 text-orange-600 hover:bg-orange-50'"
+                        class="text-xs px-3 py-1.5 rounded-full border transition whitespace-nowrap">
+                    {{ category.name }}
+                </button>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
         
         {% for category in menu.categories %}
-        <div id="category-{{ category.id }}" class="mb-4 scroll-mt-16">
-            <h3 class="text-sm font-medium text-gray-600 mb-2">{{ category.name }}</h3>
+        <div id="category-{{ category.id }}" class="mb-4 scroll-mt-28 category-section">
+            <h3 class="text-sm font-medium text-gray-600 mb-2 pt-2">{{ category.name }}</h3>
             <div class="space-y-2">
                 {% for item in category.items %}
                 {% include "partials/menu_item.html" %}
@@ -419,15 +422,28 @@
         {% endif %}
     </div>
     
-    <!-- 懸浮購物車按鈕（只有未結單時顯示） -->
-    <button @click="showCart = true"
-            x-show="orderStatus !== 'submitted'"
-            class="fixed bottom-4 right-4 z-40 bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center">
-        <span class="text-xl">🛒</span>
-        <span x-show="cartCount > 0"
-              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
-              x-text="cartCount"></span>
-    </button>
+    <!-- 懸浮按鈕區域 -->
+    <div class="fixed bottom-4 right-4 z-40 flex flex-col gap-2">
+        <!-- 返回頂端按鈕 -->
+        <button @click="window.scrollTo({top: 0, behavior: 'smooth'})"
+                x-data="{ showTop: false }"
+                x-init="window.addEventListener('scroll', () => showTop = window.scrollY > 300)"
+                x-show="showTop"
+                x-transition
+                class="bg-gray-500 hover:bg-gray-600 text-white rounded-full w-12 h-12 shadow-lg flex items-center justify-center">
+            <span class="text-lg">↑</span>
+        </button>
+        
+        <!-- 購物車按鈕（只有未結單時顯示） -->
+        <button @click="showCart = true"
+                x-show="orderStatus !== 'submitted'"
+                class="bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center relative">
+            <span class="text-xl">🛒</span>
+            <span x-show="cartCount > 0"
+                  class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                  x-text="cartCount"></span>
+        </button>
+    </div>
     
     <!-- 購物車側欄（只有未結單時使用） -->
     <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
@@ -764,6 +780,44 @@ function scrollToItem(itemId) {
         setTimeout(() => {
             el.classList.remove('ring-2', 'ring-orange-400');
         }, 2000);
+    }
+}
+
+// 菜單分類導覽
+function menuNav() {
+    return {
+        activeCategory: '',
+        init() {
+            // 監聽滾動事件
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        this.activeCategory = entry.target.id;
+                    }
+                });
+            }, {
+                rootMargin: '-100px 0px -70% 0px',
+                threshold: 0
+            });
+            
+            // 觀察所有分類區塊
+            document.querySelectorAll('.category-section').forEach(section => {
+                observer.observe(section);
+            });
+            
+            // 設定初始分類
+            const firstCategory = document.querySelector('.category-section');
+            if (firstCategory) {
+                this.activeCategory = firstCategory.id;
+            }
+        },
+        scrollToCategory(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                this.activeCategory = id;
+            }
+        }
     }
 }
 </script>

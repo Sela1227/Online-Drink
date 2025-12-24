@@ -102,6 +102,20 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="app/templates")
 
+# 加入台北時區過濾器
+from datetime import timezone, timedelta
+
+def to_taipei_time(dt):
+    """將 UTC 時間轉換為台北時間 (UTC+8)"""
+    if dt is None:
+        return None
+    taipei_tz = timezone(timedelta(hours=8))
+    # 假設 dt 是 naive UTC 時間
+    utc_dt = dt.replace(tzinfo=timezone.utc)
+    return utc_dt.astimezone(taipei_tz)
+
+templates.env.filters['taipei'] = to_taipei_time
+
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(home.router, tags=["home"])

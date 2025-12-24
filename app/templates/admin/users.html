@@ -72,11 +72,11 @@
                 </div>
                 <div class="text-xs text-gray-400 truncate">
                     {% if u.last_login_at %}
-                    最後登入：{{ u.last_login_at.strftime('%m/%d %H:%M') }}
+                    最後登入：{{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}
                     {% else %}
                     尚未登入
                     {% endif %}
-                    ・加入 {{ u.created_at.strftime('%Y-%m-%d') }}
+                    ・加入 {{ (u.created_at|taipei).strftime('%Y-%m-%d') }}
                     ・{{ u.orders|length }} 筆訂單
                 </div>
             </a>

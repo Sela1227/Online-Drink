@@ -66,13 +66,13 @@
             </div>
             <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-500">帳號建立時間</span>
-                <span class="text-gray-700">{{ target_user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                <span class="text-gray-700">{{ (target_user.created_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}</span>
             </div>
             <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-500">最後登入時間</span>
                 <span class="text-gray-700">
                     {% if target_user.last_login_at %}
-                    {{ target_user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {{ (target_user.last_login_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}
                     {% else %}
                     <span class="text-gray-400">尚未記錄</span>
                     {% endif %}
@@ -82,7 +82,7 @@
                 <span class="text-gray-500">最後活動時間</span>
                 <span class="text-gray-700">
                     {% if target_user.last_active_at %}
-                    {{ target_user.last_active_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {{ (target_user.last_active_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}
                     {% else %}
                     <span class="text-gray-400">尚未記錄</span>
                     {% endif %}

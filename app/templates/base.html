@@ -12,6 +12,15 @@
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    <!-- HTMX 全局錯誤處理 -->
+    <script>
+    document.body.addEventListener('htmx:responseError', function(evt) {
+        if (evt.detail.xhr.status === 401) {
+            window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+        }
+    });
+    </script>
+    
     <!-- Header -->
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -71,8 +80,7 @@
             // 檢查是否閒置超時
             if (Date.now() - lastActivity > IDLE_TIMEOUT) {
                 clearInterval(heartbeatTimer);
-                alert('您已閒置超過 30 分鐘，請重新登入');
-                window.location.href = '/auth/logout';
+                window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
                 return;
             }
             
@@ -81,8 +89,7 @@
                 const response = await fetch('/auth/heartbeat', { method: 'POST' });
                 if (response.status === 401) {
                     clearInterval(heartbeatTimer);
-                    alert('登入已過期，請重新登入');
-                    window.location.href = '/auth/logout';
+                    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
                 }
             } catch (e) {
                 console.log('Heartbeat failed:', e);

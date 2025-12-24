@@ -75,12 +75,12 @@
             </div>
             <div class="flex justify-between">
                 <span class="text-gray-500">註冊時間</span>
-                <span class="text-gray-700">{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="text-gray-700">{{ (user.created_at|taipei).strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             {% if user.last_login_at %}
             <div class="flex justify-between">
                 <span class="text-gray-500">上次登入</span>
-                <span class="text-gray-700">{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="text-gray-700">{{ (user.last_login_at|taipei).strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             {% endif %}
         </div>

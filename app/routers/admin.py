@@ -293,7 +293,13 @@ async def update_store(
         raise HTTPException(status_code=404, detail="店家不存在")
     
     store.name = name
-    store.category = CategoryType(category)
+    
+    # 安全轉換分類
+    try:
+        store.category = CategoryType(category)
+    except ValueError:
+        # 如果轉換失敗，保持原來的分類
+        pass
     
     # 處理 Logo 上傳 (使用 Cloudinary)
     if logo_file and logo_file.filename:
