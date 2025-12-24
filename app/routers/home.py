@@ -1,26 +1,35 @@
-from fastapi import APIRouter, Request, Depends, Form
+"""
+home.py 修復版
+
+修復問題：
+1. 時間到的團單必須移到已截止區（不管 is_closed 狀態）
+2. 只有 deadline > now AND is_closed == False 的才顯示在開放區
+"""
+from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, func
+from sqlalchemy import or_, and_
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.group import Group
-from app.models.order import Order, OrderItem, OrderStatus
-from app.models.store import CategoryType, Store
-from app.services.auth import get_current_user, get_current_user_optional
+from app.models.store import Store, CategoryType
+from app.models.order import Order, OrderStatus
+from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-# 加入台北時區過濾器
+# ===== 註冊台北時區過濾器 =====
 def to_taipei_time(dt):
-    """將 UTC 時間轉換為台北時間 (UTC+8)"""
     if dt is None:
         return None
     taipei_tz = timezone(timedelta(hours=8))
-    utc_dt = dt.replace(tzinfo=timezone.utc)
+    if dt.tzinfo is None:
+        utc_dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        utc_dt = dt
     return utc_dt.astimezone(taipei_tz)
 
 templates.env.filters['taipei'] = to_taipei_time
@@ -36,7 +45,7 @@ async def home(
     one_week_ago = now - timedelta(days=7)
     
     # ===== 開放中的飲料團 =====
-    # 必須未關團 AND 未截止
+    # 條件：未手動關閉 AND 未過期
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -44,7 +53,7 @@ async def home(
     ).filter(
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
-        Group.deadline > now,  # 未截止
+        Group.deadline > now,  # 必須未過期
     ).order_by(Group.deadline.asc()).all()
     
     # ===== 開放中的餐點團 =====
@@ -55,7 +64,7 @@ async def home(
     ).filter(
         Group.category == CategoryType.MEAL,
         Group.is_closed == False,
-        Group.deadline > now,  # 未截止
+        Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
     # ===== 開放中的團購團 =====
@@ -67,13 +76,13 @@ async def home(
         ).filter(
             Group.category == CategoryType.GROUP_BUY,
             Group.is_closed == False,
-            Group.deadline > now,  # 未截止
+            Group.deadline > now,
         ).order_by(Group.deadline.asc()).all()
     except Exception:
         groupbuy_groups = []
     
-    # ===== 已截止區（最近一週內） =====
-    # 截止條件：已關團 OR 已過 deadline
+    # ===== 已截止區（最近一週） =====
+    # 條件：(手動關閉 OR 已過期) AND 最近一週內
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -81,16 +90,15 @@ async def home(
     ).filter(
         or_(
             Group.is_closed == True,
-            Group.deadline <= now
+            Group.deadline <= now  # 時間到就是截止
         ),
-        # 最近一週內
         or_(
             Group.deadline >= one_week_ago,
             Group.updated_at >= one_week_ago
         )
     ).order_by(Group.deadline.desc()).limit(20).all()
     
-    # ===== 歷史區（超過一週，只有管理員能看） =====
+    # ===== 歷史區（超過一週，管理員可見） =====
     history_groups = []
     if user.is_admin:
         history_groups = db.query(Group).options(
@@ -102,10 +110,19 @@ async def home(
                 Group.is_closed == True,
                 Group.deadline <= now
             ),
-            # 超過一週
             Group.deadline < one_week_ago,
             Group.updated_at < one_week_ago
         ).order_by(Group.deadline.desc()).limit(30).all()
+    
+    # 公告
+    try:
+        from app.models.system import SystemSetting
+        announcement_setting = db.query(SystemSetting).filter(
+            SystemSetting.key == "announcement"
+        ).first()
+        announcement = announcement_setting.value if announcement_setting else ""
+    except:
+        announcement = ""
     
     return templates.TemplateResponse("home.html", {
         "request": request,
@@ -115,6 +132,7 @@ async def home(
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "history_groups": history_groups,
+        "announcement": announcement,
     })
 
 
@@ -164,7 +182,7 @@ async def home_groups(
     except Exception:
         groupbuy_groups = []
     
-    # ===== 已截止區（最近一週內） =====
+    # ===== 已截止區 =====
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -180,7 +198,7 @@ async def home_groups(
         )
     ).order_by(Group.deadline.desc()).limit(20).all()
     
-    # ===== 歷史區（超過一週，只有管理員能看） =====
+    # ===== 歷史區 =====
     history_groups = []
     if user.is_admin:
         history_groups = db.query(Group).options(
@@ -204,25 +222,4 @@ async def home_groups(
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "history_groups": history_groups,
-    })
-
-
-@router.get("/my-orders")
-async def my_orders(
-    request: Request,
-    db: Session = Depends(get_db),
-    user = Depends(get_current_user)
-):
-    """我的訂單列表"""
-    orders = db.query(Order).options(
-        joinedload(Order.group).joinedload(Group.store),
-        joinedload(Order.items).joinedload(OrderItem.menu_item)
-    ).filter(
-        Order.user_id == user.id
-    ).order_by(Order.created_at.desc()).limit(50).all()
-    
-    return templates.TemplateResponse("my_orders.html", {
-        "request": request,
-        "user": user,
-        "orders": orders,
     })
