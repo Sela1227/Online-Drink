@@ -17,7 +17,7 @@
                     {% if store.logo_url %}
                     <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-cover">
                     {% else %}
-                    <span class="text-3xl">{% if store.category.value == 'drink' %}🧋{% else %}🍱{% endif %}</span>
+                    <span class="text-3xl">{% if store.category and store.category.value == 'drink' %}🧋{% elif store.category and store.category.value == 'group_buy' %}🛒{% else %}🍱{% endif %}</span>
                     {% endif %}
                 </div>
                 <div>
@@ -37,19 +37,19 @@
                 <div class="flex gap-4">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="category" value="drink" 
-                               {% if store.category.value == 'drink' %}checked{% endif %}
+                               {% if store.category and store.category.value == 'drink' %}checked{% endif %}
                                class="text-orange-500 focus:ring-orange-500">
                         <span>🧋 飲料店</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="category" value="meal" 
-                               {% if store.category.value == 'meal' %}checked{% endif %}
+                               {% if store.category and store.category.value == 'meal' %}checked{% endif %}
                                class="text-orange-500 focus:ring-orange-500">
                         <span>🍱 餐廳</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="category" value="group_buy" 
-                               {% if store.category.value == 'group_buy' %}checked{% endif %}
+                               {% if store.category and store.category.value == 'group_buy' %}checked{% endif %}
                                class="text-orange-500 focus:ring-orange-500">
                         <span>🛒 團購</span>
                     </label>
@@ -57,7 +57,7 @@
             </div>
             
             <!-- 飲料店甜度/冰塊選項 -->
-            {% if store.category.value == 'drink' and store.options %}
+            {% if store.category and store.category.value == 'drink' and store.options %}
             <div class="p-3 bg-gray-50 rounded-lg space-y-2 text-sm">
                 <div>
                     <span class="font-medium text-gray-700">甜度：</span>

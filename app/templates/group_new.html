@@ -180,7 +180,7 @@ function newGroupForm() {
         {
             id: {{ store.id }},
             name: "{{ store.name }}",
-            category: "{{ store.category.value }}",
+            category: "{{ store.category.value if store.category else 'meal' }}",
             branches: {{ store.branches | tojson if store.branches else "[]" }},
             has_toppings: {{ 'true' if store.toppings else 'false' }}
         }{% if not loop.last %},{% endif %}

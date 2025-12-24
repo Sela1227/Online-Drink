@@ -42,7 +42,7 @@
     <div class="bg-white rounded-lg shadow-sm divide-y">
         {% for store in stores %}
         <div class="p-4 flex items-center gap-3"
-             x-show="filter === 'all' || filter === '{{ store.category.value }}'">
+             x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
             <!-- Logo -->
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {% if store.logo_url %}
@@ -56,9 +56,10 @@
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900">{{ store.name }}</div>
                 <div class="text-sm text-gray-500">
-                    {% if store.category.value == 'drink' %}飲料店
-                    {% elif store.category.value == 'meal' %}餐廳
-                    {% else %}團購{% endif %}
+                    {% if store.category and store.category.value == 'drink' %}飲料店
+                    {% elif store.category and store.category.value == 'meal' %}餐廳
+                    {% elif store.category and store.category.value == 'group_buy' %}團購
+                    {% else %}未分類{% endif %}
                     {% if store.branches %}· {{ store.branches|length }} 間分店{% endif %}
                 </div>
             </div>
