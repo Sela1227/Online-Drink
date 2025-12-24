@@ -1,0 +1,57 @@
+{
+  "store": {
+    "name": "可不可熟成紅茶",
+    "category": "drink",
+    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
+    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "溫", "熱"]
+  },
+  "menu": {
+    "categories": [
+      {
+        "name": "熟成好茶",
+        "items": [
+          {"name": "熟成紅茶", "price": 30, "price_l": 35},
+          {"name": "麗春紅茶", "price": 30, "price_l": 35},
+          {"name": "烏米紅茶", "price": 30, "price_l": 35}
+        ]
+      },
+      {
+        "name": "熟成冬瓜",
+        "items": [
+          {"name": "雪花冷露", "price": 35, "price_l": 40},
+          {"name": "熟成冷露", "price": 35, "price_l": 40},
+          {"name": "春芽冷露", "price": 35, "price_l": 40},
+          {"name": "檸檬冷露", "price": 45, "price_l": 55}
+        ]
+      },
+      {
+        "name": "熟成好純",
+        "items": [
+          {"name": "輕醇歐蕾", "price": 40, "price_l": 50},
+          {"name": "雙茶歐蕾", "price": 50, "price_l": 69},
+          {"name": "香梅冰茶", "price": 45, "price_l": 55},
+          {"name": "金萱檸檬", "price": 50, "price_l": 65}
+        ]
+      },
+      {
+        "name": "熟成手作",
+        "items": [
+          {"name": "熟成紅茶", "price": 40, "price_l": 50},
+          {"name": "春韻綠茶", "price": 40, "price_l": 50},
+          {"name": "太妃熟成", "price": 45, "price_l": 50},
+          {"name": "金萱熟成", "price": 48, "price_l": 58}
+        ]
+      },
+      {
+        "name": "熟成鮮奶",
+        "items": [
+          {"name": "熟成歐蕾", "price": 55, "price_l": 70},
+          {"name": "冷萃歐蕾", "price": 55, "price_l": 70},
+          {"name": "金萱歐蕾", "price": 55, "price_l": 70},
+          {"name": "雪藏歐蕾", "price": 55, "price_l": 65},
+          {"name": "白玉歐蕾", "price": 55, "price_l": 65}
+        ]
+      }
+    ]
+  }
+}

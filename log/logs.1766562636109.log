@@ -1,0 +1,305 @@
+2025-12-24T07:48:42.000000000Z [inf]  Starting Container
+2025-12-24T07:48:44.279998695Z [err]  Traceback (most recent call last):
+2025-12-24T07:48:44.280003945Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T07:48:44.280009392Z [err]      sys.exit(main())
+2025-12-24T07:48:44.280015001Z [err]               ^^^^^^
+2025-12-24T07:48:44.280020278Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T07:48:44.280025107Z [err]      return self.main(*args, **kwargs)
+2025-12-24T07:48:44.280031290Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280035906Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T07:48:44.280041810Z [err]      rv = self.invoke(ctx)
+2025-12-24T07:48:44.280046571Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280051628Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T07:48:44.280056651Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T07:48:44.280061751Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280067921Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T07:48:44.280074132Z [err]      return callback(*args, **kwargs)
+2025-12-24T07:48:44.280470066Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280475148Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T07:48:44.280481071Z [err]      run(
+2025-12-24T07:48:44.280486921Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T07:48:44.280492841Z [err]      server.run()
+2025-12-24T07:48:44.280498410Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T07:48:44.280503803Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T07:48:44.280509325Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280515420Z [err]  ^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280522086Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T07:48:44.280528097Z [err]      return runner.run(main)
+2025-12-24T07:48:44.280534673Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.280540963Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T07:48:44.280547212Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T07:48:44.281339704Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T07:48:44.281363420Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.281374577Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T07:48:44.281383366Z [err]      module = importlib.import_module(module_str)
+2025-12-24T07:48:44.281390302Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.281399156Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T07:48:44.281406598Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T07:48:44.281445872Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.281454051Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T07:48:44.281469071Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T07:48:44.281473899Z [err]      await self._serve(sockets)
+2025-12-24T07:48:44.281478468Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T07:48:44.281483378Z [err]      config.load()
+2025-12-24T07:48:44.281488963Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T07:48:44.282678242Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.282683830Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T07:48:44.282690045Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T07:48:44.282696423Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T07:48:44.282702208Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T07:48:44.282708005Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T07:48:44.282714406Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T07:48:44.282720383Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T07:48:44.282725994Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T07:48:44.282731396Z [err]    File "/app/app/routers/home.py", line 38, in <module>
+2025-12-24T07:48:44.282737137Z [err]      @router.get("")
+2025-12-24T07:48:44.282742524Z [err]       ^^^^^^^^^^^^^^
+2025-12-24T07:48:44.282748622Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1138, in decorator
+2025-12-24T07:48:44.282754849Z [err]      self.add_api_route(
+2025-12-24T07:48:44.282760680Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1077, in add_api_route
+2025-12-24T07:48:44.282766410Z [err]      route = route_class(
+2025-12-24T07:48:44.283377967Z [err]      param_details = analyze_param(
+2025-12-24T07:48:44.283387697Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:44.283391707Z [err]              ^^^^^^^^^^^^
+2025-12-24T07:48:44.283395826Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 533, in analyze_param
+2025-12-24T07:48:44.283401923Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 696, in __init__
+2025-12-24T07:48:44.283409006Z [err]      self.dependant = get_dependant(
+2025-12-24T07:48:44.283415217Z [err]                       ^^^^^^^^^^^^^^
+2025-12-24T07:48:44.283421827Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 305, in get_dependant
+2025-12-24T07:48:44.283427618Z [err]      sub_dependant = get_dependant(
+2025-12-24T07:48:44.283435851Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:44.283442275Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 283, in get_dependant
+2025-12-24T07:48:44.284878186Z [err]      field = create_model_field(
+2025-12-24T07:48:44.284884318Z [err]              ^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:44.284891971Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/utils.py", line 121, in create_model_field
+2025-12-24T07:48:44.284900691Z [err]      raise fastapi.exceptions.FastAPIError(
+2025-12-24T07:48:44.284907910Z [err]  fastapi.exceptions.FastAPIError: Invalid args for response field! Hint: check that <class 'sqlalchemy.orm.session.Session'> is a valid Pydantic field type. If you are using a return type annotation that is not a valid Pydantic field (e.g. Union[Response, dict, None]) you can disable generating the response model from the type annotation with the path operation decorator parameter response_model=None. Read more: https://fastapi.tiangolo.com/tutorial/response-model/
+2025-12-24T07:48:46.489748058Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.489752076Z [err]  Traceback (most recent call last):
+2025-12-24T07:48:46.489756443Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T07:48:46.489761845Z [err]      sys.exit(main())
+2025-12-24T07:48:46.489766654Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T07:48:46.489767633Z [err]               ^^^^^^
+2025-12-24T07:48:46.489773157Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T07:48:46.489776806Z [err]      rv = self.invoke(ctx)
+2025-12-24T07:48:46.489779167Z [err]      return self.main(*args, **kwargs)
+2025-12-24T07:48:46.489797901Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.489814314Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T07:48:46.489821813Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T07:48:46.489838554Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.489844189Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T07:48:46.489849461Z [err]      return callback(*args, **kwargs)
+2025-12-24T07:48:46.489855204Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.491888574Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.491900882Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T07:48:46.491907861Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T07:48:46.491935915Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T07:48:46.491942412Z [err]      run(
+2025-12-24T07:48:46.491949180Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T07:48:46.491962694Z [err]      server.run()
+2025-12-24T07:48:46.491968687Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T07:48:46.491974402Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T07:48:46.491979150Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.491985026Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.491989599Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T07:48:46.491994268Z [err]      return runner.run(main)
+2025-12-24T07:48:46.492735916Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.492745477Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T07:48:46.492751912Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T07:48:46.492757645Z [err]      await self._serve(sockets)
+2025-12-24T07:48:46.492763678Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T07:48:46.492769155Z [err]      config.load()
+2025-12-24T07:48:46.492775237Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T07:48:46.492780734Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T07:48:46.492786592Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.492793163Z [err]  ^^^^^
+2025-12-24T07:48:46.492798911Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T07:48:46.492804802Z [err]      module = importlib.import_module(module_str)
+2025-12-24T07:48:46.495136498Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T07:48:46.495145838Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.495149364Z [err]    File "/app/app/routers/home.py", line 38, in <module>
+2025-12-24T07:48:46.495153807Z [err]  ^^^^
+2025-12-24T07:48:46.495158528Z [err]      @router.get("")
+2025-12-24T07:48:46.495161602Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T07:48:46.495167208Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T07:48:46.495177886Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.495188720Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T07:48:46.495194019Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T07:48:46.495199245Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T07:48:46.495204029Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T07:48:46.495208674Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T07:48:46.495216446Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T07:48:46.495221355Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T07:48:46.496670379Z [err]      param_details = analyze_param(
+2025-12-24T07:48:46.496672502Z [err]      self.add_api_route(
+2025-12-24T07:48:46.496678082Z [err]       ^^^^^^^^^^^^^^
+2025-12-24T07:48:46.496684616Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1077, in add_api_route
+2025-12-24T07:48:46.496684768Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1138, in decorator
+2025-12-24T07:48:46.496691650Z [err]      route = route_class(
+2025-12-24T07:48:46.496698553Z [err]              ^^^^^^^^^^^^
+2025-12-24T07:48:46.496705621Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 696, in __init__
+2025-12-24T07:48:46.496713384Z [err]      self.dependant = get_dependant(
+2025-12-24T07:48:46.496722256Z [err]                       ^^^^^^^^^^^^^^
+2025-12-24T07:48:46.496731013Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 305, in get_dependant
+2025-12-24T07:48:46.496738265Z [err]      sub_dependant = get_dependant(
+2025-12-24T07:48:46.496744591Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:46.496750967Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 283, in get_dependant
+2025-12-24T07:48:46.498175617Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:46.498180959Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 533, in analyze_param
+2025-12-24T07:48:46.498185765Z [err]      field = create_model_field(
+2025-12-24T07:48:46.498190211Z [err]              ^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:46.498195057Z [err]  
+2025-12-24T07:48:46.498199811Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/utils.py", line 121, in create_model_field
+2025-12-24T07:48:46.498204822Z [err]      raise fastapi.exceptions.FastAPIError(
+2025-12-24T07:48:46.498208842Z [err]  fastapi.exceptions.FastAPIError: Invalid args for response field! Hint: check that <class 'sqlalchemy.orm.session.Session'> is a valid Pydantic field type. If you are using a return type annotation that is not a valid Pydantic field (e.g. Union[Response, dict, None]) you can disable generating the response model from the type annotation with the path operation decorator parameter response_model=None. Read more: https://fastapi.tiangolo.com/tutorial/response-model/
+2025-12-24T07:48:49.226580289Z [err]  Traceback (most recent call last):
+2025-12-24T07:48:49.226648181Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T07:48:49.226656166Z [err]      sys.exit(main())
+2025-12-24T07:48:49.229535546Z [err]               ^^^^^^
+2025-12-24T07:48:49.229544637Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T07:48:49.229550366Z [err]      return self.main(*args, **kwargs)
+2025-12-24T07:48:49.229555107Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229560580Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T07:48:49.229567102Z [err]      rv = self.invoke(ctx)
+2025-12-24T07:48:49.229572995Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229578876Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T07:48:49.229584615Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T07:48:49.229592448Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229597967Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T07:48:49.229603806Z [err]      return callback(*args, **kwargs)
+2025-12-24T07:48:49.229628471Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229636032Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T07:48:49.229683528Z [err]      await self._serve(sockets)
+2025-12-24T07:48:49.229693105Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T07:48:49.229696099Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T07:48:49.229702295Z [err]      config.load()
+2025-12-24T07:48:49.229704004Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T07:48:49.229705681Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T07:48:49.229711680Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T07:48:49.229714345Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229722800Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T07:48:49.229728206Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T07:48:49.229730572Z [err]  
+2025-12-24T07:48:49.229731821Z [err]      module = importlib.import_module(module_str)
+2025-12-24T07:48:49.229732148Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T07:48:49.229736849Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229739434Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T07:48:49.229741178Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229748337Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T07:48:49.229754293Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T07:48:49.229755702Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T07:48:49.229761328Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229763796Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T07:48:49.229770442Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T07:48:49.229776233Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T07:48:49.229783429Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T07:48:49.229790064Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T07:48:49.229926496Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229932504Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T07:48:49.229938228Z [err]      run(
+2025-12-24T07:48:49.229946120Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T07:48:49.229953656Z [err]      server.run()
+2025-12-24T07:48:49.229959169Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T07:48:49.229964552Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T07:48:49.229969780Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229975865Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.229981882Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T07:48:49.229987468Z [err]      return runner.run(main)
+2025-12-24T07:48:49.231393988Z [err]    File "/app/app/routers/home.py", line 38, in <module>
+2025-12-24T07:48:49.231397696Z [err]      @router.get("")
+2025-12-24T07:48:49.231401990Z [err]       ^^^^^^^^^^^^^^
+2025-12-24T07:48:49.231406198Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1138, in decorator
+2025-12-24T07:48:49.231410092Z [err]      self.add_api_route(
+2025-12-24T07:48:49.231418572Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1077, in add_api_route
+2025-12-24T07:48:49.231422959Z [err]      route = route_class(
+2025-12-24T07:48:49.231427308Z [err]              ^^^^^^^^^^^^
+2025-12-24T07:48:49.231432300Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 696, in __init__
+2025-12-24T07:48:49.231437018Z [err]      self.dependant = get_dependant(
+2025-12-24T07:48:49.231441654Z [err]                       ^^^^^^^^^^^^^^
+2025-12-24T07:48:49.231446006Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 305, in get_dependant
+2025-12-24T07:48:49.231451410Z [err]      sub_dependant = get_dependant(
+2025-12-24T07:48:49.231772870Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:49.231796615Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 283, in get_dependant
+2025-12-24T07:48:49.231804563Z [err]      param_details = analyze_param(
+2025-12-24T07:48:49.231810781Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:49.231817223Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 533, in analyze_param
+2025-12-24T07:48:49.231824650Z [err]      field = create_model_field(
+2025-12-24T07:48:49.231830875Z [err]              ^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:49.231838360Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/utils.py", line 121, in create_model_field
+2025-12-24T07:48:49.231845966Z [err]      raise fastapi.exceptions.FastAPIError(
+2025-12-24T07:48:49.231852772Z [err]  fastapi.exceptions.FastAPIError: Invalid args for response field! Hint: check that <class 'sqlalchemy.orm.session.Session'> is a valid Pydantic field type. If you are using a return type annotation that is not a valid Pydantic field (e.g. Union[Response, dict, None]) you can disable generating the response model from the type annotation with the path operation decorator parameter response_model=None. Read more: https://fastapi.tiangolo.com/tutorial/response-model/
+2025-12-24T07:48:51.377402680Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T07:48:51.377410117Z [err]      return self.main(*args, **kwargs)
+2025-12-24T07:48:51.377413524Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T07:48:51.377420875Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.377421629Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.377428332Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T07:48:51.377429027Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T07:48:51.377435381Z [err]      return callback(*args, **kwargs)
+2025-12-24T07:48:51.377437246Z [err]      rv = self.invoke(ctx)
+2025-12-24T07:48:51.377445411Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.377451624Z [err]  Traceback (most recent call last):
+2025-12-24T07:48:51.377464985Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T07:48:51.377473320Z [err]      sys.exit(main())
+2025-12-24T07:48:51.377481334Z [err]               ^^^^^^
+2025-12-24T07:48:51.377491477Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T07:48:51.380588337Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.380593039Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T07:48:51.380597844Z [err]      run(
+2025-12-24T07:48:51.380603042Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T07:48:51.380606972Z [err]      server.run()
+2025-12-24T07:48:51.380611018Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T07:48:51.380616697Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T07:48:51.380623620Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.380629722Z [err]  ^^^^^^^^^^^^^
+2025-12-24T07:48:51.380636109Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T07:48:51.380642062Z [err]      return runner.run(main)
+2025-12-24T07:48:51.380651323Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.380657339Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T07:48:51.380869699Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T07:48:51.380874595Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.380879347Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T07:48:51.380886744Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T07:48:51.380892822Z [err]      await self._serve(sockets)
+2025-12-24T07:48:51.380897395Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T07:48:51.380902606Z [err]      config.load()
+2025-12-24T07:48:51.380907899Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T07:48:51.380913206Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T07:48:51.380918075Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.380922785Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T07:48:51.380928065Z [err]      module = importlib.import_module(module_str)
+2025-12-24T07:48:51.381938567Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.381944509Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T07:48:51.381950186Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T07:48:51.381956680Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.381961159Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T07:48:51.381965409Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T07:48:51.381969640Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T07:48:51.381973791Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T07:48:51.381978067Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T07:48:51.381982072Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T07:48:51.381986125Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T07:48:51.381990104Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T07:48:51.381994424Z [err]    File "/app/app/routers/home.py", line 38, in <module>
+2025-12-24T07:48:51.381999115Z [err]      @router.get("")
+2025-12-24T07:48:51.383084963Z [err]       ^^^^^^^^^^^^^^
+2025-12-24T07:48:51.383092131Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1138, in decorator
+2025-12-24T07:48:51.383097478Z [err]      self.add_api_route(
+2025-12-24T07:48:51.383102945Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 1077, in add_api_route
+2025-12-24T07:48:51.383108257Z [err]      route = route_class(
+2025-12-24T07:48:51.383113979Z [err]              ^^^^^^^^^^^^
+2025-12-24T07:48:51.383121227Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 696, in __init__
+2025-12-24T07:48:51.383126867Z [err]      self.dependant = get_dependant(
+2025-12-24T07:48:51.383133531Z [err]                       ^^^^^^^^^^^^^^
+2025-12-24T07:48:51.383139308Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 305, in get_dependant
+2025-12-24T07:48:51.383145527Z [err]      sub_dependant = get_dependant(
+2025-12-24T07:48:51.383150931Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:51.383156634Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 283, in get_dependant
+2025-12-24T07:48:51.383161401Z [err]      param_details = analyze_param(
+2025-12-24T07:48:51.383169346Z [err]                      ^^^^^^^^^^^^^^
+2025-12-24T07:48:51.383174873Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/dependencies/utils.py", line 533, in analyze_param
+2025-12-24T07:48:51.384562892Z [err]      field = create_model_field(
+2025-12-24T07:48:51.384570264Z [err]              ^^^^^^^^^^^^^^^^^^^
+2025-12-24T07:48:51.384577398Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/utils.py", line 121, in create_model_field
+2025-12-24T07:48:51.384584336Z [err]      raise fastapi.exceptions.FastAPIError(
+2025-12-24T07:48:51.384591586Z [err]  fastapi.exceptions.FastAPIError: Invalid args for response field! Hint: check that <class 'sqlalchemy.orm.session.Session'> is a valid Pydantic field type. If you are using a return type annotation that is not a valid Pydantic field (e.g. Union[Response, dict, None]) you can disable generating the response model from the type annotation with the path operation decorator parameter response_model=None. Read more: https://fastapi.tiangolo.com/tutorial/response-model/

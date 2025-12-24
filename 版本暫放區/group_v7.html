@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4" x-data="orderPage()">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
+        
+        <!-- 簡潔的團單資訊 -->
+        <div class="flex items-center gap-3 mt-2">
+            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                {% if store.logo_url %}
+                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-10 h-10 object-contain">
+                {% else %}
+                <span class="text-2xl">{{ group.category_icon }}</span>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <h1 class="font-bold text-lg text-gray-900 truncate">{{ group.name }}</h1>
+                <div class="text-sm text-gray-500">{{ store.name }} · {{ group.owner.show_name }}</div>
+            </div>
+            <div class="text-right">
+                {% if is_open %}
+                <div class="text-orange-600 font-medium"
+                     x-data="countdown('{{ group.deadline.isoformat() }}')"
+                     x-text="display"></div>
+                {% else %}
+                <div class="text-gray-500">已截止</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 備註顯示 -->
+        {% if group.note %}
+        <div class="mt-3 p-3 bg-amber-50 rounded-lg text-sm text-amber-800">
+            📝 {{ group.note }}
+        </div>
+        {% endif %}
+        
+        <!-- 操作按鈕 -->
+        <div class="flex items-center justify-between mt-3 pt-3 border-t text-xs">
+            <div class="flex gap-3">
+                <button @click="copyLink()" class="text-gray-600 hover:text-gray-800">複製連結</button>
+                <button @click="showQR = true" class="text-gray-600 hover:text-gray-800">QR Code</button>
+            </div>
+            {% if is_owner or is_admin %}
+            <div class="flex gap-3 items-center">
+                <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">修改</button>
+                {% if is_open %}
+                <form action="/groups/{{ group.id }}/close" method="post" class="inline"
+                      onsubmit="return confirm('確定要提早結單嗎？結單後將無法再點餐。')">
+                    <button type="submit" class="text-orange-600 hover:text-orange-700">提早結單</button>
+                </form>
+                {% endif %}
+                <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
+                <a href="/groups/{{ group.id }}/export/payment" class="text-gray-600 hover:text-gray-800">個人明細</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if pending_count > 0 %}
+        <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded">
+            {{ pending_count }} 人尚未結單
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 團單設定 Modal -->
+    {% if is_owner or is_admin %}
+    <div x-show="showSettings" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+         @click.self="showSettings = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+                <h3 class="font-bold text-lg">團單設定</h3>
+                <button @click="showSettings = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            
+            <div class="p-4 space-y-4">
+                <!-- 編輯團單 -->
+                <div class="border rounded-lg p-3">
+                    <h4 class="font-medium text-gray-800 mb-2">編輯團單</h4>
+                    <form action="/groups/{{ group.id }}/edit" method="post" class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">團名</label>
+                            <input type="text" name="name" value="{{ group.name }}" required
+                                   class="w-full border rounded px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">備註</label>
+                            <textarea name="note" rows="2" class="w-full border rounded px-3 py-2 text-sm"
+                                      placeholder="取餐地點、外送費等">{{ group.note or '' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">截止時間</label>
+                            <input type="datetime-local" name="deadline" 
+                                   value="{{ group.deadline.strftime('%Y-%m-%dT%H:%M') }}"
+                                   class="w-full border rounded px-3 py-2 text-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded text-sm">
+                            儲存變更
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- 轉移團主 -->
+                <div class="border rounded-lg p-3">
+                    <h4 class="font-medium text-gray-800 mb-2">轉移團主</h4>
+                    <form action="/groups/{{ group.id }}/transfer" method="post"
+                          onsubmit="return confirm('確定要將團主轉移給選擇的用戶嗎？')">
+                        <div class="mb-3">
+                            <label class="block text-sm text-gray-600 mb-1">選擇新團主</label>
+                            <select name="new_owner_id" required class="w-full border rounded px-3 py-2 text-sm">
+                                <option value="">請選擇...</option>
+                                {% for u in all_users %}
+                                {% if u.id != group.owner_id %}
+                                <option value="{{ u.id }}">{{ u.show_name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded text-sm">
+                            轉移團主
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- 刪除團單 -->
+                <div class="border border-red-200 rounded-lg p-3 bg-red-50">
+                    <h4 class="font-medium text-red-800 mb-2">刪除團單</h4>
+                    <p class="text-sm text-red-600 mb-3">
+                        {% if group.orders|length > 0 %}
+                        ⚠️ 此團已有 {{ group.orders|length }} 筆訂單，刪除後無法復原！
+                        {% else %}
+                        刪除後無法復原
+                        {% endif %}
+                    </p>
+                    <form action="/groups/{{ group.id }}/delete" method="post"
+                          onsubmit="return confirm('{% if group.orders|length > 0 %}此團已有 {{ group.orders|length }} 筆訂單！{% endif %}確定要刪除嗎？此操作無法復原。')">
+                        <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded text-sm">
+                            刪除團單
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 訂單牆 -->
+    <div id="order-wall" hx-get="/groups/{{ group.id }}/orders/wall" hx-trigger="load, orderUpdated from:body">
+        {% include "partials/order_wall.html" %}
+    </div>
+
+    <!-- 我的訂單（已結單時顯示在頁面上） -->
+    <div id="my-order-display" x-show="orderStatus === 'submitted'">
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                我的訂單
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">已結單</span>
+            </h2>
+            <div id="my-order-content" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
+                {% include "partials/my_order.html" %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 菜單 -->
+    {% if is_open %}
+    <div class="bg-white rounded-lg shadow-sm p-4 pb-24">
+        <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
+        
+        <!-- 分類快速導覽 -->
+        {% if menu.categories|length > 1 %}
+        <div class="flex flex-wrap gap-2 mb-4 sticky top-0 bg-white py-2 -mx-4 px-4 border-b z-10">
+            {% for category in menu.categories %}
+            <button onclick="document.getElementById('category-{{ category.id }}').scrollIntoView({behavior: 'smooth', block: 'start'})"
+                    class="text-xs px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition">
+                {{ category.name }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        {% for category in menu.categories %}
+        <div id="category-{{ category.id }}" class="mb-4 scroll-mt-16">
+            <h3 class="text-sm font-medium text-gray-600 mb-2">{{ category.name }}</h3>
+            <div class="space-y-2">
+                {% for item in category.items %}
+                {% include "partials/menu_item.html" %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
+        {% if uncategorized %}
+        <div class="space-y-2">
+            {% for item in uncategorized %}
+            {% include "partials/menu_item.html" %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 懸浮購物車按鈕（只有未結單時顯示） -->
+    <button @click="showCart = true"
+            x-show="orderStatus !== 'submitted'"
+            class="fixed bottom-4 right-4 z-40 bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center">
+        <span class="text-xl">🛒</span>
+        <span x-show="cartCount > 0"
+              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+              x-text="cartCount"></span>
+    </button>
+    
+    <!-- 購物車側欄（只有未結單時使用） -->
+    <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/30" @click="showCart = false"></div>
+        <div class="absolute right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-xl flex flex-col"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full">
+            
+            <!-- 購物車標題 -->
+            <div class="p-4 border-b flex items-center justify-between bg-orange-500 text-white">
+                <h3 class="font-semibold text-lg">購物車</h3>
+                <button @click="showCart = false" class="text-white/80 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <!-- 購物車內容 -->
+            <div class="flex-1 overflow-y-auto" id="cart-content"
+                 hx-get="/groups/{{ group.id }}/orders/mine" 
+                 hx-trigger="load, orderUpdated from:body"
+                 hx-swap="innerHTML">
+                {% include "partials/my_order.html" %}
+            </div>
+            
+            <!-- 購物車底部 -->
+            <div class="p-4 border-t bg-gray-50">
+                <div class="flex gap-2">
+                    <button @click="showCart = false" 
+                            class="flex-1 py-2.5 rounded-lg border hover:bg-gray-100 font-medium">
+                        繼續點餐
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- QR Code Modal -->
+    <div x-show="showQR" x-cloak
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @click.self="showQR = false">
+        <div class="bg-white rounded-lg p-6 mx-4 max-w-sm w-full text-center">
+            <h3 class="font-semibold mb-4">掃碼加入團購</h3>
+            <div hx-get="/groups/{{ group.id }}/qrcode" hx-trigger="load" class="flex justify-center">
+                <div class="animate-pulse bg-gray-200 w-48 h-48"></div>
+            </div>
+            <button @click="showQR = false" class="mt-4 text-gray-500 hover:text-gray-700">關閉</button>
+        </div>
+    </div>
+
+    <!-- 加入品項 Modal -->
+    <div x-show="showAddItem" x-cloak
+         class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
+         @click.self="showAddItem = false">
+        <div class="bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <h3 class="font-semibold text-lg mb-4" x-text="selectedItem?.name"></h3>
+            
+            <form hx-post="/groups/{{ group.id }}/orders/items" 
+                  hx-target="#cart-content"
+                  hx-swap="innerHTML"
+                  @htmx:after-request="afterAddItem()">
+                
+                <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
+                
+                <!-- 尺寸選擇 -->
+                <div x-show="selectedItem?.price_l" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">尺寸</label>
+                    <div class="flex gap-2">
+                        <label class="cursor-pointer flex-1">
+                            <input type="radio" name="size" value="M" x-model="selectedSize" class="peer hidden" checked>
+                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                                M <span x-text="'$' + selectedItem?.price"></span>
+                            </span>
+                        </label>
+                        <label class="cursor-pointer flex-1">
+                            <input type="radio" name="size" value="L" x-model="selectedSize" class="peer hidden">
+                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                                L <span x-text="'$' + selectedItem?.price_l"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 甜度 -->
+                {% if group.category.value == 'drink' %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">甜度</label>
+                    {% if group.lock_sugar %}
+                    <div class="text-gray-600">{{ group.default_sugar }} (已鎖定)</div>
+                    <input type="hidden" name="sugar" value="{{ group.default_sugar }}">
+                    {% else %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for opt in store.options if opt.option_type.value == 'sugar' %}
+                        <label class="cursor-pointer">
+                            <input type="radio" name="sugar" value="{{ opt.option_value }}" 
+                                   class="peer hidden" {% if opt.option_value == group.default_sugar %}checked{% endif %}>
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                                {{ opt.option_value }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- 冰塊 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">冰塊</label>
+                    {% if group.lock_ice %}
+                    <div class="text-gray-600">{{ group.default_ice }} (已鎖定)</div>
+                    <input type="hidden" name="ice" value="{{ group.default_ice }}">
+                    {% else %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for opt in store.options if opt.option_type.value == 'ice' %}
+                        <label class="cursor-pointer">
+                            <input type="radio" name="ice" value="{{ opt.option_value }}" 
+                                   class="peer hidden" {% if opt.option_value == group.default_ice %}checked{% endif %}>
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                                {{ opt.option_value }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- 加料選項（飲料店） -->
+                {% if store.toppings %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">加料</label>
+                    <div class="flex flex-wrap gap-2">
+                        {% for topping in store.toppings if topping.is_active %}
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="toppings" value="{{ topping.id }}" class="peer hidden">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                                {{ topping.name }} {% if topping.price > 0 %}+${{ topping.price|int }}{% endif %}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endif %}
+                
+                <!-- 加購選項 -->
+                <div x-show="selectedItem?.options?.length > 0" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">加購選項</label>
+                    <div class="space-y-2" x-html="renderOptions()"></div>
+                </div>
+                
+                <!-- 數量 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">數量</label>
+                    <div class="flex items-center gap-3">
+                        <button type="button" @click="quantity = Math.max(1, quantity - 1)"
+                                class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-xl">−</button>
+                        <input type="number" name="quantity" x-model="quantity" min="1" 
+                               class="w-16 text-center border rounded py-2">
+                        <button type="button" @click="quantity++"
+                                class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-xl">+</button>
+                    </div>
+                </div>
+                
+                <!-- 備註 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">備註</label>
+                    <input type="text" name="note" placeholder="特殊需求..." 
+                           class="w-full border rounded px-3 py-2">
+                </div>
+                
+                <!-- 按鈕 -->
+                <div class="flex gap-2">
+                    <button type="button" @click="showAddItem = false"
+                            class="flex-1 py-3 rounded-lg border hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button type="submit"
+                            class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                        加入購物車
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function orderPage() {
+    return {
+        showQR: false,
+        showAddItem: false,
+        showCart: false,
+        showSettings: false,
+        selectedItem: null,
+        selectedSize: 'M',
+        quantity: 1,
+        cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
+        orderStatus: '{{ my_order.status.value if my_order else "none" }}',
+        
+        async openAddItem(item) {
+            // 如果已結單，先問是否要加點
+            if (this.orderStatus === 'submitted') {
+                if (!confirm('您已結單，是否要加點？\n\n選「確定」將修改訂單並加點\n選「取消」則不加點')) {
+                    return;
+                }
+                // 先調用修改訂單 API
+                await fetch('/groups/{{ group.id }}/orders/edit', { method: 'POST' });
+                this.orderStatus = 'editing';
+                document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+            }
+            
+            this.selectedItem = item;
+            this.selectedSize = 'M';
+            this.quantity = 1;
+            this.showAddItem = true;
+        },
+        
+        afterAddItem() {
+            this.showAddItem = false;
+            this.updateCartCount();
+            this.orderStatus = 'draft';
+            document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+        },
+        
+        updateCartCount() {
+            setTimeout(() => {
+                const items = document.querySelectorAll('#cart-content [data-item-id]');
+                this.cartCount = items.length;
+            }, 100);
+        },
+        
+        copyLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert('連結已複製！');
+        },
+        
+        renderOptions() {
+            if (!this.selectedItem?.options) return '';
+            return this.selectedItem.options.map(opt => `
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="options" value="${opt.id}" class="rounded">
+                    <span>${opt.name}</span>
+                    ${opt.price_diff > 0 ? `<span class="text-gray-500">+$${opt.price_diff}</span>` : ''}
+                </label>
+            `).join('');
+        }
+    }
+}
+
+function countdown(deadline) {
+    return {
+        display: '',
+        init() {
+            this.update();
+            setInterval(() => this.update(), 1000);
+        },
+        update() {
+            const now = new Date();
+            const end = new Date(deadline);
+            const diff = end - now;
+            
+            if (diff <= 0) {
+                this.display = '已截止';
+                return;
+            }
+            
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (hours > 0) {
+                this.display = `⏰ ${hours}h ${minutes}m`;
+            } else {
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                this.display = `⏰ ${minutes}m ${seconds}s`;
+            }
+        }
+    }
+}
+
+// 監聽訂單更新事件
+document.body.addEventListener('orderUpdated', function() {
+    setTimeout(() => {
+        const items = document.querySelectorAll('#cart-content [data-item-id]');
+        const countEl = document.querySelector('[x-text="cartCount"]');
+        if (countEl) {
+            countEl.textContent = items.length;
+        }
+    }, 100);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}首頁 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 訂飲料 -->
+    {% if drink_groups %}
+    <section>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
+        <div class="grid grid-cols-2 gap-3">
+            {% for group in drink_groups %}
+            <a href="/groups/{{ group.id }}" 
+               class="block bg-amber-50 rounded-lg p-4 shadow hover:shadow-md transition relative"
+               style="min-height: 120px;">
+                <!-- 便利貼頂部膠帶效果 -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 bg-amber-200/70 rounded"></div>
+                
+                <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
+                
+                <!-- 備註（簡短顯示） -->
+                {% if group.note %}
+                <div class="text-xs text-amber-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
+                {% endif %}
+                
+                <div class="absolute bottom-3 right-3">
+                    {% if group.is_open %}
+                    <span class="text-xs text-orange-600 font-medium"
+                          x-data="countdown('{{ group.deadline.isoformat() }}')"
+                          x-text="display"></span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">已截止</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- 訂餐 -->
+    {% if meal_groups %}
+    <section>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
+        <div class="grid grid-cols-2 gap-3">
+            {% for group in meal_groups %}
+            <a href="/groups/{{ group.id }}" 
+               class="block bg-green-50 rounded-lg p-4 shadow hover:shadow-md transition relative"
+               style="min-height: 120px;">
+                <!-- 便利貼頂部膠帶效果 -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 bg-green-200/70 rounded"></div>
+                
+                <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ group.store.name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
+                
+                <!-- 備註（簡短顯示） -->
+                {% if group.note %}
+                <div class="text-xs text-green-700 mt-1 line-clamp-1">📝 {{ group.note }}</div>
+                {% endif %}
+                
+                <div class="absolute bottom-3 right-3">
+                    {% if group.is_open %}
+                    <span class="text-xs text-orange-600 font-medium"
+                          x-data="countdown('{{ group.deadline.isoformat() }}')"
+                          x-text="display"></span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">已截止</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- 無開放中的團 -->
+    {% if not drink_groups and not meal_groups %}
+    <div class="text-center py-12 text-gray-500">
+        <p>目前沒有開放中的團</p>
+        <p class="text-sm mt-1">點擊上方「開團」按鈕開新團！</p>
+    </div>
+    {% endif %}
+
+    <!-- 已截止 -->
+    {% if closed_groups %}
+    <section>
+        <h2 class="text-lg font-semibold text-gray-400 mb-3">已截止</h2>
+        <div class="grid grid-cols-2 gap-3 opacity-60">
+            {% for group in closed_groups %}
+            <a href="/groups/{{ group.id }}" 
+               class="block bg-gray-100 rounded-lg p-4 shadow relative"
+               style="min-height: 120px;">
+                <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.store.name }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ group.owner.show_name }}</div>
+                <div class="absolute bottom-3 right-3">
+                    <span class="text-xs text-gray-400">已截止</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+function countdown(deadline) {
+    return {
+        display: '',
+        init() {
+            this.update();
+            setInterval(() => this.update(), 60000);
+        },
+        update() {
+            const now = new Date();
+            const end = new Date(deadline);
+            const diff = end - now;
+            
+            if (diff <= 0) {
+                this.display = '已截止';
+                return;
+            }
+            
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (hours > 24) {
+                const days = Math.floor(hours / 24);
+                this.display = `${days}天`;
+            } else if (hours > 0) {
+                this.display = `${hours}h ${minutes}m`;
+            } else {
+                this.display = `${minutes}m`;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

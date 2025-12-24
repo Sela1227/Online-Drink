@@ -1,0 +1,109 @@
+{
+  "store": {
+    "name": "大苑子",
+    "category": "drink",
+    "sugar_options": ["正常糖", "7分糖", "5分糖", "3分糖", "無糖"],
+    "ice_options": ["多冰", "正常冰", "少冰", "去冰", "熱"]
+  },
+  "menu": {
+    "categories": [
+      {
+        "name": "著時必喝",
+        "items": [
+          {"name": "鮮搾橘子紅茶", "price": 70},
+          {"name": "台灣鮮搾柳丁綠", "price": 70, "price_l": 105},
+          {"name": "巨峰葡萄芭樂", "price": 75},
+          {"name": "巨峰葡萄冰茶", "price": 70},
+          {"name": "巨峰葡萄雪沙", "price": 90}
+        ]
+      },
+      {
+        "name": "果茶系列",
+        "items": [
+          {"name": "大苑子水果茶", "price": 75},
+          {"name": "台灣檸檬春烏龍", "price": 60},
+          {"name": "翡翠檸檬", "price": 60, "price_l": 95},
+          {"name": "埔里百香果綠", "price": 60, "price_l": 95},
+          {"name": "鮮搾葡萄柚綠", "price": 70, "price_l": 105}
+        ]
+      },
+      {
+        "name": "鮮搾果汁",
+        "items": [
+          {"name": "羽衣甘藍5蔬果汁", "price": 79},
+          {"name": "天天5蔬果汁", "price": 69},
+          {"name": "芭樂甘草", "price": 70, "price_l": 105},
+          {"name": "芭樂檸檬", "price": 65, "price_l": 100},
+          {"name": "芭樂梅", "price": 65, "price_l": 100},
+          {"name": "番茄梅", "price": 65, "price_l": 100}
+        ]
+      },
+      {
+        "name": "特調",
+        "items": [
+          {"name": "古早味冬瓜茶", "price": 35, "price_l": 60},
+          {"name": "蘋果醋冰茶", "price": 55, "price_l": 90},
+          {"name": "百年蜜仙草", "price": 55, "price_l": 90},
+          {"name": "百香愛玉", "price": 60},
+          {"name": "檸檬愛玉", "price": 60},
+          {"name": "冬瓜檸檬", "price": 60},
+          {"name": "冬瓜檸檬奇亞籽", "price": 60},
+          {"name": "養樂多綠茶", "price": 55, "price_l": 90},
+          {"name": "蘋果多輕飲", "price": 65},
+          {"name": "蜂蜜檸檬", "price": 70},
+          {"name": "蜂蜜檸檬奇亞籽", "price": 70},
+          {"name": "柚美粒", "price": 70, "price_l": 105}
+        ]
+      },
+      {
+        "name": "好茶",
+        "items": [
+          {"name": "台灣春烏龍", "price": 39, "price_l": 70},
+          {"name": "古城錫蘭紅茶", "price": 30, "price_l": 55},
+          {"name": "文山青茶", "price": 30, "price_l": 55},
+          {"name": "纖活綠茶", "price": 30, "price_l": 55},
+          {"name": "百年仙草干茶", "price": 35, "price_l": 60}
+        ]
+      },
+      {
+        "name": "許慶良鮮乳",
+        "items": [
+          {"name": "許慶良鮮奶茶", "price": 55, "price_l": 65},
+          {"name": "許慶良鮮奶綠", "price": 55, "price_l": 65},
+          {"name": "許慶良鮮奶冬瓜", "price": 55, "price_l": 65},
+          {"name": "許慶良觀音拿鐵", "price": 55, "price_l": 65},
+          {"name": "許慶良奶酪鮮奶茶", "price": 75},
+          {"name": "許慶良布丁鮮奶茶", "price": 75},
+          {"name": "許慶良窯燒桂圓鮮奶茶", "price": 75}
+        ]
+      },
+      {
+        "name": "奶茶",
+        "items": [
+          {"name": "奶茶", "price": 45, "price_l": 55},
+          {"name": "纖活奶綠", "price": 45, "price_l": 55},
+          {"name": "布丁奶茶", "price": 65}
+        ]
+      },
+      {
+        "name": "暖冬推薦",
+        "items": [
+          {"name": "窯燒桂圓紅棗茶", "price": 70},
+          {"name": "窯燒桂圓蜜朵朵", "price": 75},
+          {"name": "許慶良紫米紅豆鮮奶", "price": 70, "price_l": 90},
+          {"name": "紫米紅豆奶茶", "price": 65, "price_l": 85},
+          {"name": "許慶良芋頭鮮奶", "price": 70, "price_l": 90},
+          {"name": "芋頭奶綠", "price": 65, "price_l": 85}
+        ]
+      },
+      {
+        "name": "冰釀銀耳",
+        "items": [
+          {"name": "冰釀蜜朵朵", "price": 95},
+          {"name": "錫蘭紅茶蜜朵朵", "price": 60},
+          {"name": "鮮搾蘋果蜜朵朵", "price": 75}
+        ]
+      }
+    ]
+  }
+}

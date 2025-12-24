@@ -1,0 +1,24 @@
+<button @click="openAddItem({
+            id: {{ item.id }},
+            name: '{{ item.name }}',
+            price: {{ item.price }},
+            price_l: {{ item.price_l if item.price_l else 'null' }},
+            options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
+        })"
+        class="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition text-left">
+    <div>
+        <div class="font-medium text-gray-800">{{ item.name }}</div>
+        {% if item.options %}
+        <div class="text-xs text-gray-500">
+            可加購：{% for opt in item.options %}{{ opt.name }}{% if not loop.last %}、{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    <div class="text-orange-600 font-medium">
+        {% if item.price_l %}
+        ${{ item.price }}/${{ item.price_l }}
+        {% else %}
+        ${{ item.price }}
+        {% endif %}
+    </div>
+</button>

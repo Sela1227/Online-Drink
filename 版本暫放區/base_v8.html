@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SELA 快點來點餐{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/home" class="flex items-center gap-2">
+                <img src="/static/images/sela-logo.svg" alt="SELA" class="h-8 w-8">
+                <span class="font-bold text-orange-600">快點來點餐</span>
+            </a>
+            <div class="flex items-center gap-3">
+                {% if user %}
+                <a href="/groups/new" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded">
+                    開團
+                </a>
+                {% endif %}
+                {% if user and user.is_admin %}
+                <a href="/admin" class="text-sm text-gray-600 hover:text-gray-800">
+                    管理
+                </a>
+                {% endif %}
+                {% if user %}
+                <a href="/profile" class="text-sm text-gray-600 hover:text-orange-600 flex items-center gap-1">
+                    {% if user.picture_url %}
+                    <img src="{{ user.picture_url }}" class="w-6 h-6 rounded-full">
+                    {% endif %}
+                    <span>{{ user.show_name }}</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-lg mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+    
+    {% if user %}
+    <!-- 閒置偵測 -->
+    <script>
+    (function() {
+        const IDLE_TIMEOUT = 30 * 60 * 1000;  // 30 分鐘
+        const HEARTBEAT_INTERVAL = 5 * 60 * 1000;  // 5 分鐘
+        let lastActivity = Date.now();
+        let heartbeatTimer = null;
+        
+        // 偵測用戶活動
+        function updateActivity() {
+            lastActivity = Date.now();
+        }
+        
+        // 監聽用戶活動
+        ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, updateActivity, { passive: true });
+        });
+        
+        // 心跳檢查
+        async function heartbeat() {
+            // 檢查是否閒置超時
+            if (Date.now() - lastActivity > IDLE_TIMEOUT) {
+                clearInterval(heartbeatTimer);
+                alert('您已閒置超過 30 分鐘，請重新登入');
+                window.location.href = '/auth/logout';
+                return;
+            }
+            
+            // 發送心跳
+            try {
+                const response = await fetch('/auth/heartbeat', { method: 'POST' });
+                if (response.status === 401) {
+                    clearInterval(heartbeatTimer);
+                    alert('登入已過期，請重新登入');
+                    window.location.href = '/auth/logout';
+                }
+            } catch (e) {
+                console.log('Heartbeat failed:', e);
+            }
+        }
+        
+        // 啟動心跳
+        heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
+        
+        // 頁面可見性變更時檢查
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                heartbeat();
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

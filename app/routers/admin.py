@@ -1,347 +1,413 @@
+"""
+admin.py - 管理後台路由
+修復版 2024/12/24
+"""
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, JSONResponse
-from sqlalchemy.orm import Session
-from pydantic import ValidationError
+from fastapi.responses import RedirectResponse, HTMLResponse
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_
+from datetime import datetime, timezone, timedelta
 import json
-import cloudinary
-import cloudinary.uploader
 
 from app.database import get_db
-from app.config import get_settings
-from app.models.store import Store, StoreOption, CategoryType, OptionType
+from app.models.user import User
+from app.models.store import Store, CategoryType, StoreOption
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.models.group import Group
-from app.schemas.menu import MenuImport, FullImport, MenuContent
+from app.models.order import Order, OrderStatus
 from app.services.auth import get_admin_user
-from app.services.import_service import import_store_and_menu, import_menu
+from app.services.import_service import import_store_from_json
+from app.config import get_settings
+
+try:
+    from app.services.upload_service import upload_image
+except ImportError:
+    upload_image = None
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
 
-# 設定 Cloudinary
-if settings.cloudinary_cloud_name:
-    cloudinary.config(
-        cloud_name=settings.cloudinary_cloud_name,
-        api_key=settings.cloudinary_api_key,
-        api_secret=settings.cloudinary_api_secret,
-    )
+
+# ===== 註冊台北時區過濾器 =====
+def to_taipei_time(dt):
+    if dt is None:
+        return None
+    taipei_tz = timezone(timedelta(hours=8))
+    if dt.tzinfo is None:
+        utc_dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        utc_dt = dt
+    return utc_dt.astimezone(taipei_tz)
+
+templates.env.filters['taipei'] = to_taipei_time
 
 
+# ===== 管理首頁 =====
 @router.get("")
-async def admin_home(request: Request, db: Session = Depends(get_db)):
-    """後台首頁"""
-    user = await get_admin_user(request, db)
+async def admin_index(
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    stats = {
+        "total_users": db.query(User).count(),
+        "total_stores": db.query(Store).filter(Store.is_active == True).count(),
+        "total_groups": db.query(Group).count(),
+        "active_groups": db.query(Group).filter(
+            Group.is_closed == False,
+            Group.deadline > datetime.utcnow()
+        ).count(),
+    }
     
-    from app.models.user import User
-    store_count = db.query(Store).count()
-    group_count = db.query(Group).count()
-    user_count = db.query(User).count()
+    thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
+    try:
+        online_count = db.query(User).filter(
+            User.last_active_at >= thirty_minutes_ago
+        ).count()
+    except:
+        online_count = 0
     
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
         "user": user,
-        "store_count": store_count,
-        "group_count": group_count,
-        "user_count": user_count,
+        "stats": stats,
+        "online_count": online_count,
     })
 
 
+# ===== 店家管理 =====
 @router.get("/stores")
-async def store_list(request: Request, db: Session = Depends(get_db)):
-    """店家列表"""
-    user = await get_admin_user(request, db)
+async def store_list(
+    request: Request,
+    category: str = None,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    query = db.query(Store).filter(Store.is_active == True)
     
-    stores = db.query(Store).order_by(Store.created_at.desc()).all()
+    if category:
+        try:
+            cat_type = CategoryType(category.lower())
+            query = query.filter(Store.category == cat_type)
+        except ValueError:
+            pass
+    
+    stores = query.order_by(Store.name).all()
     
     return templates.TemplateResponse("admin/stores.html", {
         "request": request,
         "user": user,
         "stores": stores,
+        "categories": list(CategoryType),
+        "selected_category": category,
     })
 
 
-@router.get("/stores/{store_id}/menus")
-async def menu_list(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """菜單版本列表"""
-    user = await get_admin_user(request, db)
+@router.get("/stores/{store_id}")
+async def store_detail(
+    store_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    store = db.query(Store).options(
+        joinedload(Store.menus).joinedload(Menu.categories).joinedload(MenuCategory.items)
+    ).filter(Store.id == store_id).first()
     
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    return templates.TemplateResponse("admin/store_detail.html", {
+        "request": request,
+        "user": user,
+        "store": store,
+        "categories": list(CategoryType),
+    })
+
+
+@router.post("/stores/{store_id}/update")
+async def update_store(
+    store_id: int,
+    name: str = Form(...),
+    category: str = Form(...),
+    phone: str = Form(None),
+    logo: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
     store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
-    menus = db.query(Menu).filter(Menu.store_id == store_id).order_by(Menu.created_at.desc()).all()
+    store.name = name
     
-    return templates.TemplateResponse("admin/menus.html", {
-        "request": request,
-        "user": user,
-        "store": store,
-        "menus": menus,
-    })
+    # ===== 修復：分類大小寫轉換 =====
+    try:
+        category_lower = category.lower()
+        store.category = CategoryType(category_lower)
+    except ValueError:
+        try:
+            store.category = CategoryType[category.upper()]
+        except KeyError:
+            pass
+    
+    if phone:
+        store.phone = phone
+    
+    if logo and logo.filename and upload_image:
+        try:
+            logo_url = await upload_image(logo, folder="store_logos")
+            if logo_url:
+                store.logo_url = logo_url
+        except Exception as e:
+            print(f"Logo upload error: {e}")
+    
+    db.commit()
+    
+    return RedirectResponse(f"/admin/stores/{store_id}", status_code=302)
 
 
-@router.post("/stores/{store_id}/menus/{menu_id}/activate")
-async def activate_menu(store_id: int, menu_id: int, request: Request, db: Session = Depends(get_db)):
-    """啟用菜單版本"""
-    user = await get_admin_user(request, db)
-    
-    # 停用其他版本
-    db.query(Menu).filter(Menu.store_id == store_id).update({"is_active": False})
-    
-    # 啟用指定版本
-    menu = db.query(Menu).filter(Menu.id == menu_id, Menu.store_id == store_id).first()
-    if menu:
-        menu.is_active = True
+@router.post("/stores/{store_id}/delete")
+async def delete_store(
+    store_id: int,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if store:
+        store.is_active = False
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/menus", status_code=302)
+    return RedirectResponse("/admin/stores", status_code=302)
 
 
+# ===== JSON 匯入 =====
 @router.get("/import")
-async def import_page(request: Request, db: Session = Depends(get_db)):
-    """匯入頁面"""
-    user = await get_admin_user(request, db)
-    
-    stores = db.query(Store).filter(Store.is_active == True).all()
-    
+async def import_page(
+    request: Request,
+    user = Depends(get_admin_user)
+):
     return templates.TemplateResponse("admin/import.html", {
         "request": request,
         "user": user,
-        "stores": stores,
-    })
-
-
-@router.post("/import/preview")
-async def import_preview(
-    request: Request,
-    json_text: str = Form(None),
-    json_file: UploadFile = File(None),
-    db: Session = Depends(get_db),
-):
-    """匯入預覽"""
-    user = await get_admin_user(request, db)
-    
-    # 取得 JSON 內容
-    if json_file and json_file.filename:
-        content = await json_file.read()
-        json_str = content.decode("utf-8")
-    elif json_text:
-        json_str = json_text
-    else:
-        raise HTTPException(status_code=400, detail="請提供 JSON 內容")
-    
-    try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
-    
-    # 判斷匯入類型
-    is_full_import = "store" in data
-    
-    try:
-        if is_full_import:
-            validated = FullImport(**data)
-        else:
-            validated = MenuImport(**data)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
-    
-    # 如果是菜單匯入，取得現有菜單做比較
-    existing_menu = None
-    if not is_full_import:
-        store = db.query(Store).filter(Store.id == validated.store_id).first()
-        if not store:
-            raise HTTPException(status_code=404, detail="店家不存在")
-        existing_menu = db.query(Menu).filter(
-            Menu.store_id == validated.store_id,
-            Menu.is_active == True
-        ).first()
-    
-    return templates.TemplateResponse("admin/import_preview.html", {
-        "request": request,
-        "user": user,
-        "data": validated,
-        "is_full_import": is_full_import,
-        "existing_menu": existing_menu,
-        "json_str": json_str,
     })
 
 
 @router.post("/import")
 async def do_import(
     request: Request,
-    json_str: str = Form(...),
+    json_file: UploadFile = File(None),
+    json_text: str = Form(None),
     db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
 ):
-    """執行匯入"""
-    user = await get_admin_user(request, db)
-    
     try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
-    
-    is_full_import = "store" in data
-    
-    try:
-        if is_full_import:
-            validated = FullImport(**data)
-            store = import_store_and_menu(db, validated)
-            return RedirectResponse(url=f"/admin/stores/{store.id}/menus", status_code=302)
+        if json_file and json_file.filename:
+            content = await json_file.read()
+            data = json.loads(content.decode('utf-8'))
+        elif json_text:
+            data = json.loads(json_text)
         else:
-            validated = MenuImport(**data)
-            menu = import_menu(db, validated)
-            return RedirectResponse(url=f"/admin/stores/{validated.store_id}/menus", status_code=302)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
-
-
-@router.get("/groups")
-async def group_list(request: Request, db: Session = Depends(get_db)):
-    """所有團單"""
-    user = await get_admin_user(request, db)
-    
-    groups = db.query(Group).order_by(Group.created_at.desc()).all()
-    
-    return templates.TemplateResponse("admin/groups.html", {
-        "request": request,
-        "user": user,
-        "groups": groups,
-    })
-
-
-@router.post("/stores/{store_id}/toggle")
-async def toggle_store(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """啟用/停用店家"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if store:
-        store.is_active = not store.is_active
-        db.commit()
-    
-    return RedirectResponse(url="/admin/stores", status_code=302)
-
-
-@router.get("/stores/{store_id}/edit")
-async def edit_store_page(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """編輯店家頁面"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    return templates.TemplateResponse("admin/store_edit.html", {
-        "request": request,
-        "user": user,
-        "store": store,
-    })
-
-
-@router.post("/stores/{store_id}/edit")
-async def update_store(
-    store_id: int,
-    request: Request,
-    name: str = Form(...),
-    logo_url: str = Form(None),
-    db: Session = Depends(get_db),
-):
-    """更新店家資料"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    store.name = name
-    if logo_url:
-        store.logo_url = logo_url
-    
-    db.commit()
-    
-    return RedirectResponse(url="/admin/stores", status_code=302)
-
-
-@router.post("/stores/{store_id}/logo")
-async def upload_store_logo(
-    store_id: int,
-    request: Request,
-    logo: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
-    """上傳店家 Logo"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 檢查是否有設定 Cloudinary
-    if not settings.cloudinary_cloud_name:
-        raise HTTPException(status_code=400, detail="尚未設定 Cloudinary")
-    
-    # 檢查檔案類型
-    if not logo.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="只能上傳圖片")
-    
-    try:
-        # 上傳到 Cloudinary
-        result = cloudinary.uploader.upload(
-            logo.file,
-            folder="group-buy/stores",
-            public_id=f"store_{store_id}",
-            overwrite=True,
-            transformation=[
-                {"width": 200, "height": 200, "crop": "fill"},
-                {"quality": "auto"},
-                {"format": "webp"}
-            ]
-        )
+            raise ValueError("請提供 JSON 檔案或文字")
         
-        # 更新店家 Logo URL
-        store.logo_url = result['secure_url']
-        db.commit()
+        result = import_store_from_json(db, data)
         
-        return JSONResponse({
+        return templates.TemplateResponse("admin/import.html", {
+            "request": request,
+            "user": user,
             "success": True,
-            "url": result['secure_url']
+            "message": f"成功匯入：{result['store_name']}，共 {result['item_count']} 個品項",
         })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"上傳失敗: {str(e)}")
+        return templates.TemplateResponse("admin/import.html", {
+            "request": request,
+            "user": user,
+            "error": str(e),
+        })
 
 
+# ===== 使用者管理 =====
 @router.get("/users")
-async def user_list(request: Request, db: Session = Depends(get_db)):
-    """使用者列表"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import User
+async def user_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
     users = db.query(User).order_by(User.created_at.desc()).all()
+    
+    thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
+    try:
+        online_count = db.query(User).filter(
+            User.last_active_at >= thirty_minutes_ago
+        ).count()
+    except:
+        online_count = 0
     
     return templates.TemplateResponse("admin/users.html", {
         "request": request,
         "user": user,
         "users": users,
+        "online_count": online_count,
+        "now": datetime.utcnow(),
+    })
+
+
+@router.get("/users/{user_id}")
+async def user_detail(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin = Depends(get_admin_user)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="用戶不存在")
+    
+    order_count = db.query(Order).filter(
+        Order.user_id == user_id,
+        Order.status == OrderStatus.SUBMITTED
+    ).count()
+    
+    group_count = db.query(Group).filter(Group.owner_id == user_id).count()
+    
+    return templates.TemplateResponse("admin/user_detail.html", {
+        "request": request,
+        "user": admin,
+        "target_user": target_user,
+        "order_count": order_count,
+        "group_count": group_count,
     })
 
 
 @router.post("/users/{user_id}/toggle-admin")
-async def toggle_user_admin(user_id: int, request: Request, db: Session = Depends(get_db)):
-    """切換使用者管理員權限"""
-    admin = await get_admin_user(request, db)
-    
-    from app.models.user import User
+async def toggle_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin = Depends(get_admin_user)
+):
     target_user = db.query(User).filter(User.id == user_id).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="使用者不存在")
+    if target_user and target_user.id != admin.id:
+        target_user.is_admin = not target_user.is_admin
+        db.commit()
     
-    # 不能移除自己的管理員權限
-    if target_user.id == admin.id:
-        raise HTTPException(status_code=400, detail="無法移除自己的管理員權限")
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+@router.post("/users/{user_id}/logout")
+async def force_logout_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin = Depends(get_admin_user)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        target_user.last_active_at = None
+        db.commit()
     
-    target_user.is_admin = not target_user.is_admin
-    db.commit()
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+@router.post("/users/logout-all")
+async def logout_all_users(
+    db: Session = Depends(get_db),
+    admin = Depends(get_admin_user)
+):
+    try:
+        from app.models.system import SystemSetting
+        setting = db.query(SystemSetting).filter(
+            SystemSetting.key == "token_version"
+        ).first()
+        if setting:
+            setting.value = str(int(setting.value) + 1)
+        else:
+            setting = SystemSetting(key="token_version", value="2")
+            db.add(setting)
+        db.commit()
+    except Exception as e:
+        print(f"Logout all error: {e}")
     
-    return RedirectResponse(url="/admin/users", status_code=302)
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+# ===== 公告管理 =====
+@router.get("/announcements")
+async def announcement_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    try:
+        from app.models.system import SystemSetting
+        announcement = db.query(SystemSetting).filter(
+            SystemSetting.key == "announcement"
+        ).first()
+        current_announcement = announcement.value if announcement else ""
+    except:
+        current_announcement = ""
+    
+    return templates.TemplateResponse("admin/announcements.html", {
+        "request": request,
+        "user": user,
+        "current_announcement": current_announcement,
+    })
+
+
+@router.post("/announcements/update")
+async def update_announcement(
+    content: str = Form(""),
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    try:
+        from app.models.system import SystemSetting
+        announcement = db.query(SystemSetting).filter(
+            SystemSetting.key == "announcement"
+        ).first()
+        if announcement:
+            announcement.value = content
+        else:
+            announcement = SystemSetting(key="announcement", value=content)
+            db.add(announcement)
+        db.commit()
+    except Exception as e:
+        print(f"Announcement update error: {e}")
+    
+    return RedirectResponse("/admin/announcements", status_code=302)
+
+
+# ===== 菜單品項管理 =====
+@router.post("/stores/{store_id}/items/{item_id}/update")
+async def update_menu_item(
+    store_id: int,
+    item_id: int,
+    name: str = Form(...),
+    price: float = Form(...),
+    price_l: float = Form(None),
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if item:
+        item.name = name
+        item.price = price
+        item.price_l = price_l
+        db.commit()
+    
+    return RedirectResponse(f"/admin/stores/{store_id}", status_code=302)
+
+
+@router.post("/stores/{store_id}/items/{item_id}/delete")
+async def delete_menu_item(
+    store_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    user = Depends(get_admin_user)
+):
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if item:
+        db.delete(item)
+        db.commit()
+    
+    return RedirectResponse(f"/admin/stores/{store_id}", status_code=302)

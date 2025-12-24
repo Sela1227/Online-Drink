@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}使用者管理 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+            <h1 class="text-xl font-bold text-gray-800">使用者管理</h1>
+        </div>
+        <div class="text-right">
+            <div class="text-sm text-gray-500">共 {{ users|length }} 人</div>
+            <div class="text-sm font-medium text-green-600">🟢 {{ online_count }} 人在線</div>
+        </div>
+    </div>
+    
+    <!-- 一鍵登出按鈕 -->
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="font-medium text-red-800">一鍵登出所有用戶</div>
+                <div class="text-sm text-red-600">執行後所有用戶需重新登入（Token 版本：{{ system_setting.token_version if system_setting else 1 }}）</div>
+            </div>
+            <form action="/admin/users/logout-all" method="post"
+                  onsubmit="return confirm('確定要登出所有用戶嗎？\n\n執行後所有人（包括你自己）都需要重新登入。')">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    🚨 登出所有人
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    {% if request.query_params.get('logout_all') == 'success' %}
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
+        ✅ 已成功登出所有用戶，所有人需重新登入。
+    </div>
+    {% endif %}
+    
+    {% if users %}
+    <div class="bg-white rounded-lg shadow-sm divide-y">
+        {% for u in users %}
+        <div class="p-4 flex items-center gap-3 hover:bg-gray-50 transition">
+            <!-- 頭像 + 在線狀態（可點擊） -->
+            <a href="/admin/users/{{ u.id }}" class="relative w-10 h-10 flex-shrink-0">
+                <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                    {% if u.picture_url %}
+                    <img src="{{ u.picture_url }}" alt="{{ u.display_name }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <span class="text-lg">👤</span>
+                    {% endif %}
+                </div>
+                <!-- 在線指示燈 -->
+                {% if u.is_online %}
+                <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+                {% endif %}
+            </a>
+            
+            <!-- 資訊（可點擊） -->
+            <a href="/admin/users/{{ u.id }}" class="flex-1 min-w-0">
+                <div class="font-medium text-gray-900 truncate">
+                    {{ u.show_name }}
+                    {% if u.nickname %}
+                    <span class="text-xs text-gray-400 font-normal">({{ u.display_name }})</span>
+                    {% endif %}
+                    {% if u.is_admin %}
+                    <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
+                    {% endif %}
+                    {% if u.is_online %}
+                    <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-1">在線</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-gray-400 truncate">
+                    {% if u.last_login_at %}
+                    最後登入：{{ u.last_login_at.strftime('%m/%d %H:%M') }}
+                    {% else %}
+                    尚未登入
+                    {% endif %}
+                    ・加入 {{ u.created_at.strftime('%Y-%m-%d') }}
+                    ・{{ u.orders|length }} 筆訂單
+                </div>
+            </a>
+            
+            <!-- 操作 -->
+            <div class="flex-shrink-0">
+                {% if u.id != user.id %}
+                <form action="/admin/users/{{ u.id }}/toggle-admin" method="post" class="inline"
+                      onsubmit="return confirm('確定要{{ '移除' if u.is_admin else '設為' }}管理員嗎？')">
+                    <button type="submit" class="text-sm px-3 py-1.5 rounded transition
+                        {% if u.is_admin %}
+                        bg-gray-100 text-gray-600 hover:bg-gray-200
+                        {% else %}
+                        bg-amber-50 text-amber-600 hover:bg-amber-100
+                        {% endif %}
+                    ">
+                        {% if u.is_admin %}移除管理員{% else %}設為管理員{% endif %}
+                    </button>
+                </form>
+                {% else %}
+                <span class="text-xs text-gray-400">（你自己）</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
+        <div class="text-4xl mb-2">👥</div>
+        <p>還沒有任何使用者</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

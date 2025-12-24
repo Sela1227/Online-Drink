@@ -1,0 +1,74 @@
+{
+  "store": {
+    "name": "一沐日",
+    "category": "drink",
+    "sugar_options": ["正常糖", "七分糖", "五分糖", "三分糖", "無糖"],
+    "ice_options": ["正常冰", "少冰", "去冰", "完去冰", "微冰", "常溫"]
+  },
+  "menu": {
+    "categories": [
+      {
+        "name": "原味茶",
+        "items": [
+          {"name": "冬瓜茶", "price": 30, "price_l": 45},
+          {"name": "桂花紅茶", "price": 30, "price_l": 45},
+          {"name": "養樂多綠茶", "price": 35, "price_l": 50},
+          {"name": "荔枝紅茶", "price": 40, "price_l": 60},
+          {"name": "鳳梨綠茶", "price": 40, "price_l": 60},
+          {"name": "鳳山紅茶", "price": 40, "price_l": 60},
+          {"name": "高山青茶", "price": 40, "price_l": 60}
+        ]
+      },
+      {
+        "name": "滋味茶",
+        "items": [
+          {"name": "高讚塔烏龍茶", "price": 35, "price_l": 50},
+          {"name": "手沖烏龍茶", "price": 35, "price_l": 50},
+          {"name": "高山烏龍茶", "price": 35, "price_l": 50},
+          {"name": "冷萃金萱茶", "price": 35, "price_l": 50},
+          {"name": "輕香烏龍綠", "price": 40, "price_l": 55}
+        ]
+      },
+      {
+        "name": "加料茶",
+        "items": [
+          {"name": "仙草粉圓茶", "price": 45, "price_l": 60},
+          {"name": "招牌粉圓茶", "price": 45, "price_l": 60},
+          {"name": "草仔粿奶茶", "price": 50, "price_l": 70},
+          {"name": "九層塔奶茶", "price": 50, "price_l": 70}
+        ]
+      },
+      {
+        "name": "牧場鮮乳",
+        "items": [
+          {"name": "烏龍鮮乳茶", "price": 65},
+          {"name": "烏龍鮮奶茶", "price": 70},
+          {"name": "紅茶鮮奶茶", "price": 70}
+        ]
+      },
+      {
+        "name": "高讚鮮茶",
+        "items": [
+          {"name": "奶茶三兄弟", "price": 55, "price_l": 70},
+          {"name": "奶蓋烏龍茶", "price": 55, "price_l": 70},
+          {"name": "高讚奶蓋茶", "price": 55, "price_l": 70}
+        ]
+      },
+      {
+        "name": "奶茶蓋茶",
+        "items": [
+          {"name": "烏龍奶茶", "price": 35, "price_l": 50},
+          {"name": "香醇奶茶", "price": 35, "price_l": 50},
+          {"name": "紅茶奶茶", "price": 40, "price_l": 55}
+        ]
+      },
+      {
+        "name": "香醇奶茶",
+        "items": [
+          {"name": "香醇奶茶", "price": 55, "price_l": 65},
+          {"name": "珍珠奶茶", "price": 55, "price_l": 65}
+        ]
+      }
+    ]
+  }
+}

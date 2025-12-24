@@ -1,0 +1,55 @@
+{% if submitted_orders %}
+<div class="bg-white rounded-lg shadow-sm p-4">
+    <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        📋 已結單
+        <span class="text-sm font-normal text-gray-500">({{ submitted_orders|length }} 人)</span>
+    </h2>
+    
+    <div class="space-y-4">
+        {% for order in submitted_orders %}
+        <div class="border-b pb-3 last:border-b-0 last:pb-0">
+            <!-- 使用者名稱 -->
+            <div class="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                {% if order.user.picture_url %}
+                <img src="{{ order.user.picture_url }}" class="w-6 h-6 rounded-full">
+                {% endif %}
+                {{ order.user.display_name }}
+                <span class="text-sm text-gray-400">${{ order.total_amount }}</span>
+            </div>
+            
+            <!-- 品項列表 -->
+            <div class="space-y-1 text-sm">
+                {% for item in order.items %}
+                <div class="flex items-center gap-2 text-gray-600">
+                    <span class="flex-1">
+                        {{ item.item_name }}{% if item.size %}({{ item.size }}){% endif %}
+                        {% if item.sugar or item.ice %}
+                        <span class="text-gray-400">
+                            ({% if item.sugar %}{{ item.sugar }}{% endif %}{% if item.sugar and item.ice %}/{% endif %}{% if item.ice %}{{ item.ice }}{% endif %})
+                        </span>
+                        {% endif %}
+                        {% for opt in item.selected_options %}
+                        <span class="text-xs bg-gray-100 px-1 rounded">{{ opt.option_name }}</span>
+                        {% endfor %}
+                        {% if item.note %}
+                        <span class="text-xs text-amber-600">📝 {{ item.note }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="text-gray-400">x{{ item.quantity }}</span>
+                    
+                    <!-- 跟點按鈕 -->
+                    <button hx-post="/groups/{{ group_id }}/orders/follow/{{ item.id }}"
+                            hx-target="#my-order"
+                            hx-swap="innerHTML"
+                            @htmx:after-request="$dispatch('orderUpdated')"
+                            class="text-xs text-orange-600 hover:text-orange-700 px-2 py-0.5 border border-orange-200 rounded hover:bg-orange-50">
+                        +跟點
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

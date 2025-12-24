@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}後台管理 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <h1 class="text-xl font-bold text-gray-800">後台管理</h1>
+    
+    <!-- 統計方塊（可點擊） -->
+    <div class="grid grid-cols-4 gap-3">
+        <a href="/admin/stores" class="bg-white rounded-lg shadow-sm p-4 text-center hover:shadow-md transition">
+            <div class="text-2xl font-bold text-orange-600">{{ store_count }}</div>
+            <div class="text-xs text-gray-500">店家</div>
+        </a>
+        <a href="/admin/groups" class="bg-white rounded-lg shadow-sm p-4 text-center hover:shadow-md transition">
+            <div class="text-2xl font-bold text-orange-600">{{ group_count }}</div>
+            <div class="text-xs text-gray-500">團單</div>
+        </a>
+        <a href="/admin/users" class="bg-white rounded-lg shadow-sm p-4 text-center hover:shadow-md transition">
+            <div class="text-2xl font-bold text-orange-600">{{ user_count }}</div>
+            <div class="text-xs text-gray-500">使用者</div>
+        </a>
+        <a href="/admin/users" class="bg-white rounded-lg shadow-sm p-4 text-center hover:shadow-md transition">
+            <div class="text-2xl font-bold text-green-600">{{ online_count }}</div>
+            <div class="text-xs text-gray-500">🟢 在線</div>
+        </a>
+    </div>
+    
+    <!-- 快捷功能 -->
+    <div class="bg-white rounded-lg shadow-sm divide-y">
+        <a href="/groups/new" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">➕</span>
+                <span class="font-medium">開團</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+        <a href="/admin/import" class="flex items-center justify-between p-4 hover:bg-gray-50">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">📥</span>
+                <span class="font-medium">匯入店家/菜單</span>
+            </div>
+            <span class="text-gray-400">→</span>
+        </a>
+    </div>
+</div>
+{% endblock %}

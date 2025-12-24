@@ -1,0 +1,37 @@
+{
+  "store": {
+    "name": "茶湯會",
+    "category": "drink",
+    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
+    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"],
+    "toppings": [
+      {"name": "珍珠", "price": 10},
+      {"name": "椰果", "price": 10},
+      {"name": "仙草", "price": 10},
+      {"name": "布丁", "price": 15},
+      {"name": "芋圓", "price": 15},
+      {"name": "粉條", "price": 10}
+    ]
+  },
+  "menu": {
+    "categories": [
+      {
+        "name": "經典茶品",
+        "items": [
+          {"name": "觀音拿鐵", "price": 55, "price_l": 65},
+          {"name": "珍珠奶茶", "price": 50, "price_l": 60},
+          {"name": "紅茶拿鐵", "price": 50, "price_l": 60},
+          {"name": "烏龍拿鐵", "price": 55, "price_l": 65}
+        ]
+      },
+      {
+        "name": "純茶系列",
+        "items": [
+          {"name": "四季春茶", "price": 30, "price_l": 40},
+          {"name": "阿里山冷露", "price": 35, "price_l": 45},
+          {"name": "日式煎茶", "price": 35, "price_l": 45}
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}開新團 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-sm p-4">
+    <h1 class="text-xl font-bold text-gray-800 mb-4">
+        {% if copy_from %}複製開團{% else %}開新團{% endif %}
+    </h1>
+    
+    <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()">
+        <!-- 店家選擇 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家</label>
+            <select name="store_id" x-model="storeId" @change="onStoreChange()" required
+                    class="w-full border rounded-lg px-3 py-2">
+                <option value="">請選擇...</option>
+                {% for store in stores %}
+                <option value="{{ store.id }}" 
+                        data-category="{{ store.category.value }}"
+                        data-branches='{{ store.branches | tojson if store.branches else "[]" }}'
+                        {% if copy_from and copy_from.store_id == store.id %}selected{% endif %}>
+                    {{ store.name }} ({{ '飲料' if store.category.value == 'drink' else '餐點' }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- 分店選擇 -->
+        <div x-show="branches.length > 0" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇分店</label>
+            <select name="branch_id" x-model="branchId" class="w-full border rounded-lg px-3 py-2">
+                <option value="">不指定分店</option>
+                <template x-for="branch in branches" :key="branch.id">
+                    <option :value="branch.id" x-text="branch.name + (branch.phone ? ' (' + branch.phone + ')' : '')"></option>
+                </template>
+            </select>
+        </div>
+        
+        <!-- 團名 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">團名</label>
+            <input type="text" name="name" required placeholder="例：下午茶團"
+                   class="w-full border rounded-lg px-3 py-2"
+                   value="{% if copy_from %}{{ copy_from.name }}{% endif %}">
+        </div>
+        
+        <!-- 備註 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">備註（選填）</label>
+            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間、外送費每人 $10"
+                      class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
+        </div>
+        
+        <!-- 截止時間 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">截止時間</label>
+            <div class="flex flex-wrap gap-2 mb-2">
+                <button type="button" @click="setDeadline('30m')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    30分鐘後
+                </button>
+                <button type="button" @click="setDeadline('1h')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    1小時後
+                </button>
+                <button type="button" @click="setDeadline('12:00')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    今天 12:00
+                </button>
+                <button type="button" @click="setDeadline('17:00')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    今天 17:00
+                </button>
+            </div>
+            <input type="datetime-local" name="deadline" x-ref="deadline" required
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 飲料團設定 -->
+        <div x-show="isDrink" x-cloak class="space-y-4 p-4 bg-gray-50 rounded-lg">
+            <h3 class="font-medium text-gray-700">飲料團設定</h3>
+            
+            <!-- 預設甜度 -->
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">預設甜度</label>
+                <select name="default_sugar" class="w-full border rounded px-3 py-2">
+                    <option value="">不指定</option>
+                    <option value="正常糖">正常糖</option>
+                    <option value="少糖">少糖</option>
+                    <option value="半糖">半糖</option>
+                    <option value="微糖">微糖</option>
+                    <option value="無糖">無糖</option>
+                </select>
+            </div>
+            
+            <!-- 預設冰塊 -->
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">預設冰塊</label>
+                <select name="default_ice" class="w-full border rounded px-3 py-2">
+                    <option value="">不指定</option>
+                    <option value="正常冰">正常冰</option>
+                    <option value="少冰">少冰</option>
+                    <option value="微冰">微冰</option>
+                    <option value="去冰">去冰</option>
+                    <option value="熱">熱</option>
+                </select>
+            </div>
+            
+            <!-- 鎖定選項 -->
+            <div class="flex gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="lock_sugar" value="true">
+                    <span class="text-sm text-gray-600">鎖定甜度</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="lock_ice" value="true">
+                    <span class="text-sm text-gray-600">鎖定冰塊</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- 送出按鈕 -->
+        <div class="flex gap-2 pt-4">
+            <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+                取消
+            </a>
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                開團
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function newGroupForm() {
+    return {
+        storeId: '{% if copy_from %}{{ copy_from.store_id }}{% endif %}',
+        branchId: '',
+        isDrink: false,
+        branches: [],
+        
+        init() {
+            this.onStoreChange();
+        },
+        
+        onStoreChange() {
+            const select = document.querySelector('select[name="store_id"]');
+            const option = select.options[select.selectedIndex];
+            
+            if (option && option.value) {
+                this.isDrink = option.dataset.category === 'drink';
+                try {
+                    this.branches = JSON.parse(option.dataset.branches || '[]');
+                } catch (e) {
+                    this.branches = [];
+                }
+            } else {
+                this.isDrink = false;
+                this.branches = [];
+            }
+            this.branchId = '';
+        },
+        
+        setDeadline(preset) {
+            const now = new Date();
+            let target;
+            
+            if (preset === '30m') {
+                target = new Date(now.getTime() + 30 * 60000);
+            } else if (preset === '1h') {
+                target = new Date(now.getTime() + 60 * 60000);
+            } else if (preset === '12:00') {
+                target = new Date(now);
+                target.setHours(12, 0, 0, 0);
+                if (target <= now) target.setDate(target.getDate() + 1);
+            } else if (preset === '17:00') {
+                target = new Date(now);
+                target.setHours(17, 0, 0, 0);
+                if (target <= now) target.setDate(target.getDate() + 1);
+            }
+            
+            if (target) {
+                const y = target.getFullYear();
+                const m = String(target.getMonth() + 1).padStart(2, '0');
+                const d = String(target.getDate()).padStart(2, '0');
+                const h = String(target.getHours()).padStart(2, '0');
+                const min = String(target.getMinutes()).padStart(2, '0');
+                this.$refs.deadline.value = `${y}-${m}-${d}T${h}:${min}`;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

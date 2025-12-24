@@ -1,0 +1,349 @@
+2025-12-24T00:33:30.000000000Z [inf]  Starting Container
+2025-12-24T00:33:32.128246559Z [err]  INFO:     Started server process [1]
+2025-12-24T00:33:32.128252394Z [err]  INFO:     Waiting for application startup.
+2025-12-24T00:33:32.190485260Z [inf]  Column order_items.size check: OK
+2025-12-24T00:33:32.201127185Z [inf]  Column order_items.created_at check: OK
+2025-12-24T00:33:32.212202947Z [inf]  Column menu_items.price_l check: OK
+2025-12-24T00:33:32.244099980Z [inf]  Column stores.phone check: OK
+2025-12-24T00:33:32.270331123Z [inf]  Column stores.branch check: OK
+2025-12-24T00:33:32.281330573Z [inf]  Column groups.branch_id check: OK
+2025-12-24T00:33:32.296951469Z [inf]  Added column: users.last_login_at
+2025-12-24T00:33:32.318222222Z [inf]  Added column: users.last_active_at
+2025-12-24T00:33:32.339946717Z [err]  ERROR:    Traceback (most recent call last):
+2025-12-24T00:33:32.339947336Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.339955509Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:32.339955974Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.339962808Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:32.339965062Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.339969622Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:32.339972044Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:32.339976695Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:32.339979055Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:32.339985148Z [err]  psycopg2.errors.NotNullViolation: null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:32.339986138Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.339991351Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:32.339997472Z [err]  
+2025-12-24T00:33:32.340003738Z [err]  
+2025-12-24T00:33:32.340010964Z [err]  The above exception was the direct cause of the following exception:
+2025-12-24T00:33:32.340017437Z [err]  
+2025-12-24T00:33:32.340024955Z [err]  Traceback (most recent call last):
+2025-12-24T00:33:32.340032308Z [err]    File "/opt/venv/lib/python3.12/site-packages/starlette/routing.py", line 694, in lifespan
+2025-12-24T00:33:32.340038661Z [err]      async with self.lifespan_context(app) as maybe_state:
+2025-12-24T00:33:32.340044894Z [err]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340955901Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340955905Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.340962320Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340965735Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.340973206Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:32.340974994Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340976727Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.340981198Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:32.340986797Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:32.340987934Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340988711Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.340994044Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:32.340996707Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.340997844Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:32.341000140Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341005688Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.341006110Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.341006155Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:32.341012822Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341019875Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.341025690Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.341830212Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:32.341843027Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:32.341852759Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341862227Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:32.341870666Z [err]      return await anext(self.gen)
+2025-12-24T00:33:32.341879185Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341886283Z [err]    File "/app/app/main.py", line 55, in lifespan
+2025-12-24T00:33:32.341893237Z [err]      conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
+2025-12-24T00:33:32.341899793Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2025-12-24T00:33:32.341906960Z [err]      return meth(
+2025-12-24T00:33:32.341914067Z [err]             ^^^^^
+2025-12-24T00:33:32.341921556Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+2025-12-24T00:33:32.341928791Z [err]      return connection._execute_clauseelement(
+2025-12-24T00:33:32.341936351Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341944177Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+2025-12-24T00:33:32.341961315Z [err]      ret = self._execute_context(
+2025-12-24T00:33:32.341968144Z [err]            ^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.341975462Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2025-12-24T00:33:32.341982295Z [err]      return self._exec_single_context(
+2025-12-24T00:33:32.341989043Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:32.342643800Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+2025-12-24T00:33:32.342648604Z [err]      self._handle_dbapi_exception(
+2025-12-24T00:33:32.342652356Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+2025-12-24T00:33:32.342656214Z [err]      raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+2025-12-24T00:33:32.342660107Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:32.342664111Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:32.342667849Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:32.342672481Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:32.342676330Z [err]  sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:32.342679922Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:32.342683547Z [err]  
+2025-12-24T00:33:32.342687167Z [err]  [SQL: INSERT INTO system_settings (id, token_version) VALUES (1, 1)]
+2025-12-24T00:33:32.342692329Z [err]  (Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-12-24T00:33:32.342696297Z [err]  
+2025-12-24T00:33:32.342699891Z [err]  ERROR:    Application startup failed. Exiting.
+2025-12-24T00:33:34.152251766Z [err]  INFO:     Started server process [1]
+2025-12-24T00:33:34.152257464Z [err]  INFO:     Waiting for application startup.
+2025-12-24T00:33:34.430145424Z [inf]  Column order_items.size check: OK
+2025-12-24T00:33:34.441203327Z [inf]  Column order_items.created_at check: OK
+2025-12-24T00:33:34.462255626Z [inf]  Column menu_items.price_l check: OK
+2025-12-24T00:33:34.477180802Z [inf]  Column stores.phone check: OK
+2025-12-24T00:33:34.488117597Z [inf]  Column stores.branch check: OK
+2025-12-24T00:33:34.509586920Z [inf]  Column groups.branch_id check: OK
+2025-12-24T00:33:34.520065016Z [inf]  Column users.last_login_at check: OK
+2025-12-24T00:33:34.540295019Z [inf]  Column users.last_active_at check: OK
+2025-12-24T00:33:34.562105082Z [err]  ERROR:    Traceback (most recent call last):
+2025-12-24T00:33:34.562114106Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:34.562116567Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:34.562122189Z [err]  The above exception was the direct cause of the following exception:
+2025-12-24T00:33:34.562122604Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:34.562125913Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562130996Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:34.562133720Z [err]  
+2025-12-24T00:33:34.562141553Z [err]  Traceback (most recent call last):
+2025-12-24T00:33:34.562142003Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:34.562148286Z [err]    File "/opt/venv/lib/python3.12/site-packages/starlette/routing.py", line 694, in lifespan
+2025-12-24T00:33:34.562152178Z [err]  psycopg2.errors.NotNullViolation: null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:34.562155271Z [err]      async with self.lifespan_context(app) as maybe_state:
+2025-12-24T00:33:34.562161028Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:34.562163848Z [err]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562169995Z [err]  
+2025-12-24T00:33:34.562172581Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.562178644Z [err]  
+2025-12-24T00:33:34.562180043Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.562187024Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562192840Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:34.562715780Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.562716626Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.562721405Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.562726518Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.562727286Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562732303Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562733274Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:34.562735721Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562739441Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:34.562742179Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.562744988Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562749965Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.562751743Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.562755357Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.562761323Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562761772Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.562766725Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:34.562771366Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:34.562772827Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:34.562777800Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:34.562783072Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563507564Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:34.563513268Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:34.563518847Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563520196Z [err]      ret = self._execute_context(
+2025-12-24T00:33:34.563524432Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:34.563529515Z [err]             ^^^^^
+2025-12-24T00:33:34.563530718Z [err]            ^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563530736Z [err]      return await anext(self.gen)
+2025-12-24T00:33:34.563536946Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563539362Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+2025-12-24T00:33:34.563541895Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2025-12-24T00:33:34.563542399Z [err]    File "/app/app/main.py", line 55, in lifespan
+2025-12-24T00:33:34.563547934Z [err]      return connection._execute_clauseelement(
+2025-12-24T00:33:34.563552250Z [err]      return self._exec_single_context(
+2025-12-24T00:33:34.563554492Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563561598Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+2025-12-24T00:33:34.563563986Z [err]      conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
+2025-12-24T00:33:34.563564466Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:34.563568818Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2025-12-24T00:33:34.563572934Z [err]      return meth(
+2025-12-24T00:33:34.564112704Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+2025-12-24T00:33:34.564116505Z [err]  
+2025-12-24T00:33:34.564118892Z [err]      self._handle_dbapi_exception(
+2025-12-24T00:33:34.564124039Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+2025-12-24T00:33:34.564126446Z [err]  ERROR:    Application startup failed. Exiting.
+2025-12-24T00:33:34.564128999Z [err]      raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+2025-12-24T00:33:34.564133877Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:34.564137985Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:34.564141561Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:34.564145134Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:34.564148669Z [err]  sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:34.564152365Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:34.564156157Z [err]  
+2025-12-24T00:33:34.564160486Z [err]  [SQL: INSERT INTO system_settings (id, token_version) VALUES (1, 1)]
+2025-12-24T00:33:34.564164162Z [err]  (Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-12-24T00:33:36.326583506Z [err]  INFO:     Started server process [1]
+2025-12-24T00:33:36.326591197Z [err]  INFO:     Waiting for application startup.
+2025-12-24T00:33:36.681214522Z [inf]  Column order_items.size check: OK
+2025-12-24T00:33:36.702622410Z [inf]  Column order_items.created_at check: OK
+2025-12-24T00:33:36.713466031Z [inf]  Column menu_items.price_l check: OK
+2025-12-24T00:33:36.734204718Z [inf]  Column stores.phone check: OK
+2025-12-24T00:33:36.743855295Z [inf]  Column stores.branch check: OK
+2025-12-24T00:33:36.764313957Z [inf]  Column groups.branch_id check: OK
+2025-12-24T00:33:36.779803284Z [inf]  Column users.last_login_at check: OK
+2025-12-24T00:33:36.800555499Z [inf]  Column users.last_active_at check: OK
+2025-12-24T00:33:36.816472277Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.816477037Z [err]  ERROR:    Traceback (most recent call last):
+2025-12-24T00:33:36.816485627Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:36.816485657Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.816493356Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:36.816495932Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:36.816500320Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:36.816505169Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:36.816507622Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:36.816514142Z [err]  psycopg2.errors.NotNullViolation: null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:36.816514646Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.816519797Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:36.816525478Z [err]  
+2025-12-24T00:33:36.816531279Z [err]  
+2025-12-24T00:33:36.816536694Z [err]  The above exception was the direct cause of the following exception:
+2025-12-24T00:33:36.816542035Z [err]  
+2025-12-24T00:33:36.816547251Z [err]  Traceback (most recent call last):
+2025-12-24T00:33:36.816552372Z [err]    File "/opt/venv/lib/python3.12/site-packages/starlette/routing.py", line 694, in lifespan
+2025-12-24T00:33:36.816557852Z [err]      async with self.lifespan_context(app) as maybe_state:
+2025-12-24T00:33:36.816563113Z [err]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.816568617Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817249312Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817249637Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:36.817258600Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:36.817260424Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.817264423Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817270550Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817270597Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817275809Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.817281020Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:36.817281551Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817289061Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:36.817295914Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817302462Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817308897Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.817315737Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817322661Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:36.817327717Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:36.817331560Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817335876Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817339717Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.817344119Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817884551Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:36.817890224Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:36.817894896Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817900129Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:36.817901900Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817901970Z [err]      return meth(
+2025-12-24T00:33:36.817904856Z [err]      return await anext(self.gen)
+2025-12-24T00:33:36.817910049Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817913950Z [err]             ^^^^^
+2025-12-24T00:33:36.817915527Z [err]    File "/app/app/main.py", line 55, in lifespan
+2025-12-24T00:33:36.817920517Z [err]      conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
+2025-12-24T00:33:36.817924011Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+2025-12-24T00:33:36.817927320Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2025-12-24T00:33:36.817932760Z [err]      return connection._execute_clauseelement(
+2025-12-24T00:33:36.817940768Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817948264Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+2025-12-24T00:33:36.817956231Z [err]      ret = self._execute_context(
+2025-12-24T00:33:36.817965136Z [err]            ^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:36.817972111Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2025-12-24T00:33:36.817976712Z [err]      return self._exec_single_context(
+2025-12-24T00:33:36.818563547Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+2025-12-24T00:33:36.818570228Z [err]      self._handle_dbapi_exception(
+2025-12-24T00:33:36.818574712Z [err]  
+2025-12-24T00:33:36.818575684Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+2025-12-24T00:33:36.818581954Z [err]      raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+2025-12-24T00:33:36.818582966Z [err]  ERROR:    Application startup failed. Exiting.
+2025-12-24T00:33:36.818585912Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:36.818586729Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:36.818589565Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:36.818596285Z [err]  
+2025-12-24T00:33:36.818599663Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:36.818604794Z [err]  [SQL: INSERT INTO system_settings (id, token_version) VALUES (1, 1)]
+2025-12-24T00:33:36.818609902Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:36.818613741Z [err]  (Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-12-24T00:33:36.818619468Z [err]  sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:38.508285431Z [err]  INFO:     Started server process [1]
+2025-12-24T00:33:38.508288887Z [err]  INFO:     Waiting for application startup.
+2025-12-24T00:33:38.859012841Z [inf]  Column order_items.size check: OK
+2025-12-24T00:33:38.879683063Z [inf]  Column order_items.created_at check: OK
+2025-12-24T00:33:38.890704009Z [inf]  Column menu_items.price_l check: OK
+2025-12-24T00:33:38.906845855Z [inf]  Column stores.phone check: OK
+2025-12-24T00:33:38.922430227Z [inf]  Column stores.branch check: OK
+2025-12-24T00:33:38.943733101Z [inf]  Column groups.branch_id check: OK
+2025-12-24T00:33:38.964507632Z [inf]  Column users.last_login_at check: OK
+2025-12-24T00:33:38.985560859Z [inf]  Column users.last_active_at check: OK
+2025-12-24T00:33:39.006782800Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.006794299Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.006801795Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.006809929Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:39.006816429Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:39.006823525Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.006829210Z [err]  ERROR:    Traceback (most recent call last):
+2025-12-24T00:33:39.006833907Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:39.006837933Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:39.006844022Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:39.006848574Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:39.006852875Z [err]  psycopg2.errors.NotNullViolation: null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:39.006858281Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:39.006862873Z [err]  
+2025-12-24T00:33:39.006867837Z [err]  
+2025-12-24T00:33:39.006872056Z [err]  The above exception was the direct cause of the following exception:
+2025-12-24T00:33:39.006876355Z [err]  
+2025-12-24T00:33:39.006881195Z [err]  Traceback (most recent call last):
+2025-12-24T00:33:39.006885813Z [err]    File "/opt/venv/lib/python3.12/site-packages/starlette/routing.py", line 694, in lifespan
+2025-12-24T00:33:39.006890749Z [err]      async with self.lifespan_context(app) as maybe_state:
+2025-12-24T00:33:39.006894597Z [err]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007434285Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.007437215Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007439932Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.007444063Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.007448153Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:39.007451095Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.007453129Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007458859Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:39.007460355Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007468064Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007468823Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:39.007477069Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:39.007483431Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007489993Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.007495757Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.007501617Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007507732Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:39.007515296Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:39.007522175Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.007531099Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.007538172Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.009582502Z [err]    File "/opt/venv/lib/python3.12/site-packages/fastapi/routing.py", line 202, in merged_lifespan
+2025-12-24T00:33:39.009592380Z [err]      async with original_context(app) as maybe_original_state:
+2025-12-24T00:33:39.009600887Z [err]                 ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.009609021Z [err]    File "/root/.nix-profile/lib/python3.12/contextlib.py", line 210, in __aenter__
+2025-12-24T00:33:39.009616388Z [err]      return await anext(self.gen)
+2025-12-24T00:33:39.009621945Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.009626704Z [err]    File "/app/app/main.py", line 55, in lifespan
+2025-12-24T00:33:39.009630426Z [err]      conn.execute(text("INSERT INTO system_settings (id, token_version) VALUES (1, 1)"))
+2025-12-24T00:33:39.009634295Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2025-12-24T00:33:39.009638138Z [err]      return meth(
+2025-12-24T00:33:39.009642052Z [err]             ^^^^^
+2025-12-24T00:33:39.009646009Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+2025-12-24T00:33:39.009650727Z [err]      return connection._execute_clauseelement(
+2025-12-24T00:33:39.009654571Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.009658859Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+2025-12-24T00:33:39.009666561Z [err]      ret = self._execute_context(
+2025-12-24T00:33:39.009672905Z [err]            ^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.009678945Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2025-12-24T00:33:39.009684977Z [err]      return self._exec_single_context(
+2025-12-24T00:33:39.009691488Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T00:33:39.009699846Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+2025-12-24T00:33:39.009706334Z [err]      self._handle_dbapi_exception(
+2025-12-24T00:33:39.009712674Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+2025-12-24T00:33:39.009719561Z [err]      raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+2025-12-24T00:33:39.009726109Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+2025-12-24T00:33:39.009732309Z [err]      self.dialect.do_execute(
+2025-12-24T00:33:39.009738988Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+2025-12-24T00:33:39.009745355Z [err]      cursor.execute(statement, parameters)
+2025-12-24T00:33:39.009752657Z [err]  sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "updated_at" of relation "system_settings" violates not-null constraint
+2025-12-24T00:33:39.009759487Z [err]  DETAIL:  Failing row contains (1, 1, null, null).
+2025-12-24T00:33:39.009766056Z [err]  
+2025-12-24T00:33:39.009773542Z [err]  [SQL: INSERT INTO system_settings (id, token_version) VALUES (1, 1)]
+2025-12-24T00:33:39.009781462Z [err]  (Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-12-24T00:33:39.009787770Z [err]  
+2025-12-24T00:33:39.009792179Z [err]  ERROR:    Application startup failed. Exiting.

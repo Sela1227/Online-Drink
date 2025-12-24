@@ -1,42 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}編輯店家 - 團購系統{% endblock %}
+{% block title %}編輯店家 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div>
+        <a href="/admin/stores" class="text-sm text-gray-500 hover:text-gray-700">← 返回店家列表</a>
         <h1 class="text-xl font-bold text-gray-800">編輯店家</h1>
-        <a href="/admin/stores" class="text-sm text-gray-500 hover:text-gray-700">← 返回</a>
     </div>
     
-    <div class="bg-white rounded-lg shadow-sm p-4 space-y-4">
-        <!-- Logo 預覽與上傳 -->
-        <div class="flex items-center gap-4" x-data="logoUpload()">
-            <div class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" alt="{{ store.name }}" id="logo-preview" class="w-full h-full object-contain">
-                {% else %}
-                <span class="text-4xl" id="logo-preview">
-                    {% if store.category.value == 'drink' %}🧋{% else %}🍱{% endif %}
-                </span>
-                {% endif %}
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
+            <!-- Logo 上傳 -->
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                    {% if store.logo_url %}
+                    <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <span class="text-3xl">{% if store.category.value == 'drink' %}🧋{% else %}🍱{% endif %}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <input type="file" name="logo_file" accept="image/*" class="text-sm">
+                    <p class="text-xs text-gray-400 mt-1">留空則不更換</p>
+                </div>
             </div>
             
-            <div>
-                <input type="file" id="logo-input" accept="image/*" class="hidden" @change="uploadLogo($event)">
-                <button type="button" @click="$refs.fileInput.click()" 
-                        class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded transition"
-                        :disabled="uploading">
-                    <span x-show="!uploading">📷 上傳 Logo</span>
-                    <span x-show="uploading">⏳ 上傳中...</span>
-                </button>
-                <input type="file" x-ref="fileInput" accept="image/*" class="hidden" @change="uploadLogo($event)">
-                <p class="text-xs text-gray-400 mt-1">建議 200x200 像素</p>
-            </div>
-        </div>
-        
-        <!-- 表單 -->
-        <form action="/admin/stores/{{ store.id }}/edit" method="post" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">店家名稱</label>
                 <input type="text" name="name" value="{{ store.name }}" required
@@ -44,96 +33,97 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Logo 網址</label>
-                <input type="text" name="logo_url" id="logo-url-input" 
-                       value="{{ store.logo_url or '' }}" placeholder="https://..."
-                       class="w-full border rounded-lg px-3 py-2">
-                <p class="text-xs text-gray-400 mt-1">可直接貼上圖片網址，或使用上方上傳功能</p>
-            </div>
-            
-            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">類型</label>
-                <div class="text-gray-600">
-                    {{ '飲料店' if store.category.value == 'drink' else '餐點店' }}
-                    <span class="text-xs text-gray-400">（無法修改）</span>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="drink" 
+                               {% if store.category.value == 'drink' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🧋 飲料店</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="meal" 
+                               {% if store.category.value == 'meal' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🍱 餐廳</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="category" value="group_buy" 
+                               {% if store.category.value == 'group_buy' %}checked{% endif %}
+                               class="text-orange-500 focus:ring-orange-500">
+                        <span>🛒 團購</span>
+                    </label>
                 </div>
             </div>
             
             <!-- 飲料店甜度/冰塊選項 -->
-            {% if store.category.value == 'drink' %}
-            <div class="p-3 bg-gray-50 rounded-lg space-y-2">
-                <div class="text-sm font-medium text-gray-700">甜度選項</div>
-                <div class="text-sm text-gray-600">
-                    {% for opt in store.options if opt.option_type.value == 'sugar' %}
-                    {{ opt.option_value }}{% if not loop.last %}、{% endif %}
-                    {% endfor %}
+            {% if store.category.value == 'drink' and store.options %}
+            <div class="p-3 bg-gray-50 rounded-lg space-y-2 text-sm">
+                <div>
+                    <span class="font-medium text-gray-700">甜度：</span>
+                    <span class="text-gray-600">
+                        {% for opt in store.options if opt.option_type.value == 'sugar' %}
+                        {{ opt.option_value }}{% if not loop.last %}、{% endif %}
+                        {% endfor %}
+                    </span>
                 </div>
-                
-                <div class="text-sm font-medium text-gray-700 mt-2">冰塊選項</div>
-                <div class="text-sm text-gray-600">
-                    {% for opt in store.options if opt.option_type.value == 'ice' %}
-                    {{ opt.option_value }}{% if not loop.last %}、{% endif %}
-                    {% endfor %}
+                <div>
+                    <span class="font-medium text-gray-700">冰塊：</span>
+                    <span class="text-gray-600">
+                        {% for opt in store.options if opt.option_type.value == 'ice' %}
+                        {{ opt.option_value }}{% if not loop.last %}、{% endif %}
+                        {% endfor %}
+                    </span>
                 </div>
-                <p class="text-xs text-gray-400">如需修改選項，請重新匯入店家</p>
             </div>
             {% endif %}
             
-            <div class="flex gap-2 pt-4">
+            <div class="flex gap-2 pt-2">
                 <a href="/admin/stores" class="flex-1 py-2 text-center rounded-lg border hover:bg-gray-50">
                     取消
                 </a>
-                <button type="submit" class="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">
+                <button type="submit" class="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
                     儲存
                 </button>
             </div>
         </form>
     </div>
-</div>
-
-<script>
-function logoUpload() {
-    return {
-        uploading: false,
+    
+    <!-- 分店管理 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">分店管理</h2>
         
-        async uploadLogo(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            this.uploading = true;
-            
-            const formData = new FormData();
-            formData.append('logo', file);
-            
-            try {
-                const response = await fetch('/admin/stores/{{ store.id }}/logo', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // 更新預覽
-                    const preview = document.getElementById('logo-preview');
-                    if (preview.tagName === 'IMG') {
-                        preview.src = data.url;
-                    } else {
-                        preview.outerHTML = `<img src="${data.url}" alt="Logo" class="w-full h-full object-contain">`;
-                    }
-                    
-                    // 更新 URL 輸入框
-                    document.getElementById('logo-url-input').value = data.url;
-                } else {
-                    alert('上傳失敗：' + (data.detail || '未知錯誤'));
-                }
-            } catch (error) {
-                alert('上傳失敗：' + error.message);
-            } finally {
-                this.uploading = false;
-            }
-        }
-    }
-}
-</script>
+        {% if store.branches %}
+        <div class="space-y-2 mb-4">
+            {% for branch in store.branches %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <div>
+                    <div class="font-medium">{{ branch.name }}</div>
+                    {% if branch.phone %}
+                    <div class="text-sm text-gray-500">{{ branch.phone }}</div>
+                    {% endif %}
+                </div>
+                <form action="/admin/stores/{{ store.id }}/branches/{{ branch.id }}/delete" method="post" class="inline"
+                      onsubmit="return confirm('確定要刪除這個分店嗎？')">
+                    <button type="submit" class="text-sm text-red-500 hover:text-red-700">刪除</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 mb-4">尚未新增分店</p>
+        {% endif %}
+        
+        <!-- 新增分店 -->
+        <form action="/admin/stores/{{ store.id }}/branches" method="post" class="flex gap-2">
+            <input type="text" name="branch_name" placeholder="分店名稱（如：中科店）" required
+                   class="flex-1 border rounded-lg px-3 py-2 text-sm">
+            <input type="text" name="branch_phone" placeholder="電話"
+                   class="w-32 border rounded-lg px-3 py-2 text-sm">
+            <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                新增
+            </button>
+        </form>
+    </div>
+</div>
 {% endblock %}

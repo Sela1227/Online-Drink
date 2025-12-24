@@ -1,56 +1,87 @@
 {% extends "base.html" %}
 
-{% block title %}店家管理 - 團購系統{% endblock %}
+{% block title %}店家管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-<div class="space-y-4">
+<div class="space-y-4" x-data="{ filter: 'all' }">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">店家管理</h1>
-        <a href="/admin/import" class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg">
+        <div>
+            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+            <h1 class="text-xl font-bold text-gray-800">店家管理</h1>
+        </div>
+        <a href="/admin/import" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
             + 匯入新店家
         </a>
+    </div>
+    
+    <!-- 分類篩選 -->
+    <div class="flex gap-2">
+        <button @click="filter = 'all'" 
+                :class="filter === 'all' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 rounded-lg text-sm transition">
+            全部
+        </button>
+        <button @click="filter = 'drink'" 
+                :class="filter === 'drink' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 rounded-lg text-sm transition">
+            飲料店
+        </button>
+        <button @click="filter = 'meal'" 
+                :class="filter === 'meal' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 rounded-lg text-sm transition">
+            餐廳
+        </button>
+        <button @click="filter = 'group_buy'" 
+                :class="filter === 'group_buy' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 rounded-lg text-sm transition">
+            團購
+        </button>
     </div>
     
     {% if stores %}
     <div class="bg-white rounded-lg shadow-sm divide-y">
         {% for store in stores %}
-        <div class="p-4 flex items-center gap-3">
+        <div class="p-4 flex items-center gap-3"
+             x-show="filter === 'all' || filter === '{{ store.category.value }}'">
             <!-- Logo -->
-            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-10 h-10 object-contain">
+                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-cover">
                 {% else %}
-                <span class="text-2xl">
-                    {% if store.category.value == 'drink' %}🧋{% else %}🍱{% endif %}
-                </span>
+                <span class="text-2xl text-gray-400">🏪</span>
                 {% endif %}
             </div>
             
             <!-- 資訊 -->
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900">{{ store.name }}</div>
                 <div class="text-sm text-gray-500">
-                    {{ '飲料' if store.category.value == 'drink' else '餐點' }}
-                    ・{{ store.menus|length }} 個菜單版本
+                    {% if store.category.value == 'drink' %}飲料店
+                    {% elif store.category.value == 'meal' %}餐廳
+                    {% else %}團購{% endif %}
+                    {% if store.branches %}· {{ store.branches|length }} 間分店{% endif %}
                 </div>
             </div>
             
             <!-- 狀態 -->
             {% if store.is_active %}
-            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">啟用中</span>
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">啟用</span>
             {% else %}
-            <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">已停用</span>
+            <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">停用</span>
             {% endif %}
             
             <!-- 操作 -->
-            <div class="flex gap-2">
-                <a href="/admin/stores/{{ store.id }}/menus" class="text-sm text-indigo-600 hover:text-indigo-700">
-                    菜單
-                </a>
+            <div class="flex gap-2 text-sm">
+                <a href="/admin/stores/{{ store.id }}/edit" class="text-gray-600 hover:text-gray-800">編輯</a>
+                <a href="/admin/stores/{{ store.id }}/menus" class="text-orange-600 hover:text-orange-700">菜單</a>
                 <form action="/admin/stores/{{ store.id }}/toggle" method="post" class="inline">
-                    <button type="submit" class="text-sm text-gray-500 hover:text-gray-700">
+                    <button type="submit" class="text-gray-600 hover:text-gray-800">
                         {% if store.is_active %}停用{% else %}啟用{% endif %}
                     </button>
+                </form>
+                <form action="/admin/stores/{{ store.id }}/delete" method="post" class="inline"
+                      onsubmit="return confirm('確定要刪除「{{ store.name }}」嗎？')">
+                    <button type="submit" class="text-red-500 hover:text-red-700">刪除</button>
                 </form>
             </div>
         </div>
@@ -58,9 +89,8 @@
     </div>
     {% else %}
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
-        <div class="text-4xl mb-2">🏪</div>
         <p>還沒有任何店家</p>
-        <a href="/admin/import" class="text-indigo-600 hover:text-indigo-700">前往匯入</a>
+        <a href="/admin/import" class="text-orange-600 hover:text-orange-700">前往匯入</a>
     </div>
     {% endif %}
 </div>
