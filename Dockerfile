@@ -18,5 +18,5 @@ COPY . .
 # 設定環境變數
 ENV PYTHONUNBUFFERED=1
 
-# 啟動指令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# 啟動指令（使用 shell 展開 $PORT）
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
