@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}匯入店家/菜單 - 團購系統{% endblock %}
+{% block title %}匯入店家/菜單 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
-        <a href="/admin" class="text-gray-500 hover:text-gray-700">← 返回</a>
+        <div>
+            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+            <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
+        </div>
     </div>
     
     <!-- 說明 -->
@@ -39,7 +41,7 @@
       {
         "name": "熟成紅茶",
         "items": [
-          { "name": "熟成紅茶", "price": 30 },
+          { "name": "熟成紅茶", "price": 30, "price_l": 35 },
           { "name": "熟成冷露", "price": 35 }
         ]
       }
@@ -78,26 +80,22 @@
     
     <!-- 匯入表單 -->
     <form action="/admin/import/preview" method="post" enctype="multipart/form-data" 
-          class="bg-white rounded-lg shadow-sm p-4 space-y-4">
-        
-        <!-- 文字輸入 -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">貼上 JSON</label>
-            <textarea name="json_text" rows="10" 
-                      placeholder="貼上 JSON 格式內容..."
-                      class="w-full border rounded-lg px-3 py-2 font-mono text-sm"></textarea>
-        </div>
-        
-        <div class="text-center text-gray-500 text-sm">或</div>
+          class="bg-white rounded-lg shadow-sm p-4 space-y-4"
+          x-data="{ hasFile: false, fileName: '' }">
         
         <!-- 檔案上傳 -->
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">上傳 JSON 檔案</label>
-            <input type="file" name="json_file" accept=".json"
+            <input type="file" name="json_file" accept=".json" required
+                   @change="hasFile = $event.target.files.length > 0; fileName = $event.target.files[0]?.name || ''"
                    class="w-full border rounded-lg px-3 py-2">
+            <p x-show="fileName" class="text-sm text-gray-500 mt-1" x-text="'已選擇：' + fileName"></p>
         </div>
         
-        <button type="submit" class="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
+        <button type="submit" 
+                x-show="hasFile"
+                x-transition
+                class="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
             預覽匯入內容
         </button>
     </form>

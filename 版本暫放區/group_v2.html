@@ -8,62 +8,117 @@
         {% if copy_from %}複製開團{% else %}開新團{% endif %}
     </h1>
     
-    <form action="/groups" method="post" class="space-y-4">
-        <!-- 店家選擇 -->
+    <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()">
+        <!-- 分類選擇 -->
         <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇類型</label>
+            <div class="grid grid-cols-3 gap-2">
+                <button type="button" @click="selectCategory('drink')"
+                        :class="selectedCategory === 'drink' ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🧋</div>
+                    <div class="text-sm font-medium">飲料店</div>
+                </button>
+                <button type="button" @click="selectCategory('meal')"
+                        :class="selectedCategory === 'meal' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🍱</div>
+                    <div class="text-sm font-medium">餐廳</div>
+                </button>
+                <button type="button" @click="selectCategory('group_buy')"
+                        :class="selectedCategory === 'group_buy' ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1">🛒</div>
+                    <div class="text-sm font-medium">團購</div>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 店家選擇 -->
+        <div x-show="selectedCategory" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家</label>
-            <select name="store_id" id="store_id" required onchange="onStoreChange()"
+            <select name="store_id" x-model="storeId" @change="onStoreChange()" required
                     class="w-full border rounded-lg px-3 py-2">
                 <option value="">請選擇...</option>
-                {% for store in stores %}
-                <option value="{{ store.id }}" 
-                        data-category="{{ store.category.value }}"
-                        {% if copy_from and copy_from.store_id == store.id %}selected{% endif %}>
-                    {{ store.name }} ({{ '飲料' if store.category.value == 'drink' else '餐點' }})
-                </option>
-                {% endfor %}
+                <template x-for="store in filteredStores" :key="store.id">
+                    <option :value="store.id" 
+                            :data-category="store.category"
+                            :data-branches="JSON.stringify(store.branches)"
+                            :data-has-toppings="store.has_toppings"
+                            x-text="store.name">
+                    </option>
+                </template>
+            </select>
+            <p class="text-xs text-gray-400 mt-1" x-show="filteredStores.length === 0">
+                此類型尚無店家，請先到後台新增
+            </p>
+        </div>
+        
+        <!-- 分店選擇 -->
+        <div x-show="branches.length > 0" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇分店</label>
+            <select name="branch_id" x-model="branchId" class="w-full border rounded-lg px-3 py-2">
+                <option value="">不指定分店</option>
+                <template x-for="branch in branches" :key="branch.id">
+                    <option :value="branch.id" x-text="branch.name + (branch.phone ? ' (' + branch.phone + ')' : '')"></option>
+                </template>
             </select>
         </div>
         
         <!-- 團名 -->
-        <div>
+        <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">團名</label>
             <input type="text" name="name" required placeholder="例：下午茶團"
                    class="w-full border rounded-lg px-3 py-2"
                    value="{% if copy_from %}{{ copy_from.name }}{% endif %}">
         </div>
         
+        <!-- 備註 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">備註（選填）</label>
+            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間"
+                      class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
+        </div>
+        
+        <!-- 外送費 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">外送費（選填）</label>
+            <div class="flex items-center gap-2">
+                <span class="text-gray-500">$</span>
+                <input type="number" name="delivery_fee" min="0" step="1" placeholder="0"
+                       class="w-32 border rounded-lg px-3 py-2"
+                       value="{% if copy_from and copy_from.delivery_fee %}{{ copy_from.delivery_fee|int }}{% endif %}">
+                <span class="text-sm text-gray-500">會自動平均分攤給所有人</span>
+            </div>
+        </div>
+        
         <!-- 截止時間 -->
-        <div>
+        <div x-show="storeId" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-2">截止時間</label>
             <div class="flex flex-wrap gap-2 mb-2">
-                <button type="button" onclick="setDeadline('30m')"
+                <button type="button" @click="setDeadline('30m')"
                         class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
                     30分鐘後
                 </button>
-                <button type="button" onclick="setDeadline('1h')"
+                <button type="button" @click="setDeadline('1h')"
                         class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
                     1小時後
                 </button>
-                <button type="button" onclick="setDeadline('12:00')"
+                <button type="button" @click="setDeadline('12:00')"
                         class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
                     今天 12:00
                 </button>
-                <button type="button" onclick="setDeadline('17:00')"
+                <button type="button" @click="setDeadline('17:00')"
                         class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
                     今天 17:00
                 </button>
-                <button type="button" onclick="setDeadline('tomorrow')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
-                    明天 12:00
-                </button>
             </div>
-            <input type="datetime-local" name="deadline" id="deadline" required
+            <input type="datetime-local" name="deadline" x-ref="deadline" required
                    class="w-full border rounded-lg px-3 py-2">
         </div>
         
         <!-- 飲料團設定 -->
-        <div id="drink-options" class="space-y-4 p-4 bg-gray-50 rounded-lg" style="display: none;">
+        <div x-show="selectedCategory === 'drink' && storeId" x-cloak class="space-y-4 p-4 bg-amber-50 rounded-lg">
             <h3 class="font-medium text-gray-700">飲料團設定</h3>
             
             <!-- 預設甜度 -->
@@ -106,72 +161,93 @@
         </div>
         
         <!-- 送出按鈕 -->
-        <div class="flex gap-2 pt-4">
+        <div class="flex gap-2 pt-4" x-show="storeId" x-cloak>
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
             <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
-                開團！
+                開團
             </button>
         </div>
     </form>
 </div>
 
 <script>
-// 店家變更時顯示/隱藏飲料設定
-function onStoreChange() {
-    const select = document.getElementById('store_id');
-    const option = select.options[select.selectedIndex];
-    const category = option.dataset.category || '';
-    const drinkOptions = document.getElementById('drink-options');
+function newGroupForm() {
+    // 從後端傳入的店家資料
+    const allStores = [
+        {% for store in stores %}
+        {
+            id: {{ store.id }},
+            name: "{{ store.name }}",
+            category: "{{ store.category.value }}",
+            branches: {{ store.branches | tojson if store.branches else "[]" }},
+            has_toppings: {{ 'true' if store.toppings else 'false' }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
     
-    if (category === 'drink') {
-        drinkOptions.style.display = 'block';
-    } else {
-        drinkOptions.style.display = 'none';
+    return {
+        selectedCategory: '{% if copy_from %}{{ copy_from.category.value }}{% endif %}',
+        storeId: '{% if copy_from %}{{ copy_from.store_id }}{% endif %}',
+        branchId: '',
+        branches: [],
+        
+        get filteredStores() {
+            return allStores.filter(s => s.category === this.selectedCategory);
+        },
+        
+        init() {
+            if (this.storeId) {
+                this.onStoreChange();
+            }
+        },
+        
+        selectCategory(category) {
+            this.selectedCategory = category;
+            this.storeId = '';
+            this.branches = [];
+            this.branchId = '';
+        },
+        
+        onStoreChange() {
+            const store = allStores.find(s => s.id == this.storeId);
+            if (store) {
+                this.branches = store.branches || [];
+            } else {
+                this.branches = [];
+            }
+            this.branchId = '';
+        },
+        
+        setDeadline(preset) {
+            const now = new Date();
+            let target;
+            
+            if (preset === '30m') {
+                target = new Date(now.getTime() + 30 * 60000);
+            } else if (preset === '1h') {
+                target = new Date(now.getTime() + 60 * 60000);
+            } else if (preset === '12:00') {
+                target = new Date(now);
+                target.setHours(12, 0, 0, 0);
+                if (target <= now) target.setDate(target.getDate() + 1);
+            } else if (preset === '17:00') {
+                target = new Date(now);
+                target.setHours(17, 0, 0, 0);
+                if (target <= now) target.setDate(target.getDate() + 1);
+            }
+            
+            if (target) {
+                const y = target.getFullYear();
+                const m = String(target.getMonth() + 1).padStart(2, '0');
+                const d = String(target.getDate()).padStart(2, '0');
+                const h = String(target.getHours()).padStart(2, '0');
+                const min = String(target.getMinutes()).padStart(2, '0');
+                this.$refs.deadline.value = `${y}-${m}-${d}T${h}:${min}`;
+            }
+        }
     }
 }
-
-// 設定截止時間
-function setDeadline(preset) {
-    const now = new Date();
-    let target;
-    
-    if (preset === '30m') {
-        target = new Date(now.getTime() + 30 * 60000);
-    } else if (preset === '1h') {
-        target = new Date(now.getTime() + 60 * 60000);
-    } else if (preset === '12:00') {
-        target = new Date(now);
-        target.setHours(12, 0, 0, 0);
-        if (target <= now) {
-            target.setDate(target.getDate() + 1);
-        }
-    } else if (preset === '17:00') {
-        target = new Date(now);
-        target.setHours(17, 0, 0, 0);
-        if (target <= now) {
-            target.setDate(target.getDate() + 1);
-        }
-    } else if (preset === 'tomorrow') {
-        target = new Date(now);
-        target.setDate(target.getDate() + 1);
-        target.setHours(12, 0, 0, 0);
-    }
-    
-    if (target) {
-        const year = target.getFullYear();
-        const month = String(target.getMonth() + 1).padStart(2, '0');
-        const day = String(target.getDate()).padStart(2, '0');
-        const hours = String(target.getHours()).padStart(2, '0');
-        const minutes = String(target.getMinutes()).padStart(2, '0');
-        document.getElementById('deadline').value = `${year}-${month}-${day}T${hours}:${minutes}`;
-    }
-}
-
-// 頁面載入時檢查初始狀態
-document.addEventListener('DOMContentLoaded', function() {
-    onStoreChange();
-});
 </script>
 {% endblock %}
