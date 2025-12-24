@@ -1,0 +1,340 @@
+2025-12-24T08:31:57.000000000Z [inf]  Starting Container
+2025-12-24T08:31:58.607025591Z [err]      sys.exit(main())
+2025-12-24T08:31:58.607026339Z [err]      rv = self.invoke(ctx)
+2025-12-24T08:31:58.607037841Z [err]               ^^^^^^
+2025-12-24T08:31:58.607038812Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.607046340Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T08:31:58.607048102Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T08:31:58.607055645Z [err]      return self.main(*args, **kwargs)
+2025-12-24T08:31:58.607056647Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T08:31:58.607062316Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.607065558Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.607069500Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T08:31:58.607124521Z [err]  Traceback (most recent call last):
+2025-12-24T08:31:58.607132014Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T08:31:58.609843001Z [err]  ^^^^^^^^^^^
+2025-12-24T08:31:58.609851358Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T08:31:58.609855468Z [err]      return callback(*args, **kwargs)
+2025-12-24T08:31:58.609859940Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.609864035Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T08:31:58.609867609Z [err]      run(
+2025-12-24T08:31:58.609871194Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T08:31:58.609874948Z [err]      server.run()
+2025-12-24T08:31:58.609878700Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T08:31:58.609892118Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T08:31:58.609897019Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.611534297Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T08:31:58.611542390Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T08:31:58.611547414Z [err]      await self._serve(sockets)
+2025-12-24T08:31:58.611549678Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.611552928Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T08:31:58.611555505Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T08:31:58.611558356Z [err]      config.load()
+2025-12-24T08:31:58.611561401Z [err]      return runner.run(main)
+2025-12-24T08:31:58.611567123Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T08:31:58.611567413Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.611571995Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T08:31:58.611576495Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T08:31:58.611580856Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.611585539Z [err]  ^^^^^
+2025-12-24T08:31:58.614488121Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T08:31:58.614493220Z [err]                        ^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.614498673Z [err]  ^^^^^^^^^^^
+2025-12-24T08:31:58.614503611Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T08:31:58.614509324Z [err]      module = importlib.import_module(module_str)
+2025-12-24T08:31:58.614514025Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.614519257Z [err]  ^^^^^^^^^^^
+2025-12-24T08:31:58.614524595Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T08:31:58.614531427Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T08:31:58.617023576Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.617027912Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.617032412Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T08:31:58.617036635Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T08:31:58.617041290Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T08:31:58.617046758Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T08:31:58.617050614Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T08:31:58.617054087Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T08:31:58.617057828Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T08:31:58.617062049Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T08:31:58.617065943Z [err]    File "/app/app/routers/auth.py", line 9, in <module>
+2025-12-24T08:31:58.617070011Z [err]      from app.services.auth import (
+2025-12-24T08:31:58.617074095Z [err]    File "/app/app/services/auth.py", line 12, in <module>
+2025-12-24T08:31:58.617079248Z [err]      from app.models.user import User
+2025-12-24T08:31:58.617083926Z [err]    File "/app/app/models/__init__.py", line 10, in <module>
+2025-12-24T08:31:58.620185083Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.620196614Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 326, in setup_mapping
+2025-12-24T08:31:58.620202813Z [err]      return _ClassScanMapperConfig(
+2025-12-24T08:31:58.620230343Z [err]      from app.models.system import SystemSetting
+2025-12-24T08:31:58.620236721Z [err]    File "/app/app/models/system.py", line 10, in <module>
+2025-12-24T08:31:58.620245597Z [err]      class SystemSetting(Base):
+2025-12-24T08:31:58.620252683Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_api.py", line 846, in __init_subclass__
+2025-12-24T08:31:58.620260875Z [err]      _as_declarative(cls._sa_registry, cls, cls.__dict__)
+2025-12-24T08:31:58.620276230Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 245, in _as_declarative
+2025-12-24T08:31:58.620283349Z [err]      return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+2025-12-24T08:31:58.620289749Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.623332719Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+2025-12-24T08:31:58.623342986Z [err]      return fn(*args, **kwargs)  # type: ignore[no-any-return]
+2025-12-24T08:31:58.623350828Z [err]             ^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.623358885Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 429, in __new__
+2025-12-24T08:31:58.623367034Z [err]      return cls._new(*args, **kw)
+2025-12-24T08:31:58.623417858Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.623423487Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 577, in __init__
+2025-12-24T08:31:58.623428157Z [err]      self._setup_table(table)
+2025-12-24T08:31:58.623432605Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 1762, in _setup_table
+2025-12-24T08:31:58.623436982Z [err]      table_cls(
+2025-12-24T08:31:58.623442024Z [err]    File "<string>", line 2, in __new__
+2025-12-24T08:31:58.629854133Z [err]  sqlalchemy.exc.InvalidRequestError: Table 'system_settings' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.
+2025-12-24T08:31:58.629963427Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:31:58.629970098Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 461, in _new
+2025-12-24T08:31:58.629976113Z [err]      raise exc.InvalidRequestError(
+2025-12-24T08:32:00.576256908Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.576268061Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T08:32:00.576276541Z [err]      rv = self.invoke(ctx)
+2025-12-24T08:32:00.576283973Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.576284705Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T08:32:00.576304612Z [err]  Traceback (most recent call last):
+2025-12-24T08:32:00.576312654Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T08:32:00.576313349Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T08:32:00.576318173Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T08:32:00.576324499Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.576327836Z [err]      sys.exit(main())
+2025-12-24T08:32:00.576330714Z [err]  ^^^^^^^^^^^
+2025-12-24T08:32:00.576334561Z [err]               ^^^^^^
+2025-12-24T08:32:00.576340421Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T08:32:00.576345730Z [err]      return self.main(*args, **kwargs)
+2025-12-24T08:32:00.577071267Z [err]      return callback(*args, **kwargs)
+2025-12-24T08:32:00.577076333Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.577095836Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T08:32:00.577103096Z [err]      run(
+2025-12-24T08:32:00.577108906Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T08:32:00.577113895Z [err]      server.run()
+2025-12-24T08:32:00.577119248Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T08:32:00.577124608Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T08:32:00.577132193Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.577138100Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.577145081Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T08:32:00.577152326Z [err]      return runner.run(main)
+2025-12-24T08:32:00.577158476Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.577163988Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T08:32:00.577169840Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T08:32:00.581399175Z [err]      module = importlib.import_module(module_str)
+2025-12-24T08:32:00.581409529Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.581418703Z [err]  ^
+2025-12-24T08:32:00.581434467Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T08:32:00.581438765Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.581446409Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T08:32:00.581447388Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T08:32:00.581456593Z [err]      await self._serve(sockets)
+2025-12-24T08:32:00.581456695Z [err]      config.load()
+2025-12-24T08:32:00.581465256Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T08:32:00.581471818Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T08:32:00.581478250Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.581485943Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T08:32:00.584456092Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T08:32:00.584461854Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T08:32:00.584467854Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.584473964Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T08:32:00.584481887Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T08:32:00.584494838Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T08:32:00.584500879Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T08:32:00.584507507Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T08:32:00.584513657Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T08:32:00.584520044Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T08:32:00.584526188Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T08:32:00.584532590Z [err]    File "/app/app/routers/auth.py", line 9, in <module>
+2025-12-24T08:32:00.584540858Z [err]      from app.services.auth import (
+2025-12-24T08:32:00.584548265Z [err]    File "/app/app/services/auth.py", line 12, in <module>
+2025-12-24T08:32:00.584554654Z [err]      from app.models.user import User
+2025-12-24T08:32:00.584560650Z [err]    File "/app/app/models/__init__.py", line 10, in <module>
+2025-12-24T08:32:00.586389720Z [err]      from app.models.system import SystemSetting
+2025-12-24T08:32:00.586393454Z [err]    File "/app/app/models/system.py", line 10, in <module>
+2025-12-24T08:32:00.586397381Z [err]      class SystemSetting(Base):
+2025-12-24T08:32:00.586401757Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_api.py", line 846, in __init_subclass__
+2025-12-24T08:32:00.586405589Z [err]      _as_declarative(cls._sa_registry, cls, cls.__dict__)
+2025-12-24T08:32:00.586409320Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 245, in _as_declarative
+2025-12-24T08:32:00.586413097Z [err]      return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+2025-12-24T08:32:00.586417062Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.586421082Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.586425007Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 326, in setup_mapping
+2025-12-24T08:32:00.586647810Z [err]      return _ClassScanMapperConfig(
+2025-12-24T08:32:00.589964824Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.589972249Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 577, in __init__
+2025-12-24T08:32:00.589980588Z [err]      self._setup_table(table)
+2025-12-24T08:32:00.589988151Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 1762, in _setup_table
+2025-12-24T08:32:00.589995271Z [err]      table_cls(
+2025-12-24T08:32:00.590002361Z [err]    File "<string>", line 2, in __new__
+2025-12-24T08:32:00.590009093Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+2025-12-24T08:32:00.590015582Z [err]      return fn(*args, **kwargs)  # type: ignore[no-any-return]
+2025-12-24T08:32:00.590023194Z [err]             ^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.590029478Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 429, in __new__
+2025-12-24T08:32:00.590037163Z [err]      return cls._new(*args, **kw)
+2025-12-24T08:32:00.590044170Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:00.590051089Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 461, in _new
+2025-12-24T08:32:00.590057627Z [err]      raise exc.InvalidRequestError(
+2025-12-24T08:32:00.590066210Z [err]  sqlalchemy.exc.InvalidRequestError: Table 'system_settings' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.
+2025-12-24T08:32:02.798693286Z [err]  Traceback (most recent call last):
+2025-12-24T08:32:02.798707205Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T08:32:02.798713791Z [err]      sys.exit(main())
+2025-12-24T08:32:02.798719833Z [err]               ^^^^^^
+2025-12-24T08:32:02.798725422Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T08:32:02.798731684Z [err]      return self.main(*args, **kwargs)
+2025-12-24T08:32:02.798736789Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.798742018Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T08:32:02.798747262Z [err]      rv = self.invoke(ctx)
+2025-12-24T08:32:02.798753097Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.798758203Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T08:32:02.798764904Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T08:32:02.798771856Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.798777157Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T08:32:02.798782333Z [err]      return callback(*args, **kwargs)
+2025-12-24T08:32:02.798787748Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.802501048Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T08:32:02.802512582Z [err]      run(
+2025-12-24T08:32:02.802519706Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T08:32:02.802525681Z [err]      server.run()
+2025-12-24T08:32:02.802531108Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T08:32:02.802537071Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T08:32:02.802542744Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.802548008Z [err]  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.802553243Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T08:32:02.802558988Z [err]      return runner.run(main)
+2025-12-24T08:32:02.802564441Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.802569757Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T08:32:02.802575874Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T08:32:02.804624194Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.804631263Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T08:32:02.804637236Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T08:32:02.804642901Z [err]      await self._serve(sockets)
+2025-12-24T08:32:02.804647967Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T08:32:02.804653281Z [err]      config.load()
+2025-12-24T08:32:02.804658553Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T08:32:02.804663261Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T08:32:02.804668354Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.804674340Z [err]  
+2025-12-24T08:32:02.804679873Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T08:32:02.804684906Z [err]      module = importlib.import_module(module_str)
+2025-12-24T08:32:02.808011917Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.808022738Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T08:32:02.808030376Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T08:32:02.808036898Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.808042766Z [err]  ^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.808048702Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T08:32:02.808054618Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T08:32:02.808060372Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T08:32:02.808065778Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T08:32:02.808071420Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T08:32:02.808076776Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T08:32:02.808081989Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T08:32:02.808098614Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T08:32:02.810770199Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 326, in setup_mapping
+2025-12-24T08:32:02.810780529Z [err]      return _ClassScanMapperConfig(
+2025-12-24T08:32:02.810787636Z [err]    File "/app/app/routers/auth.py", line 9, in <module>
+2025-12-24T08:32:02.810795405Z [err]      from app.services.auth import (
+2025-12-24T08:32:02.810800923Z [err]    File "/app/app/services/auth.py", line 12, in <module>
+2025-12-24T08:32:02.810806098Z [err]      from app.models.user import User
+2025-12-24T08:32:02.810811838Z [err]    File "/app/app/models/__init__.py", line 10, in <module>
+2025-12-24T08:32:02.810818080Z [err]      from app.models.system import SystemSetting
+2025-12-24T08:32:02.810823138Z [err]    File "/app/app/models/system.py", line 10, in <module>
+2025-12-24T08:32:02.810828514Z [err]      class SystemSetting(Base):
+2025-12-24T08:32:02.810833737Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_api.py", line 846, in __init_subclass__
+2025-12-24T08:32:02.810839129Z [err]      _as_declarative(cls._sa_registry, cls, cls.__dict__)
+2025-12-24T08:32:02.810845908Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 245, in _as_declarative
+2025-12-24T08:32:02.810851622Z [err]      return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+2025-12-24T08:32:02.810857804Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.813713936Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.813726276Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 577, in __init__
+2025-12-24T08:32:02.813733797Z [err]      self._setup_table(table)
+2025-12-24T08:32:02.813740784Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 1762, in _setup_table
+2025-12-24T08:32:02.813748389Z [err]      table_cls(
+2025-12-24T08:32:02.813754880Z [err]    File "<string>", line 2, in __new__
+2025-12-24T08:32:02.813762904Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+2025-12-24T08:32:02.813769323Z [err]      return fn(*args, **kwargs)  # type: ignore[no-any-return]
+2025-12-24T08:32:02.813775752Z [err]             ^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.813782870Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 429, in __new__
+2025-12-24T08:32:02.813789023Z [err]      return cls._new(*args, **kw)
+2025-12-24T08:32:02.813795481Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:02.813802210Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 461, in _new
+2025-12-24T08:32:02.813809107Z [err]      raise exc.InvalidRequestError(
+2025-12-24T08:32:02.816158896Z [err]  sqlalchemy.exc.InvalidRequestError: Table 'system_settings' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.
+2025-12-24T08:32:04.839609399Z [err]  Traceback (most recent call last):
+2025-12-24T08:32:04.839619930Z [err]    File "/opt/venv/bin/uvicorn", line 8, in <module>
+2025-12-24T08:32:04.839626878Z [err]      sys.exit(main())
+2025-12-24T08:32:04.839632429Z [err]               ^^^^^^
+2025-12-24T08:32:04.839639378Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+2025-12-24T08:32:04.839646737Z [err]      return self.main(*args, **kwargs)
+2025-12-24T08:32:04.839653072Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.839658941Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+2025-12-24T08:32:04.839664467Z [err]      rv = self.invoke(ctx)
+2025-12-24T08:32:04.839672967Z [err]           ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.839679877Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+2025-12-24T08:32:04.839685933Z [err]      return ctx.invoke(self.callback, **ctx.params)
+2025-12-24T08:32:04.839690806Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.839696415Z [err]    File "/opt/venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+2025-12-24T08:32:04.839702444Z [err]      return callback(*args, **kwargs)
+2025-12-24T08:32:04.839708686Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.839714746Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 424, in main
+2025-12-24T08:32:04.839721908Z [err]      run(
+2025-12-24T08:32:04.839728775Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/main.py", line 594, in run
+2025-12-24T08:32:04.842270610Z [err]      server.run()
+2025-12-24T08:32:04.842272179Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+2025-12-24T08:32:04.842283206Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 67, in run
+2025-12-24T08:32:04.842290123Z [err]      return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+2025-12-24T08:32:04.842296219Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.842302541Z [err]  ^^^^^^^^^^
+2025-12-24T08:32:04.842308314Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 194, in run
+2025-12-24T08:32:04.842314383Z [err]      return runner.run(main)
+2025-12-24T08:32:04.842320675Z [err]             ^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.842328306Z [err]    File "/root/.nix-profile/lib/python3.12/asyncio/runners.py", line 118, in run
+2025-12-24T08:32:04.842334210Z [err]      return self._loop.run_until_complete(task)
+2025-12-24T08:32:04.842340446Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.842346689Z [err]    File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+2025-12-24T08:32:04.845135742Z [err]      await self._serve(sockets)
+2025-12-24T08:32:04.845148809Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+2025-12-24T08:32:04.845158490Z [err]      config.load()
+2025-12-24T08:32:04.845165355Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/config.py", line 439, in load
+2025-12-24T08:32:04.845172437Z [err]      self.loaded_app = import_from_string(self.app)
+2025-12-24T08:32:04.845184804Z [err]                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.845191697Z [err]    File "/opt/venv/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+2025-12-24T08:32:04.845198380Z [err]      module = importlib.import_module(module_str)
+2025-12-24T08:32:04.845206798Z [err]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.845214423Z [err]    File "/root/.nix-profile/lib/python3.12/importlib/__init__.py", line 90, in import_module
+2025-12-24T08:32:04.845222760Z [err]      return _bootstrap._gcd_import(name[level:], package, level)
+2025-12-24T08:32:04.849729737Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.849733656Z [err]    File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2025-12-24T08:32:04.849737554Z [err]    File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2025-12-24T08:32:04.849741794Z [err]    File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+2025-12-24T08:32:04.849746449Z [err]    File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+2025-12-24T08:32:04.849750563Z [err]    File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+2025-12-24T08:32:04.849755927Z [err]    File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2025-12-24T08:32:04.849760291Z [err]    File "/app/app/main.py", line 13, in <module>
+2025-12-24T08:32:04.849764094Z [err]      from app.routers import auth, home, groups, orders, admin
+2025-12-24T08:32:04.849768205Z [err]    File "/app/app/routers/auth.py", line 9, in <module>
+2025-12-24T08:32:04.849772350Z [err]      from app.services.auth import (
+2025-12-24T08:32:04.849776073Z [err]    File "/app/app/services/auth.py", line 12, in <module>
+2025-12-24T08:32:04.849779751Z [err]      from app.models.user import User
+2025-12-24T08:32:04.849789496Z [err]    File "/app/app/models/__init__.py", line 10, in <module>
+2025-12-24T08:32:04.849793916Z [err]      from app.models.system import SystemSetting
+2025-12-24T08:32:04.849797729Z [err]    File "/app/app/models/system.py", line 10, in <module>
+2025-12-24T08:32:04.849801440Z [err]      class SystemSetting(Base):
+2025-12-24T08:32:04.849806012Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_api.py", line 846, in __init_subclass__
+2025-12-24T08:32:04.849809768Z [err]      _as_declarative(cls._sa_registry, cls, cls.__dict__)
+2025-12-24T08:32:04.849813285Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 245, in _as_declarative
+2025-12-24T08:32:04.853657007Z [err]      return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+2025-12-24T08:32:04.853667668Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.853674417Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 326, in setup_mapping
+2025-12-24T08:32:04.853681236Z [err]      return _ClassScanMapperConfig(
+2025-12-24T08:32:04.853686597Z [err]             ^^^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.853692893Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 577, in __init__
+2025-12-24T08:32:04.853698117Z [err]      self._setup_table(table)
+2025-12-24T08:32:04.853703459Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 1762, in _setup_table
+2025-12-24T08:32:04.853708451Z [err]      table_cls(
+2025-12-24T08:32:04.853713759Z [err]    File "<string>", line 2, in __new__
+2025-12-24T08:32:04.853718432Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+2025-12-24T08:32:04.853723249Z [err]      return fn(*args, **kwargs)  # type: ignore[no-any-return]
+2025-12-24T08:32:04.853728686Z [err]             ^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.856204349Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 429, in __new__
+2025-12-24T08:32:04.856210582Z [err]      return cls._new(*args, **kw)
+2025-12-24T08:32:04.856215539Z [err]             ^^^^^^^^^^^^^^^^^^^^^
+2025-12-24T08:32:04.856220468Z [err]    File "/opt/venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 461, in _new
+2025-12-24T08:32:04.856224723Z [err]      raise exc.InvalidRequestError(
+2025-12-24T08:32:04.856228979Z [err]  sqlalchemy.exc.InvalidRequestError: Table 'system_settings' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.
