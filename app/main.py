@@ -64,7 +64,30 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Enum {enum_name}.{new_value} check: {e}")
     
-    add_enum_value_if_not_exists("categorytype", "group_buy")
+    # 添加大寫版本（SQLAlchemy 使用 enum name）
+    add_enum_value_if_not_exists("categorytype", "GROUP_BUY")
+    
+    # 修正舊的小寫 group_buy -> GROUP_BUY
+    def fix_enum_case():
+        try:
+            with engine.begin() as conn:
+                # 檢查是否有使用小寫 group_buy 的記錄
+                result = conn.execute(text("SELECT COUNT(*) FROM stores WHERE category = 'group_buy'"))
+                store_count = result.scalar()
+                result = conn.execute(text("SELECT COUNT(*) FROM groups WHERE category = 'group_buy'"))
+                group_count = result.scalar()
+                
+                if store_count > 0 or group_count > 0:
+                    # 更新為大寫
+                    conn.execute(text("UPDATE stores SET category = 'GROUP_BUY' WHERE category = 'group_buy'"))
+                    conn.execute(text("UPDATE groups SET category = 'GROUP_BUY' WHERE category = 'group_buy'"))
+                    print(f"Fixed enum case: {store_count} stores, {group_count} groups")
+                else:
+                    print("Enum case fix: OK (no lowercase values)")
+        except Exception as e:
+            print(f"Enum case fix check: {e}")
+    
+    fix_enum_case()
     
     # 確保 system_settings 有初始資料
     from app.models.user import SystemSetting

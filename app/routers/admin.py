@@ -308,12 +308,17 @@ async def update_store(
     
     store.name = name
     
-    # 安全轉換分類 - 使用 raw SQL 避免 enum 大小寫問題
-    if category in ('drink', 'meal', 'group_buy'):
+    # 分類修改 - 使用 raw SQL 直接用大寫值
+    category_map = {
+        'drink': 'DRINK',
+        'meal': 'MEAL',
+        'group_buy': 'GROUP_BUY'
+    }
+    if category in category_map:
         from sqlalchemy import text
         db.execute(
             text("UPDATE stores SET category = :cat WHERE id = :id"),
-            {"cat": category, "id": store_id}
+            {"cat": category_map[category], "id": store_id}
         )
     
     # 處理 Logo 上傳 (使用 Cloudinary)

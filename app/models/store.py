@@ -22,28 +22,12 @@ class OptionType(str, enum.Enum):
     ICE = "ice"
 
 
-# 建立使用 value 的 Enum 類型
-CategoryTypeEnum = Enum(
-    CategoryType,
-    name="categorytype",
-    create_constraint=False,
-    values_callable=lambda x: [e.value for e in x]
-)
-
-OptionTypeEnum = Enum(
-    OptionType,
-    name="optiontype",
-    create_constraint=False,
-    values_callable=lambda x: [e.value for e in x]
-)
-
-
 class Store(Base):
     __tablename__ = "stores"
     
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    category: Mapped[CategoryType] = mapped_column(CategoryTypeEnum)
+    category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -93,7 +77,7 @@ class StoreOption(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
-    option_type: Mapped[OptionType] = mapped_column(OptionTypeEnum)
+    option_type: Mapped[OptionType] = mapped_column(Enum(OptionType))
     option_value: Mapped[str] = mapped_column(String(50))
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     
