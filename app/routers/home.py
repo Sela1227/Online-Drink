@@ -78,6 +78,68 @@ async def home(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@router.get("/home/groups")
+async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
+    """首頁團單列表（HTMX partial）"""
+    user = await get_current_user(request, db)
+    
+    now = datetime.utcnow()
+    
+    # 開放中的飲料團
+    drink_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
+        Group.category == CategoryType.DRINK,
+        Group.is_closed == False,
+        Group.deadline > now,
+    ).order_by(Group.deadline.asc()).all()
+    
+    # 開放中的訂餐團
+    meal_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
+        Group.category == CategoryType.MEAL,
+        Group.is_closed == False,
+        Group.deadline > now,
+    ).order_by(Group.deadline.asc()).all()
+    
+    # 開放中的團購團
+    try:
+        groupbuy_groups = db.query(Group).options(
+            joinedload(Group.store),
+            joinedload(Group.owner),
+            joinedload(Group.orders)
+        ).filter(
+            Group.category == CategoryType.GROUP_BUY,
+            Group.is_closed == False,
+            Group.deadline > now,
+        ).order_by(Group.deadline.asc()).all()
+    except Exception:
+        db.rollback()
+        groupbuy_groups = []
+    
+    # 已截止的團（最近 10 個）
+    closed_groups = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner)
+    ).filter(
+        or_(Group.is_closed == True, Group.deadline <= now)
+    ).order_by(Group.deadline.desc()).limit(10).all()
+    
+    return templates.TemplateResponse("partials/home_groups.html", {
+        "request": request,
+        "user": user,
+        "drink_groups": drink_groups,
+        "meal_groups": meal_groups,
+        "groupbuy_groups": groupbuy_groups,
+        "closed_groups": closed_groups,
+    })
+
+
 @router.get("/my/groups")
 async def my_groups(request: Request, db: Session = Depends(get_db)):
     """我參與過的團單"""
@@ -115,6 +177,39 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         "order_count": order_count,
         "group_count": group_count,
     })
+
+
+@router.get("/welcome")
+async def welcome_page(request: Request, db: Session = Depends(get_db)):
+    """首次登入歡迎頁面"""
+    user = await get_current_user(request, db)
+    
+    return templates.TemplateResponse("welcome.html", {
+        "request": request,
+        "user": user,
+    })
+
+
+@router.post("/welcome")
+async def complete_welcome(
+    request: Request,
+    nickname: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """完成首次設定"""
+    user = await get_current_user(request, db)
+    
+    # 設定暱稱（空白則用 LINE 名稱，但標記為已設定）
+    nickname = nickname.strip()
+    if nickname:
+        user.nickname = nickname
+    else:
+        # 使用 LINE 名稱，但設定為相同值表示已完成設定
+        user.nickname = user.display_name
+    
+    db.commit()
+    
+    return RedirectResponse(url="/home", status_code=302)
 
 
 @router.post("/profile")

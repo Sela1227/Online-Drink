@@ -5,6 +5,7 @@
             price_l: {{ item.price_l if item.price_l else 'null' }},
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
         })"
+        data-menu-item-id="{{ item.id }}"
         class="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition text-left">
     <div>
         <div class="font-medium text-gray-800">{{ item.name }}</div>

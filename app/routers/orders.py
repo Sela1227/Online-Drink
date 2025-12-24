@@ -508,3 +508,202 @@ async def follow_item(
         "group": group,
         "is_open": group.is_open,
     })
+
+
+@router.post("/groups/{group_id}/orders/copy-last")
+async def copy_last_order(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """複製上次訂單到購物車"""
+    from fastapi.responses import RedirectResponse
+    from app.models.store import Store, StoreTopping
+    
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).options(
+        joinedload(Group.store)
+    ).filter(Group.id == group_id).first()
+    if not group or not group.is_open:
+        raise HTTPException(status_code=400, detail="團單已截止")
+    
+    # 找到上次在同店家的訂單
+    previous_order = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings),
+    ).join(Group).filter(
+        Order.user_id == user.id,
+        Group.store_id == group.store_id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.id != db.query(Order.id).filter(
+            Order.group_id == group_id,
+            Order.user_id == user.id,
+        ).scalar_subquery(),
+    ).order_by(Order.created_at.desc()).first()
+    
+    if not previous_order:
+        raise HTTPException(status_code=404, detail="找不到上次的訂單")
+    
+    # 取得或建立當前訂單
+    order = get_or_create_order(db, group_id, user.id)
+    
+    # 清空現有品項
+    for item in order.items:
+        for opt in item.selected_options:
+            db.delete(opt)
+        for topping in item.selected_toppings:
+            db.delete(topping)
+        db.delete(item)
+    
+    # 複製上次訂單的品項
+    for old_item in previous_order.items:
+        new_item = OrderItem(
+            order_id=order.id,
+            menu_item_id=old_item.menu_item_id,
+            item_name=old_item.item_name,
+            size=old_item.size,
+            sugar=old_item.sugar,
+            ice=old_item.ice,
+            quantity=old_item.quantity,
+            unit_price=old_item.unit_price,
+            note=old_item.note,
+        )
+        db.add(new_item)
+        db.flush()
+        
+        # 複製選項
+        for old_opt in old_item.selected_options:
+            new_opt = OrderItemOption(
+                order_item_id=new_item.id,
+                item_option_id=old_opt.item_option_id,
+                option_name=old_opt.option_name,
+                price_diff=old_opt.price_diff,
+            )
+            db.add(new_opt)
+        
+        # 複製加料
+        for old_topping in old_item.selected_toppings:
+            new_topping = OrderItemTopping(
+                order_item_id=new_item.id,
+                store_topping_id=old_topping.store_topping_id,
+                topping_name=old_topping.topping_name,
+                price=old_topping.price,
+            )
+            db.add(new_topping)
+    
+    order.status = OrderStatus.DRAFT
+    db.commit()
+    
+    return RedirectResponse(url=f"/groups/{group_id}?copied=1", status_code=302)
+
+
+@router.get("/groups/{group_id}/random")
+async def random_item(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """隨機推薦品項"""
+    import random
+    from app.models.menu import Menu, MenuItem
+    
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 取得該菜單的所有品項
+    items = db.query(MenuItem).filter(MenuItem.menu_id == group.menu_id).all()
+    
+    if not items:
+        return HTMLResponse("<div class='text-center text-gray-500'>此菜單沒有品項</div>")
+    
+    # 隨機選一個
+    chosen = random.choice(items)
+    
+    return HTMLResponse(f"""
+    <div class="text-center p-4">
+        <div class="text-4xl mb-3">🎲</div>
+        <div class="text-xl font-bold text-gray-800 mb-1">{chosen.name}</div>
+        <div class="text-orange-600 text-lg mb-3">${chosen.price}</div>
+        <button onclick="scrollToItem({chosen.id}); document.querySelector('[x-data]').__x.$data.showRandom = false;"
+                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
+            去點這個！
+        </button>
+        <button onclick="htmx.trigger(this.closest('.random-result'), 'refreshRandom')"
+                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm ml-2">
+            🔄 再抽一次
+        </button>
+    </div>
+    """)
+
+
+@router.get("/groups/{group_id}/favorites")
+async def get_favorites(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """取得用戶在此店家的最常點品項"""
+    from sqlalchemy import func
+    from app.models.menu import MenuItem
+    
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 查詢用戶在此店家的歷史訂單品項，按品項名稱分組計數
+    favorites = db.query(
+        OrderItem.item_name,
+        OrderItem.sugar,
+        OrderItem.ice,
+        OrderItem.size,
+        func.sum(OrderItem.quantity).label('total_qty'),
+        func.max(OrderItem.unit_price).label('price'),
+        func.max(OrderItem.menu_item_id).label('menu_item_id'),
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Group.store_id == group.store_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).group_by(
+        OrderItem.item_name,
+        OrderItem.sugar,
+        OrderItem.ice,
+        OrderItem.size,
+    ).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(10).all()
+    
+    if not favorites:
+        return HTMLResponse("""
+        <div class="text-center py-8 text-gray-500">
+            <div class="text-3xl mb-2">📝</div>
+            <p>還沒有點過這家店</p>
+            <p class="text-sm">點過幾次後就會出現你的最愛！</p>
+        </div>
+        """)
+    
+    # 生成 HTML
+    items_html = ""
+    for fav in favorites:
+        spec_parts = []
+        if fav.size:
+            spec_parts.append(fav.size)
+        if fav.sugar:
+            spec_parts.append(fav.sugar)
+        if fav.ice:
+            spec_parts.append(fav.ice)
+        spec = " / ".join(spec_parts) if spec_parts else ""
+        
+        items_html += f"""
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+             onclick="scrollToItem({fav.menu_item_id}); document.querySelector('[x-data]').__x.$data.showFavorites = false;">
+            <div class="flex-1">
+                <div class="font-medium text-gray-800">{fav.item_name}</div>
+                <div class="text-xs text-gray-500">{spec}</div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-orange-600">${fav.price}</span>
+                <span class="text-xs text-gray-400">點過 {int(fav.total_qty)} 次</span>
+            </div>
+        </div>
+        """
+    
+    return HTMLResponse(f"""
+    <div class="space-y-2">
+        {items_html}
+    </div>
+    <p class="text-xs text-gray-400 text-center mt-4">點擊品項可快速跳到菜單位置</p>
+    """)

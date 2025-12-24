@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.group import Group
 from app.models.store import Store, StoreBranch, CategoryType
-from app.models.menu import Menu
+from app.models.menu import Menu, MenuItem
 from app.models.order import Order, OrderItem, OrderStatus
 from app.services.auth import get_current_user, get_current_user_optional
 from app.services.export_service import generate_order_text, generate_payment_text
@@ -139,6 +139,47 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         Order.status.in_([OrderStatus.DRAFT, OrderStatus.EDITING])
     ).count()
     
+    # 取得未結單的訂單（用於催單）
+    pending_orders = []
+    if group.owner_id == user.id or user.is_admin:
+        pending_orders = db.query(Order).filter(
+            Order.group_id == group_id,
+            Order.status.in_([OrderStatus.DRAFT, OrderStatus.EDITING])
+        ).options(
+            joinedload(Order.user),
+            joinedload(Order.items)
+        ).all()
+        # 只保留有品項的訂單
+        pending_orders = [o for o in pending_orders if len(o.items) > 0]
+    
+    # 取得用戶在同店家的上次訂單（用於複製上次訂單）
+    last_order = None
+    last_order_items = []
+    previous_order = db.query(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.group_id != group_id  # 排除當前團
+    ).order_by(Order.created_at.desc()).first()
+    
+    if previous_order:
+        last_order = previous_order
+        last_order_items = previous_order.items
+    
+    # 取得用戶在同店家的常點品項（統計前 5 名）
+    from sqlalchemy import func
+    favorite_items = db.query(
+        OrderItem.item_name,
+        OrderItem.menu_item_id,
+        func.count(OrderItem.id).label('count')
+    ).join(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED
+    ).group_by(OrderItem.item_name, OrderItem.menu_item_id).order_by(
+        func.count(OrderItem.id).desc()
+    ).limit(5).all()
+    
     # 取得菜單品項（含分類）
     menu = group.menu
     
@@ -156,6 +197,10 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "submitted_orders": submitted_orders,
         "my_order": my_order,
         "pending_count": pending_count,
+        "pending_orders": pending_orders,
+        "last_order": last_order,
+        "last_order_items": last_order_items,
+        "favorite_items": favorite_items,
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,
@@ -233,6 +278,74 @@ async def group_qrcode(group_id: int, db: Session = Depends(get_db)):
         content=f'<img src="data:image/png;base64,{img_str}" alt="QR Code" />',
         status_code=200,
     )
+
+
+@router.post("/{group_id}/orders/copy-last")
+async def copy_last_order(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """複製上次訂單到購物車"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    if not group.is_open:
+        raise HTTPException(status_code=400, detail="團單已截止")
+    
+    # 找到上次在同店家的訂單
+    previous_order = db.query(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.group_id != group_id
+    ).order_by(Order.created_at.desc()).first()
+    
+    if not previous_order:
+        raise HTTPException(status_code=404, detail="找不到上次訂單")
+    
+    # 取得或建立當前訂單
+    my_order = db.query(Order).filter(
+        Order.group_id == group_id,
+        Order.user_id == user.id
+    ).first()
+    
+    if not my_order:
+        my_order = Order(
+            group_id=group_id,
+            user_id=user.id,
+            status=OrderStatus.DRAFT,
+        )
+        db.add(my_order)
+        db.flush()
+    elif my_order.status == OrderStatus.SUBMITTED:
+        # 已結單，先改為編輯狀態
+        my_order.status = OrderStatus.EDITING
+    
+    # 複製品項
+    for old_item in previous_order.items:
+        # 檢查品項是否還在菜單上
+        menu_item = db.query(MenuItem).filter(
+            MenuItem.id == old_item.menu_item_id,
+            MenuItem.menu_id == group.menu_id
+        ).first()
+        
+        if menu_item:  # 品項還存在才複製
+            new_item = OrderItem(
+                order_id=my_order.id,
+                menu_item_id=old_item.menu_item_id,
+                item_name=old_item.item_name,
+                size=old_item.size,
+                price=old_item.price,
+                sugar=old_item.sugar,
+                ice=old_item.ice,
+                quantity=old_item.quantity,
+                note=old_item.note,
+            )
+            db.add(new_item)
+    
+    db.commit()
+    
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
 
 
 @router.get("/{group_id}/copy")

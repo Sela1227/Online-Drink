@@ -131,6 +131,10 @@ async def callback(request: Request, code: str, state: str, db: Session = Depend
         if not next_url.startswith("/") or next_url.startswith("//"):
             next_url = "/home"
         
+        # 首次登入（沒設過暱稱）導向歡迎頁面
+        if user.nickname is None:
+            next_url = "/welcome"
+        
         logger.info(f"[{request_id}] 導向到: {next_url}")
         
         # 設定 cookie 並導向

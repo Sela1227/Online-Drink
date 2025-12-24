@@ -3,80 +3,16 @@
 {% block title %}首頁 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- 訂飲料 -->
-    {% if drink_groups %}
-    <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🧋 訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
-            {% for group in drink_groups %}
-            {% include "partials/group_card.html" with context %}
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    <!-- 訂餐 -->
-    {% if meal_groups %}
-    <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🍱 訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
-            {% for group in meal_groups %}
-            {% include "partials/group_card.html" with context %}
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-    
-    <!-- 團購 -->
-    {% if groupbuy_groups %}
-    <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🛒 團購 <span class="text-sm font-normal text-gray-500">({{ groupbuy_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-3">
-            {% for group in groupbuy_groups %}
-            {% include "partials/group_card.html" with context %}
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    <!-- 無開放中的團 -->
-    {% if not drink_groups and not meal_groups and not groupbuy_groups %}
-    <div class="text-center py-12 text-gray-500">
-        <p>目前沒有開放中的團</p>
-        <p class="text-sm mt-1">點擊上方「開團」按鈕開新團！</p>
-    </div>
-    {% endif %}
-
-    <!-- 已截止 -->
-    {% if closed_groups %}
-    <section x-data="{ showClosed: false }">
-        <h2 class="text-lg font-semibold text-gray-400 mb-3 cursor-pointer flex items-center gap-2" @click="showClosed = !showClosed">
-            <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
-            已截止 <span class="text-sm font-normal">({{ closed_groups|length }})</span>
-        </h2>
-        <div x-show="showClosed" x-collapse class="grid grid-cols-2 gap-3 opacity-60">
-            {% for group in closed_groups %}
-            <a href="/groups/{{ group.id }}" 
-               class="block bg-gray-100 rounded-lg p-3 shadow relative">
-                <div class="flex items-start gap-2">
-                    {% if group.store.logo_url %}
-                    <img src="{{ group.store.logo_url }}" class="w-8 h-8 rounded object-contain bg-white flex-shrink-0">
-                    {% endif %}
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
-                        <div class="text-xs text-gray-400">{{ group.store.name }}</div>
-                    </div>
-                </div>
-                <div class="text-xs text-gray-400 mt-2">{{ group.owner.show_name }} · 已截止</div>
-            </a>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
+<div id="group-list" 
+     hx-get="/home/groups" 
+     hx-trigger="refreshGroups from:body"
+     hx-swap="innerHTML">
+    {% include "partials/home_groups.html" %}
 </div>
 
 <script>
+let refreshScheduled = false;
+
 function countdown(deadline) {
     return {
         display: '',
@@ -91,6 +27,14 @@ function countdown(deadline) {
             
             if (diff <= 0) {
                 this.display = '已截止';
+                // 觸發首頁刷新（防止重複觸發）
+                if (!refreshScheduled) {
+                    refreshScheduled = true;
+                    setTimeout(() => {
+                        htmx.trigger('#group-list', 'refreshGroups');
+                        refreshScheduled = false;
+                    }, 2000);
+                }
                 return;
             }
             

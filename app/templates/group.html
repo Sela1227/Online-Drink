@@ -47,6 +47,9 @@
             </div>
             {% if is_owner or is_admin %}
             <div class="flex gap-3 items-center">
+                {% if is_open and pending_count > 0 %}
+                <button @click="showReminder = true" class="text-amber-600 hover:text-amber-700">📢 催單</button>
+                {% endif %}
                 <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">修改</button>
                 {% if is_open %}
                 <form action="/groups/{{ group.id }}/close" method="post" class="inline"
@@ -61,8 +64,11 @@
         </div>
         
         {% if pending_count > 0 %}
-        <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded">
-            {{ pending_count }} 人尚未結單
+        <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded flex items-center justify-between">
+            <span>{{ pending_count }} 人尚未結單</span>
+            {% if is_owner or is_admin %}
+            <button @click="showReminder = true" class="text-amber-700 hover:text-amber-800 font-medium">查看名單</button>
+            {% endif %}
         </div>
         {% endif %}
     </div>
@@ -148,6 +154,72 @@
         </div>
     </div>
     {% endif %}
+    
+    <!-- 催單 Modal -->
+    {% if (is_owner or is_admin) and pending_orders %}
+    <div x-show="showReminder" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+         @click.self="showReminder = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
+            <div class="p-4 border-b">
+                <h3 class="font-semibold text-gray-800">📢 催單提醒</h3>
+            </div>
+            
+            <div class="p-4">
+                <p class="text-sm text-gray-600 mb-3">以下 {{ pending_orders|length }} 人尚未結單：</p>
+                
+                <div class="bg-gray-50 rounded-lg p-3 mb-4 max-h-60 overflow-y-auto">
+                    <div class="space-y-2">
+                        {% for order in pending_orders %}
+                        <div class="flex items-center gap-2 text-sm">
+                            {% if order.user.picture_url %}
+                            <img src="{{ order.user.picture_url }}" class="w-6 h-6 rounded-full">
+                            {% endif %}
+                            <span class="font-medium">{{ order.user.show_name }}</span>
+                            <span class="text-gray-400">（{{ order.items|length }} 項，${{ order.total_amount }}）</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- 複製名單 -->
+                <div class="mb-4">
+                    <label class="block text-sm text-gray-600 mb-1">複製名單</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="pending-names" readonly
+                               value="{% for order in pending_orders %}{{ order.user.show_name }}{% if not loop.last %}、{% endif %}{% endfor %}"
+                               class="flex-1 border rounded px-3 py-2 text-sm bg-gray-50">
+                        <button type="button" onclick="copyPendingNames()"
+                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                            複製
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 提示文字 -->
+                <p class="text-xs text-gray-400 mb-4">
+                    你可以複製名單，貼到 LINE 群組提醒大家結單
+                </p>
+            </div>
+            
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg">
+                <button @click="showReminder = false"
+                        class="w-full py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function copyPendingNames() {
+        const input = document.getElementById('pending-names');
+        input.select();
+        document.execCommand('copy');
+        alert('已複製名單！');
+    }
+    </script>
+    {% endif %}
 
     <!-- 訂單牆 -->
     <div id="order-wall" hx-get="/groups/{{ group.id }}/orders/wall" hx-trigger="load, orderUpdated from:body">
@@ -166,6 +238,121 @@
             </div>
         </div>
     </div>
+
+    <!-- 快速點餐（團開放中且尚未結單時顯示） -->
+    {% if is_open %}
+    <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'">
+        <h2 class="font-semibold text-gray-800 mb-3">⚡ 快速點餐</h2>
+        
+        <div class="flex flex-wrap gap-2 mb-3">
+            <!-- 複製上次訂單 -->
+            {% if last_order and last_order_items %}
+            <button @click="showLastOrder = true"
+                    class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition">
+                📋 上次訂單
+            </button>
+            {% endif %}
+            
+            <!-- 隨機選擇器 -->
+            <button @click="randomPick()"
+                    class="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition">
+                🎲 隨機選
+            </button>
+        </div>
+        
+        <!-- 常點清單 -->
+        {% if favorite_items %}
+        <div class="border-t pt-3">
+            <div class="text-xs text-gray-500 mb-2">❤️ 你在 {{ store.name }} 的常點</div>
+            <div class="flex flex-wrap gap-2">
+                {% for fav in favorite_items %}
+                <button onclick="scrollToItem({{ fav.menu_item_id }})"
+                        class="text-xs px-2.5 py-1.5 bg-orange-50 text-orange-700 rounded-full hover:bg-orange-100 transition">
+                    {{ fav.item_name }} <span class="text-orange-400">({{ fav.count }})</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 上次訂單 Modal -->
+    {% if last_order and last_order_items %}
+    <div x-show="showLastOrder" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+         @click.self="showLastOrder = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
+            <div class="p-4 border-b">
+                <h3 class="font-semibold text-gray-800">📋 上次在 {{ store.name }} 的訂單</h3>
+                <p class="text-xs text-gray-400 mt-1">{{ last_order.created_at.strftime('%Y/%m/%d') }}</p>
+            </div>
+            
+            <div class="p-4 max-h-60 overflow-y-auto">
+                <div class="space-y-2">
+                    {% for item in last_order_items %}
+                    <div class="flex justify-between items-center text-sm bg-gray-50 rounded p-2">
+                        <div>
+                            <div class="font-medium">{{ item.item_name }}</div>
+                            {% if item.sugar or item.ice %}
+                            <div class="text-xs text-gray-500">{{ item.sugar }} / {{ item.ice }}</div>
+                            {% endif %}
+                            {% if item.note %}
+                            <div class="text-xs text-gray-400">{{ item.note }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="text-right">
+                            <div class="text-orange-600">${{ item.price }}</div>
+                            <div class="text-xs text-gray-400">x{{ item.quantity }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex gap-2">
+                <button @click="showLastOrder = false"
+                        class="flex-1 py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                    取消
+                </button>
+                <form action="/groups/{{ group.id }}/orders/copy-last" method="post" class="flex-1">
+                    <button type="submit"
+                            class="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm">
+                        複製到購物車
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 隨機選擇器 Modal -->
+    <div x-show="showRandom" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+         @click.self="showRandom = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 text-center">
+            <div class="p-6">
+                <div class="text-5xl mb-4">🎲</div>
+                <template x-if="randomResult">
+                    <div>
+                        <div class="text-xl font-bold text-gray-800 mb-1" x-text="randomResult.name"></div>
+                        <div class="text-orange-600 text-lg mb-4">$<span x-text="randomResult.price"></span></div>
+                    </div>
+                </template>
+            </div>
+            
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex gap-2">
+                <button @click="randomPick()"
+                        class="flex-1 py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                    🔄 再抽一次
+                </button>
+                <button @click="goToRandomItem()"
+                        class="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm">
+                    去點這個！
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 菜單 -->
     {% if is_open %}
@@ -404,16 +591,50 @@
 
 <script>
 function orderPage() {
+    // 菜單品項列表（用於隨機選擇）
+    const menuItems = [
+        {% for category in menu.categories %}
+        {% for item in category.items %}
+        { id: {{ item.id }}, name: "{{ item.name }}", price: {{ item.price }} },
+        {% endfor %}
+        {% endfor %}
+        {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
+        {% for item in uncategorized %}
+        { id: {{ item.id }}, name: "{{ item.name }}", price: {{ item.price }} },
+        {% endfor %}
+    ];
+    
     return {
         showQR: false,
         showAddItem: false,
         showCart: false,
         showSettings: false,
+        showReminder: false,
+        showLastOrder: false,
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
         orderStatus: '{{ my_order.status.value if my_order else "none" }}',
+        showRandom: false,
+        randomResult: null,
+        
+        randomPick() {
+            if (menuItems.length === 0) {
+                alert('菜單是空的！');
+                return;
+            }
+            const item = menuItems[Math.floor(Math.random() * menuItems.length)];
+            this.randomResult = item;
+            this.showRandom = true;
+        },
+        
+        goToRandomItem() {
+            if (this.randomResult) {
+                scrollToItem(this.randomResult.id);
+                this.showRandom = false;
+            }
+        },
         
         async openAddItem(item) {
             // 如果已結單，先問是否要加點
@@ -495,7 +716,7 @@ function countdown(deadline) {
     }
 }
 
-// 監聽訂單更新事件
+// 監聯訂單更新事件
 document.body.addEventListener('orderUpdated', function() {
     setTimeout(() => {
         const items = document.querySelectorAll('#cart-content [data-item-id]');
@@ -505,5 +726,18 @@ document.body.addEventListener('orderUpdated', function() {
         }
     }, 100);
 });
+
+// 滾動到指定品項
+function scrollToItem(itemId) {
+    const el = document.querySelector(`[data-menu-item-id="${itemId}"]`);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 閃爍效果
+        el.classList.add('ring-2', 'ring-orange-400');
+        setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-orange-400');
+        }, 2000);
+    }
+}
 </script>
 {% endblock %}
