@@ -56,14 +56,21 @@ class OrderItem(Base):
     order: Mapped["Order"] = relationship(back_populates="items")
     menu_item: Mapped["MenuItem"] = relationship(back_populates="order_items")
     selected_options: Mapped[list["OrderItemOption"]] = relationship(back_populates="order_item", cascade="all, delete-orphan")
+    selected_toppings: Mapped[list["OrderItemTopping"]] = relationship(back_populates="order_item", cascade="all, delete-orphan")
     
     @property
     def options_total(self) -> Decimal:
+        """加購選項總價"""
         return sum(opt.price_diff for opt in self.selected_options)
     
     @property
+    def toppings_total(self) -> Decimal:
+        """加料總價"""
+        return sum(t.price for t in self.selected_toppings)
+    
+    @property
     def subtotal(self) -> Decimal:
-        return (self.unit_price + self.options_total) * self.quantity
+        return (self.unit_price + self.options_total + self.toppings_total) * self.quantity
 
 
 class OrderItemOption(Base):
@@ -77,6 +84,20 @@ class OrderItemOption(Base):
     
     # Relationships
     order_item: Mapped["OrderItem"] = relationship(back_populates="selected_options")
+
+
+class OrderItemTopping(Base):
+    """訂單品項的加料選擇"""
+    __tablename__ = "order_item_toppings"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.id"))
+    store_topping_id: Mapped[int | None] = mapped_column(ForeignKey("store_toppings.id"), nullable=True)
+    topping_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 冗餘存儲
+    
+    # Relationships
+    order_item: Mapped["OrderItem"] = relationship(back_populates="selected_toppings")
 
 
 # Avoid circular import

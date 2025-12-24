@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from decimal import Decimal
 
-from app.models.store import Store, StoreOption, CategoryType, OptionType
+from app.models.store import Store, StoreOption, StoreTopping, CategoryType, OptionType
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.schemas.menu import FullImport, MenuImport, MenuContent
 
@@ -40,6 +40,18 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
                 sort_order=i,
             )
             db.add(option)
+    
+    # 建立加料選項
+    if data.store.toppings:
+        for i, topping_data in enumerate(data.store.toppings):
+            topping = StoreTopping(
+                store_id=store.id,
+                name=topping_data.name,
+                price=topping_data.price,
+                sort_order=i,
+                is_active=True,
+            )
+            db.add(topping)
     
     # 建立菜單
     _create_menu(db, store.id, data.menu, is_active=True)

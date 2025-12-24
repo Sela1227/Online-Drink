@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("stores", "phone", "VARCHAR(50)")
     add_column_if_not_exists("stores", "branch", "VARCHAR(100)")
     add_column_if_not_exists("groups", "branch_id", "INTEGER")
+    add_column_if_not_exists("groups", "note", "TEXT")
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
     

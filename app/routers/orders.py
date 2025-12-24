@@ -7,7 +7,7 @@ from decimal import Decimal
 from app.database import get_db
 from app.models.group import Group
 from app.models.menu import MenuItem, ItemOption
-from app.models.order import Order, OrderItem, OrderItemOption, OrderStatus
+from app.models.order import Order, OrderItem, OrderItemOption, OrderItemTopping, OrderStatus
 from app.services.auth import get_current_user
 
 router = APIRouter()
@@ -86,6 +86,7 @@ async def add_item(
     quantity: int = Form(1),
     note: str = Form(None),
     options: list[int] = Form(default=[]),
+    toppings: list[int] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     """加入品項"""
@@ -139,7 +140,8 @@ async def add_item(
             item.note == note):
             # 檢查選項是否相同
             existing_option_ids = {opt.item_option_id for opt in item.selected_options}
-            if existing_option_ids == set(options):
+            existing_topping_ids = {t.store_topping_id for t in item.selected_toppings}
+            if existing_option_ids == set(options) and existing_topping_ids == set(toppings):
                 existing_item = item
                 break
     
@@ -172,6 +174,19 @@ async def add_item(
                     price_diff=option.price_diff,
                 )
                 db.add(order_item_option)
+        
+        # 加入加料
+        from app.models.store import StoreTopping
+        for topping_id in toppings:
+            topping = db.query(StoreTopping).filter(StoreTopping.id == topping_id).first()
+            if topping:
+                order_item_topping = OrderItemTopping(
+                    order_item_id=order_item.id,
+                    store_topping_id=topping_id,
+                    topping_name=topping.name,
+                    price=topping.price,
+                )
+                db.add(order_item_topping)
     
     db.commit()
     

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum, Integer
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from app.models.store import CategoryType
@@ -14,6 +14,7 @@ class Group(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     branch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 分店 ID
     name: Mapped[str] = mapped_column(String(100))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)  # 團主備註
     category: Mapped[CategoryType] = mapped_column(Enum(CategoryType))
     deadline: Mapped[datetime] = mapped_column(DateTime)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -39,6 +40,12 @@ class Group(Base):
     @property
     def is_open(self) -> bool:
         return not self.is_closed and not self.is_expired
+    
+    @property
+    def order_count(self) -> int:
+        """已結單的訂單數"""
+        from app.models.order import OrderStatus
+        return len([o for o in self.orders if o.status == OrderStatus.SUBMITTED])
 
 
 # Avoid circular import

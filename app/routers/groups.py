@@ -45,6 +45,7 @@ async def create_group(
     store_id: int = Form(...),
     name: str = Form(...),
     deadline: str = Form(...),
+    note: str = Form(None),
     branch_id: int = Form(None),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
@@ -81,6 +82,7 @@ async def create_group(
         owner_id=user.id,
         branch_id=branch_id if branch_id else None,
         name=name,
+        note=note.strip() if note else None,
         category=store.category,
         deadline=deadline_dt,
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
@@ -98,6 +100,8 @@ async def create_group(
 @router.get("/{group_id}")
 async def group_page(group_id: int, request: Request, db: Session = Depends(get_db)):
     """團單頁面"""
+    from app.models.user import User
+    
     user, new_token = await get_current_user_optional(request, db)
     
     # 未登入：導向登入頁面，登入後回來
@@ -138,6 +142,11 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     # 取得菜單品項（含分類）
     menu = group.menu
     
+    # 取得所有用戶（用於轉移團主）
+    all_users = []
+    if group.owner_id == user.id or user.is_admin:
+        all_users = db.query(User).order_by(User.display_name).all()
+    
     return templates.TemplateResponse("group.html", {
         "request": request,
         "user": user,
@@ -150,6 +159,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,
+        "all_users": all_users,
     })
 
 
@@ -291,3 +301,76 @@ async def export_payment(group_id: int, request: Request, db: Session = Depends(
         "title": "收款文字",
         "text": text,
     })
+
+
+@router.post("/{group_id}/edit")
+async def edit_group(
+    group_id: int,
+    request: Request,
+    name: str = Form(...),
+    note: str = Form(None),
+    deadline: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    """編輯團單"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 只有團主或管理者可以編輯
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以編輯")
+    
+    # 更新團名和備註（任何時候都可以改）
+    group.name = name
+    group.note = note.strip() if note else None
+    
+    # 更新截止時間
+    if deadline:
+        try:
+            deadline_dt = datetime.fromisoformat(deadline)
+            group.deadline = deadline_dt
+        except ValueError:
+            pass
+    
+    db.commit()
+    
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.post("/{group_id}/transfer")
+async def transfer_group(
+    group_id: int,
+    request: Request,
+    new_owner_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """轉移團主"""
+    from app.models.user import User
+    import logging
+    logger = logging.getLogger("groups")
+    
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 只有團主或管理者可以轉移
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以轉移")
+    
+    # 確認新團主存在
+    new_owner = db.query(User).filter(User.id == new_owner_id).first()
+    if not new_owner:
+        raise HTTPException(status_code=404, detail="找不到該用戶")
+    
+    old_owner_name = group.owner.display_name
+    group.owner_id = new_owner_id
+    db.commit()
+    
+    logger.info(f"團單 {group_id} 團主從 {old_owner_name} 轉移到 {new_owner.display_name}")
+    
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)

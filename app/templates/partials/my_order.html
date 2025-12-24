@@ -29,6 +29,9 @@
                     {% for opt in item.selected_options %}
                     <span class="text-xs bg-gray-100 px-1 rounded ml-1">{{ opt.option_name }}</span>
                     {% endfor %}
+                    {% for topping in item.selected_toppings %}
+                    <span class="text-xs bg-blue-100 text-blue-700 px-1 rounded ml-1">+{{ topping.topping_name }}</span>
+                    {% endfor %}
                 </div>
                 {% if item.note %}
                 <div class="text-xs text-amber-600">{{ item.note }}</div>
