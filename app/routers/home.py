@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.group import Group
@@ -13,6 +13,19 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# 加入台北時區過濾器
+def to_taipei_time(dt):
+    if dt is None:
+        return None
+    taipei_tz = timezone(timedelta(hours=8))
+    if dt.tzinfo is None:
+        utc_dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        utc_dt = dt
+    return utc_dt.astimezone(taipei_tz)
+
+templates.env.filters['taipei'] = to_taipei_time
 
 
 def get_hot_items(db: Session, limit: int = 10):

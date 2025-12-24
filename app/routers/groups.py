@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 import qrcode
 import io
@@ -20,6 +20,19 @@ from app.services.export_service import generate_order_text, generate_payment_te
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
+
+# 加入台北時區過濾器
+def to_taipei_time(dt):
+    if dt is None:
+        return None
+    taipei_tz = timezone(timedelta(hours=8))
+    if dt.tzinfo is None:
+        utc_dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        utc_dt = dt
+    return utc_dt.astimezone(taipei_tz)
+
+templates.env.filters['taipei'] = to_taipei_time
 
 
 @router.get("/new")
