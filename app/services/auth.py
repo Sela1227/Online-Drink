@@ -1,5 +1,5 @@
 """
-auth.py - 認證服務
+auth.py - 認證服務（完整版）
 """
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+import httpx
 
 from app.database import get_db
 from app.models.user import User
@@ -38,6 +39,49 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+async def exchange_line_token(code: str) -> Optional[dict]:
+    """用 authorization code 換取 LINE access token"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://api.line.me/oauth2/v2.1/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": settings.line_redirect_uri,
+                    "client_id": settings.line_channel_id,
+                    "client_secret": settings.line_channel_secret,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"LINE token exchange failed: {response.text}")
+                return None
+        except Exception as e:
+            print(f"LINE token exchange error: {e}")
+            return None
+
+
+async def get_line_profile(access_token: str) -> Optional[dict]:
+    """取得 LINE 用戶資料"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                "https://api.line.me/v2/profile",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"LINE profile fetch failed: {response.text}")
+                return None
+        except Exception as e:
+            print(f"LINE profile fetch error: {e}")
+            return None
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -126,6 +170,7 @@ def get_or_create_user(
         line_id=line_id,
         display_name=display_name,
         picture_url=picture_url,
+        is_first_login=True,
         last_active_at=datetime.utcnow()
     )
     db.add(user)
