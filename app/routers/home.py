@@ -1,15 +1,15 @@
 """
-home.py 修復版
+home.py 修復版 v2
 
 修復問題：
-1. 時間到的團單必須移到已截止區（不管 is_closed 狀態）
-2. 只有 deadline > now AND is_closed == False 的才顯示在開放區
+1. 時間到的團單移到已截止區（不管 is_closed 狀態）
+2. taipei filter 註冊
 """
 from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_
+from sqlalchemy import or_
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
@@ -45,7 +45,6 @@ async def home(
     one_week_ago = now - timedelta(days=7)
     
     # ===== 開放中的飲料團 =====
-    # 條件：未手動關閉 AND 未過期
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -53,7 +52,7 @@ async def home(
     ).filter(
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
-        Group.deadline > now,  # 必須未過期
+        Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
     # ===== 開放中的餐點團 =====
@@ -82,7 +81,6 @@ async def home(
         groupbuy_groups = []
     
     # ===== 已截止區（最近一週） =====
-    # 條件：(手動關閉 OR 已過期) AND 最近一週內
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -90,7 +88,7 @@ async def home(
     ).filter(
         or_(
             Group.is_closed == True,
-            Group.deadline <= now  # 時間到就是截止
+            Group.deadline <= now
         ),
         or_(
             Group.deadline >= one_week_ago,
@@ -146,7 +144,6 @@ async def home_groups(
     now = datetime.utcnow()
     one_week_ago = now - timedelta(days=7)
     
-    # ===== 開放中的飲料團 =====
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -157,7 +154,6 @@ async def home_groups(
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
-    # ===== 開放中的餐點團 =====
     meal_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -168,7 +164,6 @@ async def home_groups(
         Group.deadline > now,
     ).order_by(Group.deadline.asc()).all()
     
-    # ===== 開放中的團購團 =====
     try:
         groupbuy_groups = db.query(Group).options(
             joinedload(Group.store),
@@ -182,7 +177,6 @@ async def home_groups(
     except Exception:
         groupbuy_groups = []
     
-    # ===== 已截止區 =====
     closed_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
@@ -198,7 +192,6 @@ async def home_groups(
         )
     ).order_by(Group.deadline.desc()).limit(20).all()
     
-    # ===== 歷史區 =====
     history_groups = []
     if user.is_admin:
         history_groups = db.query(Group).options(

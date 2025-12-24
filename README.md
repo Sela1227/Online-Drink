@@ -1,4 +1,4 @@
-# SELA Bug 修復 - 2024/12/24 (第二批)
+# SELA Bug 修復 - 2024/12/24 v2
 
 ## 🐛 修復的問題
 
@@ -24,69 +24,25 @@ app/
 
 ---
 
-## 🔍 修復詳情
-
-### 1. 截止團單邏輯修復 (home.py)
-
-**修復前（錯誤）：**
-```python
-# 開放區只檢查 is_closed，沒檢查 deadline
-drink_groups = db.query(Group).filter(
-    Group.category == CategoryType.DRINK,
-    Group.is_closed == False,  # ❌ 只檢查這個
-)
-```
-
-**修復後（正確）：**
-```python
-# 必須同時檢查 is_closed 和 deadline
-drink_groups = db.query(Group).filter(
-    Group.category == CategoryType.DRINK,
-    Group.is_closed == False,
-    Group.deadline > now,  # ✅ 加入時間檢查
-)
-```
-
-### 2. taipei filter 註冊 (admin.py)
-
-**加入程式碼：**
-```python
-def to_taipei_time(dt):
-    if dt is None:
-        return None
-    taipei_tz = timezone(timedelta(hours=8))
-    if dt.tzinfo is None:
-        utc_dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        utc_dt = dt
-    return utc_dt.astimezone(taipei_tz)
-
-templates.env.filters['taipei'] = to_taipei_time
-```
-
-### 3. 分類大小寫轉換 (admin.py)
-
-**修復程式碼：**
-```python
-try:
-    category_lower = category.lower()
-    store.category = CategoryType(category_lower)
-except ValueError:
-    try:
-        store.category = CategoryType[category.upper()]
-    except KeyError:
-        pass  # 保持原值
-```
-
----
-
 ## 🚀 部署步驟
+
+### ⚠️ 重要：請完整覆蓋檔案
 
 ```powershell
 cd C:\Users\cbrto\Documents\Python\線上訂餐
 
-# 解壓 sela-bugfix2.zip 覆蓋
+# 1. 備份現有檔案
+copy app\routers\home.py app\routers\home.py.bak
+copy app\routers\admin.py app\routers\admin.py.bak
 
+# 2. 解壓 sela-bugfix2.zip
+# 3. 確認完整覆蓋這些檔案：
+#    - app/routers/home.py
+#    - app/routers/admin.py
+#    - app/templates/partials/home_groups.html
+#    - app/templates/partials/group_card.html
+
+# 4. 部署
 git add .
 git commit -m "Fix: deadline check, taipei filter, category case"
 git push

@@ -40,13 +40,20 @@
     <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between">
         <!-- 訂單統計 -->
         <div class="text-xs text-gray-500">
-            {% set submitted = group.orders|selectattr('status.value', 'equalto', 'submitted')|list|length %}
-            {% set pending = group.orders|selectattr('status.value', 'in', ['draft', 'editing'])|list|length %}
-            {% if submitted > 0 %}
-            <span class="text-green-600">✓{{ submitted }}</span>
+            {% set submitted_count = namespace(value=0) %}
+            {% set pending_count = namespace(value=0) %}
+            {% for order in group.orders %}
+                {% if order.status.value == 'submitted' %}
+                    {% set submitted_count.value = submitted_count.value + 1 %}
+                {% elif order.status.value in ['draft', 'editing'] %}
+                    {% set pending_count.value = pending_count.value + 1 %}
+                {% endif %}
+            {% endfor %}
+            {% if submitted_count.value > 0 %}
+            <span class="text-green-600">✓{{ submitted_count.value }}</span>
             {% endif %}
-            {% if pending > 0 %}
-            <span class="text-orange-500 ml-1">🛒{{ pending }}</span>
+            {% if pending_count.value > 0 %}
+            <span class="text-orange-500 ml-1">🛒{{ pending_count.value }}</span>
             {% endif %}
         </div>
         
