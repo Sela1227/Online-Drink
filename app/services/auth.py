@@ -100,14 +100,31 @@ async def exchange_line_token(code: str) -> str:
 
 def get_or_create_user(db: Session, line_user_id: str, display_name: str, picture_url: str | None) -> User:
     """取得或建立使用者"""
+    import logging
+    logger = logging.getLogger("auth")
+    
+    # 查詢用戶
     user = db.query(User).filter(User.line_user_id == line_user_id).first()
     
     if user:
+        logger.info(f"找到現有用戶：id={user.id}, line_user_id={line_user_id[:8]}..., 舊名={user.display_name}, 新名={display_name}")
+        
+        # 檢查：如果資料庫名稱和 LINE 回傳的不同，記錄警告
+        if user.display_name != display_name:
+            logger.warning(f"用戶名稱變更：{user.display_name} → {display_name}")
+        
         # 更新資料
         user.display_name = display_name
         user.picture_url = picture_url
         db.commit()
     else:
+        logger.info(f"建立新用戶：line_user_id={line_user_id[:8]}..., name={display_name}")
+        
+        # 額外檢查：是否有相同 display_name 的用戶（可能是問題來源）
+        same_name_users = db.query(User).filter(User.display_name == display_name).all()
+        if same_name_users:
+            logger.warning(f"⚠️ 已存在相同名稱的用戶：{[u.id for u in same_name_users]}")
+        
         # 建立新使用者
         is_admin = line_user_id == settings.admin_line_user_id
         user = User(
@@ -119,6 +136,7 @@ def get_or_create_user(db: Session, line_user_id: str, display_name: str, pictur
         db.add(user)
         db.commit()
         db.refresh(user)
+        logger.info(f"新用戶建立成功：id={user.id}")
     
     return user
 

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import os
+import logging
 
 from app.config import get_settings
 from app.database import engine, Base, get_db
@@ -13,6 +14,13 @@ from app.routers import auth, home, groups, orders, admin
 from app.services.auth import get_current_user_optional
 
 settings = get_settings()
+
+# 設定 logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("main")
 
 
 @asynccontextmanager

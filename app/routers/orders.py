@@ -89,7 +89,13 @@ async def add_item(
     db: Session = Depends(get_db),
 ):
     """加入品項"""
+    import logging
+    logger = logging.getLogger("orders")
+    
     user = await get_current_user(request, db)
+    
+    # 日誌：記錄誰在加品項
+    logger.info(f"[加品項] user_id={user.id}, name={user.display_name}, group_id={group_id}, menu_item_id={menu_item_id}")
     
     # 檢查團單狀態
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -111,6 +117,13 @@ async def add_item(
     
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
+    
+    logger.info(f"[加品項] order_id={order.id}, order_user_id={order.user_id}")
+    
+    # 驗證：訂單的 user_id 應該和當前用戶一致
+    if order.user_id != user.id:
+        logger.error(f"🚨 訂單用戶不匹配！order.user_id={order.user_id}, current user.id={user.id}")
+        raise HTTPException(status_code=403, detail="訂單用戶不匹配")
     
     # 如果是已結單狀態，不能直接加
     if order.status == OrderStatus.SUBMITTED:
