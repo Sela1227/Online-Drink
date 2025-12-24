@@ -84,6 +84,10 @@ async def get_line_profile(access_token: str) -> Optional[dict]:
             return None
 
 
+# 別名（兼容舊代碼）
+get_line_user_profile = get_line_profile
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     """取得當前登入用戶"""
     token = request.cookies.get("access_token")
