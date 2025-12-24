@@ -1,37 +1,37 @@
-# SELA 缺失檔案修復包
+# SELA 修復 - 只包含缺失的 Model
 
-## ❌ 缺失的檔案
+## ⚠️ 重要：先刪除重複檔案！
 
-```
-app/models/
-├── __init__.py    ← 新增
-├── store.py       ← 新增
-├── menu.py        ← 新增
-└── system.py      ← 新增
-```
-
-## 🚀 部署步驟
+你的專案有重複定義問題。請先執行：
 
 ```powershell
 cd C:\Users\cbrto\Documents\Python\線上訂餐
 
-# 1. 解壓 sela-missing-models.zip（選「全部覆蓋」）
+# 刪除我之前給你的重複檔案
+del app\models\__init__.py
+del app\models\system.py
+```
 
-# 2. 確認檔案存在
+## 📦 這個包只有
+
+```
+app/models/
+├── store.py   ← CategoryType, Store, StoreOption 等
+└── menu.py    ← Menu, MenuItem, MenuCategory 等
+```
+
+## 🚀 部署
+
+```powershell
+# 1. 先刪除重複檔案（上面的命令）
+
+# 2. 解壓 sela-models-only.zip
+
+# 3. 確認
 dir app\models\
 
-# 應該看到：
-# __init__.py
-# feedback.py
-# group.py
-# menu.py      ← 新增
-# order.py
-# store.py     ← 新增
-# system.py    ← 新增
-# user.py
-
-# 3. 部署
+# 4. 部署
 git add .
-git commit -m "Add missing models: store, menu, system"
+git commit -m "Add store.py and menu.py models"
 git push --force
 ```
