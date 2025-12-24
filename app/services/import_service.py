@@ -168,3 +168,6 @@ def _populate_menu(db: Session, menu: Menu, content: MenuContent):
                         sort_order=opt_idx,
                     )
                     db.add(option)
+
+# §O¦W
+import_store_from_json = import_store_and_menu

@@ -1,0 +1,348 @@
+2025-12-24T08:58:38.400100111Z [inf]  
+2025-12-24T08:58:40.669937450Z [inf]  [35m[Region: europe-west4][0m
+2025-12-24T08:58:40.674279420Z [inf]  [35m==============
+2025-12-24T08:58:40.674315464Z [inf]  Using Nixpacks
+2025-12-24T08:58:40.674323470Z [inf]  ==============
+2025-12-24T08:58:40.674333445Z [inf]  [0m
+2025-12-24T08:58:40.674431182Z [inf]  context: 28qq-G3Nc
+2025-12-24T08:58:40.795496852Z [inf]  ╔══════════════════════════════ Nixpacks v1.38.0 ══════════════════════════════╗
+2025-12-24T08:58:40.795558030Z [inf]  ║ setup      │ python3, postgresql_16.dev, gcc                                 ║
+2025-12-24T08:58:40.795565151Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2025-12-24T08:58:40.795569589Z [inf]  ║ install    │ python -m venv --copies /opt/venv && . /opt/venv/bin/activate   ║
+2025-12-24T08:58:40.795576652Z [inf]  ║            │ && pip install -r requirements.txt                              ║
+2025-12-24T08:58:40.795581296Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2025-12-24T08:58:40.795585873Z [inf]  ║ start      │ uvicorn app.main:app --host 0.0.0.0 --port $PORT                ║
+2025-12-24T08:58:40.795590577Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2025-12-24T08:58:41.200484761Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T08:58:41.200539502Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T08:58:41.200563497Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T08:58:41.200584062Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T08:58:41.226515114Z [inf]  [internal] load build definition from Dockerfile
+2025-12-24T08:58:41.230436802Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-24T08:58:41.533988432Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-24T08:58:41.534144606Z [inf]  [internal] load .dockerignore
+2025-12-24T08:58:41.534181033Z [inf]  [internal] load .dockerignore
+2025-12-24T08:58:41.534630511Z [inf]  [internal] load .dockerignore
+2025-12-24T08:58:41.547331515Z [inf]  [internal] load .dockerignore
+2025-12-24T08:58:41.554192525Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T08:58:41.554236257Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T08:58:41.554248387Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T08:58:41.554260912Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T08:58:41.554272724Z [inf]  [stage-0 4/8] RUN nix-env -if .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix && nix-collect-garbage -d
+2025-12-24T08:58:41.554288760Z [inf]  [stage-0 3/8] COPY .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix
+2025-12-24T08:58:41.554298556Z [inf]  [internal] load build context
+2025-12-24T08:58:41.554311564Z [inf]  [internal] load build context
+2025-12-24T08:58:41.554466887Z [inf]  [internal] load build context
+2025-12-24T08:58:41.626963481Z [inf]  [internal] load build context
+2025-12-24T08:58:41.629295783Z [inf]  [stage-0 3/8] COPY .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix
+2025-12-24T08:58:41.629366511Z [inf]  [stage-0 4/8] RUN nix-env -if .nixpacks/nixpkgs-bc8f8d1be58e8c8383e683a06e1e1e57893fff87.nix && nix-collect-garbage -d
+2025-12-24T08:58:41.629410661Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T08:58:41.709363073Z [inf]  [stage-0 5/8] COPY . /app/.
+2025-12-24T08:58:41.711409312Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T08:58:46.531351218Z [inf]  Collecting fastapi>=0.104.0 (from -r requirements.txt (line 1))
+
+2025-12-24T08:58:46.569495628Z [inf]    Downloading fastapi-0.127.0-py3-none-any.whl.metadata (30 kB)
+
+2025-12-24T08:58:46.637306129Z [inf]  Collecting uvicorn>=0.24.0 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:46.644981076Z [inf]    Downloading uvicorn-0.40.0-py3-none-any.whl.metadata (6.7 kB)
+
+2025-12-24T08:58:47.251338211Z [inf]  Collecting sqlalchemy>=2.0.0 (from -r requirements.txt (line 3))
+
+2025-12-24T08:58:47.259764398Z [inf]    Downloading sqlalchemy-2.0.45-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+
+2025-12-24T08:58:47.298208707Z [inf]  Collecting pydantic-settings>=2.0.0 (from -r requirements.txt (line 4))
+
+2025-12-24T08:58:47.305758249Z [inf]    Downloading pydantic_settings-2.12.0-py3-none-any.whl.metadata (3.4 kB)
+
+2025-12-24T08:58:47.324623606Z [inf]  Collecting python-multipart>=0.0.6 (from -r requirements.txt (line 5))
+
+2025-12-24T08:58:47.332566121Z [inf]    Downloading python_multipart-0.0.21-py3-none-any.whl.metadata (1.8 kB)
+
+2025-12-24T08:58:47.377433611Z [inf]  Collecting jinja2>=3.1.2 (from -r requirements.txt (line 6))
+
+2025-12-24T08:58:47.385881768Z [inf]    Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+
+2025-12-24T08:58:47.428181577Z [inf]  Collecting httpx>=0.25.0 (from -r requirements.txt (line 7))
+
+2025-12-24T08:58:47.436161667Z [inf]    Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+
+2025-12-24T08:58:47.462407389Z [inf]  Collecting python-jose>=3.3.0 (from python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:47.470985145Z [inf]    Downloading python_jose-3.5.0-py2.py3-none-any.whl.metadata (5.5 kB)
+
+2025-12-24T08:58:47.494733817Z [inf]  Collecting qrcode>=7.4 (from qrcode[pil]>=7.4->-r requirements.txt (line 9))
+
+2025-12-24T08:58:47.502015809Z [inf]    Downloading qrcode-8.2-py3-none-any.whl.metadata (17 kB)
+
+2025-12-24T08:58:47.606349021Z [inf]  Collecting psycopg2-binary>=2.9.9 (from -r requirements.txt (line 10))
+
+2025-12-24T08:58:47.614411894Z [inf]    Downloading psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T08:58:47.641443401Z [inf]  Collecting cloudinary>=1.36.0 (from -r requirements.txt (line 11))
+
+2025-12-24T08:58:47.650521053Z [inf]    Downloading cloudinary-1.44.1-py3-none-any.whl.metadata (8.0 kB)
+
+2025-12-24T08:58:47.707829069Z [inf]  Collecting starlette<0.51.0,>=0.40.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:47.715676283Z [inf]    Downloading starlette-0.50.0-py3-none-any.whl.metadata (6.3 kB)
+
+2025-12-24T08:58:47.945968519Z [inf]  Collecting pydantic>=2.7.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:47.954605739Z [inf]    Downloading pydantic-2.12.5-py3-none-any.whl.metadata (90 kB)
+
+2025-12-24T08:58:47.988491196Z [inf]  Collecting typing-extensions>=4.8.0 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:47.996618923Z [inf]    Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+
+2025-12-24T08:58:48.010320687Z [inf]  Collecting annotated-doc>=0.0.2 (from fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:48.018614727Z [inf]    Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+
+2025-12-24T08:58:48.056350139Z [inf]  Collecting click>=7.0 (from uvicorn>=0.24.0->uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:48.065852655Z [inf]    Downloading click-8.3.1-py3-none-any.whl.metadata (2.6 kB)
+
+2025-12-24T08:58:48.087888588Z [inf]  Collecting h11>=0.8 (from uvicorn>=0.24.0->uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:48.096454524Z [inf]    Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+
+2025-12-24T08:58:48.323900418Z [inf]  Collecting greenlet>=1 (from sqlalchemy>=2.0.0->-r requirements.txt (line 3))
+
+2025-12-24T08:58:48.332214913Z [inf]    Downloading greenlet-3.3.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (4.1 kB)
+
+2025-12-24T08:58:48.370805967Z [inf]  Collecting python-dotenv>=0.21.0 (from pydantic-settings>=2.0.0->-r requirements.txt (line 4))
+
+2025-12-24T08:58:48.379284468Z [inf]    Downloading python_dotenv-1.2.1-py3-none-any.whl.metadata (25 kB)
+
+2025-12-24T08:58:48.399202308Z [inf]  Collecting typing-inspection>=0.4.0 (from pydantic-settings>=2.0.0->-r requirements.txt (line 4))
+
+2025-12-24T08:58:48.407233874Z [inf]    Downloading typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+
+2025-12-24T08:58:48.567766878Z [inf]  Collecting MarkupSafe>=2.0 (from jinja2>=3.1.2->-r requirements.txt (line 6))
+
+2025-12-24T08:58:48.576032087Z [inf]    Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+
+2025-12-24T08:58:48.609816807Z [inf]  Collecting anyio (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T08:58:48.617501411Z [inf]    Downloading anyio-4.12.0-py3-none-any.whl.metadata (4.3 kB)
+
+2025-12-24T08:58:48.647890422Z [inf]  Collecting certifi (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T08:58:48.655366569Z [inf]    Downloading certifi-2025.11.12-py3-none-any.whl.metadata (2.5 kB)
+
+2025-12-24T08:58:48.688430204Z [inf]  Collecting httpcore==1.* (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T08:58:48.695810355Z [inf]    Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+
+2025-12-24T08:58:48.715791338Z [inf]  Collecting idna (from httpx>=0.25.0->-r requirements.txt (line 7))
+
+2025-12-24T08:58:48.722679364Z [inf]    Downloading idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+
+2025-12-24T08:58:48.747741115Z [inf]  Collecting ecdsa!=0.15 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:48.754942237Z [inf]    Downloading ecdsa-0.19.1-py2.py3-none-any.whl.metadata (29 kB)
+
+2025-12-24T08:58:48.779471495Z [inf]  Collecting rsa!=4.1.1,!=4.4,<5.0,>=4.0 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:48.787316782Z [inf]    Downloading rsa-4.9.1-py3-none-any.whl.metadata (5.6 kB)
+
+2025-12-24T08:58:48.821384614Z [inf]  Collecting pyasn1>=0.5.0 (from python-jose>=3.3.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:48.828451074Z [inf]    Downloading pyasn1-0.6.1-py3-none-any.whl.metadata (8.4 kB)
+
+2025-12-24T08:58:48.848864482Z [inf]  Collecting six (from cloudinary>=1.36.0->-r requirements.txt (line 11))
+
+2025-12-24T08:58:48.856081513Z [inf]    Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+
+2025-12-24T08:58:48.911883715Z [inf]  Collecting urllib3>=1.26.5 (from cloudinary>=1.36.0->-r requirements.txt (line 11))
+
+2025-12-24T08:58:48.919763665Z [inf]    Downloading urllib3-2.6.2-py3-none-any.whl.metadata (6.6 kB)
+
+2025-12-24T08:58:49.23262394Z [inf]  Collecting cryptography>=3.4.0 (from python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:49.240812537Z [inf]    Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (5.7 kB)
+
+2025-12-24T08:58:49.49826449Z [inf]  Collecting pillow>=9.1.0 (from qrcode[pil]>=7.4->-r requirements.txt (line 9))
+
+2025-12-24T08:58:49.506208033Z [inf]    Downloading pillow-12.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.8 kB)
+
+2025-12-24T08:58:49.554740494Z [inf]  Collecting httptools>=0.6.3 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:49.562309341Z [inf]    Downloading httptools-0.7.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+
+2025-12-24T08:58:49.618032142Z [inf]  Collecting pyyaml>=5.1 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:49.62557005Z [inf]    Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+
+2025-12-24T08:58:49.680384436Z [inf]  Collecting uvloop>=0.15.1 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:49.688391227Z [inf]    Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T08:58:49.801699944Z [inf]  Collecting watchfiles>=0.13 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:49.810478219Z [inf]    Downloading watchfiles-1.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+
+2025-12-24T08:58:50.032632872Z [inf]  Collecting websockets>=10.4 (from uvicorn[standard]>=0.24.0->-r requirements.txt (line 2))
+
+2025-12-24T08:58:50.040420863Z [inf]    Downloading websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+
+2025-12-24T08:58:50.199885661Z [inf]  Collecting cffi>=2.0.0 (from cryptography>=3.4.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:50.2078739Z [inf]    Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
+
+2025-12-24T08:58:50.236719804Z [inf]  Collecting annotated-types>=0.6.0 (from pydantic>=2.7.0->fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:50.244662372Z [inf]    Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+
+2025-12-24T08:58:51.436055583Z [inf]  Collecting pydantic-core==2.41.5 (from pydantic>=2.7.0->fastapi>=0.104.0->-r requirements.txt (line 1))
+
+2025-12-24T08:58:51.444038426Z [inf]    Downloading pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.3 kB)
+
+2025-12-24T08:58:51.539983188Z [inf]  Collecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->python-jose[cryptography]>=3.3.0->-r requirements.txt (line 8))
+
+2025-12-24T08:58:51.548360774Z [inf]    Downloading pycparser-2.23-py3-none-any.whl.metadata (993 bytes)
+
+2025-12-24T08:58:51.567715122Z [inf]  Downloading fastapi-0.127.0-py3-none-any.whl (112 kB)
+
+2025-12-24T08:58:51.577429797Z [inf]  Downloading uvicorn-0.40.0-py3-none-any.whl (68 kB)
+
+2025-12-24T08:58:51.593086482Z [inf]  Downloading sqlalchemy-2.0.45-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.3 MB)
+
+2025-12-24T08:58:51.618578931Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 153.9 MB/s eta 0:00:00
+2025-12-24T08:58:51.618880358Z [inf]  
+
+2025-12-24T08:58:51.626636636Z [inf]  Downloading pydantic_settings-2.12.0-py3-none-any.whl (51 kB)
+
+2025-12-24T08:58:51.634720685Z [inf]  Downloading python_multipart-0.0.21-py3-none-any.whl (24 kB)
+
+2025-12-24T08:58:51.642247655Z [inf]  Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+
+2025-12-24T08:58:51.650296962Z [inf]  Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+
+2025-12-24T08:58:51.65840228Z [inf]  Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+
+2025-12-24T08:58:51.666947199Z [inf]  Downloading python_jose-3.5.0-py2.py3-none-any.whl (34 kB)
+
+2025-12-24T08:58:51.675305978Z [inf]  Downloading qrcode-8.2-py3-none-any.whl (45 kB)
+
+2025-12-24T08:58:51.683625214Z [inf]  Downloading psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.2 MB)
+
+2025-12-24T08:58:51.70664813Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.2/4.2 MB 238.3 MB/s eta 0:00:00
+2025-12-24T08:58:51.706873611Z [inf]  
+
+2025-12-24T08:58:51.715813336Z [inf]  Downloading cloudinary-1.44.1-py3-none-any.whl (147 kB)
+
+2025-12-24T08:58:51.724479785Z [inf]  Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+
+2025-12-24T08:58:51.732396775Z [inf]  Downloading click-8.3.1-py3-none-any.whl (108 kB)
+
+2025-12-24T08:58:51.741255072Z [inf]  Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl (4.5 MB)
+
+2025-12-24T08:58:51.759004576Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 327.3 MB/s eta 0:00:00
+2025-12-24T08:58:51.759353676Z [inf]  
+
+2025-12-24T08:58:51.767054254Z [inf]  Downloading ecdsa-0.19.1-py2.py3-none-any.whl (150 kB)
+
+2025-12-24T08:58:51.776691875Z [inf]  Downloading greenlet-3.3.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (609 kB)
+
+2025-12-24T08:58:51.781669261Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 609.9/609.9 kB 311.0 MB/s eta 0:00:00
+2025-12-24T08:58:51.781787172Z [inf]  
+
+2025-12-24T08:58:51.789811782Z [inf]  Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+
+2025-12-24T08:58:51.797899769Z [inf]  Downloading httptools-0.7.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (517 kB)
+
+2025-12-24T08:58:51.80919654Z [inf]  Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+
+2025-12-24T08:58:51.81795592Z [inf]  Downloading pillow-12.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.0 MB)
+
+2025-12-24T08:58:51.848153393Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.0/7.0 MB 279.6 MB/s eta 0:00:00
+2025-12-24T08:58:51.848486159Z [inf]  
+
+2025-12-24T08:58:51.85654892Z [inf]  Downloading pyasn1-0.6.1-py3-none-any.whl (83 kB)
+
+2025-12-24T08:58:51.864942229Z [inf]  Downloading pydantic-2.12.5-py3-none-any.whl (463 kB)
+
+2025-12-24T08:58:51.875393597Z [inf]  Downloading pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+
+2025-12-24T08:58:51.883955495Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 352.3 MB/s eta 0:00:00
+2025-12-24T08:58:51.884138043Z [inf]  
+
+2025-12-24T08:58:51.891237664Z [inf]  Downloading python_dotenv-1.2.1-py3-none-any.whl (21 kB)
+
+2025-12-24T08:58:51.899493776Z [inf]  Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+
+2025-12-24T08:58:51.906817523Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 229.1 MB/s eta 0:00:00
+2025-12-24T08:58:51.907176077Z [inf]  
+
+2025-12-24T08:58:51.915154008Z [inf]  Downloading rsa-4.9.1-py3-none-any.whl (34 kB)
+
+2025-12-24T08:58:51.923765063Z [inf]  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+
+2025-12-24T08:58:51.931772054Z [inf]  Downloading starlette-0.50.0-py3-none-any.whl (74 kB)
+
+2025-12-24T08:58:51.93963852Z [inf]  Downloading anyio-4.12.0-py3-none-any.whl (113 kB)
+
+2025-12-24T08:58:51.947417395Z [inf]  Downloading idna-3.11-py3-none-any.whl (71 kB)
+
+2025-12-24T08:58:51.95567657Z [inf]  Downloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+
+2025-12-24T08:58:51.964405106Z [inf]  Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+
+2025-12-24T08:58:51.972610332Z [inf]  Downloading urllib3-2.6.2-py3-none-any.whl (131 kB)
+
+2025-12-24T08:58:51.981851853Z [inf]  Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+
+2025-12-24T08:58:52.002441075Z [inf]     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 268.3 MB/s eta 0:00:00
+2025-12-24T08:58:52.002692409Z [inf]  
+
+2025-12-24T08:58:52.010589074Z [inf]  Downloading watchfiles-1.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (456 kB)
+
+2025-12-24T08:58:52.026871951Z [inf]  Downloading websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (182 kB)
+
+2025-12-24T08:58:52.038087194Z [inf]  Downloading certifi-2025.11.12-py3-none-any.whl (159 kB)
+
+2025-12-24T08:58:52.046759791Z [inf]  Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+
+2025-12-24T08:58:52.055494105Z [inf]  Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (219 kB)
+
+2025-12-24T08:58:52.064756405Z [inf]  Downloading pycparser-2.23-py3-none-any.whl (118 kB)
+
+2025-12-24T08:58:52.299015073Z [inf]  Installing collected packages: websockets, uvloop, urllib3, typing-extensions, six, qrcode, pyyaml, python-multipart, python-dotenv, pycparser, pyasn1, psycopg2-binary, pillow, MarkupSafe, idna, httptools, h11, greenlet, click, certifi, annotated-types, annotated-doc, uvicorn, typing-inspection, sqlalchemy, rsa, pydantic-core, jinja2, httpcore, ecdsa, cloudinary, cffi, anyio, watchfiles, starlette, python-jose, pydantic, httpx, cryptography, pydantic-settings, fastapi
+
+2025-12-24T08:58:58.220930184Z [inf]  Successfully installed MarkupSafe-3.0.3 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.12.0 certifi-2025.11.12 cffi-2.0.0 click-8.3.1 cloudinary-1.44.1 cryptography-46.0.3 ecdsa-0.19.1 fastapi-0.127.0 greenlet-3.3.0 h11-0.16.0 httpcore-1.0.9 httptools-0.7.1 httpx-0.28.1 idna-3.11 jinja2-3.1.6 pillow-12.0.0 psycopg2-binary-2.9.11 pyasn1-0.6.1 pycparser-2.23 pydantic-2.12.5 pydantic-core-2.41.5 pydantic-settings-2.12.0 python-dotenv-1.2.1 python-jose-3.5.0 python-multipart-0.0.21 pyyaml-6.0.3 qrcode-8.2 rsa-4.9.1 six-1.17.0 sqlalchemy-2.0.45 starlette-0.50.0 typing-extensions-4.15.0 typing-inspection-0.4.2 urllib3-2.6.2 uvicorn-0.40.0 uvloop-0.22.1 watchfiles-1.1.1 websockets-15.0.1
+
+2025-12-24T08:58:59.681986418Z [inf]  [stage-0 6/8] RUN --mount=type=cache,id=s/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a-/root/cache/pip,target=/root/.cache/pip python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt
+2025-12-24T08:58:59.683715229Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T08:58:59.940386695Z [inf]  [stage-0 7/8] RUN printf '\nPATH=/opt/venv/bin:$PATH' >> /root/.profile
+2025-12-24T08:58:59.943713713Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T08:59:00.019981293Z [inf]  [stage-0 8/8] COPY . /app
+2025-12-24T08:59:00.023685809Z [inf]  exporting to docker image format
+2025-12-24T08:59:00.023725327Z [inf]  exporting to image
+2025-12-24T08:59:01.660735990Z [inf]  [auth] sharing credentials for production-europe-west4-drams3a.railway-registry.com
+2025-12-24T08:59:01.660818717Z [inf]  [auth] sharing credentials for production-europe-west4-drams3a.railway-registry.com
+2025-12-24T08:59:05.882803000Z [inf]  importing to docker
+2025-12-24T08:59:23.320311614Z [inf]  importing to docker
+2025-12-24T08:59:23.398993739Z [inf]  === Successfully Built! ===
+2025-12-24T08:59:23.399043065Z [inf]  Run:
+2025-12-24T08:59:23.399051331Z [inf]  docker run -it production-europe-west4-drams3a.railway-registry.com/8dbe4f37-75da-4b1a-a6f8-63b71fa47c6a:24b3dce5-0c66-4321-8105-db32ead779ec
+2025-12-24T08:59:23.546804109Z [inf]  [92mBuild time: 42.87 seconds[0m
+2025-12-24T08:59:40.110137821Z [inf]  
+2025-12-24T08:59:40.110208172Z [inf]  [35m====================
+Starting Healthcheck
+====================
+[0m
+2025-12-24T08:59:40.110210470Z [inf]  [37mPath: /[0m
+2025-12-24T08:59:40.110211695Z [inf]  [37mRetry window: 1m40s[0m
+2025-12-24T08:59:40.110212693Z [inf]  
+2025-12-24T08:59:50.302837658Z [inf]  [93mAttempt #1 failed with service unavailable. Continuing to retry for 1m29s[0m
+2025-12-24T08:59:51.459265244Z [inf]  [93mAttempt #2 failed with service unavailable. Continuing to retry for 1m28s[0m
+2025-12-24T08:59:53.614867278Z [inf]  [93mAttempt #3 failed with service unavailable. Continuing to retry for 1m26s[0m
+2025-12-24T08:59:57.771249871Z [inf]  [93mAttempt #4 failed with service unavailable. Continuing to retry for 1m22s[0m
+2025-12-24T09:00:06.029028821Z [inf]  [93mAttempt #5 failed with service unavailable. Continuing to retry for 1m14s[0m
+2025-12-24T09:00:22.186986084Z [inf]  [93mAttempt #6 failed with service unavailable. Continuing to retry for 57s[0m
+2025-12-24T09:00:52.529201202Z [inf]  [93mAttempt #7 failed with service unavailable. Continuing to retry for 27s[0m
+2025-12-24T09:00:53.751956805Z [inf]  
+2025-12-24T09:00:53.752022496Z [inf]  [91m1/1 replicas never became healthy![0m
+2025-12-24T09:00:53.752024406Z [inf]  [91mHealthcheck failed![0m
