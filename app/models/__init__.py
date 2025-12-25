@@ -6,6 +6,7 @@ from app.models.order import Order, OrderItem, OrderItemOption
 from app.models.department import Department, UserDepartment, GroupDepartment, DeptRole
 from app.models.treat import TreatRecord
 from app.models.vote import Vote, VoteOption, VoteRecord
+from app.models.template import GroupTemplate
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "Vote",
     "VoteOption",
     "VoteRecord",
+    "GroupTemplate",
 ]

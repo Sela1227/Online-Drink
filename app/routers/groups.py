@@ -50,11 +50,18 @@ async def new_group_page(request: Request, db: Session = Depends(get_db)):
     from app.models.department import Department
     departments = db.query(Department).filter(Department.is_active == True).all()
     
+    # 取得使用者的開團模板
+    from app.models.template import GroupTemplate
+    my_templates = db.query(GroupTemplate).filter(
+        GroupTemplate.user_id == user.id
+    ).options(joinedload(GroupTemplate.store)).order_by(GroupTemplate.use_count.desc()).limit(5).all()
+    
     return templates.TemplateResponse("group_new.html", {
         "request": request,
         "user": user,
         "stores": stores,
         "departments": departments,
+        "my_templates": my_templates,
     })
 
 
@@ -77,6 +84,7 @@ async def create_group(
     lucky_draw_count: int = Form(1),
     min_members: int = Form(None),
     auto_extend: bool = Form(False),
+    auto_remind_minutes: int = Form(None),
     db: Session = Depends(get_db),
 ):
     """建立團單"""
@@ -131,6 +139,7 @@ async def create_group(
         lucky_draw_count=lucky_draw_count if enable_lucky_draw else 1,
         min_members=min_members if min_members and min_members >= 2 else None,
         auto_extend=auto_extend if min_members else False,
+        auto_remind_minutes=auto_remind_minutes if auto_remind_minutes else None,
     )
     db.add(group)
     db.flush()  # 取得 group.id

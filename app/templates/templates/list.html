@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}我的開團模板 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
+                <h1 class="text-xl font-bold text-gray-800 mt-1">📋 我的開團模板</h1>
+                <p class="text-sm text-gray-500 mt-1">儲存常用設定，一鍵快速開團</p>
+            </div>
+            <a href="/templates/new" 
+               class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                + 新增模板
+            </a>
+        </div>
+    </div>
+    
+    <!-- 模板列表 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        {% if my_templates %}
+        <div class="space-y-3">
+            {% for tpl in my_templates %}
+            <div class="border rounded-lg p-4 hover:border-orange-300 transition">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-3">
+                        {% if tpl.store.logo_url %}
+                        <img src="{{ tpl.store.logo_url }}" class="w-10 h-10 rounded object-contain">
+                        {% else %}
+                        <div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xl">
+                            {% if tpl.store.category.value == 'drink' %}🧋
+                            {% elif tpl.store.category.value == 'meal' %}🍱
+                            {% else %}🛒{% endif %}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div class="font-medium text-gray-800">{{ tpl.name }}</div>
+                            <div class="text-sm text-gray-500">
+                                {{ tpl.store.name }} · {{ tpl.group_name }}
+                            </div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                ⏱ {{ tpl.default_duration_minutes }}分鐘
+                                {% if tpl.is_blind_mode %}· 🙈 盲點{% endif %}
+                                {% if tpl.enable_lucky_draw %}· 🎊 抽獎{% endif %}
+                                {% if tpl.min_members %}· 🎯 {{ tpl.min_members }}人成團{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        已用 {{ tpl.use_count }} 次
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 mt-3">
+                    <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-1">
+                        <button type="submit" 
+                                class="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+                            ⚡ 使用開團
+                        </button>
+                    </form>
+                    <form action="/templates/{{ tpl.id }}/delete" method="post"
+                          onsubmit="return confirm('確定要刪除此模板嗎？')">
+                        <button type="submit" 
+                                class="px-4 py-2 text-red-500 hover:text-red-700 border rounded-lg text-sm">
+                            刪除
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-gray-500 py-8">
+            <div class="text-4xl mb-2">📋</div>
+            <p>還沒有儲存任何模板</p>
+            <p class="text-sm mt-1">可從開團頁面新增，或從已開的團單儲存</p>
+            <a href="/templates/new" class="inline-block mt-4 text-orange-500 hover:text-orange-600">
+                新增第一個模板 →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

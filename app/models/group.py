@@ -41,6 +41,10 @@ class Group(Base):
     min_members: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 最少成團人數
     auto_extend: Mapped[bool] = mapped_column(Boolean, default=False)  # 未達人數是否自動延長
     
+    # Phase 5：自動催單
+    auto_remind_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 截止前 N 分鐘催單
+    last_remind_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 上次催單時間
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships

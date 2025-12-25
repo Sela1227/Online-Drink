@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}新增開團模板 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-sm p-4">
+    <a href="/templates" class="text-sm text-gray-500 hover:text-gray-700">← 返回模板列表</a>
+    <h1 class="text-xl font-bold text-gray-800 mt-2 mb-4">📋 新增開團模板</h1>
+    
+    <form action="/templates" method="post" class="space-y-4" x-data="templateForm()">
+        <!-- 模板名稱 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">模板名稱</label>
+            <input type="text" name="template_name" required placeholder="例：每週五下午茶"
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 選擇店家 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家</label>
+            <select name="store_id" x-model="storeId" @change="onStoreChange()" required
+                    class="w-full border rounded-lg px-3 py-2">
+                <option value="">請選擇...</option>
+                {% for store in stores %}
+                <option value="{{ store.id }}" 
+                        data-category="{{ store.category.value }}">
+                    {% if store.category.value == 'drink' %}🧋
+                    {% elif store.category.value == 'meal' %}🍱
+                    {% else %}🛒{% endif %}
+                    {{ store.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- 預設團名 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">預設團名</label>
+            <input type="text" name="group_name" required placeholder="例：下午茶團"
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 預設開放時間 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">預設開放時間</label>
+            <div class="flex items-center gap-2">
+                <select name="default_duration" class="border rounded-lg px-3 py-2">
+                    <option value="30">30 分鐘</option>
+                    <option value="60" selected>1 小時</option>
+                    <option value="90">1.5 小時</option>
+                    <option value="120">2 小時</option>
+                    <option value="180">3 小時</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- 備註 -->
+        <div x-show="storeId" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-2">備註（選填）</label>
+            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間"
+                      class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        
+        <!-- 飲料設定 -->
+        <div x-show="storeId && storeCategory === 'drink'" x-cloak 
+             class="p-4 bg-amber-50 rounded-lg space-y-3">
+            <h3 class="font-medium text-gray-700">飲料團設定</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">預設甜度</label>
+                    <select name="default_sugar" class="w-full border rounded px-2 py-1 text-sm">
+                        <option value="">不指定</option>
+                        <option value="正常糖">正常糖</option>
+                        <option value="少糖">少糖</option>
+                        <option value="半糖">半糖</option>
+                        <option value="微糖">微糖</option>
+                        <option value="無糖">無糖</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">預設冰塊</label>
+                    <select name="default_ice" class="w-full border rounded px-2 py-1 text-sm">
+                        <option value="">不指定</option>
+                        <option value="正常冰">正常冰</option>
+                        <option value="少冰">少冰</option>
+                        <option value="微冰">微冰</option>
+                        <option value="去冰">去冰</option>
+                        <option value="熱">熱</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="lock_sugar" value="true">
+                    <span>鎖定甜度</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="lock_ice" value="true">
+                    <span>鎖定冰塊</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- 趣味功能 -->
+        <div x-show="storeId" x-cloak class="p-4 bg-purple-50 rounded-lg space-y-3">
+            <h3 class="font-medium text-purple-700">🎉 趣味功能</h3>
+            
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="is_blind_mode" value="true">
+                <span>🙈 盲點模式</span>
+            </label>
+            
+            <div x-data="{ enableLucky: false }">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enable_lucky_draw" value="true"
+                           @change="enableLucky = $event.target.checked">
+                    <span>🎊 隨機免單</span>
+                </label>
+                <div x-show="enableLucky" class="mt-2 ml-6 flex items-center gap-2">
+                    <span class="text-sm">免單</span>
+                    <input type="number" name="lucky_draw_count" value="1" min="1" max="5"
+                           class="w-14 border rounded px-2 py-1 text-center text-sm">
+                    <span class="text-sm">人</span>
+                </div>
+            </div>
+            
+            <div x-data="{ enableMin: false }">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @change="enableMin = $event.target.checked">
+                    <span>🎯 湊團制</span>
+                </label>
+                <div x-show="enableMin" class="mt-2 ml-6 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">最少</span>
+                        <input type="number" name="min_members" value="5" min="2" max="50"
+                               class="w-14 border rounded px-2 py-1 text-center text-sm">
+                        <span class="text-sm">人成團</span>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" name="auto_extend" value="true">
+                        <span>未達人數自動延長</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 送出 -->
+        <div class="flex gap-2 pt-4" x-show="storeId" x-cloak>
+            <a href="/templates" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+                取消
+            </a>
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                儲存模板
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function templateForm() {
+    return {
+        storeId: '',
+        storeCategory: '',
+        
+        onStoreChange() {
+            const select = document.querySelector('select[name="store_id"]');
+            const option = select.options[select.selectedIndex];
+            this.storeCategory = option?.dataset?.category || '';
+        }
+    }
+}
+</script>
+{% endblock %}

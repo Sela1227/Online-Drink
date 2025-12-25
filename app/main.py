@@ -10,7 +10,7 @@ import logging
 
 from app.config import get_settings
 from app.database import engine, Base, get_db
-from app.routers import auth, home, groups, orders, admin, votes
+from app.routers import auth, home, groups, orders, admin, votes, templates
 from app.services.auth import get_current_user_optional
 
 settings = get_settings()
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     from app.models import department  # noqa: F401
     from app.models import treat  # noqa: F401 - Phase 3 請客記錄
     from app.models import vote  # noqa: F401 - Phase 3 投票系統
+    from app.models import template  # noqa: F401 - Phase 5 開團模板
     
     Base.metadata.create_all(bind=engine)
     
@@ -74,6 +75,10 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("stores", "foodpanda_url", "VARCHAR(500)")
     add_column_if_not_exists("stores", "google_maps_url", "VARCHAR(500)")
     add_column_if_not_exists("stores", "address", "VARCHAR(300)")
+    
+    # Phase 5: 自動催單欄位
+    add_column_if_not_exists("groups", "auto_remind_minutes", "INTEGER")
+    add_column_if_not_exists("groups", "last_remind_at", "TIMESTAMP")
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
@@ -171,6 +176,7 @@ app.include_router(groups.router, prefix="/groups", tags=["groups"])
 app.include_router(orders.router, tags=["orders"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(votes.router, tags=["votes"])
+app.include_router(templates.router, tags=["templates"])
 
 # 開發模式路由
 if settings.debug:
