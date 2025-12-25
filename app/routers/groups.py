@@ -329,13 +329,23 @@ async def delete_group(group_id: int, request: Request, db: Session = Depends(ge
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主或管理員可以刪除團單")
     
+    # 刪除請客記錄
+    from app.models.treat import TreatRecord
+    db.query(TreatRecord).filter(TreatRecord.group_id == group_id).delete()
+    
+    # 刪除部門關聯
+    from app.models.department import GroupDepartment
+    db.query(GroupDepartment).filter(GroupDepartment.group_id == group_id).delete()
+    
     # 刪除相關訂單和訂單項目
+    from app.models.order import OrderItemOption, OrderItemTopping
     orders = db.query(Order).filter(Order.group_id == group_id).all()
     for order in orders:
         for item in order.items:
             # 刪除訂單項目的選項
-            for opt in item.selected_options:
-                db.delete(opt)
+            db.query(OrderItemOption).filter(OrderItemOption.order_item_id == item.id).delete()
+            # 刪除訂單項目的加料
+            db.query(OrderItemTopping).filter(OrderItemTopping.order_item_id == item.id).delete()
             db.delete(item)
         db.delete(order)
     
