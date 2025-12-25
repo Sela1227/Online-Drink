@@ -10,7 +10,8 @@ import logging
 
 from app.config import get_settings
 from app.database import engine, Base, get_db
-from app.routers import auth, home, groups, orders, admin, votes, templates
+from app.routers import auth, home, groups, orders, admin, votes
+from app.routers import templates as templates_router
 from app.services.auth import get_current_user_optional
 
 settings = get_settings()
@@ -176,7 +177,7 @@ app.include_router(groups.router, prefix="/groups", tags=["groups"])
 app.include_router(orders.router, tags=["orders"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(votes.router, tags=["votes"])
-app.include_router(templates.router, tags=["templates"])
+app.include_router(templates_router.router, tags=["templates"])
 
 # 開發模式路由
 if settings.debug:
