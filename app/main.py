@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     # Startup: create tables
     # Import all models to ensure tables are created
     from app.models import department  # noqa: F401
+    from app.models import treat  # noqa: F401 - Phase 3 請客記錄
     
     Base.metadata.create_all(bind=engine)
     
@@ -54,6 +55,13 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
     add_column_if_not_exists("users", "is_guest", "BOOLEAN DEFAULT FALSE")
+    
+    # Phase 3: 趣味功能欄位
+    add_column_if_not_exists("groups", "is_blind_mode", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("groups", "enable_lucky_draw", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("groups", "lucky_draw_count", "INTEGER DEFAULT 1")
+    add_column_if_not_exists("groups", "lucky_winner_ids", "TEXT")
+    add_column_if_not_exists("groups", "treat_user_id", "INTEGER")
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
