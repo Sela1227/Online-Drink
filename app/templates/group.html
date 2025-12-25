@@ -358,11 +358,38 @@
                     {% if order.user_id != user.id %}
                     <div class="bg-gray-50 rounded-lg p-3">
                         <div class="font-medium text-gray-800 mb-2">{{ order.user.show_name }}</div>
-                        <div class="space-y-1">
+                        <div class="space-y-2">
                             {% for item in order.items %}
-                            <div class="flex justify-between text-sm">
-                                <span class="text-gray-600">{{ item.item_name }}</span>
-                                <span class="text-gray-400">×{{ item.quantity }}</span>
+                            <div class="flex items-center justify-between text-sm gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-gray-700">{{ item.item_name }}</span>
+                                    {% if item.sugar or item.ice %}
+                                    <span class="text-gray-400 text-xs">({{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }})</span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <span class="text-gray-400">×{{ item.quantity }}</span>
+                                    <button hx-post="/groups/{{ group.id }}/orders/follow/{{ item.id }}"
+                                            hx-target="#my-order"
+                                            hx-swap="innerHTML"
+                                            hx-on::after-request="
+                                                this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
+                                                this.textContent = '✓';
+                                                this.disabled = true;
+                                                this.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                                                this.classList.add('bg-gray-300');
+                                                if (window.Alpine) {
+                                                    const comp = Alpine.$data(document.querySelector('[x-data]'));
+                                                    if (comp) {
+                                                        comp.orderStatus = 'draft';
+                                                        comp.updateCartCount();
+                                                    }
+                                                }
+                                            "
+                                            class="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-1 rounded transition">
+                                        +1
+                                    </button>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -371,7 +398,7 @@
                     {% endfor %}
                 </div>
                 
-                <p class="text-xs text-gray-400 text-center mt-4">點擊品項名稱可快速跳到菜單</p>
+                <p class="text-xs text-gray-400 text-center mt-4">點 +1 直接加入購物車</p>
             </div>
         </div>
     </div>
