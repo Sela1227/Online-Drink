@@ -248,7 +248,11 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
         store.is_active = not store.is_active
         db.commit()
     
-    return RedirectResponse(url="/admin/stores", status_code=302)
+    # 檢查來源頁面，回到對應頁面
+    referer = request.headers.get("referer", "")
+    if "/edit" in referer:
+        return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
 
 
 @router.post("/stores/{store_id}/delete")
@@ -282,6 +286,27 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
     db.commit()
     
     return RedirectResponse(url="/admin/stores", status_code=302)
+
+
+@router.get("/stores/{store_id}")
+async def store_detail_page(store_id: int, request: Request, db: Session = Depends(get_db)):
+    """店家詳情頁面"""
+    from app.models.store import StoreBranch, StoreTopping
+    user = await get_admin_user(request, db)
+    
+    store = db.query(Store).options(
+        joinedload(Store.branches),
+        joinedload(Store.toppings),
+        joinedload(Store.options)
+    ).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    return templates.TemplateResponse("admin/store_detail.html", {
+        "request": request,
+        "user": user,
+        "store": store,
+    })
 
 
 @router.get("/stores/{store_id}/edit")
