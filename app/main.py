@@ -10,7 +10,7 @@ import logging
 
 from app.config import get_settings
 from app.database import engine, Base, get_db
-from app.routers import auth, home, groups, orders, admin
+from app.routers import auth, home, groups, orders, admin, votes
 from app.services.auth import get_current_user_optional
 
 settings = get_settings()
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     # Import all models to ensure tables are created
     from app.models import department  # noqa: F401
     from app.models import treat  # noqa: F401 - Phase 3 請客記錄
+    from app.models import vote  # noqa: F401 - Phase 3 投票系統
     
     Base.metadata.create_all(bind=engine)
     
@@ -62,6 +63,17 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "lucky_draw_count", "INTEGER DEFAULT 1")
     add_column_if_not_exists("groups", "lucky_winner_ids", "TEXT")
     add_column_if_not_exists("groups", "treat_user_id", "INTEGER")
+    
+    # Phase 3: 湊團制欄位
+    add_column_if_not_exists("groups", "min_members", "INTEGER")
+    add_column_if_not_exists("groups", "auto_extend", "BOOLEAN DEFAULT FALSE")
+    
+    # Phase 4: 店家連結欄位
+    add_column_if_not_exists("stores", "website_url", "VARCHAR(500)")
+    add_column_if_not_exists("stores", "ubereats_url", "VARCHAR(500)")
+    add_column_if_not_exists("stores", "foodpanda_url", "VARCHAR(500)")
+    add_column_if_not_exists("stores", "google_maps_url", "VARCHAR(500)")
+    add_column_if_not_exists("stores", "address", "VARCHAR(300)")
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
@@ -158,6 +170,7 @@ app.include_router(home.router, tags=["home"])
 app.include_router(groups.router, prefix="/groups", tags=["groups"])
 app.include_router(orders.router, tags=["orders"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(votes.router, tags=["votes"])
 
 # 開發模式路由
 if settings.debug:

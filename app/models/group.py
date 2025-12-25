@@ -37,6 +37,10 @@ class Group(Base):
     lucky_winner_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # 中獎者 ID（逗號分隔）
     treat_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 請客者 ID
     
+    # 湊團制
+    min_members: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 最少成團人數
+    auto_extend: Mapped[bool] = mapped_column(Boolean, default=False)  # 未達人數是否自動延長
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -61,6 +65,20 @@ class Group(Base):
         """已結單的人數"""
         from app.models.order import OrderStatus
         return len([o for o in self.orders if o.status == OrderStatus.SUBMITTED])
+    
+    @property
+    def has_enough_members(self) -> bool:
+        """是否達到最低成團人數"""
+        if not self.min_members:
+            return True
+        return self.submitted_count >= self.min_members
+    
+    @property
+    def members_needed(self) -> int:
+        """還差幾人成團"""
+        if not self.min_members:
+            return 0
+        return max(0, self.min_members - self.submitted_count)
     
     @property
     def pending_count(self) -> int:

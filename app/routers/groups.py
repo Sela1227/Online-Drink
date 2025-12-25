@@ -75,6 +75,8 @@ async def create_group(
     is_blind_mode: bool = Form(False),
     enable_lucky_draw: bool = Form(False),
     lucky_draw_count: int = Form(1),
+    min_members: int = Form(None),
+    auto_extend: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """建立團單"""
@@ -127,6 +129,8 @@ async def create_group(
         is_blind_mode=is_blind_mode,
         enable_lucky_draw=enable_lucky_draw,
         lucky_draw_count=lucky_draw_count if enable_lucky_draw else 1,
+        min_members=min_members if min_members and min_members >= 2 else None,
+        auto_extend=auto_extend if min_members else False,
     )
     db.add(group)
     db.flush()  # 取得 group.id

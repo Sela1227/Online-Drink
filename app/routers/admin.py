@@ -309,6 +309,12 @@ async def update_store(
     request: Request,
     name: str = Form(...),
     category: str = Form(...),
+    phone: str = Form(None),
+    address: str = Form(None),
+    website_url: str = Form(None),
+    google_maps_url: str = Form(None),
+    ubereats_url: str = Form(None),
+    foodpanda_url: str = Form(None),
     logo_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -322,6 +328,12 @@ async def update_store(
         raise HTTPException(status_code=404, detail="店家不存在")
     
     store.name = name
+    store.phone = phone.strip() if phone else None
+    store.address = address.strip() if address else None
+    store.website_url = website_url.strip() if website_url else None
+    store.google_maps_url = google_maps_url.strip() if google_maps_url else None
+    store.ubereats_url = ubereats_url.strip() if ubereats_url else None
+    store.foodpanda_url = foodpanda_url.strip() if foodpanda_url else None
     
     # 分類修改 - 使用 raw SQL 直接用大寫值
     category_map = {

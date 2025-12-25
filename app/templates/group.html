@@ -41,6 +41,42 @@
             </div>
         </div>
         
+        <!-- 店家連結按鈕 -->
+        {% if store.phone or store.website_url or store.google_maps_url or store.ubereats_url or store.foodpanda_url %}
+        <div class="mt-3 flex flex-wrap gap-2">
+            {% if store.phone %}
+            <a href="tel:{{ store.phone }}" 
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition">
+                📞 撥打電話
+            </a>
+            {% endif %}
+            {% if store.google_maps_url %}
+            <a href="{{ store.google_maps_url }}" target="_blank"
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition">
+                🗺️ Google 地圖
+            </a>
+            {% endif %}
+            {% if store.website_url %}
+            <a href="{{ store.website_url }}" target="_blank"
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full text-sm hover:bg-gray-100 transition">
+                🌐 官網
+            </a>
+            {% endif %}
+            {% if store.ubereats_url %}
+            <a href="{{ store.ubereats_url }}" target="_blank"
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100 transition">
+                🟢 Uber Eats
+            </a>
+            {% endif %}
+            {% if store.foodpanda_url %}
+            <a href="{{ store.foodpanda_url }}" target="_blank"
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-pink-50 text-pink-700 rounded-full text-sm hover:bg-pink-100 transition">
+                🩷 foodpanda
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+        
         <!-- 備註顯示 -->
         {% if group.note %}
         <div class="mt-3 p-3 bg-amber-50 rounded-lg text-sm text-amber-800">
@@ -83,6 +119,32 @@
                 <button type="submit" class="text-red-600 hover:text-red-700 text-xs">取消請客</button>
             </form>
             {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- 湊團進度 -->
+        {% if group.min_members %}
+        <div class="mt-3 p-3 rounded-lg text-sm {% if group.has_enough_members %}bg-green-50 text-green-800{% else %}bg-yellow-50 text-yellow-800{% endif %}">
+            <div class="flex items-center justify-between mb-2">
+                <span>🎯 <strong>湊團制</strong>：最少 {{ group.min_members }} 人成團</span>
+                {% if group.has_enough_members %}
+                <span class="text-green-600 font-medium">✓ 已成團</span>
+                {% else %}
+                <span class="text-yellow-600">還差 {{ group.members_needed }} 人</span>
+                {% endif %}
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                {% set progress = (group.submitted_count / group.min_members * 100) | int %}
+                {% set progress = [progress, 100] | min %}
+                <div class="h-2 rounded-full {% if group.has_enough_members %}bg-green-500{% else %}bg-yellow-500{% endif %}"
+                     style="width: {{ progress }}%"></div>
+            </div>
+            <div class="text-xs mt-1 text-center">
+                {{ group.submitted_count }} / {{ group.min_members }} 人
+                {% if group.auto_extend and not group.has_enough_members %}
+                <span class="text-gray-500">（未達人數將自動延長）</span>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
         

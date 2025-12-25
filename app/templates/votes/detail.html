@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}{{ vote.title }} - 投票{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <a href="/votes" class="text-sm text-gray-500 hover:text-gray-700">← 返回投票列表</a>
+        
+        <div class="mt-2">
+            <h1 class="text-xl font-bold text-gray-800">🗳️ {{ vote.title }}</h1>
+            {% if vote.description %}
+            <p class="text-gray-600 text-sm mt-1">{{ vote.description }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="flex items-center gap-4 mt-3 text-sm text-gray-500">
+            <span>{{ vote.creator.show_name }} 發起</span>
+            <span>{{ vote.total_votes }} 票</span>
+            {% if vote.is_multiple %}
+            <span class="text-purple-600">可多選</span>
+            {% endif %}
+        </div>
+        
+        <!-- 狀態提示 -->
+        {% if vote.is_open %}
+        <div class="mt-3 p-3 bg-orange-50 rounded-lg text-sm text-orange-800 flex items-center justify-between">
+            <span>⏰ 投票進行中</span>
+            <span x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display" class="font-medium"></span>
+        </div>
+        {% else %}
+        <div class="mt-3 p-3 bg-gray-100 rounded-lg text-sm text-gray-600">
+            ✅ 投票已結束
+            {% if vote.winner_store_id %}
+            <span class="font-medium text-green-600 ml-2">
+                🏆 勝出：
+                {% for opt in sorted_options if opt.store_id == vote.winner_store_id %}
+                {{ opt.store.name }}
+                {% endfor %}
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- 操作按鈕 -->
+        {% if is_creator or user.is_admin %}
+        <div class="mt-3 flex gap-2 text-sm">
+            {% if vote.is_open %}
+            <form action="/votes/{{ vote.id }}/close" method="post" class="inline"
+                  onsubmit="return confirm('確定要結束投票嗎？')">
+                <button type="submit" class="text-orange-600 hover:text-orange-700">結束投票</button>
+            </form>
+            {% endif %}
+            {% if not vote.is_open and vote.winner_store_id and not vote.created_group_id %}
+            <form action="/votes/{{ vote.id }}/create-group" method="post" class="inline">
+                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded">
+                    🎉 開團！
+                </button>
+            </form>
+            {% endif %}
+            {% if vote.created_group_id %}
+            <a href="/groups/{{ vote.created_group_id }}" class="text-green-600 hover:text-green-700">
+                → 查看團單
+            </a>
+            {% endif %}
+            <form action="/votes/{{ vote.id }}/delete" method="post" class="inline ml-auto"
+                  onsubmit="return confirm('確定要刪除此投票嗎？')">
+                <button type="submit" class="text-red-500 hover:text-red-600">刪除</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 投票選項 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">投票選項</h2>
+        
+        {% if vote.is_open %}
+        <!-- 可投票 -->
+        <form action="/votes/{{ vote.id }}/vote" method="post">
+            <div class="space-y-2">
+                {% for opt in sorted_options %}
+                {% set percentage = (opt.vote_count / vote.total_votes * 100) if vote.total_votes > 0 else 0 %}
+                <label class="block p-3 border rounded-lg cursor-pointer hover:border-orange-300 relative overflow-hidden
+                              {% if opt.id in my_votes %}border-orange-400 bg-orange-50{% endif %}">
+                    <!-- 投票進度條 -->
+                    <div class="absolute inset-0 bg-orange-100 opacity-30" 
+                         style="width: {{ percentage }}%;"></div>
+                    
+                    <div class="relative flex items-center gap-3">
+                        {% if vote.is_multiple %}
+                        <input type="checkbox" name="option_ids" value="{{ opt.id }}"
+                               {% if opt.id in my_votes %}checked{% endif %}>
+                        {% else %}
+                        <input type="radio" name="option_ids" value="{{ opt.id }}"
+                               {% if opt.id in my_votes %}checked{% endif %}>
+                        {% endif %}
+                        
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                {% if opt.store.logo_url %}
+                                <img src="{{ opt.store.logo_url }}" class="w-8 h-8 rounded object-contain">
+                                {% else %}
+                                <span class="text-xl">
+                                    {% if opt.store.category.value == 'drink' %}🧋
+                                    {% elif opt.store.category.value == 'meal' %}🍱
+                                    {% else %}🛒{% endif %}
+                                </span>
+                                {% endif %}
+                                <span class="font-medium">{{ opt.store.name }}</span>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5">
+                                {{ opt.added_by.show_name }} 提議
+                            </div>
+                        </div>
+                        
+                        <div class="text-right">
+                            <div class="font-bold text-orange-600">{{ opt.vote_count }}</div>
+                            <div class="text-xs text-gray-400">票</div>
+                        </div>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" 
+                    class="w-full mt-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium">
+                投票
+            </button>
+        </form>
+        
+        <!-- 提議新選項 -->
+        {% if available_stores %}
+        <div class="mt-4 pt-4 border-t" x-data="{ showAdd: false }">
+            <button @click="showAdd = !showAdd" 
+                    class="text-sm text-gray-500 hover:text-gray-700">
+                + 提議其他店家
+            </button>
+            
+            <div x-show="showAdd" x-cloak class="mt-3">
+                <form action="/votes/{{ vote.id }}/add-option" method="post" class="flex gap-2">
+                    <select name="store_id" required class="flex-1 border rounded-lg px-3 py-2 text-sm">
+                        <option value="">選擇店家...</option>
+                        {% for store in available_stores %}
+                        <option value="{{ store.id }}">
+                            {% if store.category.value == 'drink' %}🧋
+                            {% elif store.category.value == 'meal' %}🍱
+                            {% else %}🛒{% endif %}
+                            {{ store.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                        提議
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <!-- 已結束：只顯示結果 -->
+        <div class="space-y-2">
+            {% for opt in sorted_options %}
+            {% set percentage = (opt.vote_count / vote.total_votes * 100) if vote.total_votes > 0 else 0 %}
+            <div class="p-3 border rounded-lg relative overflow-hidden
+                        {% if opt.store_id == vote.winner_store_id %}border-green-400 bg-green-50{% endif %}">
+                <!-- 投票進度條 -->
+                <div class="absolute inset-0 bg-gray-100" 
+                     style="width: {{ percentage }}%;"></div>
+                
+                <div class="relative flex items-center gap-3">
+                    {% if opt.store_id == vote.winner_store_id %}
+                    <span class="text-xl">🏆</span>
+                    {% else %}
+                    {% if opt.store.logo_url %}
+                    <img src="{{ opt.store.logo_url }}" class="w-8 h-8 rounded object-contain">
+                    {% else %}
+                    <span class="text-xl">
+                        {% if opt.store.category.value == 'drink' %}🧋
+                        {% elif opt.store.category.value == 'meal' %}🍱
+                        {% else %}🛒{% endif %}
+                    </span>
+                    {% endif %}
+                    {% endif %}
+                    
+                    <div class="flex-1">
+                        <span class="font-medium">{{ opt.store.name }}</span>
+                    </div>
+                    
+                    <div class="text-right">
+                        <div class="font-bold {% if opt.store_id == vote.winner_store_id %}text-green-600{% else %}text-gray-600{% endif %}">
+                            {{ opt.vote_count }}
+                        </div>
+                        <div class="text-xs text-gray-400">{{ percentage|round(0)|int }}%</div>
+                    </div>
+                </div>
+                
+                <!-- 投票者 -->
+                {% if opt.voters %}
+                <div class="relative mt-2 flex flex-wrap gap-1">
+                    {% for voter in opt.voters %}
+                    <span class="text-xs bg-white px-1.5 py-0.5 rounded border">
+                        {{ voter.user.show_name }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

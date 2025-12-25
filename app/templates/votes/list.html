@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}投票選店家 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
+                <h1 class="text-xl font-bold text-gray-800 mt-1">🗳️ 投票選店家</h1>
+            </div>
+            <a href="/votes/new" 
+               class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                + 發起投票
+            </a>
+        </div>
+    </div>
+    
+    <!-- 進行中的投票 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🔥 進行中</h2>
+        
+        {% if active_votes %}
+        <div class="space-y-3">
+            {% for vote in active_votes %}
+            <a href="/votes/{{ vote.id }}" class="block p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="font-medium text-gray-800">{{ vote.title }}</div>
+                    <div class="text-sm text-orange-600"
+                         x-data="countdown('{{ vote.deadline.isoformat() }}')"
+                         x-text="display"></div>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-gray-500">
+                    <span>{{ vote.creator.show_name }} 發起</span>
+                    <span>{{ vote.options|length }} 個選項</span>
+                    <span>{{ vote.total_votes }} 票</span>
+                </div>
+                {% if vote.options %}
+                <div class="mt-2 flex flex-wrap gap-2">
+                    {% for opt in vote.options[:3] %}
+                    <span class="text-xs bg-white px-2 py-1 rounded border">
+                        {{ opt.store.name }} ({{ opt.vote_count }}票)
+                    </span>
+                    {% endfor %}
+                    {% if vote.options|length > 3 %}
+                    <span class="text-xs text-gray-400">+{{ vote.options|length - 3 }} 個選項</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-gray-500 py-8">
+            <div class="text-4xl mb-2">🗳️</div>
+            <p>目前沒有進行中的投票</p>
+            <a href="/votes/new" class="text-orange-500 hover:text-orange-600 text-sm">發起一個投票吧！</a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 已結束的投票 -->
+    {% if closed_votes %}
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">📋 已結束</h2>
+        <div class="space-y-2">
+            {% for vote in closed_votes %}
+            <a href="/votes/{{ vote.id }}" class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                <div class="flex items-center justify-between">
+                    <div class="text-gray-700">{{ vote.title }}</div>
+                    <div class="text-xs text-gray-400">{{ vote.created_at.strftime('%m/%d') }}</div>
+                </div>
+                {% if vote.winner_store_id %}
+                <div class="text-sm text-green-600 mt-1">
+                    🏆 {{ vote.options|selectattr('store_id', 'eq', vote.winner_store_id)|first|attr('store')|attr('name') if vote.options else '未知' }}
+                </div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

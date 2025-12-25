@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}發起投票 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-sm p-4">
+    <a href="/votes" class="text-sm text-gray-500 hover:text-gray-700">← 返回投票列表</a>
+    <h1 class="text-xl font-bold text-gray-800 mt-2 mb-4">🗳️ 發起投票</h1>
+    
+    <form action="/votes" method="post" class="space-y-4" x-data="newVoteForm()">
+        <!-- 投票標題 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">投票標題</label>
+            <input type="text" name="title" required
+                   placeholder="例：今天午餐吃什麼？"
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 說明 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">說明（選填）</label>
+            <textarea name="description" rows="2" placeholder="補充說明..."
+                      class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        
+        <!-- 截止時間 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">投票截止時間</label>
+            <div class="flex flex-wrap gap-2 mb-2">
+                <button type="button" @click="setDeadline('30m')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    30分鐘後
+                </button>
+                <button type="button" @click="setDeadline('1h')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    1小時後
+                </button>
+                <button type="button" @click="setDeadline('11:30')"
+                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                    今天 11:30
+                </button>
+            </div>
+            <input type="datetime-local" name="deadline" x-ref="deadline" required
+                   class="w-full border rounded-lg px-3 py-2">
+        </div>
+        
+        <!-- 投票選項 -->
+        <div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="is_multiple" value="true">
+                <span class="text-sm text-gray-600">允許多選</span>
+            </label>
+        </div>
+        
+        <!-- 選擇店家 -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家（至少2個）</label>
+            
+            <!-- 分類篩選 -->
+            <div class="flex gap-2 mb-3">
+                <button type="button" @click="filterCategory = ''"
+                        :class="filterCategory === '' ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-gray-50 border-gray-200'"
+                        class="px-3 py-1 rounded border text-sm">
+                    全部
+                </button>
+                <button type="button" @click="filterCategory = 'drink'"
+                        :class="filterCategory === 'drink' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-50 border-gray-200'"
+                        class="px-3 py-1 rounded border text-sm">
+                    🧋 飲料
+                </button>
+                <button type="button" @click="filterCategory = 'meal'"
+                        :class="filterCategory === 'meal' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-50 border-gray-200'"
+                        class="px-3 py-1 rounded border text-sm">
+                    🍱 餐廳
+                </button>
+                <button type="button" @click="filterCategory = 'group_buy'"
+                        :class="filterCategory === 'group_buy' ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 border-gray-200'"
+                        class="px-3 py-1 rounded border text-sm">
+                    🛒 團購
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-lg">
+                {% for store in stores %}
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                       x-show="filterCategory === '' || filterCategory === '{{ store.category.value }}'">
+                    <input type="checkbox" name="store_ids" value="{{ store.id }}"
+                           @change="updateSelectedCount()">
+                    <span class="text-sm">
+                        {% if store.category.value == 'drink' %}🧋
+                        {% elif store.category.value == 'meal' %}🍱
+                        {% else %}🛒{% endif %}
+                        {{ store.name }}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            <div class="text-xs text-gray-500 mt-1">
+                已選擇 <span x-text="selectedCount">0</span> 個店家
+            </div>
+        </div>
+        
+        <!-- 送出按鈕 -->
+        <div class="flex gap-2 pt-4">
+            <a href="/votes" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+                取消
+            </a>
+            <button type="submit" 
+                    :disabled="selectedCount < 2"
+                    :class="selectedCount < 2 ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'"
+                    class="flex-1 py-3 rounded-lg text-white font-medium">
+                發起投票
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function newVoteForm() {
+    return {
+        filterCategory: '',
+        selectedCount: 0,
+        
+        updateSelectedCount() {
+            this.selectedCount = document.querySelectorAll('input[name="store_ids"]:checked').length;
+        },
+        
+        setDeadline(preset) {
+            const now = new Date();
+            let target;
+            
+            if (preset === '30m') {
+                target = new Date(now.getTime() + 30 * 60000);
+            } else if (preset === '1h') {
+                target = new Date(now.getTime() + 60 * 60000);
+            } else if (preset === '11:30') {
+                target = new Date(now);
+                target.setHours(11, 30, 0, 0);
+                if (target <= now) target.setDate(target.getDate() + 1);
+            }
+            
+            if (target) {
+                const y = target.getFullYear();
+                const m = String(target.getMonth() + 1).padStart(2, '0');
+                const d = String(target.getDate()).padStart(2, '0');
+                const h = String(target.getHours()).padStart(2, '0');
+                const min = String(target.getMinutes()).padStart(2, '0');
+                this.$refs.deadline.value = `${y}-${m}-${d}T${h}:${min}`;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

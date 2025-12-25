@@ -56,6 +56,51 @@
                 </div>
             </div>
             
+            <!-- Phase 4: 店家連結 -->
+            <div class="p-4 bg-gray-50 rounded-lg space-y-3">
+                <h3 class="font-medium text-gray-700 text-sm">🔗 店家連結（選填）</h3>
+                
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">📞 電話</label>
+                    <input type="tel" name="phone" value="{{ store.phone or '' }}" placeholder="04-12345678"
+                           class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">📍 地址</label>
+                    <input type="text" name="address" value="{{ store.address or '' }}" placeholder="台中市西屯區..."
+                           class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">🌐 官網</label>
+                    <input type="url" name="website_url" value="{{ store.website_url or '' }}" placeholder="https://..."
+                           class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">🗺️ Google Maps</label>
+                    <input type="url" name="google_maps_url" value="{{ store.google_maps_url or '' }}" 
+                           placeholder="https://maps.google.com/..."
+                           class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">🟢 Uber Eats</label>
+                        <input type="url" name="ubereats_url" value="{{ store.ubereats_url or '' }}" 
+                               placeholder="https://ubereats.com/..."
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">🩷 foodpanda</label>
+                        <input type="url" name="foodpanda_url" value="{{ store.foodpanda_url or '' }}" 
+                               placeholder="https://foodpanda.com/..."
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+            </div>
+            
             <!-- 飲料店甜度/冰塊選項 -->
             {% if store.category and store.category.value == 'drink' and store.options %}
             <div class="p-3 bg-gray-50 rounded-lg space-y-2 text-sm">

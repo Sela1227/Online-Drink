@@ -230,6 +230,30 @@
                     </div>
                 </div>
                 
+                <!-- 湊團制 -->
+                <div class="p-3 bg-white rounded-lg" x-data="{ enableMinMembers: false }">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" 
+                               @change="enableMinMembers = $event.target.checked" class="mt-1">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-700">🎯 湊團制</div>
+                            <p class="text-xs text-gray-500">設定最少成團人數</p>
+                        </div>
+                    </div>
+                    <div x-show="enableMinMembers" x-cloak class="mt-3 space-y-2 pl-6">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-600">最少</span>
+                            <input type="number" name="min_members" value="5" min="2" max="50"
+                                   class="w-16 border rounded px-2 py-1 text-center">
+                            <span class="text-sm text-gray-600">人成團</span>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" name="auto_extend" value="true">
+                            <span>未達人數自動延長 30 分鐘</span>
+                        </label>
+                    </div>
+                </div>
+                
                 <!-- 請客按鈕提示 -->
                 <div class="p-3 bg-white rounded-lg text-sm text-gray-500">
                     💝 <strong>請客功能</strong>：開團後可在團單頁面按「我請客」

@@ -32,6 +32,14 @@ class Store(Base):
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Phase 4: 店家連結
+    website_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 官網
+    ubereats_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Uber Eats
+    foodpanda_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # foodpanda
+    google_maps_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Google Maps
+    address: Mapped[str | None] = mapped_column(String(300), nullable=True)  # 地址
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
