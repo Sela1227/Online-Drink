@@ -546,7 +546,24 @@ async def follow_item(
         )
         db.add(order_item_option)
     
+    # 複製加料
+    for topping in source_item.selected_toppings:
+        from app.models.order import OrderItemTopping
+        order_item_topping = OrderItemTopping(
+            order_item_id=order_item.id,
+            store_topping_id=topping.store_topping_id,
+            topping_name=topping.topping_name,
+            price=topping.price,
+        )
+        db.add(order_item_topping)
+    
     db.commit()
+    
+    # 重新載入 order（修復：確保 items 被載入）
+    order = db.query(Order).filter(Order.id == order.id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
