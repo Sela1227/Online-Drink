@@ -194,6 +194,49 @@
             </div>
         </div>
         
+        <!-- 趣味功能設定 -->
+        <div x-show="storeId" x-cloak class="p-4 bg-purple-50 rounded-lg" x-data="{ showFunOptions: false }">
+            <button type="button" @click="showFunOptions = !showFunOptions"
+                    class="flex items-center justify-between w-full text-left">
+                <h3 class="font-medium text-purple-700">🎉 趣味功能（選用）</h3>
+                <span class="text-purple-500" x-text="showFunOptions ? '▲' : '▼'"></span>
+            </button>
+            
+            <div x-show="showFunOptions" x-cloak class="mt-4 space-y-4">
+                <!-- 盲點模式 -->
+                <div class="flex items-start gap-3 p-3 bg-white rounded-lg">
+                    <input type="checkbox" name="is_blind_mode" value="true" class="mt-1">
+                    <div>
+                        <div class="font-medium text-gray-700">🙈 盲點模式</div>
+                        <p class="text-xs text-gray-500">截止前隱藏其他人的選擇，截止後一起揭曉</p>
+                    </div>
+                </div>
+                
+                <!-- 隨機免單 -->
+                <div class="p-3 bg-white rounded-lg" x-data="{ enableLucky: false }">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" name="enable_lucky_draw" value="true" 
+                               @change="enableLucky = $event.target.checked" class="mt-1">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-700">🎊 隨機免單</div>
+                            <p class="text-xs text-gray-500">結單時隨機抽選幸運兒免單</p>
+                        </div>
+                    </div>
+                    <div x-show="enableLucky" x-cloak class="mt-3 flex items-center gap-2 pl-6">
+                        <span class="text-sm text-gray-600">免單人數</span>
+                        <input type="number" name="lucky_draw_count" value="1" min="1" max="5"
+                               class="w-16 border rounded px-2 py-1 text-center">
+                        <span class="text-sm text-gray-600">人</span>
+                    </div>
+                </div>
+                
+                <!-- 請客按鈕提示 -->
+                <div class="p-3 bg-white rounded-lg text-sm text-gray-500">
+                    💝 <strong>請客功能</strong>：開團後可在團單頁面按「我請客」
+                </div>
+            </div>
+        </div>
+        
         <!-- 送出按鈕 -->
         <div class="flex gap-2 pt-4" x-show="storeId" x-cloak>
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">

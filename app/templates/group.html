@@ -48,6 +48,44 @@
         </div>
         {% endif %}
         
+        <!-- 趣味功能狀態提示 -->
+        {% if group.is_blind_mode and is_open %}
+        <div class="mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+            🙈 <strong>盲點模式</strong>：截止前無法看到其他人點了什麼，截止後一起揭曉！
+        </div>
+        {% endif %}
+        
+        {% if group.enable_lucky_draw %}
+        <div class="mt-3 p-3 bg-pink-50 rounded-lg text-sm text-pink-800">
+            🎊 <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
+            {% if not is_open and group.lucky_winner_ids %}
+            <div class="mt-2 font-bold text-lg">
+                🎉 恭喜 
+                {% for winner_id in group.lucky_winner_ids.split(',') %}
+                    {% for order in submitted_orders if order.user_id == winner_id|int %}
+                        {{ order.user.show_name }}{% if not loop.last %}、{% endif %}
+                    {% endfor %}
+                {% endfor %}
+                 中獎免單！
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        {% if group.treat_user_id %}
+        <div class="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-800 flex items-center justify-between">
+            <div>
+                💝 <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單
+            </div>
+            {% if user.id == group.treat_user_id or is_owner or is_admin %}
+            <form action="/groups/{{ group.id }}/cancel-treat" method="post" class="inline"
+                  onsubmit="return confirm('確定要取消請客嗎？')">
+                <button type="submit" class="text-red-600 hover:text-red-700 text-xs">取消請客</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+        
         <!-- 外送費顯示 -->
         {% if group.delivery_fee %}
         <div class="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800 flex items-center justify-between">
@@ -289,6 +327,14 @@
             <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 我的訂單
                 <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">已結單</span>
+                {% if not group.treat_user_id %}
+                <form action="/groups/{{ group.id }}/treat" method="post" class="ml-auto"
+                      onsubmit="return confirm('確定要請客嗎？本團將由你買單！')">
+                    <button type="submit" class="text-sm bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full transition">
+                        💝 我請客
+                    </button>
+                </form>
+                {% endif %}
             </h2>
             <div id="my-order-content" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
                 {% include "partials/my_order.html" %}
@@ -310,8 +356,8 @@
             </button>
             {% endif %}
             
-            <!-- 看別人點什麼 -->
-            {% if submitted_orders|length > 0 %}
+            <!-- 看別人點什麼（盲點模式下隱藏） -->
+            {% if submitted_orders|length > 0 and not group.is_blind_mode %}
             <button @click="showOthersOrders = true"
                     class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition">
                 👀 看別人點什麼

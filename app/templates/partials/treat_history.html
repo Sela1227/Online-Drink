@@ -1,0 +1,29 @@
+<!-- 請客歷史 Modal 內容 -->
+<div class="p-4">
+    <h3 class="font-semibold text-gray-800 mb-4">💝 {{ store_name }} 請客記錄</h3>
+    
+    {% if records %}
+    <div class="space-y-3">
+        {% for record in records %}
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+                <span class="font-medium text-gray-800">{{ record.display_name or '匿名' }}</span>
+                <div class="text-xs text-gray-500 mt-1">
+                    上次請客：{{ record.last_treat.strftime('%m/%d') if record.last_treat else '無' }}
+                </div>
+            </div>
+            <div class="text-right">
+                <span class="text-lg font-bold text-red-600">{{ record.count }}</span>
+                <span class="text-sm text-gray-500">次</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-gray-500 py-8">
+        <div class="text-4xl mb-2">💝</div>
+        <p>還沒有人請過客</p>
+        <p class="text-sm">成為第一個請客的人吧！</p>
+    </div>
+    {% endif %}
+</div>

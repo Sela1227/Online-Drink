@@ -14,6 +14,7 @@ from app.models.group import Group
 from app.models.store import Store, StoreBranch, CategoryType
 from app.models.menu import Menu, MenuItem
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.user import User
 from app.services.auth import get_current_user, get_current_user_optional
 from app.services.export_service import generate_order_text, generate_payment_text
 
@@ -71,6 +72,9 @@ async def create_group(
     default_ice: str = Form(None),
     lock_sugar: bool = Form(False),
     lock_ice: bool = Form(False),
+    is_blind_mode: bool = Form(False),
+    enable_lucky_draw: bool = Form(False),
+    lucky_draw_count: int = Form(1),
     db: Session = Depends(get_db),
 ):
     """建立團單"""
@@ -120,6 +124,9 @@ async def create_group(
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
         lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
         lock_ice=lock_ice if store.category == CategoryType.DRINK else False,
+        is_blind_mode=is_blind_mode,
+        enable_lucky_draw=enable_lucky_draw,
+        lucky_draw_count=lucky_draw_count if enable_lucky_draw else 1,
     )
     db.add(group)
     db.flush()  # 取得 group.id
@@ -155,6 +162,19 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 如果團單已過期且啟用隨機免單但尚未抽獎，進行抽獎
+    if not group.is_open and group.enable_lucky_draw and not group.lucky_winner_ids:
+        import random
+        submitted_for_draw = db.query(Order).filter(
+            Order.group_id == group_id,
+            Order.status == OrderStatus.SUBMITTED
+        ).all()
+        if submitted_for_draw:
+            winner_count = min(group.lucky_draw_count, len(submitted_for_draw))
+            winners = random.sample(submitted_for_draw, winner_count)
+            group.lucky_winner_ids = ",".join(str(o.user_id) for o in winners)
+            db.commit()
     
     # 取得已結單的訂單（訂單牆）- 使用 eager loading
     submitted_orders = db.query(Order).filter(
@@ -235,6 +255,11 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         UserFavorite.store_id == group.store_id
     ).first() is not None
     
+    # 取得請客者資訊
+    treat_user = None
+    if group.treat_user_id:
+        treat_user = db.query(User).filter(User.id == group.treat_user_id).first()
+    
     return templates.TemplateResponse("group.html", {
         "request": request,
         "user": user,
@@ -253,12 +278,14 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "is_open": group.is_open,
         "all_users": all_users,
         "is_favorited": is_favorited,
+        "treat_user": treat_user,
     })
 
 
 @router.post("/{group_id}/close")
 async def close_group(group_id: int, request: Request, db: Session = Depends(get_db)):
     """提前截止團單"""
+    import random
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -269,6 +296,22 @@ async def close_group(group_id: int, request: Request, db: Session = Depends(get
         raise HTTPException(status_code=403, detail="只有團主可以截止團單")
     
     group.is_closed = True
+    
+    # 如果啟用隨機免單，進行抽獎
+    if group.enable_lucky_draw and not group.lucky_winner_ids:
+        from app.models.order import Order, OrderStatus
+        # 取得所有已結單的訂單
+        submitted_orders = db.query(Order).filter(
+            Order.group_id == group_id,
+            Order.status == OrderStatus.SUBMITTED
+        ).all()
+        
+        if submitted_orders:
+            # 抽選幸運兒
+            winner_count = min(group.lucky_draw_count, len(submitted_orders))
+            winners = random.sample(submitted_orders, winner_count)
+            group.lucky_winner_ids = ",".join(str(o.user_id) for o in winners)
+    
     db.commit()
     
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
@@ -300,6 +343,100 @@ async def delete_group(group_id: int, request: Request, db: Session = Depends(ge
     db.commit()
     
     return RedirectResponse(url="/home", status_code=302)
+
+
+@router.post("/{group_id}/treat")
+async def set_treat(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """設定請客"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 檢查用戶是否有結單的訂單
+    my_order = db.query(Order).filter(
+        Order.group_id == group_id,
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED
+    ).first()
+    
+    if not my_order:
+        raise HTTPException(status_code=400, detail="您尚未結單，無法請客")
+    
+    # 設定請客者
+    group.treat_user_id = user.id
+    
+    # 記錄請客歷史
+    from app.models.treat import TreatRecord
+    treat_record = TreatRecord(
+        group_id=group_id,
+        treat_user_id=user.id,
+        amount=group.total_amount
+    )
+    db.add(treat_record)
+    db.commit()
+    
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.post("/{group_id}/cancel-treat")
+async def cancel_treat(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """取消請客"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 只有請客者本人或團主可以取消
+    if group.treat_user_id != user.id and group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="無權取消請客")
+    
+    # 刪除請客記錄
+    from app.models.treat import TreatRecord
+    db.query(TreatRecord).filter(
+        TreatRecord.group_id == group_id,
+        TreatRecord.treat_user_id == group.treat_user_id
+    ).delete()
+    
+    group.treat_user_id = None
+    db.commit()
+    
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.get("/{group_id}/treat-history")
+async def treat_history(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """查看請客記錄"""
+    user = await get_current_user(request, db)
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    
+    # 取得此店家的所有請客記錄
+    from app.models.treat import TreatRecord
+    from sqlalchemy import func
+    
+    records = db.query(
+        TreatRecord.treat_user_id,
+        User.display_name,
+        func.count(TreatRecord.id).label('count'),
+        func.max(TreatRecord.created_at).label('last_treat')
+    ).join(User, TreatRecord.treat_user_id == User.id).join(
+        Group, TreatRecord.group_id == Group.id
+    ).filter(
+        Group.store_id == group.store_id
+    ).group_by(
+        TreatRecord.treat_user_id, User.display_name
+    ).order_by(func.count(TreatRecord.id).desc()).all()
+    
+    return templates.TemplateResponse("partials/treat_history.html", {
+        "request": request,
+        "records": records,
+        "store_name": group.store.name
+    })
 
 
 @router.get("/{group_id}/qrcode")

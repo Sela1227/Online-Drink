@@ -30,6 +30,13 @@ class Group(Base):
     lock_sugar: Mapped[bool] = mapped_column(Boolean, default=False)
     lock_ice: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # Phase 3：趣味功能
+    is_blind_mode: Mapped[bool] = mapped_column(Boolean, default=False)  # 盲點模式
+    enable_lucky_draw: Mapped[bool] = mapped_column(Boolean, default=False)  # 啟用隨機免單
+    lucky_draw_count: Mapped[int] = mapped_column(Integer, default=1)  # 免單人數
+    lucky_winner_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # 中獎者 ID（逗號分隔）
+    treat_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 請客者 ID
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
