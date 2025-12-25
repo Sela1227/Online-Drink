@@ -287,11 +287,13 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
 @router.get("/stores/{store_id}/edit")
 async def edit_store_page(store_id: int, request: Request, db: Session = Depends(get_db)):
     """編輯店家頁面"""
-    from app.models.store import StoreBranch
+    from app.models.store import StoreBranch, StoreTopping
     user = await get_admin_user(request, db)
     
     store = db.query(Store).options(
-        joinedload(Store.branches)
+        joinedload(Store.branches),
+        joinedload(Store.toppings),
+        joinedload(Store.options)
     ).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
@@ -509,6 +511,86 @@ async def delete_branch(
     
     if branch:
         db.delete(branch)
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+
+
+@router.post("/stores/{store_id}/toppings")
+async def add_topping(
+    store_id: int,
+    request: Request,
+    topping_name: str = Form(...),
+    topping_price: float = Form(0),
+    db: Session = Depends(get_db),
+):
+    """新增加料"""
+    from app.models.store import StoreTopping
+    user = await get_admin_user(request, db)
+    
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    # 取得目前最大 sort_order
+    max_sort = db.query(StoreTopping).filter(
+        StoreTopping.store_id == store_id
+    ).count()
+    
+    topping = StoreTopping(
+        store_id=store_id,
+        name=topping_name.strip(),
+        price=topping_price,
+        sort_order=max_sort,
+        is_active=True,
+    )
+    db.add(topping)
+    db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+
+
+@router.post("/stores/{store_id}/toppings/{topping_id}/delete")
+async def delete_topping(
+    store_id: int,
+    topping_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """刪除加料"""
+    from app.models.store import StoreTopping
+    user = await get_admin_user(request, db)
+    
+    topping = db.query(StoreTopping).filter(
+        StoreTopping.id == topping_id,
+        StoreTopping.store_id == store_id
+    ).first()
+    
+    if topping:
+        db.delete(topping)
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+
+
+@router.post("/stores/{store_id}/toppings/{topping_id}/toggle")
+async def toggle_topping(
+    store_id: int,
+    topping_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """切換加料啟用狀態"""
+    from app.models.store import StoreTopping
+    user = await get_admin_user(request, db)
+    
+    topping = db.query(StoreTopping).filter(
+        StoreTopping.id == topping_id,
+        StoreTopping.store_id == store_id
+    ).first()
+    
+    if topping:
+        topping.is_active = not topping.is_active
         db.commit()
     
     return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)

@@ -78,7 +78,8 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
         Order.group_id == group_id,
         Order.user_id == user.id,
     ).options(
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
@@ -204,6 +205,12 @@ async def add_item(
     
     db.commit()
     
+    # 重新載入 order 及其 items 和 toppings
+    order = db.query(Order).filter(Order.id == order.id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
+    
     # 回傳更新後的訂單
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
@@ -245,6 +252,12 @@ async def update_item(
     
     db.commit()
     
+    # 重新載入 order
+    order = db.query(Order).filter(Order.id == order.id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
+    
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
         "order": order,
@@ -273,8 +286,15 @@ async def delete_item(item_id: int, request: Request, db: Session = Depends(get_
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="請先進入修改模式")
     
+    order_id = order.id
     db.delete(order_item)
     db.commit()
+    
+    # 重新載入 order
+    order = db.query(Order).filter(Order.id == order_id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
@@ -304,6 +324,12 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
     order.status = OrderStatus.SUBMITTED
     order.snapshot = None  # 清除快照
     db.commit()
+    
+    # 重新載入 order
+    order = db.query(Order).filter(Order.id == order.id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
@@ -361,6 +387,12 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
     order.status = OrderStatus.EDITING
     order.snapshot = snapshot
     db.commit()
+    
+    # 重新載入 order
+    order = db.query(Order).filter(Order.id == order.id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
     
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,

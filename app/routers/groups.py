@@ -176,6 +176,13 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
     
+    # 載入 store 及其 toppings（用於加料選項）
+    from app.models.store import Store, StoreTopping
+    store = db.query(Store).filter(Store.id == group.store_id).options(
+        joinedload(Store.toppings),
+        joinedload(Store.branches)
+    ).first()
+    
     # 如果團單已過期且啟用隨機免單但尚未抽獎，進行抽獎
     if not group.is_open and group.enable_lucky_draw and not group.lucky_winner_ids:
         import random
@@ -195,7 +202,8 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         Order.status == OrderStatus.SUBMITTED,
     ).options(
         joinedload(Order.user),
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).all()
     
     # 取得我的訂單 - 使用 eager loading
@@ -203,7 +211,8 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         Order.group_id == group_id,
         Order.user_id == user.id,
     ).options(
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
     # 統計未結單人數
@@ -277,7 +286,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "request": request,
         "user": user,
         "group": group,
-        "store": group.store,
+        "store": store,
         "menu": menu,
         "submitted_orders": submitted_orders,
         "my_order": my_order,

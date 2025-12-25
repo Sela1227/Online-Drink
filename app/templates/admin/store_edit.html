@@ -134,6 +134,53 @@
         </form>
     </div>
     
+    <!-- 加料管理（飲料店/餐廳才顯示） -->
+    {% if store.category and store.category.value in ['drink', 'meal'] %}
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🧋 加料管理</h2>
+        
+        {% if store.toppings %}
+        <div class="space-y-2 mb-4">
+            {% for topping in store.toppings|sort(attribute='sort_order') %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded {% if not topping.is_active %}opacity-50{% endif %}">
+                <div class="flex items-center gap-3">
+                    <span class="font-medium">{{ topping.name }}</span>
+                    <span class="text-orange-600">+${{ topping.price|int }}</span>
+                    {% if not topping.is_active %}
+                    <span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">已停用</span>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-2">
+                    <form action="/admin/stores/{{ store.id }}/toppings/{{ topping.id }}/toggle" method="post" class="inline">
+                        <button type="submit" class="text-sm {% if topping.is_active %}text-gray-500 hover:text-gray-700{% else %}text-green-500 hover:text-green-700{% endif %}">
+                            {% if topping.is_active %}停用{% else %}啟用{% endif %}
+                        </button>
+                    </form>
+                    <form action="/admin/stores/{{ store.id }}/toppings/{{ topping.id }}/delete" method="post" class="inline"
+                          onsubmit="return confirm('確定要刪除這個加料嗎？')">
+                        <button type="submit" class="text-sm text-red-500 hover:text-red-700">刪除</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 mb-4">尚未新增加料選項</p>
+        {% endif %}
+        
+        <!-- 新增加料 -->
+        <form action="/admin/stores/{{ store.id }}/toppings" method="post" class="flex gap-2">
+            <input type="text" name="topping_name" placeholder="加料名稱（如：珍珠）" required
+                   class="flex-1 border rounded-lg px-3 py-2 text-sm">
+            <input type="number" name="topping_price" placeholder="價格" value="10" min="0" step="5"
+                   class="w-24 border rounded-lg px-3 py-2 text-sm">
+            <button type="submit" class="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-sm">
+                新增
+            </button>
+        </form>
+    </div>
+    {% endif %}
+    
     <!-- 分店管理 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
         <h2 class="font-semibold text-gray-800 mb-3">分店管理</h2>
