@@ -62,7 +62,7 @@
             <span class="text-green-600 font-medium" title="已結單">✓{{ group.submitted_count }}</span>
             {% endif %}
             {% if group.pending_count > 0 %}
-            <span class="text-orange-500" title="點餐中">🛒{{ group.pending_count }}</span>
+            <span class="text-orange-500" title="{% if group.category.value == 'group_buy' %}下單中{% else %}點餐中{% endif %}">🛒{{ group.pending_count }}</span>
             {% endif %}
             {% if group.submitted_count == 0 and group.pending_count == 0 %}
             <span class="text-gray-400 text-[10px]">尚無訂單</span>

@@ -37,7 +37,7 @@
             
             <button type="submit" 
                     class="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg transition">
-                進入點餐
+                {% if group.category.value == 'group_buy' %}進入下單{% else %}進入點餐{% endif %}
             </button>
         </form>
         

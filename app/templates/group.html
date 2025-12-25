@@ -78,7 +78,7 @@
                 <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">修改</button>
                 {% if is_open %}
                 <form action="/groups/{{ group.id }}/close" method="post" class="inline"
-                      onsubmit="return confirm('確定要提早結單嗎？結單後將無法再點餐。')">
+                      onsubmit="return confirm('確定要提早結單嗎？結單後將無法再{% if group.category.value == 'group_buy' %}下單{% else %}點餐{% endif %}。')">
                     <button type="submit" class="text-orange-600 hover:text-orange-700">提早結單</button>
                 </form>
                 {% endif %}
@@ -296,10 +296,10 @@
         </div>
     </div>
 
-    <!-- 快速點餐（團開放中且尚未結單時顯示） -->
+    <!-- 快速下單（團開放中且尚未結單時顯示） -->
     {% if is_open %}
     <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'">
-        <h2 class="font-semibold text-gray-800 mb-3">⚡ 快速點餐</h2>
+        <h2 class="font-semibold text-gray-800 mb-3">⚡ {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
         
         <div class="flex flex-wrap gap-2 mb-3">
             <!-- 複製上次訂單 -->
@@ -387,7 +387,7 @@
                                                 }
                                             "
                                             class="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-1 rounded transition">
-                                        +1
+                                        跟單
                                     </button>
                                 </div>
                             </div>
@@ -576,7 +576,7 @@
                 <div class="flex gap-2">
                     <button @click="showCart = false" 
                             class="flex-1 py-2.5 rounded-lg border hover:bg-gray-100 font-medium">
-                        繼續點餐
+                        {% if group.category.value == 'group_buy' %}繼續下單{% else %}繼續點餐{% endif %}
                     </button>
                 </div>
             </div>
