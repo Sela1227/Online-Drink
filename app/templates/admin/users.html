@@ -4,15 +4,12 @@
 
 {% block content %}
 <div class="space-y-4">
-    <div>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
-        <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between">
+        <div>
             <h1 class="text-xl font-bold text-gray-800">使用者管理</h1>
-            <div class="text-right">
-                <div class="text-sm text-gray-500">共 {{ users|length }} 人</div>
-                <div class="text-sm font-medium text-green-600">🟢 {{ online_count }} 人在線</div>
-            </div>
+            <div class="text-sm text-gray-500">共 {{ users|length }} 人 · <span class="text-green-600">🟢 {{ online_count }} 人在線</span></div>
         </div>
+        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
     </div>
     
     <!-- 一鍵登出按鈕 -->

@@ -5,15 +5,15 @@
 {% block content %}
 <div class="space-y-4">
     <!-- Header -->
-    <div>
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
-        <div class="flex items-center justify-between mt-1">
-            <h1 class="text-xl font-bold text-gray-800">🗳️ 投票選店家</h1>
-            <a href="/votes/new" 
-               class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                + 發起投票
-            </a>
-        </div>
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">🗳️ 投票選店家</h1>
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+    </div>
+    <div class="flex justify-end">
+        <a href="/votes/new" 
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            + 發起投票
+        </a>
     </div>
     
     <!-- 進行中的投票 -->

@@ -5,12 +5,14 @@
 {% block content %}
 <div class="space-y-4">
     <!-- 標題列 -->
-    <div>
-        <a href="/admin/departments" class="text-sm text-gray-500 hover:text-gray-700">← 返回部門管理</a>
-        <h1 class="text-xl font-bold text-gray-800">{{ department.name }}</h1>
-        {% if department.description %}
-        <p class="text-sm text-gray-500 mt-1">{{ department.description }}</p>
-        {% endif %}
+    <div class="flex items-start justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800">{{ department.name }}</h1>
+            {% if department.description %}
+            <p class="text-sm text-gray-500 mt-1">{{ department.description }}</p>
+            {% endif %}
+        </div>
+        <a href="/admin/departments" class="text-sm text-gray-500 hover:text-gray-700">返回部門管理 →</a>
     </div>
     
     <!-- 新增成員 -->

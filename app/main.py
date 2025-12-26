@@ -81,6 +81,42 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "auto_remind_minutes", "INTEGER")
     add_column_if_not_exists("groups", "last_remind_at", "TIMESTAMP")
     
+    # Phase 7: 投票可見性欄位
+    add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
+    
+    # Phase 7: 建立 vote_departments 表（如果不存在）
+    def create_table_if_not_exists(create_sql: str, table_name: str):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(create_sql))
+            print(f"Created table: {table_name}")
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"Table {table_name} check: OK")
+            else:
+                print(f"Table {table_name} check: {e}")
+    
+    create_table_if_not_exists("""
+        CREATE TABLE IF NOT EXISTS vote_departments (
+            id SERIAL PRIMARY KEY,
+            vote_id INTEGER REFERENCES votes(id),
+            department_id INTEGER REFERENCES departments(id)
+        )
+    """, "vote_departments")
+    
+    create_table_if_not_exists("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(100) NOT NULL,
+            content VARCHAR(500) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            is_pinned BOOLEAN DEFAULT FALSE,
+            created_by_id INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT NOW(),
+            expires_at TIMESTAMP
+        )
+    """, "announcements")
+    
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
         try:

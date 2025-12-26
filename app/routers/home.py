@@ -227,6 +227,11 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     settings = db.query(SystemSetting).first()
     announcement = settings.announcement if settings else None
     
+    # 店家列表
+    stores = db.query(Store).options(
+        joinedload(Store.branches)
+    ).filter(Store.is_active == True).order_by(Store.name).all()
+    
     return templates.TemplateResponse("partials/home_groups.html", {
         "request": request,
         "user": user,
@@ -236,6 +241,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "closed_groups": closed_groups,
         "hot_items": hot_items,
         "announcement": announcement,
+        "stores": stores,
     })
 
 

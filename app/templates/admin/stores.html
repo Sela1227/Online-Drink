@@ -6,13 +6,13 @@
 <div class="space-y-4" x-data="{ filter: 'all' }">
     <!-- Header -->
     <div class="flex items-center justify-between">
-        <div>
-            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
-            <h1 class="text-xl font-bold text-gray-800">店家管理</h1>
+        <h1 class="text-xl font-bold text-gray-800">店家管理</h1>
+        <div class="flex items-center gap-3">
+            <a href="/admin/import" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                + 匯入
+            </a>
+            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
         </div>
-        <a href="/admin/import" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            + 匯入新店家
-        </a>
     </div>
     
     <!-- 分類篩選 -->
