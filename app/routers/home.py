@@ -147,6 +147,11 @@ async def home(request: Request, db: Session = Depends(get_db)):
     settings = db.query(SystemSetting).first()
     announcement = settings.announcement if settings else None
     
+    # 店家列表（啟用中）
+    stores = db.query(Store).options(
+        joinedload(Store.branches)
+    ).filter(Store.is_active == True).order_by(Store.name).all()
+    
     return templates.TemplateResponse("home.html", {
         "request": request,
         "user": user,
@@ -156,6 +161,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "closed_groups": closed_groups,
         "hot_items": hot_items,
         "announcement": announcement,
+        "stores": stores,
         "now": now,
     })
 
@@ -560,3 +566,50 @@ async def leave_department(request: Request, dept_id: int, db: Session = Depends
         db.commit()
     
     return RedirectResponse(url="/my-departments?success=1", status_code=302)
+
+
+@router.get("/stores/{store_id}")
+async def store_view(store_id: int, request: Request, db: Session = Depends(get_db)):
+    """前台店家詳情頁（只讀）"""
+    from app.models.store import StoreTopping
+    
+    user = await get_current_user(request, db)
+    
+    store = db.query(Store).options(
+        joinedload(Store.branches),
+        joinedload(Store.toppings),
+        joinedload(Store.options)
+    ).filter(Store.id == store_id, Store.is_active == True).first()
+    
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    # 取得該店家目前有開的團
+    from app.models.group import Group
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz).replace(tzinfo=None)
+    
+    active_groups = db.query(Group).options(
+        joinedload(Group.owner),
+        joinedload(Group.orders)
+    ).filter(
+        Group.store_id == store_id,
+        Group.is_closed == False,
+        Group.deadline > now,
+        Group.is_public == True,
+    ).order_by(Group.deadline.asc()).all()
+    
+    # 檢查是否已收藏
+    from app.models.user import UserFavorite
+    is_favorited = db.query(UserFavorite).filter(
+        UserFavorite.user_id == user.id,
+        UserFavorite.store_id == store_id
+    ).first() is not None
+    
+    return templates.TemplateResponse("store_view.html", {
+        "request": request,
+        "user": user,
+        "store": store,
+        "active_groups": active_groups,
+        "is_favorited": is_favorited,
+    })

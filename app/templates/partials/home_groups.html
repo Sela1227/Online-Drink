@@ -133,4 +133,61 @@
         </div>
     </section>
     {% endif %}
+    
+    <!-- 店家名單 -->
+    {% if stores %}
+    <section x-data="{ showStores: false, filter: 'all' }">
+        <h2 class="text-lg font-semibold text-gray-800 mb-3 cursor-pointer flex items-center gap-2" @click="showStores = !showStores">
+            <span x-text="showStores ? '▼' : '▶'" class="text-xs"></span>
+            🏪 店家名單 <span class="text-sm font-normal text-gray-500">({{ stores|length }})</span>
+        </h2>
+        <div x-show="showStores" x-collapse>
+            <!-- 分類篩選 -->
+            <div class="flex gap-2 mb-3 overflow-x-auto pb-1">
+                <button @click="filter = 'all'" 
+                        :class="filter === 'all' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'"
+                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                    全部
+                </button>
+                <button @click="filter = 'drink'" 
+                        :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600'"
+                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                    🧋 飲料
+                </button>
+                <button @click="filter = 'meal'" 
+                        :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600'"
+                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                    🍱 餐廳
+                </button>
+                <button @click="filter = 'group_buy'" 
+                        :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'"
+                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                    🛒 團購
+                </button>
+            </div>
+            
+            <!-- 店家網格 -->
+            <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {% for store in stores %}
+                <a href="/stores/{{ store.id }}"
+                   class="block bg-white rounded-lg shadow-sm p-2 hover:shadow-md transition text-center"
+                   x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
+                    <div class="w-12 h-12 mx-auto bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-1">
+                        {% if store.logo_url %}
+                        <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-1">
+                        {% else %}
+                        <span class="text-2xl">
+                            {% if store.category and store.category.value == 'drink' %}🧋
+                            {% elif store.category and store.category.value == 'group_buy' %}🛒
+                            {% else %}🍱{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs font-medium text-gray-700 truncate">{{ store.name }}</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
 </div>

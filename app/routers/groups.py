@@ -37,7 +37,7 @@ templates.env.filters['taipei'] = to_taipei_time
 
 
 @router.get("/new")
-async def new_group_page(request: Request, db: Session = Depends(get_db)):
+async def new_group_page(request: Request, store_id: int = None, db: Session = Depends(get_db)):
     """開團頁面"""
     user = await get_current_user(request, db)
     
@@ -62,6 +62,7 @@ async def new_group_page(request: Request, db: Session = Depends(get_db)):
         "stores": stores,
         "departments": departments,
         "my_templates": my_templates,
+        "preselect_store_id": store_id,
     })
 
 

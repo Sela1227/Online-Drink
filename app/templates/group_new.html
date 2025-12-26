@@ -351,6 +351,9 @@ function newGroupForm() {
         {% endfor %}
     ];
     
+    // 預選店家 ID
+    const preselectStoreId = '{{ preselect_store_id or "" }}';
+    
     return {
         selectedCategory: '{% if copy_from %}{{ copy_from.category.value }}{% endif %}',
         storeId: '{% if copy_from %}{{ copy_from.store_id }}{% endif %}',
@@ -362,7 +365,15 @@ function newGroupForm() {
         },
         
         init() {
-            if (this.storeId) {
+            // 如果有預選店家
+            if (preselectStoreId) {
+                const store = allStores.find(s => s.id == preselectStoreId);
+                if (store) {
+                    this.selectedCategory = store.category;
+                    this.storeId = preselectStoreId;
+                    this.onStoreChange();
+                }
+            } else if (this.storeId) {
                 this.onStoreChange();
             }
         },

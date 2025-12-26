@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}{{ store.name }} - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div>
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
+    </div>
+    
+    <!-- 店家資訊卡片 -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <!-- 頂部：Logo + 基本資訊 -->
+        <div class="p-5 flex items-start gap-4">
+            <div class="w-20 h-20 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {% if store.logo_url %}
+                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-2">
+                {% else %}
+                <span class="text-4xl">
+                    {% if store.category and store.category.value == 'drink' %}🧋
+                    {% elif store.category and store.category.value == 'group_buy' %}🛒
+                    {% else %}🍱{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h1 class="text-xl font-bold text-gray-800">{{ store.name }}</h1>
+                    <span class="text-xs px-2 py-0.5 bg-gray-100 rounded">
+                        {% if store.category and store.category.value == 'drink' %}🧋 飲料店
+                        {% elif store.category and store.category.value == 'group_buy' %}🛒 團購
+                        {% else %}🍱 餐廳{% endif %}
+                    </span>
+                </div>
+                {% if store.branches %}
+                <div class="text-sm text-gray-500 mt-1">{{ store.branches|length }} 間分店</div>
+                {% endif %}
+                
+                <!-- 收藏按鈕 -->
+                <div class="mt-3">
+                    {% if is_favorited %}
+                    <form action="/favorites/{{ store.id }}/remove" method="post" class="inline">
+                        <button type="submit" class="text-sm px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full hover:bg-orange-200">
+                            ⭐ 已收藏
+                        </button>
+                    </form>
+                    {% else %}
+                    <form action="/favorites/{{ store.id }}/add" method="post" class="inline">
+                        <button type="submit" class="text-sm px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">
+                            ☆ 收藏店家
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 聯絡資訊 -->
+        {% if store.phone or store.address %}
+        <div class="px-5 pb-4 space-y-2 border-t pt-4">
+            {% if store.phone %}
+            <div class="flex items-center gap-3 text-sm">
+                <span class="w-6 text-center">📞</span>
+                <a href="tel:{{ store.phone }}" class="text-blue-600 hover:underline">{{ store.phone }}</a>
+            </div>
+            {% endif %}
+            {% if store.address %}
+            <div class="flex items-center gap-3 text-sm">
+                <span class="w-6 text-center">📍</span>
+                <span class="text-gray-600">{{ store.address }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- 外部連結 -->
+        {% if store.website_url or store.google_maps_url or store.ubereats_url or store.foodpanda_url %}
+        <div class="px-5 pb-5 flex flex-wrap gap-2">
+            {% if store.website_url %}
+            <a href="{{ store.website_url }}" target="_blank"
+               class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">
+                🌐 官網
+            </a>
+            {% endif %}
+            {% if store.google_maps_url %}
+            <a href="{{ store.google_maps_url }}" target="_blank"
+               class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100">
+                🗺️ Google Maps
+            </a>
+            {% endif %}
+            {% if store.ubereats_url %}
+            <a href="{{ store.ubereats_url }}" target="_blank"
+               class="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100">
+                🟢 Uber Eats
+            </a>
+            {% endif %}
+            {% if store.foodpanda_url %}
+            <a href="{{ store.foodpanda_url }}" target="_blank"
+               class="px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg text-sm hover:bg-pink-100">
+                🩷 foodpanda
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 飲料店選項 -->
+    {% if store.category and store.category.value == 'drink' and store.options %}
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🥤 甜度/冰塊</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+                <div class="text-gray-500 mb-1.5">甜度</div>
+                <div class="flex flex-wrap gap-1">
+                    {% for opt in store.options if opt.option_type.value == 'sugar' %}
+                    <span class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs">{{ opt.option_value }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div>
+                <div class="text-gray-500 mb-1.5">冰塊</div>
+                <div class="flex flex-wrap gap-1">
+                    {% for opt in store.options if opt.option_type.value == 'ice' %}
+                    <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{{ opt.option_value }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 加料選項 -->
+    {% if store.toppings %}
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🧋 加料選項</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for topping in store.toppings|sort(attribute='sort_order') if topping.is_active %}
+            <span class="px-2.5 py-1 bg-orange-50 text-orange-700 rounded-lg text-sm">
+                {{ topping.name }} +${{ topping.price|int }}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 分店列表 -->
+    {% if store.branches %}
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🏪 分店 ({{ store.branches|length }})</h2>
+        <div class="space-y-2">
+            {% for branch in store.branches %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                    <div class="font-medium text-gray-800">{{ branch.name }}</div>
+                    {% if branch.phone %}
+                    <a href="tel:{{ branch.phone }}" class="text-sm text-blue-600 hover:underline">📞 {{ branch.phone }}</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 目前開放的團單 -->
+    {% if active_groups %}
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <h2 class="font-semibold text-gray-800 mb-3">🔥 目前開放的團</h2>
+        <div class="space-y-2">
+            {% for group in active_groups %}
+            <a href="/groups/{{ group.id }}" class="block p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-medium text-gray-800">{{ group.name }}</div>
+                        <div class="text-xs text-gray-500">
+                            {{ group.owner.show_name }} 開團 · 
+                            {% if group.orders %}{{ group.orders|length }}{% else %}0{% endif %} 人參加
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-orange-600 font-medium">
+                            {{ group.deadline.strftime('%H:%M') }} 截止
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 快速開團按鈕 -->
+    <div class="fixed bottom-20 left-0 right-0 px-4 max-w-lg mx-auto">
+        <a href="/groups/new?store_id={{ store.id }}" 
+           class="block w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-center rounded-xl font-medium shadow-lg">
+            🚀 用這間店開團
+        </a>
+    </div>
+    
+    <!-- 底部留白 -->
+    <div class="h-16"></div>
+</div>
+{% endblock %}
