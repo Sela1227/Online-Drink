@@ -44,13 +44,33 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     """開團頁面"""
     user = await get_current_user(request, db)
     
+    # 取得用戶的部門 IDs
+    from app.models.department import Department, UserDepartment, StoreDepartment
+    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()]
+    
     # 取得啟用中的店家（含分店）
-    stores = db.query(Store).options(
+    all_stores = db.query(Store).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).all()
     
+    # 過濾用戶可見的店家
+    visible_stores = []
+    for s in all_stores:
+        if s.is_public:
+            visible_stores.append(s)
+        elif user.is_admin:
+            visible_stores.append(s)
+        else:
+            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
+                StoreDepartment.store_id == s.id
+            ).all()}
+            if store_dept_ids & set(user_dept_ids):
+                visible_stores.append(s)
+    stores = visible_stores
+    
     # 取得啟用中的部門
-    from app.models.department import Department
     departments = db.query(Department).filter(Department.is_active == True).all()
     
     # 取得使用者的開團模板

@@ -315,10 +315,44 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
     return RedirectResponse(url="/admin/stores", status_code=302)
 
 
+@router.post("/stores/{store_id}/visibility")
+async def update_store_visibility(
+    store_id: int,
+    request: Request,
+    visibility: str = Form(...),
+    department_ids: list[str] = Form(default=[]),
+    db: Session = Depends(get_db)
+):
+    """更新店家可見範圍"""
+    from app.models.department import StoreDepartment
+    user = await get_admin_user(request, db)
+    
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    # 更新公開狀態
+    store.is_public = (visibility == "public")
+    
+    # 清除舊的部門關聯
+    db.query(StoreDepartment).filter(StoreDepartment.store_id == store_id).delete()
+    
+    # 如果是限定部門，新增關聯
+    if visibility == "departments" and department_ids:
+        for dept_id in department_ids:
+            sd = StoreDepartment(store_id=store_id, department_id=int(dept_id))
+            db.add(sd)
+    
+    db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+
+
 @router.get("/stores/{store_id}")
 async def store_detail_page(store_id: int, request: Request, db: Session = Depends(get_db)):
     """店家詳情頁面"""
     from app.models.store import StoreBranch, StoreTopping
+    from app.models.department import Department, StoreDepartment
     user = await get_admin_user(request, db)
     
     store = db.query(Store).options(
@@ -329,10 +363,19 @@ async def store_detail_page(store_id: int, request: Request, db: Session = Depen
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
+    # 取得所有部門
+    departments = db.query(Department).filter(Department.is_active == True).all()
+    
+    # 取得店家已綁定的部門 ID
+    store_depts = db.query(StoreDepartment).filter(StoreDepartment.store_id == store_id).all()
+    store_dept_ids = [sd.department_id for sd in store_depts]
+    
     return templates.TemplateResponse("admin/store_detail.html", {
         "request": request,
         "user": user,
         "store": store,
+        "departments": departments,
+        "store_dept_ids": store_dept_ids,
     })
 
 

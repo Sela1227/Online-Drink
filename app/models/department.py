@@ -67,3 +67,15 @@ class GroupDepartment(Base):
     # Relationships
     group: Mapped["Group"] = relationship()
     department: Mapped["Department"] = relationship(back_populates="groups")
+
+
+class StoreDepartment(Base):
+    """店家-部門關聯（店家顯示給哪些部門）"""
+    __tablename__ = "store_departments"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
+    department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"))
+    
+    # Relationships
+    department: Mapped["Department"] = relationship()

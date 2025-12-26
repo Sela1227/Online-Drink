@@ -157,10 +157,33 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Vote.deadline > now
     ).order_by(Vote.deadline.asc()).limit(4).all()
     
-    # 店家列表（啟用中）
-    stores = db.query(Store).options(
+    # 店家列表（啟用中，根據部門過濾）
+    from app.models.department import StoreDepartment
+    all_stores = db.query(Store).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
+    
+    # 過濾用戶可見的店家
+    def filter_visible_stores(stores_list):
+        visible = []
+        for s in stores_list:
+            # 公開店家：所有人可見
+            if s.is_public:
+                visible.append(s)
+                continue
+            # 管理員可見所有
+            if user.is_admin:
+                visible.append(s)
+                continue
+            # 部門交集
+            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
+                StoreDepartment.store_id == s.id
+            ).all()}
+            if store_dept_ids & set(user_dept_ids):
+                visible.append(s)
+        return visible
+    
+    stores = filter_visible_stores(all_stores)
     
     return templates.TemplateResponse("home.html", {
         "request": request,
@@ -248,10 +271,31 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         Vote.deadline > now
     ).order_by(Vote.deadline.asc()).limit(4).all()
     
-    # 店家列表
-    stores = db.query(Store).options(
+    # 取得用戶的部門 IDs
+    from app.models.department import UserDepartment, StoreDepartment
+    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()]
+    
+    # 店家列表（根據部門過濾）
+    all_stores = db.query(Store).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
+    
+    # 過濾用戶可見的店家
+    visible_stores = []
+    for s in all_stores:
+        if s.is_public:
+            visible_stores.append(s)
+        elif user.is_admin:
+            visible_stores.append(s)
+        else:
+            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
+                StoreDepartment.store_id == s.id
+            ).all()}
+            if store_dept_ids & set(user_dept_ids):
+                visible_stores.append(s)
+    stores = visible_stores
     
     return templates.TemplateResponse("partials/home_groups.html", {
         "request": request,

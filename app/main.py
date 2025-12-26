@@ -136,6 +136,19 @@ async def lifespan(app: FastAPI):
         )
     """, "store_recommendations")
     
+    # 店家-部門關聯表
+    create_table_if_not_exists("""
+        CREATE TABLE IF NOT EXISTS store_departments (
+            id SERIAL PRIMARY KEY,
+            store_id INTEGER REFERENCES stores(id) ON DELETE CASCADE,
+            department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
+            UNIQUE(store_id, department_id)
+        )
+    """, "store_departments")
+    
+    # 店家 is_public 欄位
+    add_column_if_not_exists("stores", "is_public", "BOOLEAN DEFAULT TRUE")
+    
     # 投票唯一約束：同一人對同一選項只能投一票
     def add_unique_constraint_if_not_exists():
         try:

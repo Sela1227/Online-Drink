@@ -38,12 +38,17 @@
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
                     <h1 class="text-2xl font-bold text-gray-800">{{ store.name }}</h1>
                     {% if store.is_active %}
                     <span class="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">啟用中</span>
                     {% else %}
                     <span class="text-xs bg-gray-200 text-gray-600 px-2.5 py-1 rounded-full font-medium">已停用</span>
+                    {% endif %}
+                    {% if store.is_public %}
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">🌐 公開</span>
+                    {% else %}
+                    <span class="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium">🔒 限定部門</span>
                     {% endif %}
                 </div>
                 <div class="mt-2 flex items-center gap-3 text-sm text-gray-500">
@@ -235,6 +240,57 @@
         {% else %}
         <p class="text-sm text-gray-500 text-center py-4">尚未新增任何分店</p>
         {% endif %}
+    </div>
+    
+    <!-- 可見範圍設定 -->
+    <div class="bg-white rounded-xl shadow-sm p-5">
+        <h2 class="font-semibold text-gray-800 mb-3">👥 可見範圍</h2>
+        <form action="/admin/stores/{{ store.id }}/visibility" method="POST">
+            <div class="space-y-3">
+                <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <input type="radio" name="visibility" value="public" 
+                           {% if store.is_public %}checked{% endif %}
+                           onchange="document.getElementById('dept-select').classList.add('hidden')">
+                    <div>
+                        <div class="font-medium text-gray-700">🌐 公開</div>
+                        <div class="text-xs text-gray-500">所有人都可以看到此店家</div>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <input type="radio" name="visibility" value="departments"
+                           {% if not store.is_public %}checked{% endif %}
+                           onchange="document.getElementById('dept-select').classList.remove('hidden')">
+                    <div>
+                        <div class="font-medium text-gray-700">🔒 限定部門</div>
+                        <div class="text-xs text-gray-500">只有指定部門的成員可以看到</div>
+                    </div>
+                </label>
+                
+                <!-- 部門選擇 -->
+                <div id="dept-select" class="{% if store.is_public %}hidden{% endif %} mt-3 p-4 bg-purple-50 rounded-lg">
+                    <div class="text-sm font-medium text-purple-800 mb-2">選擇可見的部門：</div>
+                    {% if departments %}
+                    <div class="grid grid-cols-2 gap-2">
+                        {% for dept in departments %}
+                        <label class="flex items-center gap-2 p-2 bg-white rounded cursor-pointer hover:bg-purple-100">
+                            <input type="checkbox" name="department_ids" value="{{ dept.id }}"
+                                   {% if dept.id in store_dept_ids %}checked{% endif %}>
+                            <span class="text-sm">{{ dept.name }}</span>
+                            <span class="text-xs text-gray-400">({{ dept.member_count }}人)</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500">尚未建立任何部門</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button type="submit" class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600">
+                    💾 儲存設定
+                </button>
+            </div>
+        </form>
     </div>
     
     <!-- 快速操作 -->
