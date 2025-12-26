@@ -802,3 +802,296 @@ async def submit_recommendation(
     db.commit()
     
     return RedirectResponse(url="/recommend?success=1", status_code=302)
+
+
+@router.get("/stats")
+async def stats_page(
+    request: Request, 
+    period: str = "month",
+    start_date: str = None,
+    end_date: str = None,
+    db: Session = Depends(get_db)
+):
+    """個人消費統計頁面"""
+    from sqlalchemy import func, extract, case
+    from app.models.order import Order, OrderItem, OrderStatus
+    from app.models.group import Group
+    from app.models.store import Store, CategoryType
+    from decimal import Decimal
+    
+    user = await get_current_user(request, db)
+    
+    # 台北時區
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz).replace(tzinfo=None)
+    today = now.date()
+    
+    # 計算時間範圍
+    if period == "custom" and start_date and end_date:
+        try:
+            date_start = datetime.strptime(start_date, "%Y-%m-%d")
+            date_end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        except:
+            date_start = today.replace(day=1)
+            date_end = now
+            period = "month"
+    elif period == "last_month":
+        # 過去一個月（30天）
+        date_start = now - timedelta(days=30)
+        date_end = now
+    elif period == "month":
+        # 這個月
+        date_start = datetime(today.year, today.month, 1)
+        date_end = now
+    elif period == "3months":
+        # 過去三個月
+        date_start = now - timedelta(days=90)
+        date_end = now
+    elif period == "year":
+        # 今年
+        date_start = datetime(today.year, 1, 1)
+        date_end = now
+    elif period == "all":
+        # 全部
+        date_start = datetime(2020, 1, 1)
+        date_end = now
+    else:
+        # 預設：這個月
+        date_start = datetime(today.year, today.month, 1)
+        date_end = now
+    
+    # 基礎查詢：該用戶在時間範圍內的已提交訂單
+    base_query = db.query(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    )
+    
+    # ===== 基本統計 =====
+    total_orders = base_query.count()
+    total_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).scalar() or Decimal("0")
+    
+    avg_amount = total_amount / total_orders if total_orders > 0 else Decimal("0")
+    
+    # ===== 按類別統計 =====
+    category_stats = {}
+    for cat in [CategoryType.DRINK, CategoryType.MEAL, CategoryType.GROUP_BUY]:
+        cat_orders = base_query.filter(Group.category == cat).count()
+        cat_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
+            Order.user_id == user.id,
+            Order.status == OrderStatus.SUBMITTED,
+            Order.created_at >= date_start,
+            Order.created_at <= date_end,
+            Group.category == cat
+        ).scalar() or Decimal("0")
+        category_stats[cat.value] = {
+            "orders": cat_orders,
+            "amount": cat_amount
+        }
+    
+    # ===== 最愛店家 TOP 5 =====
+    favorite_stores = db.query(
+        Store.id,
+        Store.name,
+        Store.logo_url,
+        func.count(Order.id).label("order_count"),
+        func.sum(Order.total_amount).label("total_spent")
+    ).join(Group, Group.store_id == Store.id).join(
+        Order, Order.group_id == Group.id
+    ).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(Store.id).order_by(func.count(Order.id).desc()).limit(5).all()
+    
+    # ===== 最常點的品項 TOP 10 =====
+    favorite_items = db.query(
+        OrderItem.item_name,
+        func.sum(OrderItem.quantity).label("total_qty"),
+        func.sum(OrderItem.unit_price * OrderItem.quantity).label("total_spent")
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.quantity).desc()).limit(10).all()
+    
+    # ===== 最常跟團的團主 TOP 5 =====
+    from app.models.user import User
+    favorite_owners = db.query(
+        User.id,
+        User.display_name,
+        User.nickname,
+        User.picture_url,
+        func.count(Order.id).label("follow_count")
+    ).join(Group, Group.owner_id == User.id).join(
+        Order, Order.group_id == Group.id
+    ).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end,
+        Group.owner_id != user.id  # 排除自己開的團
+    ).group_by(User.id).order_by(func.count(Order.id).desc()).limit(5).all()
+    
+    # ===== 開團統計 =====
+    groups_created = db.query(Group).filter(
+        Group.owner_id == user.id,
+        Group.created_at >= date_start,
+        Group.created_at <= date_end
+    ).count()
+    
+    # ===== 抽獎統計 =====
+    # 中獎次數
+    lucky_wins = db.query(Group).filter(
+        Group.lucky_winner_ids.contains(str(user.id)),
+        Group.created_at >= date_start,
+        Group.created_at <= date_end
+    ).count()
+    
+    # 被請客次數（在有 treat_user_id 的團中有訂單）
+    treated_count = db.query(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Group.treat_user_id.isnot(None),
+        Group.treat_user_id != user.id,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).count()
+    
+    # 請客次數
+    treat_count = db.query(Group).filter(
+        Group.treat_user_id == user.id,
+        Group.created_at >= date_start,
+        Group.created_at <= date_end
+    ).count()
+    
+    # ===== 月度趨勢（最近6個月）=====
+    monthly_trend = []
+    for i in range(5, -1, -1):
+        month_date = today.replace(day=1) - timedelta(days=i*30)
+        month_start = datetime(month_date.year, month_date.month, 1)
+        if month_date.month == 12:
+            month_end = datetime(month_date.year + 1, 1, 1) - timedelta(seconds=1)
+        else:
+            month_end = datetime(month_date.year, month_date.month + 1, 1) - timedelta(seconds=1)
+        
+        month_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
+            Order.user_id == user.id,
+            Order.status == OrderStatus.SUBMITTED,
+            Order.created_at >= month_start,
+            Order.created_at <= month_end
+        ).scalar() or Decimal("0")
+        
+        monthly_trend.append({
+            "month": month_start.strftime("%m月"),
+            "amount": int(month_amount)
+        })
+    
+    # ===== 時段分析 =====
+    # 取得所有訂單的小時分布
+    hour_stats = db.query(
+        extract('hour', Order.created_at).label('hour'),
+        func.count(Order.id).label('count')
+    ).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(extract('hour', Order.created_at)).all()
+    
+    # 找出最常下單時段
+    peak_hour = max(hour_stats, key=lambda x: x.count).hour if hour_stats else 12
+    
+    # ===== 星期分析 =====
+    weekday_stats = db.query(
+        extract('dow', Order.created_at).label('dow'),
+        func.count(Order.id).label('count')
+    ).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(extract('dow', Order.created_at)).all()
+    
+    weekday_names = ['日', '一', '二', '三', '四', '五', '六']
+    peak_weekday = max(weekday_stats, key=lambda x: x.count).dow if weekday_stats else 1
+    
+    # ===== 甜度冰塊偏好（飲料）=====
+    sugar_stats = db.query(
+        OrderItem.sugar,
+        func.count(OrderItem.id).label('count')
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Group.category == CategoryType.DRINK,
+        OrderItem.sugar.isnot(None),
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(OrderItem.sugar).order_by(func.count(OrderItem.id).desc()).limit(3).all()
+    
+    ice_stats = db.query(
+        OrderItem.ice,
+        func.count(OrderItem.id).label('count')
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Group.category == CategoryType.DRINK,
+        OrderItem.ice.isnot(None),
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(OrderItem.ice).order_by(func.count(OrderItem.id).desc()).limit(3).all()
+    
+    # ===== 加料偏好 =====
+    from app.models.order import OrderItemTopping
+    topping_stats = db.query(
+        OrderItemTopping.topping_name,
+        func.count(OrderItemTopping.id).label('count')
+    ).join(OrderItem).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= date_start,
+        Order.created_at <= date_end
+    ).group_by(OrderItemTopping.topping_name).order_by(func.count(OrderItemTopping.id).desc()).limit(5).all()
+    
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "user": user,
+        "period": period,
+        "start_date": start_date or date_start.strftime("%Y-%m-%d"),
+        "end_date": end_date or date_end.strftime("%Y-%m-%d"),
+        "date_start": date_start,
+        "date_end": date_end,
+        # 基本統計
+        "total_orders": total_orders,
+        "total_amount": total_amount,
+        "avg_amount": avg_amount,
+        # 分類統計
+        "category_stats": category_stats,
+        # 排行榜
+        "favorite_stores": favorite_stores,
+        "favorite_items": favorite_items,
+        "favorite_owners": favorite_owners,
+        # 開團統計
+        "groups_created": groups_created,
+        # 趣味統計
+        "lucky_wins": lucky_wins,
+        "treated_count": treated_count,
+        "treat_count": treat_count,
+        # 趨勢
+        "monthly_trend": monthly_trend,
+        # 時段
+        "peak_hour": int(peak_hour),
+        "peak_weekday": weekday_names[int(peak_weekday)],
+        # 偏好
+        "sugar_stats": sugar_stats,
+        "ice_stats": ice_stats,
+        "topping_stats": topping_stats,
+    })
