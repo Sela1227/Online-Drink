@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}店家推薦審核 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- 標題列 -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">💡 店家推薦審核</h1>
+        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+    </div>
+    
+    <!-- 待審核 -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-4 border-b flex items-center justify-between">
+            <h2 class="font-medium text-gray-800">⏳ 待審核</h2>
+            <span class="text-sm text-gray-500">{{ pending|length }} 件</span>
+        </div>
+        
+        {% if pending %}
+        <div class="divide-y">
+            {% for rec in pending %}
+            <div class="p-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <span class="font-bold text-gray-800 text-lg">{{ rec.store_name }}</span>
+                            <span class="text-xs px-1.5 py-0.5 rounded
+                                {% if rec.category == 'drink' %}bg-amber-100 text-amber-600
+                                {% elif rec.category == 'meal' %}bg-green-100 text-green-600
+                                {% else %}bg-blue-100 text-blue-600{% endif %}">
+                                {% if rec.category == 'drink' %}🧋 飲料
+                                {% elif rec.category == 'meal' %}🍱 餐廳
+                                {% else %}🛒 團購{% endif %}
+                            </span>
+                        </div>
+                        
+                        {% if rec.menu_url %}
+                        <div class="mb-2">
+                            <a href="{{ rec.menu_url }}" target="_blank" 
+                               class="text-sm text-blue-600 hover:underline break-all">
+                                🔗 {{ rec.menu_url[:50] }}{% if rec.menu_url|length > 50 %}...{% endif %}
+                            </a>
+                        </div>
+                        {% endif %}
+                        
+                        {% if rec.note %}
+                        <div class="text-sm text-gray-600 mb-2 bg-gray-50 rounded p-2">
+                            💬 {{ rec.note }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="text-xs text-gray-400">
+                            推薦人：{{ rec.user.show_name }} · {{ rec.created_at.strftime('%Y/%m/%d %H:%M') }}
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-2 flex-shrink-0">
+                        <form action="/admin/recommendations/{{ rec.id }}/approve" method="POST">
+                            <button type="submit" class="w-full px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
+                                ✅ 核准
+                            </button>
+                        </form>
+                        
+                        <div x-data="{ showReject: false }">
+                            <button @click="showReject = !showReject" type="button" 
+                                    class="w-full px-4 py-2 border border-red-300 text-red-500 rounded-lg text-sm hover:bg-red-50">
+                                ❌ 拒絕
+                            </button>
+                            <form x-show="showReject" x-collapse
+                                  action="/admin/recommendations/{{ rec.id }}/reject" method="POST" class="mt-2">
+                                <input type="text" name="reject_reason" placeholder="拒絕原因（選填）"
+                                       class="w-full border border-gray-300 rounded px-2 py-1 text-sm mb-1">
+                                <button type="submit" class="w-full px-3 py-1 bg-red-500 text-white rounded text-sm">
+                                    確認拒絕
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-gray-500">
+            <div class="text-4xl mb-2">✨</div>
+            <p>沒有待審核的推薦</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 已處理 -->
+    {% if processed %}
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-4 border-b">
+            <h2 class="font-medium text-gray-800">📋 最近處理</h2>
+        </div>
+        <div class="divide-y">
+            {% for rec in processed %}
+            <div class="p-4 {% if rec.status == 'rejected' %}opacity-60{% endif %}">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-gray-800">{{ rec.store_name }}</span>
+                            {% if rec.status == 'approved' %}
+                            <span class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-600">✅ 已核准</span>
+                            {% else %}
+                            <span class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">❌ 已拒絕</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-xs text-gray-400 mt-1">
+                            {{ rec.user.show_name }} · {{ rec.reviewed_at.strftime('%Y/%m/%d %H:%M') if rec.reviewed_at else '' }}
+                            {% if rec.reject_reason %} · 原因：{{ rec.reject_reason }}{% endif %}
+                        </div>
+                    </div>
+                    {% if rec.status == 'approved' and rec.created_store_id %}
+                    <a href="/admin/stores/{{ rec.created_store_id }}" class="text-sm text-orange-600 hover:underline">
+                        查看店家 →
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

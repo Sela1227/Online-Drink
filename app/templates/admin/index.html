@@ -43,6 +43,13 @@
             <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             {% endif %}
         </a>
+        <a href="/admin/recommendations" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
+            <div class="text-2xl font-bold text-amber-600">{{ recommendation_count }}</div>
+            <div class="text-xs text-gray-500">💡 推薦</div>
+            {% if recommendation_count > 0 %}
+            <span class="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
+            {% endif %}
+        </a>
         <a href="/admin/announcements" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
             <div class="text-2xl font-bold text-blue-600">{{ announcement_count }}</div>
             <div class="text-xs text-gray-500">📢 公告</div>
@@ -50,6 +57,10 @@
             <span class="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
             {% endif %}
         </a>
+    </div>
+    
+    <!-- 第三排功能 -->
+    <div class="grid grid-cols-4 gap-3">
         <a href="/admin/import" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
             <div class="text-xl">📥</div>
             <div class="text-xs text-gray-500 mt-1">匯入</div>

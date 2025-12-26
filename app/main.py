@@ -117,6 +117,25 @@ async def lifespan(app: FastAPI):
         )
     """, "announcements")
     
+    # 店家推薦表
+    create_table_if_not_exists("""
+        CREATE TABLE IF NOT EXISTS store_recommendations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            store_name VARCHAR(100) NOT NULL,
+            category VARCHAR(20) NOT NULL,
+            menu_url VARCHAR(500),
+            menu_image_url VARCHAR(500),
+            note VARCHAR(500),
+            status VARCHAR(20) DEFAULT 'pending',
+            reject_reason VARCHAR(200),
+            created_at TIMESTAMP DEFAULT NOW(),
+            reviewed_at TIMESTAMP,
+            reviewer_id INTEGER,
+            created_store_id INTEGER
+        )
+    """, "store_recommendations")
+    
     # 投票唯一約束：同一人對同一選項只能投一票
     def add_unique_constraint_if_not_exists():
         try:

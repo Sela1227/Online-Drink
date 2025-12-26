@@ -68,6 +68,12 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     from app.models.department import Department
     department_count = db.query(Department).filter(Department.is_active == True).count()
     
+    # 待審核推薦數
+    from app.models.user import StoreRecommendation
+    recommendation_count = db.query(StoreRecommendation).filter(
+        StoreRecommendation.status == "pending"
+    ).count()
+    
     return templates.TemplateResponse("admin/index.html", {
         "request": request,
         "user": user,
@@ -80,6 +86,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "has_active_announcement": has_active_announcement,
         "feedback_count": feedback_count,
         "department_count": department_count,
+        "recommendation_count": recommendation_count,
     })
 
 
@@ -1091,3 +1098,107 @@ def _sync_announcement_from_active(db: Session, new_ann=None):
     else:
         settings = SystemSetting(announcement=content)
         db.add(settings)
+
+
+# ============== 店家推薦審核 ==============
+
+@router.get("/recommendations")
+async def recommendation_list(request: Request, db: Session = Depends(get_db)):
+    """店家推薦審核列表"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import StoreRecommendation
+    
+    # 待審核
+    pending = db.query(StoreRecommendation).options(
+        joinedload(StoreRecommendation.user)
+    ).filter(
+        StoreRecommendation.status == "pending"
+    ).order_by(StoreRecommendation.created_at.desc()).all()
+    
+    # 已處理
+    processed = db.query(StoreRecommendation).options(
+        joinedload(StoreRecommendation.user)
+    ).filter(
+        StoreRecommendation.status != "pending"
+    ).order_by(StoreRecommendation.reviewed_at.desc()).limit(20).all()
+    
+    return templates.TemplateResponse("admin/recommendations.html", {
+        "request": request,
+        "user": user,
+        "pending": pending,
+        "processed": processed,
+    })
+
+
+@router.post("/recommendations/{rec_id}/approve")
+async def approve_recommendation(
+    rec_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """核准店家推薦"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import StoreRecommendation
+    
+    rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec_id).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="推薦不存在")
+    
+    if rec.status != "pending":
+        return RedirectResponse(url="/admin/recommendations", status_code=302)
+    
+    # 建立新店家
+    category_map = {
+        "drink": CategoryType.DRINK,
+        "meal": CategoryType.MEAL,
+        "group_buy": CategoryType.GROUP_BUY,
+    }
+    
+    new_store = Store(
+        name=rec.store_name,
+        category=category_map.get(rec.category, CategoryType.MEAL),
+        website_url=rec.menu_url,
+    )
+    db.add(new_store)
+    db.flush()  # 取得新店家 ID
+    
+    # 更新推薦狀態
+    rec.status = "approved"
+    rec.reviewed_at = datetime.utcnow()
+    rec.reviewer_id = user.id
+    rec.created_store_id = new_store.id
+    
+    db.commit()
+    
+    return RedirectResponse(url="/admin/recommendations", status_code=302)
+
+
+@router.post("/recommendations/{rec_id}/reject")
+async def reject_recommendation(
+    rec_id: int,
+    request: Request,
+    reject_reason: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """拒絕店家推薦"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import StoreRecommendation
+    
+    rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec_id).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="推薦不存在")
+    
+    if rec.status != "pending":
+        return RedirectResponse(url="/admin/recommendations", status_code=302)
+    
+    rec.status = "rejected"
+    rec.reviewed_at = datetime.utcnow()
+    rec.reviewer_id = user.id
+    rec.reject_reason = reject_reason.strip() if reject_reason else None
+    
+    db.commit()
+    
+    return RedirectResponse(url="/admin/recommendations", status_code=302)

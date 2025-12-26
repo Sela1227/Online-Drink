@@ -683,3 +683,49 @@ async def store_menu_view(store_id: int, request: Request, db: Session = Depends
         "menu": menu,
         "categories": categories,
     })
+
+
+@router.get("/recommend")
+async def recommend_store_page(request: Request, db: Session = Depends(get_db)):
+    """推薦店家頁面"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import StoreRecommendation
+    
+    # 取得我的推薦紀錄
+    my_recommendations = db.query(StoreRecommendation).filter(
+        StoreRecommendation.user_id == user.id
+    ).order_by(StoreRecommendation.created_at.desc()).all()
+    
+    return templates.TemplateResponse("recommend.html", {
+        "request": request,
+        "user": user,
+        "recommendations": my_recommendations,
+    })
+
+
+@router.post("/recommend")
+async def submit_recommendation(
+    request: Request,
+    store_name: str = Form(...),
+    category: str = Form(...),
+    menu_url: str = Form(None),
+    note: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """提交店家推薦"""
+    user = await get_current_user(request, db)
+    
+    from app.models.user import StoreRecommendation
+    
+    recommendation = StoreRecommendation(
+        user_id=user.id,
+        store_name=store_name.strip(),
+        category=category,
+        menu_url=menu_url.strip() if menu_url else None,
+        note=note.strip() if note else None,
+    )
+    db.add(recommendation)
+    db.commit()
+    
+    return RedirectResponse(url="/recommend?success=1", status_code=302)

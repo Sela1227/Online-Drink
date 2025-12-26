@@ -123,3 +123,25 @@ class UserFavorite(Base):
     # Relationships
     user: Mapped["User"] = relationship()
     store: Mapped["Store"] = relationship()
+
+
+class StoreRecommendation(Base):
+    """使用者推薦店家"""
+    __tablename__ = "store_recommendations"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    store_name: Mapped[str] = mapped_column(String(100))
+    category: Mapped[str] = mapped_column(String(20))  # drink, meal, group_buy
+    menu_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 菜單連結
+    menu_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 菜單圖片
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 備註
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, approved, rejected
+    reject_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_store_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 審核通過後的店家ID
+    
+    # Relationships
+    user: Mapped["User"] = relationship()
