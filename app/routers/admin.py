@@ -938,7 +938,7 @@ async def create_announcement(
     db.add(ann)
     
     # 同步更新 SystemSetting 的公告
-    _sync_announcement_from_active(db, ann)
+    _sync_announcement_from_active(db)
     
     db.commit()
     
@@ -971,6 +971,7 @@ async def pin_announcement(ann_id: int, request: Request, db: Session = Depends(
     ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
     if ann:
         ann.is_pinned = True
+        _sync_announcement_from_active(db)
         db.commit()
     
     return RedirectResponse(url="/admin/announcements", status_code=302)
@@ -986,6 +987,7 @@ async def unpin_announcement(ann_id: int, request: Request, db: Session = Depend
     ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
     if ann:
         ann.is_pinned = False
+        _sync_announcement_from_active(db)
         db.commit()
     
     return RedirectResponse(url="/admin/announcements", status_code=302)
@@ -1011,14 +1013,13 @@ def _sync_announcement_from_active(db: Session, new_ann=None):
     """從啟用的公告同步到 SystemSetting"""
     from app.models.user import Announcement, SystemSetting
     
-    # 取得最新啟用的公告（優先置頂）
+    # 先 flush 確保新資料可以被查詢到
+    db.flush()
+    
+    # 取得最新啟用的公告（優先置頂，再按建立時間）
     active = db.query(Announcement).filter(
         Announcement.is_active == True
     ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).first()
-    
-    # 如果有新公告且為啟用狀態，優先使用
-    if new_ann and new_ann.is_active:
-        active = new_ann
     
     content = None
     if active:
