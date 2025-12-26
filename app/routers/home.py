@@ -832,7 +832,7 @@ async def stats_page(
             date_start = datetime.strptime(start_date, "%Y-%m-%d")
             date_end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         except:
-            date_start = today.replace(day=1)
+            date_start = datetime(today.year, today.month, 1)
             date_end = now
             period = "month"
     elif period == "last_month":
@@ -860,34 +860,33 @@ async def stats_page(
         date_start = datetime(today.year, today.month, 1)
         date_end = now
     
-    # 基礎查詢：該用戶在時間範圍內的已提交訂單
-    base_query = db.query(Order).join(Group).filter(
+    # 基礎過濾條件
+    base_filters = [
         Order.user_id == user.id,
         Order.status == OrderStatus.SUBMITTED,
         Order.created_at >= date_start,
         Order.created_at <= date_end
-    )
+    ]
     
     # ===== 基本統計 =====
-    total_orders = base_query.count()
-    total_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
-    ).scalar() or Decimal("0")
+    total_orders = db.query(Order).filter(*base_filters).count()
+    total_amount = db.query(func.sum(Order.total_amount)).filter(*base_filters).scalar() or Decimal("0")
     
     avg_amount = total_amount / total_orders if total_orders > 0 else Decimal("0")
     
     # ===== 按類別統計 =====
     category_stats = {}
     for cat in [CategoryType.DRINK, CategoryType.MEAL, CategoryType.GROUP_BUY]:
-        cat_orders = base_query.filter(Group.category == cat).count()
-        cat_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
-            Order.user_id == user.id,
-            Order.status == OrderStatus.SUBMITTED,
-            Order.created_at >= date_start,
-            Order.created_at <= date_end,
+        cat_orders = db.query(Order).join(
+            Group, Order.group_id == Group.id
+        ).filter(
+            *base_filters,
+            Group.category == cat
+        ).count()
+        cat_amount = db.query(func.sum(Order.total_amount)).select_from(Order).join(
+            Group, Order.group_id == Group.id
+        ).filter(
+            *base_filters,
             Group.category == cat
         ).scalar() or Decimal("0")
         category_stats[cat.value] = {
@@ -902,13 +901,12 @@ async def stats_page(
         Store.logo_url,
         func.count(Order.id).label("order_count"),
         func.sum(Order.total_amount).label("total_spent")
-    ).join(Group, Group.store_id == Store.id).join(
-        Order, Order.group_id == Group.id
+    ).select_from(Order).join(
+        Group, Order.group_id == Group.id
+    ).join(
+        Store, Group.store_id == Store.id
     ).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        *base_filters
     ).group_by(Store.id).order_by(func.count(Order.id).desc()).limit(5).all()
     
     # ===== 最常點的品項 TOP 10 =====
@@ -916,11 +914,10 @@ async def stats_page(
         OrderItem.item_name,
         func.sum(OrderItem.quantity).label("total_qty"),
         func.sum(OrderItem.unit_price * OrderItem.quantity).label("total_spent")
-    ).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+    ).select_from(OrderItem).join(
+        Order, OrderItem.order_id == Order.id
+    ).filter(
+        *base_filters
     ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.quantity).desc()).limit(10).all()
     
     # ===== 最常跟團的團主 TOP 5 =====
@@ -931,13 +928,12 @@ async def stats_page(
         User.nickname,
         User.picture_url,
         func.count(Order.id).label("follow_count")
-    ).join(Group, Group.owner_id == User.id).join(
-        Order, Order.group_id == Group.id
+    ).select_from(Order).join(
+        Group, Order.group_id == Group.id
+    ).join(
+        User, Group.owner_id == User.id
     ).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end,
+        *base_filters,
         Group.owner_id != user.id  # 排除自己開的團
     ).group_by(User.id).order_by(func.count(Order.id).desc()).limit(5).all()
     
@@ -957,13 +953,12 @@ async def stats_page(
     ).count()
     
     # 被請客次數（在有 treat_user_id 的團中有訂單）
-    treated_count = db.query(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
+    treated_count = db.query(Order).join(
+        Group, Order.group_id == Group.id
+    ).filter(
+        *base_filters,
         Group.treat_user_id.isnot(None),
-        Group.treat_user_id != user.id,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        Group.treat_user_id != user.id
     ).count()
     
     # 請客次數
@@ -983,7 +978,7 @@ async def stats_page(
         else:
             month_end = datetime(month_date.year, month_date.month + 1, 1) - timedelta(seconds=1)
         
-        month_amount = db.query(func.sum(Order.total_amount)).join(Group).filter(
+        month_amount = db.query(func.sum(Order.total_amount)).filter(
             Order.user_id == user.id,
             Order.status == OrderStatus.SUBMITTED,
             Order.created_at >= month_start,
@@ -1000,11 +995,8 @@ async def stats_page(
     hour_stats = db.query(
         extract('hour', Order.created_at).label('hour'),
         func.count(Order.id).label('count')
-    ).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+    ).filter(
+        *base_filters
     ).group_by(extract('hour', Order.created_at)).all()
     
     # 找出最常下單時段
@@ -1014,11 +1006,8 @@ async def stats_page(
     weekday_stats = db.query(
         extract('dow', Order.created_at).label('dow'),
         func.count(Order.id).label('count')
-    ).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+    ).filter(
+        *base_filters
     ).group_by(extract('dow', Order.created_at)).all()
     
     weekday_names = ['日', '一', '二', '三', '四', '五', '六']
@@ -1028,25 +1017,27 @@ async def stats_page(
     sugar_stats = db.query(
         OrderItem.sugar,
         func.count(OrderItem.id).label('count')
-    ).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
+    ).select_from(OrderItem).join(
+        Order, OrderItem.order_id == Order.id
+    ).join(
+        Group, Order.group_id == Group.id
+    ).filter(
+        *base_filters,
         Group.category == CategoryType.DRINK,
-        OrderItem.sugar.isnot(None),
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        OrderItem.sugar.isnot(None)
     ).group_by(OrderItem.sugar).order_by(func.count(OrderItem.id).desc()).limit(3).all()
     
     ice_stats = db.query(
         OrderItem.ice,
         func.count(OrderItem.id).label('count')
-    ).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
+    ).select_from(OrderItem).join(
+        Order, OrderItem.order_id == Order.id
+    ).join(
+        Group, Order.group_id == Group.id
+    ).filter(
+        *base_filters,
         Group.category == CategoryType.DRINK,
-        OrderItem.ice.isnot(None),
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        OrderItem.ice.isnot(None)
     ).group_by(OrderItem.ice).order_by(func.count(OrderItem.id).desc()).limit(3).all()
     
     # ===== 加料偏好 =====
@@ -1054,11 +1045,12 @@ async def stats_page(
     topping_stats = db.query(
         OrderItemTopping.topping_name,
         func.count(OrderItemTopping.id).label('count')
-    ).join(OrderItem).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+    ).select_from(OrderItemTopping).join(
+        OrderItem, OrderItemTopping.order_item_id == OrderItem.id
+    ).join(
+        Order, OrderItem.order_id == Order.id
+    ).filter(
+        *base_filters
     ).group_by(OrderItemTopping.topping_name).order_by(func.count(OrderItemTopping.id).desc()).limit(5).all()
     
     return templates.TemplateResponse("stats.html", {
