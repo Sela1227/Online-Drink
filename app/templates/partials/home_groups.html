@@ -1,16 +1,18 @@
 <div class="space-y-6">
-    <!-- 公告 -->
-    {% if announcement %}
+    <!-- 公告欄（固定顯示） -->
     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
         <div class="flex items-start gap-2">
             <span class="text-xl">📢</span>
             <div class="flex-1">
                 <div class="font-medium text-blue-800 mb-1">公告</div>
+                {% if announcement %}
                 <div class="text-sm text-blue-700 whitespace-pre-line">{{ announcement }}</div>
+                {% else %}
+                <div class="text-sm text-blue-400 italic">目前沒有公告</div>
+                {% endif %}
             </div>
         </div>
     </div>
-    {% endif %}
     
     <!-- 進行中的投票 -->
     {% if active_votes %}

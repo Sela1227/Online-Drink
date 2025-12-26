@@ -117,6 +117,32 @@ async def lifespan(app: FastAPI):
         )
     """, "announcements")
     
+    # 投票唯一約束：同一人對同一選項只能投一票
+    def add_unique_constraint_if_not_exists():
+        try:
+            with engine.begin() as conn:
+                # 先刪除重複資料（保留最早的）
+                conn.execute(text("""
+                    DELETE FROM vote_records a USING vote_records b
+                    WHERE a.id > b.id 
+                    AND a.option_id = b.option_id 
+                    AND a.user_id = b.user_id
+                """))
+                # 嘗試建立唯一約束
+                conn.execute(text("""
+                    ALTER TABLE vote_records 
+                    ADD CONSTRAINT vote_records_option_user_unique 
+                    UNIQUE (option_id, user_id)
+                """))
+            print("Added unique constraint: vote_records_option_user_unique")
+        except Exception as e:
+            if "already exists" in str(e):
+                print("Unique constraint vote_records_option_user_unique: OK")
+            else:
+                print(f"Unique constraint check: {e}")
+    
+    add_unique_constraint_if_not_exists()
+    
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
         try:

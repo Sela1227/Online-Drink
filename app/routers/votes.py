@@ -232,6 +232,9 @@ async def cast_vote(
     if not vote.is_multiple and len(option_ids) > 1:
         option_ids = [option_ids[0]]
     
+    # 去重（確保同一選項只出現一次）
+    option_ids = list(set(option_ids))
+    
     # 清除用戶之前的投票
     for opt in vote.options:
         db.query(VoteRecord).filter(
@@ -239,13 +242,19 @@ async def cast_vote(
             VoteRecord.user_id == user.id
         ).delete()
     
-    # 新增投票
+    # 新增投票（每個選項只投一票）
     for option_id in option_ids:
-        record = VoteRecord(
-            option_id=int(option_id),
-            user_id=user.id,
-        )
-        db.add(record)
+        # 確認選項存在且屬於此投票
+        option = db.query(VoteOption).filter(
+            VoteOption.id == int(option_id),
+            VoteOption.vote_id == vote_id
+        ).first()
+        if option:
+            record = VoteRecord(
+                option_id=int(option_id),
+                user_id=user.id,
+            )
+            db.add(record)
     
     db.commit()
     

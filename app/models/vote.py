@@ -65,6 +65,10 @@ class VoteOption(Base):
 class VoteRecord(Base):
     """投票紀錄"""
     __tablename__ = "vote_records"
+    __table_args__ = (
+        # 確保同一人對同一選項只能投一票
+        {'extend_existing': True}
+    )
     
     id: Mapped[int] = mapped_column(primary_key=True)
     option_id: Mapped[int] = mapped_column(ForeignKey("vote_options.id"))
