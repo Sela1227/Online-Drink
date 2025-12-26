@@ -1,24 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}匯入店家/菜單 - SELA 快點來點餐{% endblock %}
+{% block title %}匯入{% if selected_store %}菜單 - {{ selected_store.name }}{% else %}店家/菜單{% endif %} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div>
+        {% if selected_store %}
+        <a href="/admin/stores/{{ selected_store.id }}" class="text-sm text-gray-500 hover:text-gray-700">← 返回 {{ selected_store.name }}</a>
+        <h1 class="text-xl font-bold text-gray-800">匯入菜單</h1>
+        {% else %}
+        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+        <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
+        {% endif %}
+    </div>
+    
+    {% if selected_store %}
+    <!-- 目標店家資訊 -->
+    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+        <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+            {% if selected_store.logo_url %}
+            <img src="{{ selected_store.logo_url }}" alt="{{ selected_store.name }}" class="w-full h-full object-contain p-1">
+            {% else %}
+            <span class="text-2xl">
+                {% if selected_store.category and selected_store.category.value == 'drink' %}🧋
+                {% elif selected_store.category and selected_store.category.value == 'group_buy' %}🛒
+                {% else %}🍱{% endif %}
+            </span>
+            {% endif %}
+        </div>
         <div>
-            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
-            <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
+            <div class="font-medium text-gray-800">{{ selected_store.name }}</div>
+            <div class="text-sm text-orange-600">菜單將匯入到此店家</div>
         </div>
     </div>
+    {% endif %}
     
     <!-- 說明 -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
         <div class="font-medium mb-2">📝 匯入格式說明</div>
+        {% if selected_store %}
+        <p>請上傳包含 <code>menu</code> 欄位的 JSON 檔案，菜單將匯入到 <strong>{{ selected_store.name }}</strong></p>
+        {% else %}
         <p class="mb-2">支援兩種匯入方式：</p>
         <ol class="list-decimal list-inside space-y-1">
             <li><strong>完整匯入</strong>：店家 + 菜單一起建立（包含 <code>store</code> 欄位）</li>
             <li><strong>菜單匯入</strong>：僅匯入菜單到既有店家（包含 <code>store_id</code> 欄位）</li>
         </ol>
+        {% endif %}
     </div>
     
     <!-- 範例格式 -->
@@ -82,6 +110,10 @@
     <form action="/admin/import/preview" method="post" enctype="multipart/form-data" 
           class="bg-white rounded-lg shadow-sm p-4 space-y-4"
           x-data="{ hasFile: false, fileName: '' }">
+        
+        {% if selected_store_id %}
+        <input type="hidden" name="store_id" value="{{ selected_store_id }}">
+        {% endif %}
         
         <!-- 檔案上傳 -->
         <div>

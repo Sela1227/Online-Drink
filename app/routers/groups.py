@@ -85,6 +85,7 @@ async def create_group(
     min_members: int = Form(None),
     auto_extend: bool = Form(False),
     auto_remind_minutes: int = Form(None),
+    i_treat: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """建立團單"""
@@ -140,6 +141,7 @@ async def create_group(
         min_members=min_members if min_members and min_members >= 2 else None,
         auto_extend=auto_extend if min_members else False,
         auto_remind_minutes=auto_remind_minutes if auto_remind_minutes else None,
+        treat_user_id=user.id if i_treat else None,
     )
     db.add(group)
     db.flush()  # 取得 group.id

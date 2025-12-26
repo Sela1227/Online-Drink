@@ -130,16 +130,23 @@ async def activate_menu(store_id: int, menu_id: int, request: Request, db: Sessi
 
 
 @router.get("/import")
-async def import_page(request: Request, db: Session = Depends(get_db)):
+async def import_page(request: Request, store_id: int = None, db: Session = Depends(get_db)):
     """匯入頁面"""
     user = await get_admin_user(request, db)
     
-    stores = db.query(Store).filter(Store.is_active == True).all()
+    stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
+    
+    # 如果有指定 store_id，取得該店家
+    selected_store = None
+    if store_id:
+        selected_store = db.query(Store).filter(Store.id == store_id).first()
     
     return templates.TemplateResponse("admin/import.html", {
         "request": request,
         "user": user,
         "stores": stores,
+        "selected_store_id": store_id,
+        "selected_store": selected_store,
     })
 
 
@@ -147,6 +154,7 @@ async def import_page(request: Request, db: Session = Depends(get_db)):
 async def import_preview(
     request: Request,
     json_file: UploadFile = File(...),
+    store_id: int = Form(None),
     db: Session = Depends(get_db),
 ):
     """匯入預覽"""
@@ -163,6 +171,12 @@ async def import_preview(
         data = json.loads(json_str)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
+    
+    # 如果有 store_id 參數且 JSON 沒有 store 也沒有 store_id，自動注入
+    if store_id and "store" not in data and "store_id" not in data:
+        data["store_id"] = store_id
+        data["mode"] = "new"  # 預設為新增模式
+        json_str = json.dumps(data, ensure_ascii=False)
     
     # 判斷匯入類型
     is_full_import = "store" in data

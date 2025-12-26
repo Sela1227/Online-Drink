@@ -605,12 +605,12 @@
         
         <!-- 分類快速導覽（固定在頂部） -->
         {% if menu.categories|length > 1 %}
-        <div class="sticky top-12 bg-white py-2 -mx-4 px-4 border-b z-10 overflow-x-auto">
+        <div class="sticky top-12 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-orange-200 shadow-sm z-10 overflow-x-auto">
             <div class="flex gap-2 min-w-max">
                 {% for category in menu.categories %}
                 <button @click="scrollToCategory('category-{{ category.id }}')"
-                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-orange-500 text-white border-orange-500' : 'border-orange-200 text-orange-600 hover:bg-orange-50'"
-                        class="text-xs px-3 py-1.5 rounded-full border transition whitespace-nowrap">
+                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white border-orange-300 text-orange-600 hover:bg-orange-50'"
+                        class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
                     {{ category.name }}
                 </button>
                 {% endfor %}

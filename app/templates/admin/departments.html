@@ -5,22 +5,22 @@
 {% block content %}
 <div class="space-y-4">
     <!-- 標題列 -->
-    <div class="flex items-center justify-between">
+    <div>
+        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
         <h1 class="text-xl font-bold text-gray-800">👥 部門管理</h1>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回</a>
     </div>
     
     <!-- 新增部門 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
         <h2 class="font-medium text-gray-800 mb-3">➕ 新增部門</h2>
-        <form action="/admin/departments" method="POST" class="flex gap-2">
+        <form action="/admin/departments" method="POST" class="flex flex-wrap gap-2">
             <input type="text" name="name" required
                    placeholder="部門名稱"
-                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                   class="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
             <input type="text" name="description"
                    placeholder="說明（選填）"
-                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-            <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                   class="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+            <button type="submit" class="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 whitespace-nowrap">
                 新增
             </button>
         </form>
