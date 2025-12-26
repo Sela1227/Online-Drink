@@ -156,8 +156,10 @@ async def lifespan(app: FastAPI):
     
     fix_enum_case()
     
-    # 確保 system_settings 有初始資料
+    # 確保 system_settings 有初始資料和 announcement 欄位
     from app.models.user import SystemSetting
+    add_column_if_not_exists("system_settings", "announcement", "VARCHAR(500)")
+    
     try:
         with engine.begin() as conn:
             result = conn.execute(text("SELECT COUNT(*) FROM system_settings"))

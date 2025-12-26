@@ -147,6 +147,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
     settings = db.query(SystemSetting).first()
     announcement = settings.announcement if settings else None
     
+    # 進行中的投票
+    from app.models.vote import Vote, VoteOption
+    active_votes = db.query(Vote).options(
+        joinedload(Vote.creator),
+        joinedload(Vote.options).joinedload(VoteOption.voters)
+    ).filter(
+        Vote.is_closed == False,
+        Vote.deadline > now
+    ).order_by(Vote.deadline.asc()).limit(4).all()
+    
     # 店家列表（啟用中）
     stores = db.query(Store).options(
         joinedload(Store.branches)
@@ -161,6 +171,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "closed_groups": closed_groups,
         "hot_items": hot_items,
         "announcement": announcement,
+        "active_votes": active_votes,
         "stores": stores,
         "now": now,
     })
@@ -227,6 +238,16 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     settings = db.query(SystemSetting).first()
     announcement = settings.announcement if settings else None
     
+    # 進行中的投票
+    from app.models.vote import Vote, VoteOption
+    active_votes = db.query(Vote).options(
+        joinedload(Vote.creator),
+        joinedload(Vote.options).joinedload(VoteOption.voters)
+    ).filter(
+        Vote.is_closed == False,
+        Vote.deadline > now
+    ).order_by(Vote.deadline.asc()).limit(4).all()
+    
     # 店家列表
     stores = db.query(Store).options(
         joinedload(Store.branches)
@@ -241,6 +262,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "closed_groups": closed_groups,
         "hot_items": hot_items,
         "announcement": announcement,
+        "active_votes": active_votes,
         "stores": stores,
     })
 
@@ -578,6 +600,7 @@ async def leave_department(request: Request, dept_id: int, db: Session = Depends
 async def store_view(store_id: int, request: Request, db: Session = Depends(get_db)):
     """前台店家詳情頁（只讀）"""
     from app.models.store import StoreTopping
+    from app.models.menu import Menu
     
     user = await get_current_user(request, db)
     
@@ -612,10 +635,51 @@ async def store_view(store_id: int, request: Request, db: Session = Depends(get_
         UserFavorite.store_id == store_id
     ).first() is not None
     
+    # 取得啟用中的菜單
+    active_menu = db.query(Menu).filter(
+        Menu.store_id == store_id,
+        Menu.is_active == True
+    ).first()
+    
     return templates.TemplateResponse("store_view.html", {
         "request": request,
         "user": user,
         "store": store,
         "active_groups": active_groups,
         "is_favorited": is_favorited,
+        "active_menu": active_menu,
+    })
+
+
+@router.get("/stores/{store_id}/menu")
+async def store_menu_view(store_id: int, request: Request, db: Session = Depends(get_db)):
+    """前台店家菜單頁面（只讀）"""
+    from app.models.menu import Menu, MenuCategory, MenuItem
+    
+    user = await get_current_user(request, db)
+    
+    store = db.query(Store).filter(Store.id == store_id, Store.is_active == True).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    
+    # 取得啟用中的菜單
+    menu = db.query(Menu).filter(
+        Menu.store_id == store_id,
+        Menu.is_active == True
+    ).first()
+    
+    if not menu:
+        raise HTTPException(status_code=404, detail="此店家尚無菜單")
+    
+    # 取得菜單分類和品項
+    categories = db.query(MenuCategory).filter(
+        MenuCategory.menu_id == menu.id
+    ).order_by(MenuCategory.sort_order).all()
+    
+    return templates.TemplateResponse("store_menu.html", {
+        "request": request,
+        "user": user,
+        "store": store,
+        "menu": menu,
+        "categories": categories,
     })
