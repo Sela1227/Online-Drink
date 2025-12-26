@@ -308,6 +308,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "user": user,
         "group": group,
         "store": store,
+        "branch": next((b for b in store.branches if b.id == group.branch_id), None) if group.branch_id else None,
         "menu": menu,
         "submitted_orders": submitted_orders,
         "my_order": my_order,

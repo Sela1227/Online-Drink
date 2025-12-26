@@ -110,6 +110,9 @@
                         {% endif %}
                     </div>
                     <div class="text-xs font-medium text-gray-700 truncate">{{ store.name }}</div>
+                    {% if store.branches and store.branches|length > 0 %}
+                    <div class="text-[10px] text-gray-400">{{ store.branches|length }} 分店</div>
+                    {% endif %}
                 </a>
                 {% endfor %}
             </div>

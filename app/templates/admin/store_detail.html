@@ -148,24 +148,94 @@
     </div>
     {% endif %}
     
-    <!-- 分店列表 -->
-    {% if store.branches %}
-    <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-3">🏪 分店 ({{ store.branches|length }})</h2>
+    <!-- 分店管理 -->
+    <div class="bg-white rounded-xl shadow-sm p-5" x-data="{ showAddForm: false }">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-gray-800">🏪 分店管理 ({{ store.branches|length if store.branches else 0 }})</h2>
+            <button @click="showAddForm = !showAddForm" 
+                    class="text-sm px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200">
+                ➕ 新增分店
+            </button>
+        </div>
+        
+        <!-- 新增分店表單 -->
+        <div x-show="showAddForm" x-cloak class="mb-4 p-4 bg-orange-50 rounded-lg">
+            <form action="/admin/stores/{{ store.id }}/branches" method="POST" class="space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">分店名稱 *</label>
+                        <input type="text" name="name" required placeholder="例：中正店"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">電話</label>
+                        <input type="text" name="phone" placeholder="例：02-12345678"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">地址</label>
+                        <input type="text" name="address" placeholder="例：台北市中正區..."
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="showAddForm = false" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded">取消</button>
+                    <button type="submit" class="px-3 py-1.5 text-sm bg-orange-500 text-white rounded hover:bg-orange-600">新增</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- 分店列表 -->
+        {% if store.branches %}
         <div class="space-y-2">
             {% for branch in store.branches %}
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                    <div class="font-medium text-gray-800">{{ branch.name }}</div>
-                    {% if branch.phone %}
-                    <div class="text-sm text-gray-500">📞 {{ branch.phone }}</div>
-                    {% endif %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" 
+                 x-data="{ editing: false }">
+                <!-- 顯示模式 -->
+                <div x-show="!editing" class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-gray-800">{{ branch.name }}</span>
+                        {% if not branch.is_active %}
+                        <span class="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">停用</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm text-gray-500 flex flex-wrap gap-3">
+                        {% if branch.phone %}<span>📞 {{ branch.phone }}</span>{% endif %}
+                        {% if branch.address %}<span>📍 {{ branch.address }}</span>{% endif %}
+                    </div>
                 </div>
+                <div x-show="!editing" class="flex gap-1">
+                    <button @click="editing = true" class="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded">編輯</button>
+                    <form action="/admin/stores/{{ store.id }}/branches/{{ branch.id }}/toggle" method="POST" class="inline">
+                        <button type="submit" class="text-xs px-2 py-1 {% if branch.is_active %}text-gray-600 hover:bg-gray-200{% else %}text-green-600 hover:bg-green-100{% endif %} rounded">
+                            {% if branch.is_active %}停用{% else %}啟用{% endif %}
+                        </button>
+                    </form>
+                    <form action="/admin/stores/{{ store.id }}/branches/{{ branch.id }}/delete" method="POST" class="inline"
+                          onsubmit="return confirm('確定要刪除分店「{{ branch.name }}」嗎？')">
+                        <button type="submit" class="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded">刪除</button>
+                    </form>
+                </div>
+                
+                <!-- 編輯模式 -->
+                <form x-show="editing" x-cloak action="/admin/stores/{{ store.id }}/branches/{{ branch.id }}" method="POST" 
+                      class="flex-1 flex items-center gap-2">
+                    <input type="text" name="name" value="{{ branch.name }}" required
+                           class="flex-1 border rounded px-2 py-1 text-sm">
+                    <input type="text" name="phone" value="{{ branch.phone or '' }}" placeholder="電話"
+                           class="w-28 border rounded px-2 py-1 text-sm">
+                    <input type="text" name="address" value="{{ branch.address or '' }}" placeholder="地址"
+                           class="flex-1 border rounded px-2 py-1 text-sm">
+                    <button type="submit" class="text-xs px-2 py-1 bg-orange-500 text-white rounded">儲存</button>
+                    <button type="button" @click="editing = false" class="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded">取消</button>
+                </form>
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <p class="text-sm text-gray-500 text-center py-4">尚未新增任何分店</p>
+        {% endif %}
     </div>
-    {% endif %}
     
     <!-- 快速操作 -->
     <div class="bg-white rounded-xl shadow-sm p-5">

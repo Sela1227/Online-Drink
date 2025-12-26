@@ -522,8 +522,9 @@ async def logout_all_users(request: Request, db: Session = Depends(get_db)):
 async def add_branch(
     store_id: int,
     request: Request,
-    branch_name: str = Form(...),
-    branch_phone: str = Form(None),
+    name: str = Form(...),
+    phone: str = Form(None),
+    address: str = Form(None),
     db: Session = Depends(get_db),
 ):
     """新增分店"""
@@ -536,13 +537,14 @@ async def add_branch(
     
     branch = StoreBranch(
         store_id=store_id,
-        name=branch_name,
-        phone=branch_phone if branch_phone else None,
+        name=name.strip(),
+        phone=phone.strip() if phone else None,
+        address=address.strip() if address else None,
     )
     db.add(branch)
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/delete")
@@ -565,7 +567,58 @@ async def delete_branch(
         db.delete(branch)
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+
+
+@router.post("/stores/{store_id}/branches/{branch_id}")
+async def update_branch(
+    store_id: int,
+    branch_id: int,
+    request: Request,
+    name: str = Form(...),
+    phone: str = Form(None),
+    address: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    """編輯分店"""
+    from app.models.store import StoreBranch
+    user = await get_admin_user(request, db)
+    
+    branch = db.query(StoreBranch).filter(
+        StoreBranch.id == branch_id,
+        StoreBranch.store_id == store_id
+    ).first()
+    
+    if branch:
+        branch.name = name.strip()
+        branch.phone = phone.strip() if phone else None
+        branch.address = address.strip() if address else None
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+
+
+@router.post("/stores/{store_id}/branches/{branch_id}/toggle")
+async def toggle_branch(
+    store_id: int,
+    branch_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """切換分店啟用狀態"""
+    from app.models.store import StoreBranch
+    user = await get_admin_user(request, db)
+    
+    branch = db.query(StoreBranch).filter(
+        StoreBranch.id == branch_id,
+        StoreBranch.store_id == store_id
+    ).first()
+    
+    if branch:
+        branch.is_active = not branch.is_active
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
 
 
 @router.post("/stores/{store_id}/toppings")
