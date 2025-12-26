@@ -870,7 +870,13 @@ async def stats_page(
     
     # ===== 基本統計 =====
     total_orders = db.query(Order).filter(*base_filters).count()
-    total_amount = db.query(func.sum(Order.total_amount)).filter(*base_filters).scalar() or Decimal("0")
+    
+    # 計算總金額：從 OrderItem 計算 (unit_price * quantity)
+    total_amount = db.query(
+        func.sum(OrderItem.unit_price * OrderItem.quantity)
+    ).select_from(OrderItem).join(
+        Order, OrderItem.order_id == Order.id
+    ).filter(*base_filters).scalar() or Decimal("0")
     
     avg_amount = total_amount / total_orders if total_orders > 0 else Decimal("0")
     
@@ -883,7 +889,11 @@ async def stats_page(
             *base_filters,
             Group.category == cat
         ).count()
-        cat_amount = db.query(func.sum(Order.total_amount)).select_from(Order).join(
+        cat_amount = db.query(
+            func.sum(OrderItem.unit_price * OrderItem.quantity)
+        ).select_from(OrderItem).join(
+            Order, OrderItem.order_id == Order.id
+        ).join(
             Group, Order.group_id == Group.id
         ).filter(
             *base_filters,
@@ -899,15 +909,17 @@ async def stats_page(
         Store.id,
         Store.name,
         Store.logo_url,
-        func.count(Order.id).label("order_count"),
-        func.sum(Order.total_amount).label("total_spent")
-    ).select_from(Order).join(
+        func.count(func.distinct(Order.id)).label("order_count"),
+        func.sum(OrderItem.unit_price * OrderItem.quantity).label("total_spent")
+    ).select_from(OrderItem).join(
+        Order, OrderItem.order_id == Order.id
+    ).join(
         Group, Order.group_id == Group.id
     ).join(
         Store, Group.store_id == Store.id
     ).filter(
         *base_filters
-    ).group_by(Store.id).order_by(func.count(Order.id).desc()).limit(5).all()
+    ).group_by(Store.id).order_by(func.count(func.distinct(Order.id)).desc()).limit(5).all()
     
     # ===== 最常點的品項 TOP 10 =====
     favorite_items = db.query(
@@ -978,7 +990,11 @@ async def stats_page(
         else:
             month_end = datetime(month_date.year, month_date.month + 1, 1) - timedelta(seconds=1)
         
-        month_amount = db.query(func.sum(Order.total_amount)).filter(
+        month_amount = db.query(
+            func.sum(OrderItem.unit_price * OrderItem.quantity)
+        ).select_from(OrderItem).join(
+            Order, OrderItem.order_id == Order.id
+        ).filter(
             Order.user_id == user.id,
             Order.status == OrderStatus.SUBMITTED,
             Order.created_at >= month_start,
