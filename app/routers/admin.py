@@ -38,7 +38,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     """後台首頁"""
     user = await get_admin_user(request, db)
     
-    from app.models.user import User
+    from app.models.user import User, Announcement
     from datetime import datetime, timedelta
     
     store_count = db.query(Store).count()
@@ -57,6 +57,10 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     settings_row = db.query(SystemSetting).first()
     announcement = settings_row.announcement if settings_row else None
     
+    # 公告數量
+    announcement_count = db.query(Announcement).count()
+    has_active_announcement = db.query(Announcement).filter(Announcement.is_active == True).first() is not None
+    
     # 待處理的問題回報數
     feedback_count = db.query(Feedback).filter(Feedback.status == "pending").count()
     
@@ -72,6 +76,8 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         "user_count": user_count,
         "online_count": online_count,
         "announcement": announcement,
+        "announcement_count": announcement_count,
+        "has_active_announcement": has_active_announcement,
         "feedback_count": feedback_count,
         "department_count": department_count,
     })
@@ -879,3 +885,148 @@ async def remove_department_member(
         db.commit()
     
     return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
+
+
+# ============ 公告管理 ============
+
+@router.get("/announcements")
+async def announcements_page(request: Request, db: Session = Depends(get_db)):
+    """公告管理頁面"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    announcements = db.query(Announcement).options(
+        joinedload(Announcement.created_by)
+    ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).all()
+    
+    return templates.TemplateResponse("admin/announcements.html", {
+        "request": request,
+        "user": user,
+        "announcements": announcements,
+    })
+
+
+@router.post("/announcements")
+async def create_announcement(
+    request: Request,
+    title: str = Form(...),
+    content: str = Form(...),
+    is_pinned: bool = Form(False),
+    expires_at: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """新增公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement, SystemSetting
+    
+    expires_dt = None
+    if expires_at:
+        try:
+            expires_dt = datetime.fromisoformat(expires_at)
+        except:
+            pass
+    
+    ann = Announcement(
+        title=title.strip(),
+        content=content.strip(),
+        is_pinned=is_pinned,
+        expires_at=expires_dt,
+        created_by_id=user.id,
+    )
+    db.add(ann)
+    
+    # 同步更新 SystemSetting 的公告
+    _sync_announcement_from_active(db, ann)
+    
+    db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
+@router.post("/announcements/{ann_id}/toggle")
+async def toggle_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
+    """啟用/停用公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
+    if ann:
+        ann.is_active = not ann.is_active
+        _sync_announcement_from_active(db)
+        db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
+@router.post("/announcements/{ann_id}/pin")
+async def pin_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
+    """置頂公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
+    if ann:
+        ann.is_pinned = True
+        db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
+@router.post("/announcements/{ann_id}/unpin")
+async def unpin_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
+    """取消置頂"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
+    if ann:
+        ann.is_pinned = False
+        db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
+@router.post("/announcements/{ann_id}/delete")
+async def delete_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
+    """刪除公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
+    if ann:
+        db.delete(ann)
+        _sync_announcement_from_active(db)
+        db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
+def _sync_announcement_from_active(db: Session, new_ann=None):
+    """從啟用的公告同步到 SystemSetting"""
+    from app.models.user import Announcement, SystemSetting
+    
+    # 取得最新啟用的公告（優先置頂）
+    active = db.query(Announcement).filter(
+        Announcement.is_active == True
+    ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).first()
+    
+    # 如果有新公告且為啟用狀態，優先使用
+    if new_ann and new_ann.is_active:
+        active = new_ann
+    
+    content = None
+    if active:
+        content = f"【{active.title}】\n{active.content}"
+    
+    settings = db.query(SystemSetting).first()
+    if settings:
+        settings.announcement = content
+    else:
+        settings = SystemSetting(announcement=content)
+        db.add(settings)

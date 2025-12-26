@@ -52,6 +52,36 @@
             </label>
         </div>
         
+        <!-- 可見性設定 -->
+        <div x-data="{ isPublic: true }">
+            <label class="block text-sm font-medium text-gray-700 mb-2">可見範圍</label>
+            <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="visibility" value="public" checked
+                           @change="isPublic = true">
+                    <span class="text-sm text-gray-600">🌐 全體可見</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="visibility" value="department"
+                           @change="isPublic = false">
+                    <span class="text-sm text-gray-600">👥 限定部門</span>
+                </label>
+            </div>
+            
+            <!-- 部門選擇 -->
+            <div x-show="!isPublic" x-cloak class="mt-3 p-3 bg-gray-50 rounded-lg">
+                <div class="text-xs text-gray-500 mb-2">選擇可見的部門（可多選）</div>
+                <div class="space-y-1 max-h-32 overflow-y-auto">
+                    {% for dept in departments %}
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="department_ids" value="{{ dept.id }}">
+                        <span class="text-sm">{{ dept.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
         <!-- 選擇店家 -->
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家（至少2個）</label>

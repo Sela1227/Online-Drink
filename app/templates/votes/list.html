@@ -5,12 +5,10 @@
 {% block content %}
 <div class="space-y-4">
     <!-- Header -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="flex items-center justify-between">
-            <div>
-                <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
-                <h1 class="text-xl font-bold text-gray-800 mt-1">🗳️ 投票選店家</h1>
-            </div>
+    <div>
+        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">← 返回首頁</a>
+        <div class="flex items-center justify-between mt-1">
+            <h1 class="text-xl font-bold text-gray-800">🗳️ 投票選店家</h1>
             <a href="/votes/new" 
                class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
                 + 發起投票
@@ -19,68 +17,112 @@
     </div>
     
     <!-- 進行中的投票 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🔥 進行中</h2>
+    <section>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">🔥 進行中 <span class="text-sm font-normal text-gray-500">({{ active_votes|length }})</span></h2>
         
         {% if active_votes %}
-        <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-4">
             {% for vote in active_votes %}
-            <a href="/votes/{{ vote.id }}" class="block p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="font-medium text-gray-800">{{ vote.title }}</div>
-                    <div class="text-sm text-orange-600"
-                         x-data="countdown('{{ vote.deadline.isoformat() }}')"
-                         x-text="display"></div>
-                </div>
-                <div class="flex items-center gap-4 text-sm text-gray-500">
-                    <span>{{ vote.creator.show_name }} 發起</span>
-                    <span>{{ vote.options|length }} 個選項</span>
-                    <span>{{ vote.total_votes }} 票</span>
-                </div>
-                {% if vote.options %}
-                <div class="mt-2 flex flex-wrap gap-2">
-                    {% for opt in vote.options[:3] %}
-                    <span class="text-xs bg-white px-2 py-1 rounded border">
-                        {{ opt.store.name }} ({{ opt.vote_count }}票)
-                    </span>
-                    {% endfor %}
-                    {% if vote.options|length > 3 %}
-                    <span class="text-xs text-gray-400">+{{ vote.options|length - 3 }} 個選項</span>
-                    {% endif %}
+            <a href="/votes/{{ vote.id }}" 
+               class="block bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 shadow-sm hover:shadow-md transition border border-purple-100 relative"
+               style="aspect-ratio: 1 / 1; min-width: 140px;">
+                <!-- 膠帶 -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 bg-purple-200/80 rounded-sm shadow-sm"></div>
+                
+                <!-- 限定標籤 -->
+                {% if not vote.is_public %}
+                <div class="absolute top-2 right-2">
+                    <span class="text-xs bg-purple-500 text-white px-1.5 py-0.5 rounded">👥 限定</span>
                 </div>
                 {% endif %}
+                
+                <!-- 投票 icon -->
+                <div class="flex justify-center mt-2 mb-2">
+                    <div class="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center">
+                        <span class="text-3xl">🗳️</span>
+                    </div>
+                </div>
+                
+                <!-- 標題 -->
+                <div class="text-center">
+                    <div class="text-sm font-bold text-gray-800 truncate">{{ vote.title }}</div>
+                    <div class="text-xs text-gray-500 mt-0.5">{{ vote.creator.show_name }}</div>
+                </div>
+                
+                <!-- 選項預覽 -->
+                <div class="mt-2 flex justify-center gap-1">
+                    {% for opt in vote.options[:3] %}
+                    <span class="text-xs bg-white/80 px-1.5 py-0.5 rounded text-gray-600 truncate max-w-[60px]">
+                        {{ opt.store.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+                
+                <!-- 底部資訊 -->
+                <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                    <span class="text-xs text-purple-600 font-medium">{{ vote.total_votes }} 票</span>
+                    <span class="text-xs text-orange-600"
+                          x-data="countdown('{{ vote.deadline.isoformat() }}')"
+                          x-text="display"></span>
+                </div>
             </a>
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center text-gray-500 py-8">
+        <div class="text-center text-gray-500 py-8 bg-white rounded-lg">
             <div class="text-4xl mb-2">🗳️</div>
             <p>目前沒有進行中的投票</p>
             <a href="/votes/new" class="text-orange-500 hover:text-orange-600 text-sm">發起一個投票吧！</a>
         </div>
         {% endif %}
-    </div>
+    </section>
     
     <!-- 已結束的投票 -->
     {% if closed_votes %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">📋 已結束</h2>
-        <div class="space-y-2">
-            {% for vote in closed_votes %}
-            <a href="/votes/{{ vote.id }}" class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                <div class="flex items-center justify-between">
-                    <div class="text-gray-700">{{ vote.title }}</div>
-                    <div class="text-xs text-gray-400">{{ vote.created_at.strftime('%m/%d') }}</div>
-                </div>
-                {% if vote.winner_store_id %}
-                <div class="text-sm text-green-600 mt-1">
-                    🏆 {{ vote.options|selectattr('store_id', 'eq', vote.winner_store_id)|first|attr('store')|attr('name') if vote.options else '未知' }}
-                </div>
-                {% endif %}
-            </a>
-            {% endfor %}
+    <section x-data="{ showClosed: false }">
+        <h2 class="text-lg font-semibold text-gray-400 mb-3 cursor-pointer flex items-center gap-2" @click="showClosed = !showClosed">
+            <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
+            已結束 <span class="text-sm font-normal">({{ closed_votes|length }})</span>
+        </h2>
+        <div x-show="showClosed" x-collapse>
+            <div class="grid grid-cols-2 gap-4">
+                {% for vote in closed_votes %}
+                <a href="/votes/{{ vote.id }}"
+                   class="block bg-gray-100 rounded-lg p-3 shadow-sm relative opacity-60 border border-gray-200"
+                   style="aspect-ratio: 1 / 1; min-width: 140px;">
+                    <!-- 膠帶 -->
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 bg-gray-300/80 rounded-sm shadow-sm"></div>
+                    
+                    <!-- 投票 icon -->
+                    <div class="flex justify-center mt-2 mb-2">
+                        <div class="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center">
+                            <span class="text-3xl">🗳️</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 標題 -->
+                    <div class="text-center">
+                        <div class="text-sm font-bold text-gray-600 truncate">{{ vote.title }}</div>
+                        <div class="text-xs text-gray-400 mt-0.5">{{ vote.created_at.strftime('%m/%d') }}</div>
+                    </div>
+                    
+                    <!-- 勝出店家 -->
+                    {% if vote.winner_store_id %}
+                    <div class="mt-2 text-center">
+                        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            🏆 {% for opt in vote.options if opt.store_id == vote.winner_store_id %}{{ opt.store.name }}{% endfor %}
+                        </span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="absolute bottom-2 left-2 right-2 text-center">
+                        <span class="text-xs text-gray-400">已結束</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
         </div>
-    </div>
+    </section>
     {% endif %}
 </div>
 {% endblock %}

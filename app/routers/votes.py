@@ -23,24 +23,57 @@ async def vote_list(request: Request, db: Session = Depends(get_db)):
     """投票列表"""
     user = await get_current_user(request, db)
     
+    # 取得用戶的部門 IDs
+    from app.models.department import UserDepartment
+    from app.models.vote import VoteDepartment
+    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()]
+    
+    def filter_visible_votes(votes):
+        """過濾用戶可見的投票"""
+        visible = []
+        for v in votes:
+            # 公開投票：所有人可見
+            if v.is_public:
+                visible.append(v)
+                continue
+            # 發起人可見
+            if v.creator_id == user.id:
+                visible.append(v)
+                continue
+            # 管理員可見
+            if user.is_admin:
+                visible.append(v)
+                continue
+            # 部門交集
+            vote_dept_ids = {vd.department_id for vd in v.departments}
+            if vote_dept_ids & set(user_dept_ids):
+                visible.append(v)
+        return visible
+    
     # 取得進行中的投票
     now = datetime.now(TAIPEI_TZ).replace(tzinfo=None)
-    active_votes = db.query(Vote).filter(
+    active_votes_raw = db.query(Vote).filter(
         Vote.is_closed == False,
         Vote.deadline > now
     ).options(
         joinedload(Vote.creator),
         joinedload(Vote.options).joinedload(VoteOption.store),
-        joinedload(Vote.options).joinedload(VoteOption.voters)
+        joinedload(Vote.options).joinedload(VoteOption.voters),
+        joinedload(Vote.departments)
     ).order_by(Vote.deadline.asc()).all()
+    active_votes = filter_visible_votes(active_votes_raw)
     
     # 取得已結束的投票（最近10個）
-    closed_votes = db.query(Vote).filter(
+    closed_votes_raw = db.query(Vote).filter(
         (Vote.is_closed == True) | (Vote.deadline <= now)
     ).options(
         joinedload(Vote.creator),
-        joinedload(Vote.options).joinedload(VoteOption.store)
-    ).order_by(Vote.created_at.desc()).limit(10).all()
+        joinedload(Vote.options).joinedload(VoteOption.store),
+        joinedload(Vote.departments)
+    ).order_by(Vote.created_at.desc()).limit(20).all()
+    closed_votes = filter_visible_votes(closed_votes_raw)[:10]
     
     return templates.TemplateResponse("votes/list.html", {
         "request": request,
@@ -58,10 +91,15 @@ async def new_vote_page(request: Request, db: Session = Depends(get_db)):
     # 取得所有啟用的店家
     stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
     
+    # 取得啟用中的部門
+    from app.models.department import Department
+    departments = db.query(Department).filter(Department.is_active == True).all()
+    
     return templates.TemplateResponse("votes/new.html", {
         "request": request,
         "user": user,
         "stores": stores,
+        "departments": departments,
     })
 
 
@@ -72,14 +110,16 @@ async def create_vote(
     deadline: str = Form(...),
     description: str = Form(None),
     is_multiple: bool = Form(False),
+    visibility: str = Form("public"),
     db: Session = Depends(get_db),
 ):
     """建立投票"""
     user = await get_current_user(request, db)
     
-    # 取得選擇的店家
+    # 取得選擇的店家和部門
     form_data = await request.form()
     store_ids = form_data.getlist("store_ids")
+    department_ids = form_data.getlist("department_ids")
     
     if not store_ids:
         raise HTTPException(status_code=400, detail="請至少選擇一個店家")
@@ -90,6 +130,8 @@ async def create_vote(
     except ValueError:
         raise HTTPException(status_code=400, detail="截止時間格式錯誤")
     
+    is_public = visibility == "public"
+    
     # 建立投票
     vote = Vote(
         creator_id=user.id,
@@ -97,6 +139,7 @@ async def create_vote(
         description=description.strip() if description else None,
         deadline=deadline_dt,
         is_multiple=is_multiple,
+        is_public=is_public,
     )
     db.add(vote)
     db.flush()
@@ -109,6 +152,13 @@ async def create_vote(
             added_by_id=user.id,
         )
         db.add(option)
+    
+    # 如果限定部門，建立關聯
+    if not is_public and department_ids:
+        from app.models.vote import VoteDepartment
+        for dept_id in department_ids:
+            vd = VoteDepartment(vote_id=vote.id, department_id=int(dept_id))
+            db.add(vd)
     
     db.commit()
     

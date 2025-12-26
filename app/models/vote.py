@@ -15,6 +15,7 @@ class Vote(Base):
     deadline: Mapped[datetime] = mapped_column(DateTime)  # 投票截止時間
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     is_multiple: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否可多選
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 公開或限定部門
     winner_store_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 勝出店家
     created_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 建立的團單
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -22,6 +23,7 @@ class Vote(Base):
     # Relationships
     creator: Mapped["User"] = relationship()
     options: Mapped[list["VoteOption"]] = relationship(back_populates="vote", cascade="all, delete-orphan")
+    departments: Mapped[list["VoteDepartment"]] = relationship(back_populates="vote", cascade="all, delete-orphan")
     
     @property
     def is_expired(self) -> bool:
@@ -77,3 +79,18 @@ class VoteRecord(Base):
 # Avoid circular import
 from app.models.user import User
 from app.models.store import Store
+
+
+class VoteDepartment(Base):
+    """投票限定部門"""
+    __tablename__ = "vote_departments"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vote_id: Mapped[int] = mapped_column(ForeignKey("votes.id"))
+    department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"))
+    
+    vote: Mapped["Vote"] = relationship(back_populates="departments")
+    department: Mapped["Department"] = relationship()
+
+
+from app.models.department import Department

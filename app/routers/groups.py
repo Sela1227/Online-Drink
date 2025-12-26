@@ -265,6 +265,21 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         func.count(OrderItem.id).desc()
     ).limit(5).all()
     
+    # 取得該店家熱門品項（全站統計，最近 30 天）
+    from datetime import timedelta
+    thirty_days_ago = datetime.now(taipei_tz).replace(tzinfo=None) - timedelta(days=30)
+    hot_items = db.query(
+        OrderItem.item_name,
+        OrderItem.menu_item_id,
+        func.sum(OrderItem.quantity).label('total_qty')
+    ).join(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= thirty_days_ago
+    ).group_by(OrderItem.item_name, OrderItem.menu_item_id).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(5).all()
+    
     # 取得菜單品項（含分類）
     menu = group.menu
     
@@ -298,6 +313,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "last_order": last_order,
         "last_order_items": last_order_items,
         "favorite_items": favorite_items,
+        "hot_items": hot_items,
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,

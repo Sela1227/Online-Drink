@@ -79,6 +79,23 @@ class SystemSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Announcement(Base):
+    """公告歷史紀錄"""
+    __tablename__ = "announcements"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(100))
+    content: Mapped[str] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)  # 置頂
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 過期時間
+    
+    # Relationships
+    created_by: Mapped["User"] = relationship()
+
+
 class Feedback(Base):
     """問題回報"""
     __tablename__ = "feedbacks"

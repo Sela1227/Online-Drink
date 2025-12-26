@@ -414,7 +414,7 @@
 
     <!-- 快速下單（團開放中且尚未結單時顯示） -->
     {% if is_open %}
-    <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'">
+    <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
         <h2 class="font-semibold text-gray-800 mb-3">⚡ {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
         
         <div class="flex flex-wrap gap-2 mb-3">
@@ -441,18 +441,50 @@
             </button>
         </div>
         
-        <!-- 常點清單 -->
-        {% if favorite_items %}
+        <!-- 快速選項分頁 -->
+        {% if hot_items or favorite_items %}
         <div class="border-t pt-3">
-            <div class="text-xs text-gray-500 mb-2">❤️ 你在 {{ store.name }} 的常點</div>
-            <div class="flex flex-wrap gap-2">
-                {% for fav in favorite_items %}
-                <button onclick="scrollToItem({{ fav.menu_item_id }})"
-                        class="text-xs px-2.5 py-1.5 bg-orange-50 text-orange-700 rounded-full hover:bg-orange-100 transition">
-                    {{ fav.item_name }} <span class="text-orange-400">({{ fav.count }})</span>
+            <!-- 分頁切換 -->
+            <div class="flex gap-2 mb-2">
+                {% if hot_items %}
+                <button @click="quickTab = 'hot'"
+                        :class="quickTab === 'hot' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
+                        class="text-xs px-3 py-1 rounded-full font-medium transition">
+                    🔥 熱門
+                </button>
+                {% endif %}
+                {% if favorite_items %}
+                <button @click="quickTab = 'mine'"
+                        :class="quickTab === 'mine' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
+                        class="text-xs px-3 py-1 rounded-full font-medium transition">
+                    ❤️ 我的最愛
+                </button>
+                {% endif %}
+            </div>
+            
+            <!-- 熱門品項 -->
+            {% if hot_items %}
+            <div x-show="quickTab === 'hot'" class="flex flex-wrap gap-2">
+                {% for item in hot_items %}
+                <button onclick="scrollToItem({{ item.menu_item_id }})"
+                        class="text-xs px-2.5 py-1.5 bg-red-50 text-red-700 rounded-full hover:bg-red-100 transition">
+                    {{ item.item_name }} <span class="text-red-400">({{ item.total_qty|int }}份)</span>
                 </button>
                 {% endfor %}
             </div>
+            {% endif %}
+            
+            <!-- 我的常點 -->
+            {% if favorite_items %}
+            <div x-show="quickTab === 'mine'" class="flex flex-wrap gap-2">
+                {% for fav in favorite_items %}
+                <button onclick="scrollToItem({{ fav.menu_item_id }})"
+                        class="text-xs px-2.5 py-1.5 bg-orange-50 text-orange-700 rounded-full hover:bg-orange-100 transition">
+                    {{ fav.item_name }} <span class="text-orange-400">({{ fav.count }}次)</span>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         {% endif %}
     </div>

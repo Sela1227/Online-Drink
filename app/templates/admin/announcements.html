@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}公告管理 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- 標題列 -->
+    <div>
+        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">← 返回管理後台</a>
+        <h1 class="text-xl font-bold text-gray-800">📢 公告管理</h1>
+    </div>
+    
+    <!-- 新增公告 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <h2 class="font-medium text-gray-800 mb-3">➕ 新增公告</h2>
+        <form action="/admin/announcements" method="POST" class="space-y-3">
+            <div>
+                <input type="text" name="title" required placeholder="公告標題"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+            </div>
+            <div>
+                <textarea name="content" rows="3" required placeholder="公告內容..."
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
+            </div>
+            <div class="flex flex-wrap gap-4 text-sm">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="is_pinned" value="true">
+                    <span class="text-gray-600">📌 置頂</span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-600">過期時間（選填）</span>
+                    <input type="datetime-local" name="expires_at"
+                           class="border border-gray-300 rounded px-2 py-1 text-sm">
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                    發布公告
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 公告列表 -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-4 border-b">
+            <h2 class="font-medium text-gray-800">公告列表</h2>
+        </div>
+        
+        {% if announcements %}
+        <div class="divide-y">
+            {% for ann in announcements %}
+            <div class="p-4 {% if not ann.is_active %}opacity-50{% endif %}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            {% if ann.is_pinned %}
+                            <span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">📌 置頂</span>
+                            {% endif %}
+                            {% if ann.is_active %}
+                            <span class="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded">顯示中</span>
+                            {% else %}
+                            <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">已停用</span>
+                            {% endif %}
+                            <span class="font-medium text-gray-800">{{ ann.title }}</span>
+                        </div>
+                        <div class="text-sm text-gray-600 whitespace-pre-line">{{ ann.content }}</div>
+                        <div class="text-xs text-gray-400 mt-2">
+                            {{ ann.created_by.show_name }} · {{ ann.created_at.strftime('%Y/%m/%d %H:%M') }}
+                            {% if ann.expires_at %}
+                            · 過期：{{ ann.expires_at.strftime('%m/%d %H:%M') }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <form action="/admin/announcements/{{ ann.id }}/toggle" method="POST">
+                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
+                                {% if ann.is_active %}停用{% else %}啟用{% endif %}
+                            </button>
+                        </form>
+                        {% if ann.is_active and not ann.is_pinned %}
+                        <form action="/admin/announcements/{{ ann.id }}/pin" method="POST">
+                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
+                                📌 置頂
+                            </button>
+                        </form>
+                        {% elif ann.is_pinned %}
+                        <form action="/admin/announcements/{{ ann.id }}/unpin" method="POST">
+                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
+                                取消置頂
+                            </button>
+                        </form>
+                        {% endif %}
+                        <form action="/admin/announcements/{{ ann.id }}/delete" method="POST"
+                              onsubmit="return confirm('確定要刪除此公告嗎？')">
+                            <button type="submit" class="text-xs px-3 py-1 rounded border text-red-500 hover:bg-red-50 w-full">
+                                刪除
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-gray-500">
+            <div class="text-4xl mb-2">📢</div>
+            <p>尚未發布任何公告</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
