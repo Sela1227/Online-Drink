@@ -1009,6 +1009,66 @@ async def delete_announcement(ann_id: int, request: Request, db: Session = Depen
     return RedirectResponse(url="/admin/announcements", status_code=302)
 
 
+@router.get("/announcements/{ann_id}/edit")
+async def edit_announcement_page(ann_id: int, request: Request, db: Session = Depends(get_db)):
+    """編輯公告頁面"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).options(
+        joinedload(Announcement.created_by)
+    ).filter(Announcement.id == ann_id).first()
+    
+    if not ann:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    
+    return templates.TemplateResponse("admin/announcement_edit.html", {
+        "request": request,
+        "user": user,
+        "announcement": ann,
+    })
+
+
+@router.post("/announcements/{ann_id}")
+async def update_announcement(
+    ann_id: int,
+    request: Request,
+    title: str = Form(...),
+    content: str = Form(...),
+    is_pinned: bool = Form(False),
+    is_active: bool = Form(False),
+    expires_at: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """更新公告"""
+    user = await get_admin_user(request, db)
+    
+    from app.models.user import Announcement
+    
+    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
+    if not ann:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    
+    ann.title = title.strip()
+    ann.content = content.strip()
+    ann.is_pinned = is_pinned
+    ann.is_active = is_active
+    
+    if expires_at:
+        try:
+            ann.expires_at = datetime.fromisoformat(expires_at)
+        except:
+            ann.expires_at = None
+    else:
+        ann.expires_at = None
+    
+    _sync_announcement_from_active(db)
+    db.commit()
+    
+    return RedirectResponse(url="/admin/announcements", status_code=302)
+
+
 def _sync_announcement_from_active(db: Session, new_ann=None):
     """從啟用的公告同步到 SystemSetting"""
     from app.models.user import Announcement, SystemSetting

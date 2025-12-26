@@ -73,6 +73,10 @@
                         </div>
                     </div>
                     <div class="flex flex-col gap-1">
+                        <a href="/admin/announcements/{{ ann.id }}/edit" 
+                           class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full text-center">
+                            ✏️ 編輯
+                        </a>
                         <form action="/admin/announcements/{{ ann.id }}/toggle" method="POST">
                             <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
                                 {% if ann.is_active %}停用{% else %}啟用{% endif %}
