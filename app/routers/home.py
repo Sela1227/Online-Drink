@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
@@ -711,18 +711,47 @@ async def submit_recommendation(
     category: str = Form(...),
     menu_url: str = Form(None),
     note: str = Form(None),
+    menu_image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
     """提交店家推薦"""
     user = await get_current_user(request, db)
     
     from app.models.user import StoreRecommendation
+    from app.config import get_settings
+    
+    menu_image_url = None
+    
+    # 處理圖片上傳到 Cloudinary
+    if menu_image and menu_image.filename:
+        settings = get_settings()
+        if settings.cloudinary_cloud_name:
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                
+                cloudinary.config(
+                    cloud_name=settings.cloudinary_cloud_name,
+                    api_key=settings.cloudinary_api_key,
+                    api_secret=settings.cloudinary_api_secret
+                )
+                
+                contents = await menu_image.read()
+                result = cloudinary.uploader.upload(
+                    contents,
+                    folder="sela/recommendations",
+                    resource_type="image"
+                )
+                menu_image_url = result.get("secure_url")
+            except Exception as e:
+                print(f"Cloudinary upload error: {e}")
     
     recommendation = StoreRecommendation(
         user_id=user.id,
         store_name=store_name.strip(),
         category=category,
         menu_url=menu_url.strip() if menu_url else None,
+        menu_image_url=menu_image_url,
         note=note.strip() if note else None,
     )
     db.add(recommendation)

@@ -44,6 +44,15 @@
                         </div>
                         {% endif %}
                         
+                        {% if rec.menu_image_url %}
+                        <div class="mb-2">
+                            <a href="{{ rec.menu_image_url }}" target="_blank">
+                                <img src="{{ rec.menu_image_url }}" alt="菜單圖片" 
+                                     class="max-w-full h-auto max-h-48 rounded-lg border shadow-sm">
+                            </a>
+                        </div>
+                        {% endif %}
+                        
                         {% if rec.note %}
                         <div class="text-sm text-gray-600 mb-2 bg-gray-50 rounded p-2">
                             💬 {{ rec.note }}

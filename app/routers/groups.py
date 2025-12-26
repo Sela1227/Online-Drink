@@ -22,6 +22,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
 
+# 台北時區
+TAIPEI_TZ = timezone(timedelta(hours=8))
+
 # 加入台北時區過濾器
 def to_taipei_time(dt):
     if dt is None:
@@ -267,7 +270,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     
     # 取得該店家熱門品項（全站統計，最近 30 天）
     from datetime import timedelta
-    thirty_days_ago = datetime.now(taipei_tz).replace(tzinfo=None) - timedelta(days=30)
+    thirty_days_ago = datetime.now(TAIPEI_TZ).replace(tzinfo=None) - timedelta(days=30)
     hot_items = db.query(
         OrderItem.item_name,
         OrderItem.menu_item_id,

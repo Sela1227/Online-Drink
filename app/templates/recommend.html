@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}推薦店家 - SELA 快點來點餐{% endblock %}
+{% block title %}我想要推薦店家 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">💡 推薦店家</h1>
+        <h1 class="text-xl font-bold text-gray-800">💡 我想要推薦店家</h1>
         <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
     </div>
     
@@ -22,7 +22,7 @@
         <h2 class="font-medium text-gray-800 mb-3">📝 推薦新店家</h2>
         <p class="text-sm text-gray-500 mb-4">發現好吃的店家？推薦給大家一起訂！</p>
         
-        <form action="/recommend" method="POST" class="space-y-4">
+        <form action="/recommend" method="POST" enctype="multipart/form-data" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">店家名稱 <span class="text-red-500">*</span></label>
                 <input type="text" name="store_name" required placeholder="例如：50嵐、麥當勞"
@@ -45,6 +45,13 @@
                 <input type="url" name="menu_url" placeholder="https://..."
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
                 <p class="text-xs text-gray-400 mt-1">可貼上官網、Uber Eats、foodpanda 等菜單連結</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">菜單圖片（選填）</label>
+                <input type="file" name="menu_image" accept="image/*"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-orange-50 file:text-orange-600">
+                <p class="text-xs text-gray-400 mt-1">可拍照或上傳菜單圖片</p>
             </div>
             
             <div>
