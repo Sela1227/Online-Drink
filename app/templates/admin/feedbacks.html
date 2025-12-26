@@ -10,9 +10,10 @@
         <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
     </div>
     
-    {% if feedbacks %}
+    <!-- 最近回報（最多5筆） -->
+    {% if recent_feedbacks %}
     <div class="space-y-3">
-        {% for feedback in feedbacks %}
+        {% for feedback in recent_feedbacks %}
         <div class="bg-white rounded-lg shadow-sm p-4 {% if feedback.status == 'resolved' %}opacity-60{% endif %}"
              x-data="{ copied: false }">
             <div class="flex items-start justify-between gap-3">
@@ -27,7 +28,7 @@
                     </div>
                     
                     <!-- 內容 -->
-                    <p class="text-sm text-gray-700 whitespace-pre-line" id="feedback-{{ feedback.id }}">{{ feedback.content }}</p>
+                    <p class="text-sm text-gray-700 whitespace-pre-line">{{ feedback.content }}</p>
                 </div>
                 
                 <!-- 操作按鈕 -->
@@ -63,6 +64,66 @@
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
         <div class="text-4xl mb-2">🎉</div>
         <p>目前沒有問題回報</p>
+    </div>
+    {% endif %}
+    
+    <!-- 歷史紀錄 -->
+    {% if history_feedbacks %}
+    <div x-data="{ showHistory: false }">
+        <button @click="showHistory = !showHistory" 
+                class="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 font-medium transition">
+            <span x-show="!showHistory">📂 顯示歷史紀錄 ({{ history_feedbacks|length }} 筆)</span>
+            <span x-show="showHistory" x-cloak>📁 收起歷史紀錄</span>
+        </button>
+        
+        <div x-show="showHistory" x-cloak x-collapse class="mt-3 space-y-3">
+            {% for feedback in history_feedbacks %}
+            <div class="bg-gray-50 rounded-lg p-4 {% if feedback.status == 'resolved' %}opacity-60{% endif %}"
+                 x-data="{ copied: false }">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <!-- 用戶資訊 -->
+                        <div class="flex items-center gap-2 mb-2">
+                            {% if feedback.user.picture_url %}
+                            <img src="{{ feedback.user.picture_url }}" class="w-6 h-6 rounded-full">
+                            {% endif %}
+                            <span class="font-medium text-gray-600">{{ feedback.user.show_name }}</span>
+                            <span class="text-xs text-gray-400">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</span>
+                        </div>
+                        
+                        <!-- 內容 -->
+                        <p class="text-sm text-gray-600 whitespace-pre-line">{{ feedback.content }}</p>
+                    </div>
+                    
+                    <!-- 操作按鈕 -->
+                    <div class="flex flex-col gap-2 flex-shrink-0">
+                        <!-- 複製按鈕 -->
+                        <button @click="
+                            const text = `[{{ feedback.user.show_name }}] {{ feedback.created_at.strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
+                            navigator.clipboard.writeText(text);
+                            copied = true;
+                            setTimeout(() => copied = false, 2000);
+                        " class="text-xs px-3 py-1 rounded border transition"
+                           :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border-gray-300'">
+                            <span x-show="!copied">📋 複製</span>
+                            <span x-show="copied" x-cloak>✓ 已複製</span>
+                        </button>
+                        
+                        <!-- 狀態 -->
+                        {% if feedback.status == 'resolved' %}
+                        <span class="text-xs bg-green-100 text-green-600 px-3 py-1 rounded text-center">已處理</span>
+                        {% else %}
+                        <form action="/admin/feedbacks/{{ feedback.id }}/resolve" method="POST">
+                            <button type="submit" class="text-xs bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 w-full">
+                                標記已處理
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 </div>

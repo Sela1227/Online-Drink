@@ -775,17 +775,23 @@ async def feedback_list(request: Request, db: Session = Depends(get_db)):
     
     from app.models.user import Feedback, User
     
-    feedbacks = db.query(Feedback).options(
+    # 取得所有回報，pending 優先
+    all_feedbacks = db.query(Feedback).options(
         joinedload(Feedback.user)
     ).order_by(
         Feedback.status.asc(),  # pending 排前面
         Feedback.created_at.desc()
     ).all()
     
+    # 分離最近 5 筆和歷史
+    recent_feedbacks = all_feedbacks[:5]
+    history_feedbacks = all_feedbacks[5:]
+    
     return templates.TemplateResponse("admin/feedbacks.html", {
         "request": request,
         "user": user,
-        "feedbacks": feedbacks,
+        "recent_feedbacks": recent_feedbacks,
+        "history_feedbacks": history_feedbacks,
     })
 
 

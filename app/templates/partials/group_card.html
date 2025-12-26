@@ -25,13 +25,13 @@
     
     <!-- Logo 置中放大 -->
     <div class="flex justify-center mb-2">
-        <div class="w-16 h-16 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
+        <div class="w-20 h-20 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
             {% if group.store.logo_url %}
             <img src="{{ group.store.logo_url }}" 
                  alt="{{ group.store.name }}" 
-                 class="w-14 h-14 object-contain">
+                 class="w-[4.5rem] h-[4.5rem] object-contain">
             {% else %}
-            <span class="text-3xl">
+            <span class="text-4xl">
                 {% if group.category.value == 'drink' %}🧋
                 {% elif group.category.value == 'meal' %}🍱
                 {% else %}🛒{% endif %}
@@ -42,7 +42,7 @@
     
     <!-- 團名 + 店家 -->
     <div class="text-center mb-1">
-        <div class="text-sm font-bold text-gray-800 truncate">{{ group.name }}</div>
+        <div class="text-base font-bold text-gray-800 truncate">{{ group.name }}</div>
         <div class="text-xs text-gray-500 truncate">{{ group.store.name }}</div>
     </div>
     
@@ -71,9 +71,10 @@
         
         <!-- 截止時間 -->
         {% if group.is_open %}
-        <span class="text-xs text-orange-600 font-bold"
-              x-data="countdown('{{ group.deadline.isoformat() }}')"
-              x-text="display"></span>
+        <div class="text-xs text-orange-600">
+            <span class="text-gray-400 font-normal">結單</span>
+            <span class="font-bold" x-data="countdown('{{ group.deadline.isoformat() }}')" x-text="display"></span>
+        </div>
         {% else %}
         <span class="text-xs text-gray-400">已截止</span>
         {% endif %}
