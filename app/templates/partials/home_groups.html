@@ -1,53 +1,38 @@
 <div class="space-y-6">
-    <!-- 公告欄（固定顯示） -->
-    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-        <div class="flex items-start gap-2">
-            <span class="text-xl">📢</span>
-            <div class="flex-1">
-                <div class="font-medium text-blue-800 mb-1">公告</div>
-                {% if announcement %}
-                <div class="text-sm text-blue-700 whitespace-pre-line">{{ announcement }}</div>
-                {% else %}
-                <div class="text-sm text-blue-400 italic">目前沒有公告</div>
-                {% endif %}
+    
+    <!-- 公告欄 -->
+    {% if announcement %}
+    <div class="bg-white rounded-2xl p-4 shadow-sm border border-sela-100">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center flex-shrink-0">
+                <span class="text-lg">📢</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-sela-700 mb-1">公告</div>
+                <div class="text-sm text-gray-600 whitespace-pre-line">{{ announcement }}</div>
             </div>
         </div>
     </div>
+    {% endif %}
     
     <!-- 進行中的投票 -->
     {% if active_votes %}
     <section>
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-gray-800">🗳️ 投票中</h2>
-            <a href="/votes" class="text-sm text-purple-600 hover:text-purple-700">查看全部 →</a>
+            <h2 class="text-base font-semibold text-gray-800">投票中</h2>
+            <a href="/votes" class="text-sm text-sela-500 hover:text-sela-600">全部 →</a>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {% for vote in active_votes[:4] %}
             <a href="/votes/{{ vote.id }}" 
-               class="block bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 shadow-sm hover:shadow-md transition border border-purple-100 relative"
-               style="min-height: 120px;">
-                <!-- 膠帶 -->
-                <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-3 bg-purple-200/80 rounded-sm shadow-sm"></div>
-                
-                <!-- 投票 icon -->
-                <div class="flex justify-center mb-2 mt-1">
-                    <div class="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center">
-                        <span class="text-xl">🗳️</span>
-                    </div>
+               class="flex-shrink-0 w-32 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-sela-200 transition-colors snap-start">
+                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-2">
+                    <span class="text-lg">🗳️</span>
                 </div>
-                
-                <!-- 標題 -->
-                <div class="text-center">
-                    <div class="text-sm font-bold text-gray-800 truncate">{{ vote.title }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">{{ vote.creator.show_name }}</div>
-                </div>
-                
-                <!-- 底部資訊 -->
+                <div class="text-sm font-medium text-gray-800 truncate text-center">{{ vote.title }}</div>
                 <div class="flex justify-between items-center mt-2 text-xs">
-                    <span class="text-purple-600 font-medium">{{ vote.total_votes }} 票</span>
-                    <span class="text-orange-600"
-                          x-data="countdown('{{ vote.deadline.isoformat() }}')"
-                          x-text="display"></span>
+                    <span class="text-purple-500">{{ vote.total_votes }}票</span>
+                    <span class="text-sela-500" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
                 </div>
             </a>
             {% endfor %}
@@ -55,54 +40,45 @@
     </section>
     {% endif %}
     
-    <!-- 店家名單 -->
+    <!-- 店家列表（可收合） -->
     {% if stores %}
-    <section x-data="{ showStores: false, filter: 'all' }">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold text-gray-800 cursor-pointer flex items-center gap-2" @click="showStores = !showStores">
-                <span x-text="showStores ? '▼' : '▶'" class="text-xs"></span>
-                🏪 店家名單 <span class="text-sm font-normal text-gray-500">({{ stores|length }})</span>
+    <section x-data="{ open: false, filter: 'all' }">
+        <button @click="open = !open" class="w-full flex items-center justify-between py-2">
+            <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <span>🏪</span> 店家
+                <span class="text-sm font-normal text-gray-400">({{ stores|length }})</span>
             </h2>
-            <a href="/recommend" class="text-xs text-orange-600 hover:text-orange-700 px-2 py-1 bg-orange-50 rounded-full">
-                💡 我想推薦店家
-            </a>
-        </div>
-        <div x-show="showStores" x-collapse>
+            <span class="text-gray-400 text-sm" x-text="open ? '收起' : '展開'"></span>
+        </button>
+        
+        <div x-show="open" x-collapse class="mt-2">
             <!-- 分類篩選 -->
-            <div class="flex gap-2 mb-3 overflow-x-auto pb-1">
+            <div class="flex gap-2 mb-3">
                 <button @click="filter = 'all'" 
-                        :class="filter === 'all' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'"
-                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-                    全部
-                </button>
+                        :class="filter === 'all' ? 'bg-sela-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium">全部</button>
                 <button @click="filter = 'drink'" 
-                        :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600'"
-                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-                    🧋 飲料
-                </button>
+                        :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium">🧋 飲料</button>
                 <button @click="filter = 'meal'" 
-                        :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600'"
-                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-                    🍱 餐廳
-                </button>
+                        :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium">🍱 餐廳</button>
                 <button @click="filter = 'group_buy'" 
-                        :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'"
-                        class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-                    🛒 團購
-                </button>
+                        :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium">🛒 團購</button>
             </div>
             
             <!-- 店家網格 -->
-            <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div class="grid grid-cols-4 gap-2">
                 {% for store in stores %}
                 <a href="/stores/{{ store.id }}"
-                   class="block bg-white rounded-lg shadow-sm p-2 hover:shadow-md transition text-center"
+                   class="bg-white rounded-xl p-2 text-center hover:shadow-md transition-shadow"
                    x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
-                    <div class="w-12 h-12 mx-auto bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-1">
+                    <div class="w-12 h-12 mx-auto bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden mb-1">
                         {% if store.logo_url %}
-                        <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-1">
+                        <img src="{{ store.logo_url }}" class="w-10 h-10 object-contain">
                         {% else %}
-                        <span class="text-2xl">
+                        <span class="text-xl">
                             {% if store.category and store.category.value == 'drink' %}🧋
                             {% elif store.category and store.category.value == 'group_buy' %}🛒
                             {% else %}🍱{% endif %}
@@ -110,50 +86,29 @@
                         {% endif %}
                     </div>
                     <div class="text-xs font-medium text-gray-700 truncate">{{ store.name }}</div>
-                    {% if store.branches and store.branches|length > 0 %}
-                    <div class="text-[10px] text-gray-400">{{ store.branches|length }} 分店</div>
-                    {% endif %}
                 </a>
                 {% endfor %}
             </div>
+            
+            <!-- 推薦店家 -->
+            <a href="/recommend" class="mt-3 flex items-center justify-center gap-1 text-sm text-sela-500 hover:text-sela-600 py-2">
+                <span>💡</span> 我想推薦店家
+            </a>
         </div>
     </section>
     {% endif %}
     
-    <!-- 超夯商品 -->
-    {% if hot_items %}
-    <section x-data="{ showHot: false }">
-        <h2 class="text-lg font-semibold text-gray-800 mb-3 cursor-pointer flex items-center gap-2" @click="showHot = !showHot">
-            <span x-text="showHot ? '▼' : '▶'" class="text-xs"></span>
-            🔥 超夯商品 <span class="text-sm font-normal text-gray-500">（最近 30 天）</span>
-        </h2>
-        <div x-show="showHot" x-collapse>
-            <div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4">
-                <div class="space-y-2">
-                    {% for item in hot_items %}
-                    <div class="flex items-center gap-3 bg-white/80 rounded-lg px-3 py-2">
-                        <div class="text-lg font-bold text-orange-500 w-6">{{ loop.index }}</div>
-                        {% if item.store_logo %}
-                        <img src="{{ item.store_logo }}" class="w-8 h-8 rounded object-contain bg-white">
-                        {% endif %}
-                        <div class="flex-1 min-w-0">
-                            <div class="font-medium text-gray-800 truncate">{{ item.item_name }}</div>
-                            <div class="text-xs text-gray-500">{{ item.store_name }}</div>
-                        </div>
-                        <div class="text-sm text-orange-600 font-medium">{{ item.total_qty|int }} 杯</div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </section>
-    {% endif %}
+    <!-- 開放中的團 -->
+    {% if drink_groups or meal_groups or groupbuy_groups %}
     
-    <!-- 訂飲料 -->
+    <!-- 飲料團 -->
     {% if drink_groups %}
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🧋 訂飲料 <span class="text-sm font-normal text-gray-500">({{ drink_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-4 pt-2">
+        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <span>🧋</span> 飲料
+            <span class="text-sm font-normal text-gray-400">({{ drink_groups|length }})</span>
+        </h2>
+        <div class="grid grid-cols-2 gap-3">
             {% for group in drink_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -161,11 +116,14 @@
     </section>
     {% endif %}
 
-    <!-- 訂餐 -->
+    <!-- 餐廳團 -->
     {% if meal_groups %}
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🍱 訂餐 <span class="text-sm font-normal text-gray-500">({{ meal_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-4 pt-2">
+        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <span>🍱</span> 餐廳
+            <span class="text-sm font-normal text-gray-400">({{ meal_groups|length }})</span>
+        </h2>
+        <div class="grid grid-cols-2 gap-3">
             {% for group in meal_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -176,69 +134,62 @@
     <!-- 團購 -->
     {% if groupbuy_groups %}
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🛒 團購 <span class="text-sm font-normal text-gray-500">({{ groupbuy_groups|length }})</span></h2>
-        <div class="grid grid-cols-2 gap-4 pt-2">
+        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <span>🛒</span> 團購
+            <span class="text-sm font-normal text-gray-400">({{ groupbuy_groups|length }})</span>
+        </h2>
+        <div class="grid grid-cols-2 gap-3">
             {% for group in groupbuy_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
         </div>
     </section>
     {% endif %}
-
+    
+    {% else %}
     <!-- 無開放中的團 -->
-    {% if not drink_groups and not meal_groups and not groupbuy_groups %}
-    <div class="text-center py-12 text-gray-500">
-        <p>目前沒有開放中的團</p>
-        <p class="text-sm mt-1">點擊上方「開團」按鈕開新團！</p>
+    <div class="text-center py-16">
+        <div class="w-20 h-20 mx-auto bg-sela-50 rounded-full flex items-center justify-center mb-4">
+            <span class="text-4xl">🦎</span>
+        </div>
+        <p class="text-gray-500 mb-1">目前沒有開放中的團</p>
+        <p class="text-sm text-gray-400">點擊「開團」開始揪人！</p>
     </div>
     {% endif %}
 
-    <!-- 已截止 -->
+    <!-- 已截止（可收合） -->
     {% if closed_groups %}
-    <section x-data="{ showClosed: false }">
-        <h2 class="text-lg font-semibold text-gray-400 mb-3 cursor-pointer flex items-center gap-2" @click="showClosed = !showClosed">
-            <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
-            已截止 <span class="text-sm font-normal">({{ closed_groups|length }})</span>
-        </h2>
-        <div x-show="showClosed" x-collapse>
-            <div class="grid grid-cols-2 gap-4 pt-2">
+    <section x-data="{ open: false }">
+        <button @click="open = !open" class="w-full flex items-center justify-between py-2 text-gray-400">
+            <span class="text-sm">已截止 ({{ closed_groups|length }})</span>
+            <span class="text-xs" x-text="open ? '收起' : '展開'"></span>
+        </button>
+        
+        <div x-show="open" x-collapse>
+            <div class="grid grid-cols-2 gap-3 mt-2 opacity-50">
                 {% for group in closed_groups %}
-                <div class="block bg-gray-100 rounded-sm p-3 shadow relative opacity-60 border border-gray-200"
-                     style="aspect-ratio: 1 / 1; min-width: 140px;">
-                    <!-- 膠帶 -->
-                    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-4 bg-gray-300/80 rounded-sm shadow-sm"></div>
-                    
-                    <!-- Logo -->
-                    <a href="/groups/{{ group.id }}" class="block">
-                        <div class="flex justify-center mb-2">
-                            <div class="w-16 h-16 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden border border-gray-100">
-                                {% if group.store.logo_url %}
-                                <img src="{{ group.store.logo_url }}" class="w-14 h-14 object-contain">
-                                {% else %}
-                                <span class="text-3xl">
-                                    {% if group.category.value == 'drink' %}🧋
-                                    {% elif group.category.value == 'meal' %}🍱
-                                    {% else %}🛒{% endif %}
-                                </span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm font-bold text-gray-600 truncate">{{ group.name }}</div>
-                            <div class="text-xs text-gray-400 truncate">{{ group.store.name }}</div>
-                        </div>
-                        <div class="text-xs text-gray-400 text-center mt-1">{{ group.owner.show_name }}</div>
-                        <div class="absolute bottom-2 left-2 right-2 text-center">
-                            <span class="text-xs text-gray-400">已截止</span>
-                        </div>
-                    </a>
-                </div>
+                <a href="/groups/{{ group.id }}" class="bg-gray-100 rounded-2xl p-3 text-center">
+                    <div class="w-14 h-14 mx-auto bg-white rounded-xl flex items-center justify-center overflow-hidden mb-2">
+                        {% if group.store.logo_url %}
+                        <img src="{{ group.store.logo_url }}" class="w-12 h-12 object-contain grayscale">
+                        {% else %}
+                        <span class="text-2xl grayscale">
+                            {% if group.category.value == 'drink' %}🧋
+                            {% elif group.category.value == 'meal' %}🍱
+                            {% else %}🛒{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm font-medium text-gray-500 truncate">{{ group.name }}</div>
+                    <div class="text-xs text-gray-400 truncate">{{ group.store.name }}</div>
+                </a>
                 {% endfor %}
             </div>
-            <a href="/history" class="block text-center text-sm text-gray-500 mt-4 py-2 hover:text-orange-500">
+            <a href="/history" class="block text-center text-sm text-gray-400 mt-3 py-2 hover:text-sela-500">
                 查看全部歷史 →
             </a>
         </div>
     </section>
     {% endif %}
+    
 </div>

@@ -2,16 +2,47 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}SELA 快點來點餐{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sela: {
+                            50: '#FFF7ED',
+                            100: '#FFEDD5',
+                            200: '#FED7AA',
+                            300: '#FDBA74',
+                            400: '#FB923C',
+                            500: '#F97316',
+                            600: '#EA580C',
+                            700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
+        
+        /* 北歐風滾動條 */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #FDBA74; border-radius: 4px; }
+        
+        /* 平滑過渡 */
+        * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* 安全區域 */
+        body { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-sela-50/30 min-h-screen antialiased">
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
@@ -21,36 +52,45 @@
     });
     </script>
     
-    <!-- Header -->
-    <header class="bg-white shadow-sm sticky top-0 z-40">
-        <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+    <!-- Header - 簡潔北歐風 -->
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-40 border-b border-sela-100">
+        <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+            <!-- Logo -->
             <a href="/home" class="flex items-center gap-2">
-                <img src="/static/images/sela-logo.svg" alt="SELA" class="h-8 w-8">
-                <span class="font-bold text-orange-600">快點來點餐</span>
+                <img src="/static/images/sela-logo.svg" alt="SELA" class="h-9 w-9">
+                <span class="font-bold text-sela-600 text-lg tracking-tight">SELA</span>
             </a>
-            <div class="flex items-center gap-3">
+            
+            <!-- 右側操作 -->
+            <div class="flex items-center gap-2">
                 {% if user %}
-                <a href="/votes" class="text-gray-400 hover:text-orange-500" title="投票選店家">
-                    🗳️
+                <!-- 投票 -->
+                <a href="/votes" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-sela-50 transition-colors">
+                    <span class="text-lg">🗳️</span>
                 </a>
-                <a href="/feedback" class="text-gray-400 hover:text-orange-500" title="問題回報">
-                    📮
-                </a>
-                <a href="/groups/new" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded">
-                    開團
+                
+                <!-- 管理（管理員限定） -->
+                {% if user.is_admin %}
+                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-sela-50 transition-colors">
+                    <span class="text-lg">⚙️</span>
                 </a>
                 {% endif %}
-                {% if user and user.is_admin %}
-                <a href="/admin" class="text-sm text-gray-600 hover:text-gray-800">
-                    管理
+                
+                <!-- 開團按鈕 -->
+                <a href="/groups/new" 
+                   class="h-9 px-4 bg-sela-500 hover:bg-sela-600 text-white text-sm font-medium rounded-full flex items-center gap-1 transition-colors shadow-sm">
+                    <span class="text-base">+</span> 開團
                 </a>
-                {% endif %}
-                {% if user %}
-                <a href="/profile" class="text-sm text-gray-600 hover:text-orange-600 flex items-center gap-1">
+                
+                <!-- 個人頭像 -->
+                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-sela-200 hover:border-sela-400 transition-colors">
                     {% if user.picture_url %}
-                    <img src="{{ user.picture_url }}" class="w-6 h-6 rounded-full">
+                    <img src="{{ user.picture_url }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <div class="w-full h-full bg-sela-100 flex items-center justify-center text-sela-500 text-sm font-bold">
+                        {{ user.show_name[:1] }}
+                    </div>
                     {% endif %}
-                    <span>{{ user.show_name }}</span>
                 </a>
                 {% endif %}
             </div>
@@ -58,58 +98,73 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-lg mx-auto px-4 py-6">
+    <main class="max-w-lg mx-auto px-4 py-5">
         {% block content %}{% endblock %}
     </main>
+    
+    <!-- 底部導航（手機友善） -->
+    {% if user %}
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-sela-100 z-40 safe-area-pb">
+        <div class="max-w-lg mx-auto px-6 h-14 flex items-center justify-around">
+            <a href="/home" class="flex flex-col items-center gap-0.5 text-sela-600">
+                <span class="text-xl">🏠</span>
+                <span class="text-[10px] font-medium">首頁</span>
+            </a>
+            <a href="/votes" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
+                <span class="text-xl">🗳️</span>
+                <span class="text-[10px]">投票</span>
+            </a>
+            <a href="/groups/new" class="flex flex-col items-center gap-0.5">
+                <div class="w-12 h-12 -mt-6 bg-sela-500 rounded-full flex items-center justify-center shadow-lg">
+                    <span class="text-white text-2xl">+</span>
+                </div>
+            </a>
+            <a href="/feedback" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
+                <span class="text-xl">📮</span>
+                <span class="text-[10px]">回報</span>
+            </a>
+            <a href="/profile" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
+                <span class="text-xl">👤</span>
+                <span class="text-[10px]">我的</span>
+            </a>
+        </div>
+    </nav>
+    <div class="h-16"></div> <!-- 底部導航佔位 -->
+    {% endif %}
     
     {% if user %}
     <!-- 閒置偵測 -->
     <script>
     (function() {
-        const IDLE_TIMEOUT = 30 * 60 * 1000;  // 30 分鐘
-        const HEARTBEAT_INTERVAL = 5 * 60 * 1000;  // 5 分鐘
+        const IDLE_TIMEOUT = 30 * 60 * 1000;
+        const HEARTBEAT_INTERVAL = 5 * 60 * 1000;
         let lastActivity = Date.now();
         let heartbeatTimer = null;
         
-        // 偵測用戶活動
-        function updateActivity() {
-            lastActivity = Date.now();
-        }
+        function updateActivity() { lastActivity = Date.now(); }
         
-        // 監聽用戶活動
         ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
             document.addEventListener(event, updateActivity, { passive: true });
         });
         
-        // 心跳檢查
         async function heartbeat() {
-            // 檢查是否閒置超時
             if (Date.now() - lastActivity > IDLE_TIMEOUT) {
                 clearInterval(heartbeatTimer);
                 window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
                 return;
             }
-            
-            // 發送心跳
             try {
                 const response = await fetch('/auth/heartbeat', { method: 'POST' });
                 if (response.status === 401) {
                     clearInterval(heartbeatTimer);
                     window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
                 }
-            } catch (e) {
-                console.log('Heartbeat failed:', e);
-            }
+            } catch (e) {}
         }
         
-        // 啟動心跳
         heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
-        
-        // 頁面可見性變更時檢查
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                heartbeat();
-            }
+            if (document.visibilityState === 'visible') heartbeat();
         });
     })();
     </script>
