@@ -57,18 +57,13 @@
         <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
             <!-- Logo -->
             <a href="/home" class="flex items-center gap-2">
-                <img src="/static/images/sela-logo.svg" alt="SELA" class="h-9 w-9">
+                <img src="/static/images/sela-logo.jpg" alt="SELA" class="h-9 w-9 rounded-lg">
                 <span class="font-bold text-sela-600 text-lg tracking-tight">SELA</span>
             </a>
             
             <!-- 右側操作 -->
             <div class="flex items-center gap-2">
                 {% if user %}
-                <!-- 投票 -->
-                <a href="/votes" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-sela-50 transition-colors">
-                    <span class="text-lg">🗳️</span>
-                </a>
-                
                 <!-- 管理（管理員限定） -->
                 {% if user.is_admin %}
                 <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-sela-50 transition-colors">
