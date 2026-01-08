@@ -248,25 +248,26 @@ async def do_import(
     
     # 判斷匯入類型
     # 如果有 store_id，視為菜單更新（忽略 store 欄位）
-    if "store_id" in data:
-        # 菜單更新模式（忽略 store 欄位）
-        menu_data = data.get("menu", {})
-        if not menu_data:
-            raise HTTPException(status_code=400, detail="JSON 缺少 menu 內容")
-        validated = MenuImport(
-            store_id=data["store_id"],
-            mode=data.get("mode", "replace"),
-            menu=menu_data
-        )
-        menu = import_menu(db, validated)
-    elif "store" in data:
-        # 完整匯入模式（新增店家 + 菜單）
-        validated = FullImport(**data)
-        store = import_store_and_menu(db, validated)
-    else:
-        raise HTTPException(status_code=400, detail="JSON 格式錯誤")
-    
-    return RedirectResponse(url="/admin", status_code=302)
+    try:
+        if "store_id" in data:
+            # 菜單更新模式（忽略 store 欄位）
+            menu_data = data.get("menu", {})
+            if not menu_data:
+                raise HTTPException(status_code=400, detail="JSON 缺少 menu 內容")
+            validated = MenuImport(
+                store_id=data["store_id"],
+                mode=data.get("mode", "replace"),
+                menu=menu_data
+            )
+            menu = import_menu(db, validated)
+        elif "store" in data:
+            # 完整匯入模式（新增店家 + 菜單）
+            validated = FullImport(**data)
+            store = import_store_and_menu(db, validated)
+        else:
+            raise HTTPException(status_code=400, detail="JSON 格式錯誤")
+        
+        return RedirectResponse(url="/admin", status_code=302)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
 
