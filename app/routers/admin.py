@@ -185,14 +185,23 @@ async def import_preview(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
     
-    # 如果有 store_id 參數且 JSON 沒有 store 也沒有 store_id，自動注入
-    if store_id and "store" not in data and "store_id" not in data:
-        data["store_id"] = store_id
-        data["mode"] = "new"  # 預設為新增模式
-        json_str = json.dumps(data, ensure_ascii=False)
-    
     # 判斷匯入類型
-    is_full_import = "store" in data
+    # 如果有 store_id（更新菜單模式），忽略 JSON 中的 store 欄位
+    if store_id:
+        # 取出 menu 部分（如果有 store + menu 結構，忽略 store）
+        menu_data = data.get("menu", data)
+        data = {
+            "store_id": store_id,
+            "mode": "replace",
+            "menu": menu_data
+        }
+        json_str = json.dumps(data, ensure_ascii=False)
+        is_full_import = False
+    elif "store" in data:
+        # 完整匯入模式（新增店家 + 菜單）
+        is_full_import = True
+    else:
+        raise HTTPException(status_code=400, detail="JSON 缺少 store（新增店家）或請選擇店家（更新菜單）")
     
     try:
         if is_full_import:
@@ -237,16 +246,27 @@ async def do_import(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
     
-    is_full_import = "store" in data
+    # 判斷匯入類型
+    # 如果有 store_id，視為菜單更新（忽略 store 欄位）
+    if "store_id" in data:
+        # 菜單更新模式（忽略 store 欄位）
+        menu_data = data.get("menu", {})
+        if not menu_data:
+            raise HTTPException(status_code=400, detail="JSON 缺少 menu 內容")
+        validated = MenuImport(
+            store_id=data["store_id"],
+            mode=data.get("mode", "replace"),
+            menu=menu_data
+        )
+        menu = import_menu(db, validated)
+    elif "store" in data:
+        # 完整匯入模式（新增店家 + 菜單）
+        validated = FullImport(**data)
+        store = import_store_and_menu(db, validated)
+    else:
+        raise HTTPException(status_code=400, detail="JSON 格式錯誤")
     
-    try:
-        if is_full_import:
-            validated = FullImport(**data)
-            store = import_store_and_menu(db, validated)
-        else:
-            validated = MenuImport(**data)
-            menu = import_menu(db, validated)
-        return RedirectResponse(url="/admin", status_code=302)
+    return RedirectResponse(url="/admin", status_code=302)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
 
