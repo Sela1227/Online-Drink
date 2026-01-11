@@ -1,0 +1,58 @@
+{# 
+  Store Logo Macro - 統一處理店家 Logo 顯示
+  
+  使用方式:
+  {% from "partials/store_logo.html" import store_logo, store_logo_url %}
+  
+  {{ store_logo(store, size="w-10 h-10") }}
+#}
+
+{# 根據店家類別取得預設圖示 URL #}
+{% macro get_default_logo(category) %}
+{%- if category == 'drink' or (category.value is defined and category.value == 'drink') -%}
+/static/images/defaults/default-drink.svg
+{%- elif category == 'meal' or (category.value is defined and category.value == 'meal') -%}
+/static/images/defaults/default-meal.svg
+{%- elif category == 'group_buy' or (category.value is defined and category.value == 'group_buy') -%}
+/static/images/defaults/default-group_buy.svg
+{%- else -%}
+/static/images/defaults/default-meal.svg
+{%- endif -%}
+{% endmacro %}
+
+{# 取得店家 Logo URL #}
+{% macro store_logo_url(store) %}
+{%- if store.logo_url -%}
+{{ store.logo_url }}
+{%- else -%}
+{{ get_default_logo(store.category) }}
+{%- endif -%}
+{% endmacro %}
+
+{# 完整的 Logo 圖片元件 #}
+{% macro store_logo(store, size="w-10 h-10", extra_class="") %}
+<img src="{{ store_logo_url(store) }}" 
+     alt="{{ store.name }}" 
+     class="{{ size }} object-contain {{ extra_class }}"
+     onerror="this.src='/static/images/defaults/default-meal.svg'">
+{% endmacro %}
+
+{# 帶有背景框的 Logo 元件 #}
+{% macro store_logo_box(store, size="w-12 h-12", bg_class="bg-orange-50") %}
+<div class="{{ size }} {{ bg_class }} rounded-lg flex items-center justify-center overflow-hidden">
+    {{ store_logo(store, size="w-full h-full p-1") }}
+</div>
+{% endmacro %}
+
+{# 根據類別字串取得預設圖示 #}
+{% macro category_default_logo(category_str) %}
+{%- if category_str in ['drink', 'DRINK'] -%}
+/static/images/defaults/default-drink.svg
+{%- elif category_str in ['meal', 'MEAL'] -%}
+/static/images/defaults/default-meal.svg
+{%- elif category_str in ['group_buy', 'GROUP_BUY'] -%}
+/static/images/defaults/default-group_buy.svg
+{%- else -%}
+/static/images/defaults/default-meal.svg
+{%- endif -%}
+{% endmacro %}
