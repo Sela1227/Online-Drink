@@ -189,15 +189,7 @@ async def import_preview(
     
     # 判斷匯入類型
     if store_id:
-        # 單獨匯入菜單到現有店家
-        # 取出 menu 部分（支援完整格式或純菜單格式）
-        if "menu" in data:
-            menu_data = data["menu"]
-        elif "categories" in data or "items" in data:
-            menu_data = data
-        else:
-            raise HTTPException(status_code=400, detail="JSON 缺少菜單內容（需要 menu、categories 或 items）")
-        
+        menu_data = data.get("menu", data)
         data = {
             "store_id": store_id,
             "mode": "replace",
@@ -206,7 +198,6 @@ async def import_preview(
         json_str = json.dumps(data, ensure_ascii=False)
         is_full_import = False
     elif "store" in data:
-        # 完整匯入模式（新增店家 + 菜單）
         is_full_import = True
     else:
         raise HTTPException(status_code=400, detail="JSON 缺少 store（新增店家）或請選擇店家（更新菜單）")
@@ -219,7 +210,7 @@ async def import_preview(
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
     
-    # ===== 重複店家檢查 =====
+    # ===== 新增：重複店家檢查 =====
     existing_stores = []
     if is_full_import:
         store_name = validated.store.name.strip()
@@ -237,20 +228,19 @@ async def import_preview(
             })
         else:
             # 模糊比對
-            if len(store_name) >= 2:
-                similar = db.query(Store).filter(
-                    Store.is_active == True
-                ).all()
-                for s in similar:
-                    if store_name in s.name or s.name in store_name:
-                        existing_stores.append({"store": s, "match_type": "similar"})
+            similar = db.query(Store).filter(
+                Store.is_active == True,
+                or_(Store.name.contains(store_name), Store.name == store_name)
+            ).all()
+            for s in similar:
+                if store_name in s.name or s.name in store_name:
+                    existing_stores.append({"store": s, "match_type": "similar"})
     
-    # 如果是菜單匯入，取得現有菜單和店家資訊
+    # 如果是菜單匯入，取得現有菜單做比較
     existing_menu = None
-    target_store = None
     if not is_full_import:
-        target_store = db.query(Store).filter(Store.id == validated.store_id).first()
-        if not target_store:
+        store = db.query(Store).filter(Store.id == validated.store_id).first()
+        if not store:
             raise HTTPException(status_code=404, detail="店家不存在")
         existing_menu = db.query(Menu).filter(
             Menu.store_id == validated.store_id,
@@ -263,7 +253,6 @@ async def import_preview(
         "data": validated,
         "is_full_import": is_full_import,
         "existing_menu": existing_menu,
-        "target_store": target_store,
         "json_str": json_str,
         "existing_stores": existing_stores,
     })
