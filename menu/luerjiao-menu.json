@@ -1,0 +1,108 @@
+{
+  "menu": {
+    "categories": [
+      {
+        "name": "季節限定款（限大杯）",
+        "items": [
+          {"name": "柳丁綠茶（鮮榨台灣雞蛋丁）", "price": 65, "price_l": 65},
+          {"name": "柳丁檸檬（糖固定）", "price": 65, "price_l": 65},
+          {"name": "葡萄柚青（手工挖果肉）", "price": 70, "price_l": 70},
+          {"name": "葡柚美梅（葡萄柚+熬煮話梅佐檸檬）", "price": 75, "price_l": 75},
+          {"name": "葡萄柚檸檬（糖固定）", "price": 70, "price_l": 70},
+          {"name": "葡萄柚養樂多（多多3瓶/糖固定）", "price": 80, "price_l": 80},
+          {"name": "綠豆牛奶沙（悶煮毛綠豆/糖固定）", "price": 60, "price_l": 60},
+          {"name": "綠豆冰沙（糖固定）", "price": 50, "price_l": 50}
+        ]
+      },
+      {
+        "name": "手沖現泡",
+        "items": [
+          {"name": "手沖青茶（無糖）", "price": 50, "price_l": 50},
+          {"name": "手沖烏龍（無糖）", "price": 50, "price_l": 50},
+          {"name": "手沖金萱紅（可選糖度）", "price": 50, "price_l": 50},
+          {"name": "金萱紅鮮奶茶（可選熱飲/冰飲）", "price": 70, "price_l": 70},
+          {"name": "冰泡鮮奶茶", "price": 65, "price_l": 65},
+          {"name": "冰泡焦糖鮮奶茶", "price": 75, "price_l": 75},
+          {"name": "熱泡鮮奶茶", "price": 55, "price_l": 55},
+          {"name": "熱泡焦糖鮮奶茶", "price": 65, "price_l": 65}
+        ]
+      },
+      {
+        "name": "醇香鮮奶",
+        "items": [
+          {"name": "伯爵紅鮮奶茶", "price": 60, "price_l": 70},
+          {"name": "焦糖紅茶拿鐵", "price": 60, "price_l": 70},
+          {"name": "焙拿鐵", "price": 65, "price_l": 75},
+          {"name": "鐵觀音拿鐵", "price": 65, "price_l": 75},
+          {"name": "紅豆鮮奶（無另加糖）", "price": 70, "price_l": 75},
+          {"name": "黑糖珍珠鮮奶（厚奶限大杯/糖固定）", "price": 70, "price_l": 70},
+          {"name": "黑糖仙草凍鮮奶（厚奶限大杯/糖固定）", "price": 65, "price_l": 65}
+        ]
+      },
+      {
+        "name": "鮮果搖茶（限大杯）",
+        "items": [
+          {"name": "水果鮮茶（鳳梨、百香、季節水果）", "price": 65, "price_l": 65},
+          {"name": "鳳梨青茶（自熬土鳳梨果醬）", "price": 60, "price_l": 60},
+          {"name": "金桔美梅（金桔+熬煮話梅）", "price": 60, "price_l": 60},
+          {"name": "金桔檸檬（鮮榨檸檬汁）", "price": 55, "price_l": 55},
+          {"name": "百香果綠", "price": 55, "price_l": 55},
+          {"name": "百香Q凍飲", "price": 55, "price_l": 55},
+          {"name": "蜂蜜檸檬", "price": 55, "price_l": 55}
+        ]
+      },
+      {
+        "name": "原生好茶",
+        "items": [
+          {"name": "冬片青茶（冬片仔）", "price": 30, "price_l": 35},
+          {"name": "金萱烏龍", "price": 30, "price_l": 35},
+          {"name": "伯爵紅茶（經典英式紅茶）", "price": 25, "price_l": 30},
+          {"name": "茉香綠茶（茉莉花綠茶）", "price": 25, "price_l": 30},
+          {"name": "碳焙鐵觀音（深烘焙烏龍/熟沉香重喉韻）", "price": 30, "price_l": 35},
+          {"name": "玄米煎茶（淺蒸煎茶拌炒玄米粒/生津潤胃）", "price": 30, "price_l": 35},
+          {"name": "粉條綠茶", "price": 35, "price_l": 40},
+          {"name": "粉椰紅茶", "price": 35, "price_l": 40},
+          {"name": "養樂多綠茶（另加話梅+1）", "price": 50, "price_l": 55},
+          {"name": "冰淇淋紅茶", "price": 50, "price_l": 55}
+        ]
+      },
+      {
+        "name": "古早風味",
+        "items": [
+          {"name": "梅檸檬（熬煮鹽漬話梅/糖固定）", "price": 50, "price_l": 55},
+          {"name": "話梅茉綠", "price": 40, "price_l": 45},
+          {"name": "冬瓜茶（自熬黑糖冬仔）", "price": 25, "price_l": 30},
+          {"name": "檸檬冬瓜", "price": 40, "price_l": 45},
+          {"name": "粉條冬瓜（糖固定）", "price": 35, "price_l": 40},
+          {"name": "冬瓜仙草凍（手工仙草凍/糖固定）", "price": 35, "price_l": 40},
+          {"name": "洛神花茶（自熬洛神中藥包/糖固定）", "price": 35, "price_l": 40},
+          {"name": "檸檬洛神（糖固定）", "price": 50, "price_l": 55}
+        ]
+      },
+      {
+        "name": "奶香私茶（換鮮奶+$15）",
+        "items": [
+          {"name": "珍珠奶茶", "price": 50, "price_l": 55},
+          {"name": "粉條奶綠", "price": 50, "price_l": 55},
+          {"name": "紅豆珍烤奶", "price": 55, "price_l": 60},
+          {"name": "仙草凍奶（手工仙草凍/糖固定）", "price": 40, "price_l": 45},
+          {"name": "伯爵奶茶", "price": 40, "price_l": 45},
+          {"name": "茉香奶綠", "price": 40, "price_l": 45},
+          {"name": "日式烤奶（重焙火烤茶）", "price": 45, "price_l": 50},
+          {"name": "玄米奶茶（玄米煎茶）", "price": 45, "price_l": 50},
+          {"name": "鐵觀音奶茶（碳焙鐵觀音）", "price": 45, "price_l": 50}
+        ]
+      },
+      {
+        "name": "新鮮冰凍（限大杯）",
+        "items": [
+          {"name": "梅檸檬冰沙（熬煮鹽漬話梅/糖固定）", "price": 55, "price_l": 55},
+          {"name": "紅豆牛奶沙（悶煮萬丹紅豆/糖固定）", "price": 60, "price_l": 60},
+          {"name": "紅豆冰沙（糖固定）", "price": 50, "price_l": 50},
+          {"name": "漂浮黑可可冰沙（100%可可/糖固定）", "price": 70, "price_l": 70},
+          {"name": "鳳梨百香冰沙（土鳳梨+鮮百香籽/糖固定）", "price": 80, "price_l": 80}
+        ]
+      }
+    ]
+  }
+}

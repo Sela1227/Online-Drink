@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}匯入預覽 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">匯入預覽</h1>
+        <a href="/admin/import" class="text-sm text-gray-500 hover:text-gray-700">返回匯入頁面 →</a>
+    </div>
+    
+    <!-- 匯入類型 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        {% if is_full_import %}
+        <div class="text-sm text-orange-600 font-medium mb-2">📦 完整匯入（新店家 + 菜單）</div>
+        
+        <!-- 店家資訊 -->
+        <div class="border rounded-lg p-3 mb-4">
+            <h3 class="font-medium text-gray-800">店家資訊</h3>
+            <div class="mt-2 text-sm text-gray-600 space-y-1">
+                <div>名稱：<span class="font-medium">{{ data.store.name }}</span></div>
+                <div>類型：<span class="font-medium">{{ '飲料' if data.store.category == 'drink' else '餐點' }}</span></div>
+                {% if data.store.sugar_options %}
+                <div>甜度選項：{{ data.store.sugar_options | join('、') }}</div>
+                {% endif %}
+                {% if data.store.ice_options %}
+                <div>冰塊選項：{{ data.store.ice_options | join('、') }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-sm text-green-600 font-medium mb-2">📋 菜單匯入</div>
+        <div class="text-sm text-gray-600 mb-4">
+            店家 ID：{{ data.store_id }}
+            ・模式：{{ '新增版本' if data.mode == 'new' else '覆蓋現有' }}
+        </div>
+        {% endif %}
+        
+        <!-- 菜單內容 -->
+        <div class="border rounded-lg p-3">
+            <h3 class="font-medium text-gray-800 mb-2">菜單內容</h3>
+            
+            {% if data.menu.categories %}
+            {% for category in data.menu.categories %}
+            <div class="mb-3">
+                <div class="text-sm font-medium text-gray-700">{{ category.name }}</div>
+                <div class="ml-4 text-sm text-gray-600">
+                    {% for item in category.items %}
+                    <div class="flex items-center gap-2 py-1">
+                        <span>{{ item.name }}</span>
+                        <span class="text-orange-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
+                        {% if item.options %}
+                        <span class="text-xs text-gray-400">
+                            ({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if data.menu.items %}
+            <div class="text-sm text-gray-600">
+                {% for item in data.menu.items %}
+                <div class="flex items-center gap-2 py-1">
+                    <span>{{ item.name }}</span>
+                    <span class="text-orange-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
+                    {% if item.options %}
+                    <span class="text-xs text-gray-400">
+                        ({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})
+                    </span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 確認匯入 -->
+    <form action="/admin/import" method="post">
+        <input type="hidden" name="json_str" value="{{ json_str | e }}">
+        
+        <div class="flex gap-2">
+            <a href="/admin/import" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+                取消
+            </a>
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                確認匯入
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

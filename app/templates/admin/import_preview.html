@@ -14,6 +14,44 @@
         {% if is_full_import %}
         <div class="text-sm text-orange-600 font-medium mb-2">📦 完整匯入（新店家 + 菜單）</div>
         
+        <!-- ===== 重複店家警告 ===== -->
+        {% if existing_stores and existing_stores|length > 0 %}
+        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+            <div class="flex items-start gap-2">
+                <span class="text-yellow-600 text-xl">⚠️</span>
+                <div class="flex-1">
+                    <div class="font-medium text-yellow-800 mb-2">發現可能重複的店家</div>
+                    <div class="text-sm text-yellow-700 space-y-2">
+                        {% for item in existing_stores %}
+                        <div class="flex items-center justify-between bg-white rounded p-2">
+                            <div>
+                                <span class="font-medium">{{ item.store.name }}</span>
+                                {% if item.match_type == 'exact' %}
+                                <span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded ml-2">完全相同</span>
+                                {% else %}
+                                <span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded ml-2">名稱相似</span>
+                                {% endif %}
+                                <span class="text-xs text-gray-500 ml-2">ID: {{ item.store.id }}</span>
+                            </div>
+                            <a href="/admin/stores/{{ item.store.id }}" target="_blank" 
+                               class="text-xs text-blue-600 hover:underline">
+                                查看 →
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="text-sm text-yellow-700 mt-3">
+                        您可以選擇：
+                    </p>
+                    <ul class="text-sm text-yellow-700 list-disc list-inside ml-2">
+                        <li>繼續建立新店家（會產生重複）</li>
+                        <li>合併菜單到現有店家（推薦）</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- 店家資訊 -->
         <div class="border rounded-lg p-3 mb-4">
             <h3 class="font-medium text-gray-800">店家資訊</h3>
@@ -25,6 +63,13 @@
                 {% endif %}
                 {% if data.store.ice_options %}
                 <div>冰塊選項：{{ data.store.ice_options | join('、') }}</div>
+                {% endif %}
+                {% if data.store.toppings %}
+                <div>加料選項：
+                    {% for t in data.store.toppings %}
+                    {{ t.name }}{% if t.price > 0 %}(+${{ t.price }}){% endif %}{% if not loop.last %}、{% endif %}
+                    {% endfor %}
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -80,15 +125,73 @@
     </div>
     
     <!-- 確認匯入 -->
-    <form action="/admin/import" method="post">
+    <form action="/admin/import" method="post" x-data="{ mergeMode: false, selectedStoreId: null }">
         <input type="hidden" name="json_str" value="{{ json_str | e }}">
+        
+        {% if is_full_import and existing_stores and existing_stores|length > 0 %}
+        <!-- 合併選項 -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+            <div class="font-medium text-gray-800 mb-3">選擇匯入方式</div>
+            
+            <div class="space-y-3">
+                <!-- 選項 1：建立新店家 -->
+                <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition"
+                       :class="{ 'border-orange-500 bg-orange-50': !mergeMode }">
+                    <input type="radio" name="import_mode" value="new" 
+                           x-model="mergeMode" :value="false"
+                           @change="mergeMode = false; selectedStoreId = null"
+                           class="mt-1" checked>
+                    <div>
+                        <div class="font-medium text-gray-800">建立新店家</div>
+                        <div class="text-sm text-gray-500">將建立「{{ data.store.name }}」作為新店家（可能重複）</div>
+                    </div>
+                </label>
+                
+                <!-- 選項 2：合併到現有店家 -->
+                <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition"
+                       :class="{ 'border-green-500 bg-green-50': mergeMode }">
+                    <input type="radio" name="import_mode" value="merge"
+                           @change="mergeMode = true"
+                           class="mt-1">
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-800">合併到現有店家 <span class="text-xs text-green-600">(推薦)</span></div>
+                        <div class="text-sm text-gray-500 mb-2">將菜單匯入到已存在的店家，並更新甜冰/加料選項</div>
+                        
+                        <!-- 選擇目標店家 -->
+                        <div x-show="mergeMode" x-transition class="mt-2">
+                            <select name="merge_to_store_id" 
+                                    x-model="selectedStoreId"
+                                    class="w-full border rounded-lg px-3 py-2 text-sm">
+                                <option value="">-- 請選擇目標店家 --</option>
+                                {% for item in existing_stores %}
+                                <option value="{{ item.store.id }}">
+                                    {{ item.store.name }} (ID: {{ item.store.id }})
+                                    {% if item.match_type == 'exact' %}[完全相同]{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </div>
+        {% endif %}
         
         <div class="flex gap-2">
             <a href="/admin/import" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
-            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+            <button type="submit" 
+                    class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    {% if is_full_import and existing_stores and existing_stores|length > 0 %}
+                    :disabled="mergeMode && !selectedStoreId"
+                    {% endif %}>
+                {% if is_full_import and existing_stores and existing_stores|length > 0 %}
+                <span x-show="!mergeMode">確認建立新店家</span>
+                <span x-show="mergeMode">確認合併菜單</span>
+                {% else %}
                 確認匯入
+                {% endif %}
             </button>
         </div>
     </form>
