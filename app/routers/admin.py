@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from pydantic import ValidationError
 from datetime import datetime, timedelta, timezone
 import json
