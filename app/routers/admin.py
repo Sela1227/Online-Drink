@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPExc
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, joinedload
+from sqlalchemy import or_
 from pydantic import ValidationError
 from datetime import datetime, timedelta, timezone
 import json
