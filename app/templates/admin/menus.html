@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}菜單管理 - {{ store.name }}{% endblock %}
 
 {% block content %}
@@ -7,68 +6,162 @@
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-gray-800">菜單管理</h1>
         <div class="flex items-center gap-3">
-            <a href="/admin/import" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg">
-                + 匯入
-            </a>
+            <a href="/admin/import?store_id={{ store.id }}" class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg">+ 匯入菜單</a>
             <a href="/admin/stores/{{ store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回 {{ store.name }} →</a>
         </div>
     </div>
     
+    <!-- 操作說明 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        💡 點擊品項可直接編輯名稱和價格
+    </div>
+    
     {% if menus %}
-    <div class="bg-white rounded-lg shadow-sm divide-y">
-        {% for menu in menus %}
-        <div class="p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="font-medium text-gray-900">
-                        版本 #{{ menu.id }}
-                        {% if menu.is_active %}
-                        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded ml-2">使用中</span>
-                        {% endif %}
-                    </div>
-                    <div class="text-sm text-gray-500">
-                        建立於 {{ menu.created_at.strftime('%Y-%m-%d %H:%M') }}
-                        ・{{ menu.items|length }} 個品項
-                    </div>
-                </div>
-                
-                {% if not menu.is_active %}
-                <form action="/admin/stores/{{ store.id }}/menus/{{ menu.id }}/activate" method="post">
-                    <button type="submit" class="text-sm text-orange-600 hover:text-orange-700">
-                        啟用此版本
-                    </button>
-                </form>
-                {% endif %}
-            </div>
-            
-            <!-- 品項預覽 -->
-            <div class="mt-3 text-sm text-gray-600">
-                {% for category in menu.categories %}
-                <div class="font-medium text-gray-700">{{ category.name }}</div>
-                <div class="ml-4 mb-2">
-                    {% for item in category.items %}
-                    {{ item.name }} (${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}){% if not loop.last %}、{% endif %}
-                    {% endfor %}
-                </div>
-                {% endfor %}
-                
-                {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
-                {% if uncategorized %}
-                <div class="ml-0">
-                    {% for item in uncategorized %}
-                    {{ item.name }} (${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}){% if not loop.last %}、{% endif %}
-                    {% endfor %}
-                </div>
-                {% endif %}
+    {% for menu in menus %}
+    {% if menu.is_active %}
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-4 border-b flex items-center justify-between">
+            <div>
+                <span class="font-medium text-gray-800">目前使用中的菜單</span>
+                <span class="text-xs text-gray-400 ml-2">{{ menu.items|length }} 個品項</span>
             </div>
         </div>
-        {% endfor %}
+        
+        <div class="divide-y">
+            {% for category in menu.categories %}
+            <div class="p-4">
+                <div class="text-sm font-medium text-white bg-gray-600 px-2 py-1 rounded inline-block mb-2">{{ category.name }}</div>
+                
+                <div class="space-y-1">
+                    {% for item in category.items %}
+                    <div class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 group"
+                         x-data="{ 
+                             editing: false, 
+                             name: '{{ item.name|replace("'", "\'")|e }}', 
+                             price: '{{ item.price }}', 
+                             priceL: '{{ item.price_l or '' }}',
+                             saving: false,
+                             async save() {
+                                 this.saving = true;
+                                 const form = new FormData();
+                                 form.append('name', this.name);
+                                 form.append('price', this.price);
+                                 form.append('price_l', this.priceL);
+                                 await fetch('/admin/menu/items/{{ item.id }}/update', {method: 'POST', body: form});
+                                 this.saving = false;
+                                 this.editing = false;
+                             }
+                         }">
+                        
+                        <!-- 顯示模式 -->
+                        <template x-if="!editing">
+                            <div class="flex-1 flex items-center gap-2 cursor-pointer" @click="editing = true">
+                                <span class="flex-1" x-text="name"></span>
+                                <span class="text-orange-600 font-medium">
+                                    $<span x-text="price"></span>
+                                    <template x-if="priceL"><span class="text-gray-400">/$<span class="text-orange-600" x-text="priceL"></span></span></template>
+                                </span>
+                                <span class="text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition">✏️</span>
+                            </div>
+                        </template>
+                        
+                        <!-- 編輯模式 -->
+                        <template x-if="editing">
+                            <div class="flex-1 flex items-center gap-2">
+                                <input type="text" x-model="name" @keydown.enter="save()" @keydown.escape="editing = false"
+                                       class="flex-1 border rounded px-2 py-1 text-sm" autofocus>
+                                <div class="flex items-center gap-1 text-sm">
+                                    <span class="text-gray-400">$</span>
+                                    <input type="number" x-model="price" step="1" min="0" @keydown.enter="save()"
+                                           class="w-16 border rounded px-2 py-1 text-right">
+                                    <span class="text-gray-300">/</span>
+                                    <input type="number" x-model="priceL" step="1" min="0" placeholder="大杯" @keydown.enter="save()"
+                                           class="w-16 border rounded px-2 py-1 text-right">
+                                </div>
+                                <button @click="save()" class="text-green-600 hover:text-green-700 px-2" :disabled="saving">
+                                    <span x-show="!saving">✓</span>
+                                    <span x-show="saving">...</span>
+                                </button>
+                                <button @click="editing = false" class="text-gray-400 hover:text-gray-600 px-1">✕</button>
+                            </div>
+                        </template>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            
+            {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
+            {% if uncategorized %}
+            <div class="p-4">
+                <div class="text-sm font-medium text-white bg-gray-500 px-2 py-1 rounded inline-block mb-2">未分類</div>
+                <div class="space-y-1">
+                    {% for item in uncategorized %}
+                    <div class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 group"
+                         x-data="{ editing: false, name: '{{ item.name|replace("'", "\'")|e }}', price: '{{ item.price }}', priceL: '{{ item.price_l or '' }}', saving: false,
+                             async save() {
+                                 this.saving = true;
+                                 const form = new FormData();
+                                 form.append('name', this.name);
+                                 form.append('price', this.price);
+                                 form.append('price_l', this.priceL);
+                                 await fetch('/admin/menu/items/{{ item.id }}/update', {method: 'POST', body: form});
+                                 this.saving = false;
+                                 this.editing = false;
+                             }
+                         }">
+                        <template x-if="!editing">
+                            <div class="flex-1 flex items-center gap-2 cursor-pointer" @click="editing = true">
+                                <span class="flex-1" x-text="name"></span>
+                                <span class="text-orange-600 font-medium">$<span x-text="price"></span></span>
+                                <span class="text-xs text-gray-300 opacity-0 group-hover:opacity-100">✏️</span>
+                            </div>
+                        </template>
+                        <template x-if="editing">
+                            <div class="flex-1 flex items-center gap-2">
+                                <input type="text" x-model="name" @keydown.enter="save()" @keydown.escape="editing = false" class="flex-1 border rounded px-2 py-1 text-sm" autofocus>
+                                <input type="number" x-model="price" step="1" @keydown.enter="save()" class="w-20 border rounded px-2 py-1 text-sm text-right">
+                                <button @click="save()" class="text-green-600">✓</button>
+                                <button @click="editing = false" class="text-gray-400">✕</button>
+                            </div>
+                        </template>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
     </div>
+    {% endif %}
+    {% endfor %}
+    
+    <!-- 歷史版本 -->
+    {% set inactive_menus = menus | selectattr('is_active', 'false') | list %}
+    {% if inactive_menus %}
+    <details class="bg-white rounded-lg shadow-sm">
+        <summary class="p-4 cursor-pointer text-gray-600 hover:bg-gray-50">
+            📁 歷史版本 ({{ inactive_menus|length }})
+        </summary>
+        <div class="divide-y border-t">
+            {% for menu in inactive_menus %}
+            <div class="p-4 flex items-center justify-between">
+                <div class="text-sm text-gray-500">
+                    版本 #{{ menu.id }} ・{{ menu.created_at.strftime('%Y-%m-%d') }} ・{{ menu.items|length }} 品項
+                </div>
+                <form action="/admin/stores/{{ store.id }}/menus/{{ menu.id }}/activate" method="post">
+                    <button type="submit" class="text-sm text-orange-600 hover:text-orange-700">啟用</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+    
     {% else %}
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
         <div class="text-4xl mb-2">📋</div>
-        <p>還沒有任何菜單</p>
-        <a href="/admin/import" class="text-orange-600 hover:text-orange-700">前往匯入</a>
+        <p>還沒有菜單</p>
+        <a href="/admin/import?store_id={{ store.id }}" class="text-orange-600 hover:underline">匯入菜單</a>
     </div>
     {% endif %}
 </div>
