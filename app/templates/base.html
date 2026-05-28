@@ -16,14 +16,14 @@
                 extend: {
                     colors: {
                         sela: {
-                            50: '#FFF7ED',
-                            100: '#FFEDD5',
-                            200: '#FED7AA',
-                            300: '#FDBA74',
-                            400: '#FB923C',
-                            500: '#F97316',
-                            600: '#EA580C',
-                            700: '#C2410C',
+                            50: '#F0F1F9',
+                            100: '#DBDDF0',
+                            200: '#B8BCE0',
+                            300: '#8E95CC',
+                            400: '#636BB6',
+                            500: '#454C8C',
+                            600: '#373D77',
+                            700: '#292F60',
                         }
                     }
                 }
@@ -40,7 +40,7 @@
         /* 北歐風滾動條 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #FDBA74; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #8E95CC; border-radius: 4px; }
         
         /* 平滑過渡 */
         * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
@@ -50,7 +50,7 @@
     </style>
 </head>
 <body class="bg-sela-50/30 min-h-screen antialiased">
-{% set app_version = 'V1.5.0' %}
+{% set app_version = 'V1.6.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {

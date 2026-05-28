@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.5.0（emoji 收尾全清 + 底部導航動態 active）
+- **版本：** V1.6.0（主視覺換色 #454c8c 藍紫 + 移除空狀態 logo）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -218,6 +218,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.6.0 | **主視覺換色 + 移除空狀態 logo**。`base.html` 的 `tailwind.config` `sela-*` 色階從橘色系整組換成 `#454c8c` 藍紫系（以 #454c8c 為 500 階，HSL 234°/34%/41%，固定 hue 調明度生成 50~700）— 全站用 `sela-*` class 的按鈕 / active / 連結 / 邊框一次全變藍紫。品牌 logo（`sela-logo.jpg` img）不受 CSS 影響保持橘色；`default-drink.svg` 預設飲料插圖刻意保留橘色（食慾暖色）。滾動條 thumb hardcode `#FDBA74`→`#8E95CC`（新 sela-300）。首頁空狀態橘色大 SELA logo 移除，換成低調 `ti-cup`（sela-400 配 sela-50 圓底）。 |
 | V1.5.0 | **emoji 收尾全清 + 底部導航動態 active**。剩餘 52 種 emoji 全站 1:1 替換（33 檔 149 次）：⭐☆→`ti-star` / 📞→`ti-phone` / 💝🩷❤→`ti-heart` / 🗳→`ti-checkbox` / 🙈→`ti-eye-off` / ⏰→`ti-alarm` / 📍→`ti-map-pin` / ⚡→`ti-bolt` / 🎊🥳→`ti-confetti` / 🔥→`ti-flame` / ✓→`ti-check` / 🗺→`ti-map` / ⚠→`ti-alert-triangle` / 🎯→`ti-target` / ➕→`ti-plus` / 🎲→`ti-dice` / 🚀→`ti-rocket` / 🥤→`ti-cup` / 📭→`ti-mailbox` / ❌✕→`ti-x` / 💾→`ti-device-floppy` / 🏆→`ti-trophy` / 📊→`ti-chart-bar` / 📈→`ti-chart-line` / 📂→`ti-folder-open` / 📁→`ti-folder` / 📦→`ti-package` / 👀→`ti-eye` / ⚙→`ti-settings` / 🗑→`ti-trash` / ⏸→`ti-player-pause` / 🔒🔐→`ti-lock` / 🐛→`ti-bug` / 🔄→`ti-refresh` / 🚗→`ti-car` / 🥇🥈🥉→`ti-medal` / 📅→`ti-calendar` / 👑→`ti-crown` / 📜→`ti-scroll` / ⚫→`ti-circle-filled` / 💬→`ti-message` / 🔗→`ti-link` / 🚨→`ti-alert-octagon` / ⏱→`ti-stopwatch`。**保留 `→`（49 次）與 `↑`（1 次）純文字箭頭不換**。另外底部導航改用 `request.url.path` 動態判斷 active（坑 #15）：之前 hardcode「首頁」恆亮，現在依當前頁高亮對應項目（home/votes/feedback/profile，用 `path.startswith` 涵蓋子頁）。**全站零裝飾 emoji 達成**。 |
 | V1.4.1 | **Hotfix：未登入訪問需登入頁 → 導向 LINE 登入（坑 #14）**。新使用者用沒登入過的手機直接開 `/home` 看到 `{"detail":"請先登入"}` JSON 而非登入頁。在 `main.py` 加全域 401 例外處理器：瀏覽器開頁面（Accept: text/html 且非 htmx）→ `RedirectResponse` 到 `/auth/login`；htmx/API → 維持 401 JSON。**只動 main.py（加 handler）+ base.html 版本號**。 |
 | V1.4.0 | **admin 後台 9 種 emoji → Tabler**。16 檔 37 次替換：🟢→`ti-circle-filled`（保留綠色 inline style）/ 📮→`ti-mailbox` / 💡→`ti-bulb` / 📢→`ti-speakerphone` / 📥→`ti-inbox` / ⏳→`ti-hourglass` / ✨→`ti-sparkles` / ✏→`ti-pencil`（與 V1.3.0 📝 一致）/ 📌→`ti-pin`。🟢 特別處理：用 inline style `color: #22c55e` 保留綠色語義，避免 Tabler 圖示 currentColor 失去狀態色 |
@@ -244,7 +245,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 4. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
 5. 菜單匯入開放 `group_buy` category（解坑 #9）
 6. 評估把 `taipei` filter 抽到共用 templates 模組（解坑 #6，評估重構成本）
-7. 整體視覺巡檢 — emoji 全換成 Tabler 後，檢查是否有圖示在特定情境下大小 / 對齊 / 顏色語義不對（如 🟢 在線已特別保留綠色，但其他狀態色 emoji 換單色後可能失去語義，需逐一檢視）
+7. 整體視覺巡檢 — (a) emoji 換 Tabler 後檢查圖示大小 / 對齊 / 顏色語義；(b) **V1.6.0 換主色後巡檢**：原本搭配橘色設計的局部（如分類篩選按鈕 amber/green/blue、各種 hardcode 顏色）在藍紫主色下是否協調；admin 統計數字色（橘/紫/綠/藍）是否需重新搭配
 
 ## 八、升版必讀
 
