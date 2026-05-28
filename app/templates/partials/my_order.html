@@ -63,7 +63,7 @@
                     hx-swap="innerHTML"
                     hx-confirm="確定要刪除？"
                     @htmx:after-request="$dispatch('orderUpdated')"
-                    class="text-red-400 hover:text-red-600 text-sm">✕</button>
+                    class="text-red-400 hover:text-red-600 text-sm"><i class="ti ti-x"></i></button>
             {% else %}
             <span class="text-gray-500 text-sm">x{{ item.quantity }}</span>
             <div class="text-orange-600 font-medium text-sm">${{ item.subtotal }}</div>

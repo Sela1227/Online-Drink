@@ -26,7 +26,7 @@
                             id="fav-btn"
                             class="ml-2 flex items-center gap-0.5 hover:scale-105 transition-transform"
                             title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
-                        <span class="text-lg">{% if is_favorited %}⭐{% else %}☆{% endif %}</span>
+                        <span class="text-lg">{% if is_favorited %}<i class="ti ti-star"></i>{% else %}<i class="ti ti-star"></i>{% endif %}</span>
                         <span class="text-xs text-gray-400" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
                     </button>
                 </div>
@@ -48,27 +48,27 @@
             {% if branch and branch.phone %}
             <a href="tel:{{ branch.phone }}" 
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition">
-                📞 {{ branch.phone }}
+                <i class="ti ti-phone"></i> {{ branch.phone }}
             </a>
             {% elif store.phone %}
             <a href="tel:{{ store.phone }}" 
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition">
-                📞 撥打電話
+                <i class="ti ti-phone"></i> 撥打電話
             </a>
             {% endif %}
             {% if branch and branch.address %}
             <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-full text-sm">
-                📍 {{ branch.address }}
+                <i class="ti ti-map-pin"></i> {{ branch.address }}
             </span>
             {% elif store.address %}
             <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-full text-sm">
-                📍 {{ store.address }}
+                <i class="ti ti-map-pin"></i> {{ store.address }}
             </span>
             {% endif %}
             {% if store.google_maps_url %}
             <a href="{{ store.google_maps_url }}" target="_blank"
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition">
-                🗺️ Google 地圖
+                <i class="ti ti-map"></i>️ Google 地圖
             </a>
             {% endif %}
             {% if store.website_url %}
@@ -86,7 +86,7 @@
             {% if store.foodpanda_url %}
             <a href="{{ store.foodpanda_url }}" target="_blank"
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-pink-50 text-pink-700 rounded-full text-sm hover:bg-pink-100 transition">
-                🩷 foodpanda
+                <i class="ti ti-heart"></i> foodpanda
             </a>
             {% endif %}
         </div>
@@ -102,13 +102,13 @@
         <!-- 趣味功能狀態提示 -->
         {% if group.is_blind_mode and is_open %}
         <div class="mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
-            🙈 <strong>盲點模式</strong>：截止前無法看到其他人點了什麼，截止後一起揭曉！
+            <i class="ti ti-eye-off"></i> <strong>盲點模式</strong>：截止前無法看到其他人點了什麼，截止後一起揭曉！
         </div>
         {% endif %}
         
         {% if group.enable_lucky_draw %}
         <div class="mt-3 p-3 bg-pink-50 rounded-lg text-sm text-pink-800">
-            🎊 <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
+            <i class="ti ti-confetti"></i> <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
             {% if not is_open and group.lucky_winner_ids %}
             <div class="mt-2 font-bold text-lg">
                 <i class="ti ti-confetti"></i> 恭喜 
@@ -126,7 +126,7 @@
         {% if group.treat_user_id %}
         <div class="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-800 flex items-center justify-between">
             <div>
-                💝 <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單
+                <i class="ti ti-heart"></i> <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單
             </div>
             {% if user.id == group.treat_user_id or is_owner or is_admin %}
             <form action="/groups/{{ group.id }}/cancel-treat" method="post" class="inline"
@@ -141,9 +141,9 @@
         {% if group.min_members %}
         <div class="mt-3 p-3 rounded-lg text-sm {% if group.has_enough_members %}bg-green-50 text-green-800{% else %}bg-yellow-50 text-yellow-800{% endif %}">
             <div class="flex items-center justify-between mb-2">
-                <span>🎯 <strong>湊團制</strong>：最少 {{ group.min_members }} 人成團</span>
+                <span><i class="ti ti-target"></i> <strong>湊團制</strong>：最少 {{ group.min_members }} 人成團</span>
                 {% if group.has_enough_members %}
-                <span class="text-green-600 font-medium">✓ 已成團</span>
+                <span class="text-green-600 font-medium"><i class="ti ti-check"></i> 已成團</span>
                 {% else %}
                 <span class="text-yellow-600">還差 {{ group.members_needed }} 人</span>
                 {% endif %}
@@ -166,7 +166,7 @@
         <!-- 自動催單提示 -->
         {% if group.auto_remind_minutes and is_open %}
         <div class="mt-3 p-3 bg-cyan-50 rounded-lg text-sm text-cyan-800">
-            ⏰ <strong>自動催單</strong>：截止前 {{ group.auto_remind_minutes }} 分鐘將提醒尚未結單的人
+            <i class="ti ti-alarm"></i> <strong>自動催單</strong>：截止前 {{ group.auto_remind_minutes }} 分鐘將提醒尚未結單的人
         </div>
         {% endif %}
         
@@ -174,7 +174,7 @@
         {% if group.delivery_fee %}
         <div class="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800 flex items-center justify-between">
             <div>
-                🚗 外送費：${{ group.delivery_fee|int }}
+                <i class="ti ti-car"></i> 外送費：${{ group.delivery_fee|int }}
             </div>
             <div class="text-blue-600">
                 {% if group.submitted_count > 0 %}
@@ -318,7 +318,7 @@
                     <h4 class="font-medium text-red-800 mb-2">刪除團單</h4>
                     <p class="text-sm text-red-600 mb-3">
                         {% if group.orders|length > 0 %}
-                        ⚠️ 此團已有 {{ group.orders|length }} 筆訂單，刪除後無法復原！
+                        <i class="ti ti-alert-triangle"></i>️ 此團已有 {{ group.orders|length }} 筆訂單，刪除後無法復原！
                         {% else %}
                         刪除後無法復原
                         {% endif %}
@@ -416,7 +416,7 @@
                 <form action="/groups/{{ group.id }}/treat" method="post" class="ml-auto"
                       onsubmit="return confirm('確定要請客嗎？本團將由你買單！')">
                     <button type="submit" class="text-sm bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full transition">
-                        💝 我請客
+                        <i class="ti ti-heart"></i> 我請客
                     </button>
                 </form>
                 {% endif %}
@@ -430,7 +430,7 @@
     <!-- 快速下單（團開放中且尚未結單時顯示） -->
     {% if is_open %}
     <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
-        <h2 class="font-semibold text-gray-800 mb-3">⚡ {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-bolt"></i> {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
         
         <div class="flex flex-wrap gap-2 mb-3">
             <!-- 複製上次訂單 -->
@@ -445,14 +445,14 @@
             {% if submitted_orders|length > 0 and not group.is_blind_mode %}
             <button @click="showOthersOrders = true"
                     class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition">
-                👀 看別人點什麼
+                <i class="ti ti-eye"></i> 看別人點什麼
             </button>
             {% endif %}
             
             <!-- 隨機選擇器 -->
             <button @click="randomPick()"
                     class="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition">
-                🎲 隨機選
+                <i class="ti ti-dice"></i> 隨機選
             </button>
         </div>
         
@@ -465,14 +465,14 @@
                 <button @click="quickTab = 'hot'"
                         :class="quickTab === 'hot' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
-                    🔥 熱門
+                    <i class="ti ti-flame"></i> 熱門
                 </button>
                 {% endif %}
                 {% if favorite_items %}
                 <button @click="quickTab = 'mine'"
                         :class="quickTab === 'mine' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
-                    ❤️ 我的最愛
+                    <i class="ti ti-heart"></i>️ 我的最愛
                 </button>
                 {% endif %}
             </div>
@@ -511,7 +511,7 @@
          @click.self="showOthersOrders = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 max-h-[80vh] flex flex-col">
             <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="font-semibold text-gray-800">👀 大家都點什麼</h3>
+                <h3 class="font-semibold text-gray-800"><i class="ti ti-eye"></i> 大家都點什麼</h3>
                 <button @click="showOthersOrders = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
             </div>
             
@@ -537,7 +537,7 @@
                                             hx-swap="innerHTML"
                                             hx-on::after-request="
                                                 this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
-                                                this.textContent = '✓';
+                                                this.textContent = '<i class="ti ti-check"></i>';
                                                 this.disabled = true;
                                                 this.classList.remove('bg-orange-500', 'hover:bg-orange-600');
                                                 this.classList.add('bg-gray-300');
@@ -622,7 +622,7 @@
          @click.self="showRandom = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 text-center">
             <div class="p-6">
-                <div class="text-5xl mb-4">🎲</div>
+                <div class="text-5xl mb-4"><i class="ti ti-dice"></i></div>
                 <template x-if="randomResult">
                     <div>
                         <div class="text-xl font-bold text-gray-800 mb-1" x-text="randomResult.name"></div>
@@ -634,7 +634,7 @@
             <div class="p-4 border-t bg-gray-50 rounded-b-lg flex gap-2">
                 <button @click="randomPick()"
                         class="flex-1 py-2 rounded-lg border hover:bg-gray-100 text-sm">
-                    🔄 再抽一次
+                    <i class="ti ti-refresh"></i> 再抽一次
                 </button>
                 <button @click="goToRandomItem()"
                         class="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm">
@@ -1046,10 +1046,10 @@ function countdown(deadline) {
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             
             if (hours > 0) {
-                this.display = `⏰ ${hours}h ${minutes}m`;
+                this.display = `<i class="ti ti-alarm"></i> ${hours}h ${minutes}m`;
             } else {
                 const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                this.display = `⏰ ${minutes}m ${seconds}s`;
+                this.display = `<i class="ti ti-alarm"></i> ${minutes}m ${seconds}s`;
             }
         }
     }
@@ -1129,11 +1129,11 @@ async function toggleFavorite(storeId) {
         const btn = document.getElementById('fav-btn');
         const text = document.getElementById('fav-text');
         if (data.status === 'added') {
-            btn.querySelector('span:first-child').textContent = '⭐';
+            btn.querySelector('span:first-child').textContent = '<i class="ti ti-star"></i>';
             btn.title = '取消收藏';
             if (text) text.textContent = '已收藏';
         } else {
-            btn.querySelector('span:first-child').textContent = '☆';
+            btn.querySelector('span:first-child').textContent = '<i class="ti ti-star"></i>';
             btn.title = '收藏店家';
             if (text) text.textContent = '收藏';
         }

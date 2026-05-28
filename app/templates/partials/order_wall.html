@@ -6,14 +6,14 @@
         <span class="text-sm font-normal text-gray-500">({{ submitted_orders|length }} 人)</span>
         <span class="text-sm font-normal text-orange-600">${{ submitted_orders|sum(attribute='total_amount') }}</span>
         {% if group.is_blind_mode and is_open %}
-        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">🙈 盲點模式</span>
+        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded"><i class="ti ti-eye-off"></i> 盲點模式</span>
         {% endif %}
     </h2>
     
     {% if group.is_blind_mode and is_open %}
     <!-- 盲點模式：隱藏詳細內容 -->
     <div class="text-sm text-purple-600 p-3 bg-purple-50 rounded-lg">
-        🙈 盲點模式進行中，截止後才能看到大家點了什麼！
+        <i class="ti ti-eye-off"></i> 盲點模式進行中，截止後才能看到大家點了什麼！
         <div class="mt-2 text-gray-500 text-xs">
             已有 {{ submitted_orders|length }} 人結單，總金額 ${{ submitted_orders|sum(attribute='total_amount') }}
         </div>
@@ -32,10 +32,10 @@
                     {{ order.user.show_name }}
                     <span class="text-sm text-gray-400">${{ order.total_amount }}</span>
                     {% if group.lucky_winner_ids and order.user_id|string in group.lucky_winner_ids.split(',') %}
-                    <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded">🎊 免單</span>
+                    <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded"><i class="ti ti-confetti"></i> 免單</span>
                     {% endif %}
                     {% if group.treat_user_id == order.user_id %}
-                    <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">💝 請客</span>
+                    <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded"><i class="ti ti-heart"></i> 請客</span>
                     {% endif %}
                 </div>
                 

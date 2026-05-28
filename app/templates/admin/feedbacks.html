@@ -42,7 +42,7 @@
                     " class="text-xs px-3 py-1 rounded border transition"
                        :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'">
                         <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
-                        <span x-show="copied" x-cloak>✓ 已複製</span>
+                        <span x-show="copied" x-cloak><i class="ti ti-check"></i> 已複製</span>
                     </button>
                     
                     <!-- 狀態/處理 -->
@@ -72,8 +72,8 @@
     <div x-data="{ showHistory: false }">
         <button @click="showHistory = !showHistory" 
                 class="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 font-medium transition">
-            <span x-show="!showHistory">📂 顯示歷史紀錄 ({{ history_feedbacks|length }} 筆)</span>
-            <span x-show="showHistory" x-cloak>📁 收起歷史紀錄</span>
+            <span x-show="!showHistory"><i class="ti ti-folder-open"></i> 顯示歷史紀錄 ({{ history_feedbacks|length }} 筆)</span>
+            <span x-show="showHistory" x-cloak><i class="ti ti-folder"></i> 收起歷史紀錄</span>
         </button>
         
         <div x-show="showHistory" x-cloak x-collapse class="mt-3 space-y-3">
@@ -106,7 +106,7 @@
                         " class="text-xs px-3 py-1 rounded border transition"
                            :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border-gray-300'">
                             <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
-                            <span x-show="copied" x-cloak>✓ 已複製</span>
+                            <span x-show="copied" x-cloak><i class="ti ti-check"></i> 已複製</span>
                         </button>
                         
                         <!-- 狀態 -->

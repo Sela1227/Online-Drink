@@ -50,7 +50,7 @@
     </style>
 </head>
 <body class="bg-sela-50/30 min-h-screen antialiased">
-{% set app_version = 'V1.4.1' %}
+{% set app_version = 'V1.5.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
@@ -106,38 +106,43 @@
         {% block content %}{% endblock %}
     </main>
     
-    <!-- 底部導航（手機友善・V1.1.0 換 Tabler 北歐風） -->
+    <!-- 底部導航（手機友善・V1.1.0 換 Tabler 北歐風・V1.5.0 動態 active） -->
     {% if user %}
+    {% set path = request.url.path %}
+    {% set nav_home = path == '/home' or path == '/' %}
+    {% set nav_votes = path.startswith('/votes') %}
+    {% set nav_feedback = path.startswith('/feedback') %}
+    {% set nav_profile = path.startswith('/profile') %}
     <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-sela-100 z-40 safe-area-pb">
         <div class="max-w-lg mx-auto px-6 h-14 flex items-center justify-around">
-            <a href="/home" class="flex flex-col items-center gap-1 text-sela-600">
-                <div class="w-9 h-9 bg-sela-50 rounded-xl flex items-center justify-center">
+            <a href="/home" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_home else 'text-gray-400 hover:text-sela-500' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_home else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-home" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
-                <span class="text-[10px] font-medium">首頁</span>
+                <span class="text-[10px] {{ 'font-medium' if nav_home else '' }}">首頁</span>
             </a>
-            <a href="/votes" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
-                <div class="w-9 h-9 flex items-center justify-center">
+            <a href="/votes" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_votes else 'text-gray-400 hover:text-sela-500' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_votes else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-checkbox" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
-                <span class="text-[10px]">投票</span>
+                <span class="text-[10px] {{ 'font-medium' if nav_votes else '' }}">投票</span>
             </a>
             <a href="/groups/new" class="flex flex-col items-center">
                 <div class="w-12 h-12 -mt-6 bg-sela-500 rounded-full flex items-center justify-center shadow-lg">
                     <i class="ti ti-plus text-white" style="font-size: 24px;" aria-hidden="true"></i>
                 </div>
             </a>
-            <a href="/feedback" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
-                <div class="w-9 h-9 flex items-center justify-center">
+            <a href="/feedback" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_feedback else 'text-gray-400 hover:text-sela-500' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_feedback else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-mailbox" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
-                <span class="text-[10px]">回報</span>
+                <span class="text-[10px] {{ 'font-medium' if nav_feedback else '' }}">回報</span>
             </a>
-            <a href="/profile" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
-                <div class="w-9 h-9 flex items-center justify-center">
+            <a href="/profile" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_profile else 'text-gray-400 hover:text-sela-500' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_profile else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-user" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
-                <span class="text-[10px]">我的</span>
+                <span class="text-[10px] {{ 'font-medium' if nav_profile else '' }}">我的</span>
             </a>
         </div>
     </nav>

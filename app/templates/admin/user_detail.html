@@ -58,7 +58,7 @@
     
     <!-- 登入資訊 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🔐 登入資訊</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-lock"></i> 登入資訊</h2>
         <div class="space-y-2 text-sm">
             <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-500">LINE User ID</span>
@@ -91,7 +91,7 @@
             <div class="flex justify-between py-2">
                 <span class="text-gray-500">在線狀態</span>
                 <span class="{% if target_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
-                    {% if target_user.is_online %}<i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線{% else %}⚫ 離線{% endif %}
+                    {% if target_user.is_online %}<i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線{% else %}<i class="ti ti-circle-filled"></i> 離線{% endif %}
                 </span>
             </div>
         </div>
@@ -150,7 +150,7 @@
     <!-- 管理操作 -->
     {% if target_user.id != user.id %}
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">⚙️ 管理操作</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-settings"></i>️ 管理操作</h2>
         <form action="/admin/users/{{ target_user.id }}/toggle-admin" method="post"
               onsubmit="return confirm('確定要{{ '移除' if target_user.is_admin else '設為' }}管理員嗎？')">
             <button type="submit" class="w-full py-2 rounded-lg text-sm font-medium transition

@@ -44,10 +44,10 @@
                                 {{ tpl.store.name }} · {{ tpl.group_name }}
                             </div>
                             <div class="text-xs text-gray-400 mt-1">
-                                ⏱ {{ tpl.default_duration_minutes }}分鐘
-                                {% if tpl.is_blind_mode %}· 🙈 盲點{% endif %}
-                                {% if tpl.enable_lucky_draw %}· 🎊 抽獎{% endif %}
-                                {% if tpl.min_members %}· 🎯 {{ tpl.min_members }}人成團{% endif %}
+                                <i class="ti ti-stopwatch"></i> {{ tpl.default_duration_minutes }}分鐘
+                                {% if tpl.is_blind_mode %}· <i class="ti ti-eye-off"></i> 盲點{% endif %}
+                                {% if tpl.enable_lucky_draw %}· <i class="ti ti-confetti"></i> 抽獎{% endif %}
+                                {% if tpl.min_members %}· <i class="ti ti-target"></i> {{ tpl.min_members }}人成團{% endif %}
                             </div>
                         </div>
                     </div>
@@ -60,7 +60,7 @@
                     <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-1">
                         <button type="submit" 
                                 class="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
-                            ⚡ 使用開團
+                            <i class="ti ti-bolt"></i> 使用開團
                         </button>
                     </form>
                     <form action="/templates/{{ tpl.id }}/delete" method="post"

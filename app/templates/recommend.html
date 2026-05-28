@@ -61,7 +61,7 @@
             </div>
             
             <button type="submit" class="w-full bg-orange-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-orange-600">
-                🚀 送出推薦
+                <i class="ti ti-rocket"></i> 送出推薦
             </button>
         </form>
     </div>
@@ -101,7 +101,7 @@
                         {% elif rec.status == 'approved' %}
                         <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"><i class="ti ti-check"></i> 已通過</span>
                         {% else %}
-                        <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">❌ 未通過</span>
+                        <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700"><i class="ti ti-x"></i> 未通過</span>
                         {% endif %}
                     </div>
                 </div>

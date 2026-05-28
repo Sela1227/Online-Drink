@@ -6,7 +6,7 @@
 <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">🗳️ 投票選店家</h1>
+        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-checkbox"></i>️ 投票選店家</h1>
         <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
     </div>
     <div class="flex justify-end">
@@ -18,7 +18,7 @@
     
     <!-- 進行中的投票 -->
     <section>
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">🔥 進行中 <span class="text-sm font-normal text-gray-500">({{ active_votes|length }})</span></h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-3"><i class="ti ti-flame"></i> 進行中 <span class="text-sm font-normal text-gray-500">({{ active_votes|length }})</span></h2>
         
         {% if active_votes %}
         <div class="grid grid-cols-2 gap-4">
@@ -39,7 +39,7 @@
                 <!-- 投票 icon -->
                 <div class="flex justify-center mt-2 mb-2">
                     <div class="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center">
-                        <span class="text-3xl">🗳️</span>
+                        <span class="text-3xl"><i class="ti ti-checkbox"></i>️</span>
                     </div>
                 </div>
                 
@@ -70,7 +70,7 @@
         </div>
         {% else %}
         <div class="text-center text-gray-500 py-8 bg-white rounded-lg">
-            <div class="text-4xl mb-2">🗳️</div>
+            <div class="text-4xl mb-2"><i class="ti ti-checkbox"></i>️</div>
             <p>目前沒有進行中的投票</p>
             <a href="/votes/new" class="text-orange-500 hover:text-orange-600 text-sm">發起一個投票吧！</a>
         </div>
@@ -96,7 +96,7 @@
                     <!-- 投票 icon -->
                     <div class="flex justify-center mt-2 mb-2">
                         <div class="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center">
-                            <span class="text-3xl">🗳️</span>
+                            <span class="text-3xl"><i class="ti ti-checkbox"></i>️</span>
                         </div>
                     </div>
                     
@@ -110,7 +110,7 @@
                     {% if vote.winner_store_id %}
                     <div class="mt-2 text-center">
                         <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                            🏆 {% for opt in vote.options if opt.store_id == vote.winner_store_id %}{{ opt.store.name }}{% endfor %}
+                            <i class="ti ti-trophy"></i> {% for opt in vote.options if opt.store_id == vote.winner_store_id %}{{ opt.store.name }}{% endfor %}
                         </span>
                     </div>
                     {% endif %}

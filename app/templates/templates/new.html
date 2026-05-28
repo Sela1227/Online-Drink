@@ -109,14 +109,14 @@
             
             <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="is_blind_mode" value="true">
-                <span>🙈 盲點模式</span>
+                <span><i class="ti ti-eye-off"></i> 盲點模式</span>
             </label>
             
             <div x-data="{ enableLucky: false }">
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" name="enable_lucky_draw" value="true"
                            @change="enableLucky = $event.target.checked">
-                    <span>🎊 隨機免單</span>
+                    <span><i class="ti ti-confetti"></i> 隨機免單</span>
                 </label>
                 <div x-show="enableLucky" class="mt-2 ml-6 flex items-center gap-2">
                     <span class="text-sm">免單</span>
@@ -129,7 +129,7 @@
             <div x-data="{ enableMin: false }">
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" @change="enableMin = $event.target.checked">
-                    <span>🎯 湊團制</span>
+                    <span><i class="ti ti-target"></i> 湊團制</span>
                 </label>
                 <div x-show="enableMin" class="mt-2 ml-6 space-y-2">
                     <div class="flex items-center gap-2">

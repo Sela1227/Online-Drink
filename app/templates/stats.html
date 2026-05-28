@@ -6,7 +6,7 @@
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">📊 我的消費統計</h1>
+        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-chart-bar"></i> 我的消費統計</h1>
         <a href="/profile" class="text-sm text-gray-500 hover:text-gray-700">返回個人資料 →</a>
     </div>
     
@@ -39,7 +39,7 @@
         <form action="/stats" method="get" class="flex flex-wrap items-center gap-2" x-data="{ showCustom: {{ 'true' if period == 'custom' else 'false' }} }">
             <button type="button" @click="showCustom = !showCustom" 
                     class="px-3 py-1.5 rounded-full text-sm {% if period == 'custom' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
-                📅 自訂區間
+                <i class="ti ti-calendar"></i> 自訂區間
             </button>
             <div x-show="showCustom" x-cloak class="flex items-center gap-2 flex-wrap">
                 <input type="hidden" name="period" value="custom">
@@ -100,7 +100,7 @@
     
     <!-- 月度趨勢 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">📈 近6個月趨勢</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-chart-line"></i> 近6個月趨勢</h2>
         <div class="flex items-end justify-between gap-2 h-32">
             {% set max_amount = monthly_trend | map(attribute='amount') | max or 1 %}
             {% for month in monthly_trend %}
@@ -121,10 +121,10 @@
     
     <!-- 趣味統計 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🎲 趣味統計</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-dice"></i> 趣味統計</h2>
         <div class="grid grid-cols-2 gap-3">
             <div class="bg-purple-50 rounded-lg p-3 text-center">
-                <div class="text-2xl">👑</div>
+                <div class="text-2xl"><i class="ti ti-crown"></i></div>
                 <div class="text-xl font-bold text-purple-700">{{ groups_created }}</div>
                 <div class="text-xs text-purple-600">開團次數</div>
             </div>
@@ -134,12 +134,12 @@
                 <div class="text-xs text-yellow-600">中獎次數</div>
             </div>
             <div class="bg-pink-50 rounded-lg p-3 text-center">
-                <div class="text-2xl">🥳</div>
+                <div class="text-2xl"><i class="ti ti-confetti"></i></div>
                 <div class="text-xl font-bold text-pink-700">{{ treated_count }}</div>
                 <div class="text-xs text-pink-600">被請客次數</div>
             </div>
             <div class="bg-red-50 rounded-lg p-3 text-center">
-                <div class="text-2xl">💝</div>
+                <div class="text-2xl"><i class="ti ti-heart"></i></div>
                 <div class="text-xl font-bold text-red-700">{{ treat_count }}</div>
                 <div class="text-xs text-red-600">請客次數</div>
             </div>
@@ -148,7 +148,7 @@
     
     <!-- 下單習慣 -->
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">⏰ 下單習慣</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-alarm"></i> 下單習慣</h2>
         <div class="grid grid-cols-2 gap-4">
             <div class="text-center">
                 <div class="text-3xl font-bold text-orange-600">{{ peak_hour }}:00</div>
@@ -164,7 +164,7 @@
     <!-- 飲料偏好 -->
     {% if sugar_stats or ice_stats %}
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🥤 飲料偏好</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 飲料偏好</h2>
         <div class="grid grid-cols-2 gap-4">
             {% if sugar_stats %}
             <div>
@@ -212,7 +212,7 @@
     <!-- 最愛店家 TOP 5 -->
     {% if favorite_stores %}
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">❤️ 最愛店家 TOP 5</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-heart"></i>️ 最愛店家 TOP 5</h2>
         <div class="space-y-3">
             {% for store in favorite_stores %}
             <div class="flex items-center gap-3">
@@ -222,7 +222,7 @@
                     {% elif loop.index == 3 %}text-amber-600
                     {% else %}text-gray-300{% endif %}">
                     {% if loop.index <= 3 %}
-                    {{ ['🥇', '🥈', '🥉'][loop.index - 1] }}
+                    {{ ['<i class="ti ti-medal"></i>', '<i class="ti ti-medal"></i>', '<i class="ti ti-medal"></i>'][loop.index - 1] }}
                     {% else %}
                     {{ loop.index }}
                     {% endif %}
@@ -245,7 +245,7 @@
     <!-- 最常點的品項 TOP 10 -->
     {% if favorite_items %}
     <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🔥 最常點的品項 TOP 10</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-flame"></i> 最常點的品項 TOP 10</h2>
         <div class="space-y-2">
             {% for item in favorite_items %}
             <div class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-100{% endif %}">
@@ -290,7 +290,7 @@
     <!-- 沒有資料 -->
     {% if total_orders == 0 %}
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
-        <div class="text-4xl mb-2">📭</div>
+        <div class="text-4xl mb-2"><i class="ti ti-mailbox"></i></div>
         <p>這段期間沒有訂單記錄</p>
         <p class="text-sm mt-1">快去參加一個團吧！</p>
     </div>

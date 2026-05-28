@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.4.1（未登入訪問需登入頁導向登入頁 hotfix）
+- **版本：** V1.5.0（emoji 收尾全清 + 底部導航動態 active）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -174,6 +174,12 @@
     - 判斷依據：`HX-Request` header 區分 htmx，`Accept` header 區分瀏覽器 vs API
     - 教訓：**SSR 應用的「需登入」保護要區分請求來源** — 瀏覽器要 redirect、API/htmx 要 JSON。單純 raise 401 只對 API 友善，對直接開頁面的使用者是死路
 
+15. **底部導航 active 狀態 hardcode 寫死「首頁」恆亮**（V1.5.0 修正）
+    - 症狀：不論在哪一頁（投票 / 回報 / 我的），底部導航都只有「首頁」是橘色 active 樣式
+    - 原因：base.html 底部導航的「首頁」永遠帶 `text-sela-600` + `bg-sela-50`，其他永遠 `text-gray-400`，沒有依當前頁判斷
+    - 做法（V1.5.0）：在 nav 開頭 `{% set path = request.url.path %}`，4 個項目各設 active 布林（`path == '/home'` / `path.startswith('/votes')` 等），class 用 `{{ 'xxx' if active else 'yyy' }}` 三元判斷。子頁用 `startswith` 一併涵蓋（如 /votes/123 也算投票 active）
+    - 注意：`request` 在 template 內必須可用 — SELA 所有頁面都經 `TemplateResponse(request, ...)` 傳入，所以 `request.url.path` 全頁可用
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -212,6 +218,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.5.0 | **emoji 收尾全清 + 底部導航動態 active**。剩餘 52 種 emoji 全站 1:1 替換（33 檔 149 次）：⭐☆→`ti-star` / 📞→`ti-phone` / 💝🩷❤→`ti-heart` / 🗳→`ti-checkbox` / 🙈→`ti-eye-off` / ⏰→`ti-alarm` / 📍→`ti-map-pin` / ⚡→`ti-bolt` / 🎊🥳→`ti-confetti` / 🔥→`ti-flame` / ✓→`ti-check` / 🗺→`ti-map` / ⚠→`ti-alert-triangle` / 🎯→`ti-target` / ➕→`ti-plus` / 🎲→`ti-dice` / 🚀→`ti-rocket` / 🥤→`ti-cup` / 📭→`ti-mailbox` / ❌✕→`ti-x` / 💾→`ti-device-floppy` / 🏆→`ti-trophy` / 📊→`ti-chart-bar` / 📈→`ti-chart-line` / 📂→`ti-folder-open` / 📁→`ti-folder` / 📦→`ti-package` / 👀→`ti-eye` / ⚙→`ti-settings` / 🗑→`ti-trash` / ⏸→`ti-player-pause` / 🔒🔐→`ti-lock` / 🐛→`ti-bug` / 🔄→`ti-refresh` / 🚗→`ti-car` / 🥇🥈🥉→`ti-medal` / 📅→`ti-calendar` / 👑→`ti-crown` / 📜→`ti-scroll` / ⚫→`ti-circle-filled` / 💬→`ti-message` / 🔗→`ti-link` / 🚨→`ti-alert-octagon` / ⏱→`ti-stopwatch`。**保留 `→`（49 次）與 `↑`（1 次）純文字箭頭不換**。另外底部導航改用 `request.url.path` 動態判斷 active（坑 #15）：之前 hardcode「首頁」恆亮，現在依當前頁高亮對應項目（home/votes/feedback/profile，用 `path.startswith` 涵蓋子頁）。**全站零裝飾 emoji 達成**。 |
 | V1.4.1 | **Hotfix：未登入訪問需登入頁 → 導向 LINE 登入（坑 #14）**。新使用者用沒登入過的手機直接開 `/home` 看到 `{"detail":"請先登入"}` JSON 而非登入頁。在 `main.py` 加全域 401 例外處理器：瀏覽器開頁面（Accept: text/html 且非 htmx）→ `RedirectResponse` 到 `/auth/login`；htmx/API → 維持 401 JSON。**只動 main.py（加 handler）+ base.html 版本號**。 |
 | V1.4.0 | **admin 後台 9 種 emoji → Tabler**。16 檔 37 次替換：🟢→`ti-circle-filled`（保留綠色 inline style）/ 📮→`ti-mailbox` / 💡→`ti-bulb` / 📢→`ti-speakerphone` / 📥→`ti-inbox` / ⏳→`ti-hourglass` / ✨→`ti-sparkles` / ✏→`ti-pencil`（與 V1.3.0 📝 一致）/ 📌→`ti-pin`。🟢 特別處理：用 inline style `color: #22c55e` 保留綠色語義，避免 Tabler 圖示 currentColor 失去狀態色 |
 | V1.3.0 | **標題列版本號 + 高頻 emoji 全站 Tabler 化**。base.html 在 `<body>` 後加 `{% set app_version = 'V1.3.0' %}`，「SELA」標題旁顯示 `{{ app_version }}` 灰色小字（10px mono）— 升版只需改 `{% set %}` 一行；標題列 ⚙️ 換 `ti-settings`；全站 37 檔 83 次替換：📋→`ti-clipboard-list`（27 次最多）、👥→`ti-users`、👤→`ti-user`、✅→`ti-check`、🎉→`ti-confetti`、📝→`ti-pencil`、🌐→`ti-world`、🏪→`ti-building-store`。 |
@@ -229,15 +236,15 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-1. **V1.5.0：剩餘 emoji 收尾**（💾 儲存 / 🗑 刪除 / ➕ 新增 / 📁 📂 資料夾 / ⚠ 警告 / 📞 電話 / 📍 位置 / 🗺 地圖 / 🩷 ❤ 愛心 / 🔒 🔐 鎖 / 🔗 連結 / 💬 訊息 / 🚨 警報 / 🐛 bug / 🔥 熱門 / ⚡ 快速 / 🙈 盲訂 / 💝 請客 / 🎲 隨機 / 🎯 目標 / 🚀 啟動 / 👀 觀察 / 🥤 杯子 / ⭐ ☆ 收藏 / 🎊 慶祝 / 👑 🥇 🥈 🥉 名次 / 📜 歷史 / 📅 日曆 / 📊 📈 圖表 / ▶ ▼ ▲ 箭頭 / ✓ ✕ ❌ 標記） — 收尾後全站零 emoji
-2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖
-3. 訂單匯出 Excel — 原本 backlog
-4. 外送費分攤功能 — 原本 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
-5. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
-6. 菜單匯入開放 `group_buy` category（解坑 #9）
-7. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮）— 改要用 `request.url.path` 判斷
-8. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
-9. V1.1.2 的 htmx 401 redirect 與 V1.4.1 的後端 401 redirect 尚未在「session 過期」情境實機驗證 — 等自然觸發確認
+> **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為功能性 backlog。
+
+1. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
+2. 訂單匯出 Excel — 原本 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
+3. 外送費分攤功能 — `scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
+4. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
+5. 菜單匯入開放 `group_buy` category（解坑 #9）
+6. 評估把 `taipei` filter 抽到共用 templates 模組（解坑 #6，評估重構成本）
+7. 整體視覺巡檢 — emoji 全換成 Tabler 後，檢查是否有圖示在特定情境下大小 / 對齊 / 顏色語義不對（如 🟢 在線已特別保留綠色，但其他狀態色 emoji 換單色後可能失去語義，需逐一檢視）
 
 ## 八、升版必讀
 
@@ -275,4 +282,4 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 九、一句話總結
 
-V1.1.0 開始視覺風格升級 — base.html 底部導航 5 個 emoji 換成 Tabler 北歐風細線圖示 + 順手串接 V1.0.0 留下的 favicon 套組。**只動 1 個檔（base.html），所有業務邏輯零變更**。下版第一優先：**V1.1.1 改三大分類圖示（🧋 🛒 🍱）**，整站視覺風格就會統一八成。
+V1.0.0~V1.5.0 完成了從「對齊 Kit」到「全站 emoji 北歐風 Tabler 化」的完整視覺升級，途中救了多個生產 bug（Starlette 版本破壞、CDN URL 錯誤、登入路由前後端兩面、底部導航對齊與 active）。**全站零裝飾 emoji 達成**，標題列有版本號可即時辨識運行版本。下一步建議轉向功能性 backlog（#1 TemplateResponse 新 API 最優先，解除版本鎖）。

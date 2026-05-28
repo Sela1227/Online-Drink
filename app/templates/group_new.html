@@ -8,7 +8,7 @@
     {% if my_templates %}
     <div class="bg-white rounded-lg shadow-sm p-4">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="font-semibold text-gray-800">⚡ 快速開團</h2>
+            <h2 class="font-semibold text-gray-800"><i class="ti ti-bolt"></i> 快速開團</h2>
             <a href="/templates" class="text-sm text-orange-500 hover:text-orange-600">管理模板</a>
         </div>
         <div class="grid grid-cols-2 gap-2">
@@ -242,7 +242,7 @@
                 <div class="flex items-start gap-3 p-3 bg-white rounded-lg">
                     <input type="checkbox" name="is_blind_mode" value="true" class="mt-1">
                     <div>
-                        <div class="font-medium text-gray-700">🙈 盲點模式</div>
+                        <div class="font-medium text-gray-700"><i class="ti ti-eye-off"></i> 盲點模式</div>
                         <p class="text-xs text-gray-500">截止前隱藏其他人的選擇，截止後一起揭曉</p>
                     </div>
                 </div>
@@ -253,7 +253,7 @@
                         <input type="checkbox" name="enable_lucky_draw" value="true" 
                                @change="enableLucky = $event.target.checked" class="mt-1">
                         <div class="flex-1">
-                            <div class="font-medium text-gray-700">🎊 隨機免單</div>
+                            <div class="font-medium text-gray-700"><i class="ti ti-confetti"></i> 隨機免單</div>
                             <p class="text-xs text-gray-500">結單時隨機抽選幸運兒免單</p>
                         </div>
                     </div>
@@ -271,7 +271,7 @@
                         <input type="checkbox" 
                                @change="enableMinMembers = $event.target.checked" class="mt-1">
                         <div class="flex-1">
-                            <div class="font-medium text-gray-700">🎯 湊團制</div>
+                            <div class="font-medium text-gray-700"><i class="ti ti-target"></i> 湊團制</div>
                             <p class="text-xs text-gray-500">設定最少成團人數</p>
                         </div>
                     </div>
@@ -295,7 +295,7 @@
                         <input type="checkbox" 
                                @change="enableRemind = $event.target.checked" class="mt-1">
                         <div class="flex-1">
-                            <div class="font-medium text-gray-700">⏰ 自動催單</div>
+                            <div class="font-medium text-gray-700"><i class="ti ti-alarm"></i> 自動催單</div>
                             <p class="text-xs text-gray-500">截止前自動提醒尚未結單的人</p>
                         </div>
                     </div>
@@ -315,7 +315,7 @@
                     <label class="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" name="i_treat" value="true" class="mt-1">
                         <div class="flex-1">
-                            <div class="font-medium text-red-600">💝 這單我請客</div>
+                            <div class="font-medium text-red-600"><i class="ti ti-heart"></i> 這單我請客</div>
                             <p class="text-xs text-gray-500">本團將由你買單</p>
                         </div>
                     </label>

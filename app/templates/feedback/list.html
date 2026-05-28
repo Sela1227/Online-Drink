@@ -13,7 +13,7 @@
             <div>
                 <label class="block text-sm text-gray-600 mb-1">問題類型</label>
                 <select name="type" class="w-full border rounded-lg px-3 py-2">
-                    <option value="bug">🐛 功能異常</option>
+                    <option value="bug"><i class="ti ti-bug"></i> 功能異常</option>
                     <option value="suggestion"><i class="ti ti-bulb"></i> 建議功能</option>
                     <option value="other"><i class="ti ti-clipboard-list"></i> 其他</option>
                 </select>
@@ -47,7 +47,7 @@
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                     {% if fb.type.value == 'bug' %}
-                    <span class="text-red-500">🐛</span>
+                    <span class="text-red-500"><i class="ti ti-bug"></i></span>
                     {% elif fb.type.value == 'suggestion' %}
                     <span class="text-blue-500"><i class="ti ti-bulb"></i></span>
                     {% else %}
@@ -80,7 +80,7 @@
     </div>
     {% else %}
     <div class="text-center py-8 text-gray-500">
-        <div class="text-4xl mb-2">📭</div>
+        <div class="text-4xl mb-2"><i class="ti ti-mailbox"></i></div>
         <p>尚無回報紀錄</p>
     </div>
     {% endif %}

@@ -48,7 +48,7 @@
                     {% if store.is_public %}
                     <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-world"></i> 公開</span>
                     {% else %}
-                    <span class="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium">🔒 限定部門</span>
+                    <span class="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-lock"></i> 限定部門</span>
                     {% endif %}
                 </div>
                 <div class="mt-2 flex items-center gap-3 text-sm text-gray-500">
@@ -69,13 +69,13 @@
         <div class="px-6 pb-6 space-y-2">
             {% if store.phone %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">📞</span>
+                <span class="w-6 text-center"><i class="ti ti-phone"></i></span>
                 <span class="text-gray-600">{{ store.phone }}</span>
             </div>
             {% endif %}
             {% if store.address %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">📍</span>
+                <span class="w-6 text-center"><i class="ti ti-map-pin"></i></span>
                 <span class="text-gray-600">{{ store.address }}</span>
             </div>
             {% endif %}
@@ -87,7 +87,7 @@
             {% endif %}
             {% if store.google_maps_url %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">🗺️</span>
+                <span class="w-6 text-center"><i class="ti ti-map"></i>️</span>
                 <a href="{{ store.google_maps_url }}" target="_blank" class="text-blue-600 hover:underline">Google Maps</a>
             </div>
             {% endif %}
@@ -106,7 +106,7 @@
             {% if store.foodpanda_url %}
             <a href="{{ store.foodpanda_url }}" target="_blank"
                class="px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg text-sm hover:bg-pink-100">
-                🩷 foodpanda
+                <i class="ti ti-heart"></i> foodpanda
             </a>
             {% endif %}
         </div>
@@ -116,7 +116,7 @@
     <!-- 飲料店選項 -->
     {% if store.category and store.category.value == 'drink' and store.options %}
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-3">🥤 甜度/冰塊選項</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 甜度/冰塊選項</h2>
         <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
                 <div class="text-gray-500 mb-1">甜度</div>
@@ -159,7 +159,7 @@
             <h2 class="font-semibold text-gray-800"><i class="ti ti-building-store"></i> 分店管理 ({{ store.branches|length if store.branches else 0 }})</h2>
             <button @click="showAddForm = !showAddForm" 
                     class="text-sm px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200">
-                ➕ 新增分店
+                <i class="ti ti-plus"></i> 新增分店
             </button>
         </div>
         
@@ -205,8 +205,8 @@
                         {% endif %}
                     </div>
                     <div class="text-sm text-gray-500 flex flex-wrap gap-3">
-                        {% if branch.phone %}<span>📞 {{ branch.phone }}</span>{% endif %}
-                        {% if branch.address %}<span>📍 {{ branch.address }}</span>{% endif %}
+                        {% if branch.phone %}<span><i class="ti ti-phone"></i> {{ branch.phone }}</span>{% endif %}
+                        {% if branch.address %}<span><i class="ti ti-map-pin"></i> {{ branch.address }}</span>{% endif %}
                     </div>
                 </div>
                 <div x-show="!editing" class="flex gap-1">
@@ -261,7 +261,7 @@
                            {% if not store.is_public %}checked{% endif %}
                            onchange="document.getElementById('dept-select').classList.remove('hidden')">
                     <div>
-                        <div class="font-medium text-gray-700">🔒 限定部門</div>
+                        <div class="font-medium text-gray-700"><i class="ti ti-lock"></i> 限定部門</div>
                         <div class="text-xs text-gray-500">只有指定部門的成員可以看到</div>
                     </div>
                 </label>
@@ -287,7 +287,7 @@
             </div>
             <div class="mt-4 flex justify-end">
                 <button type="submit" class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600">
-                    💾 儲存設定
+                    <i class="ti ti-device-floppy"></i> 儲存設定
                 </button>
             </div>
         </form>
@@ -295,12 +295,12 @@
     
     <!-- 快速操作 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-3">⚡ 快速操作</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-bolt"></i> 快速操作</h2>
         <div class="flex flex-wrap gap-2">
             <form action="/admin/stores/{{ store.id }}/toggle" method="post" class="inline">
                 <button type="submit" 
                         class="px-4 py-2 rounded-lg text-sm font-medium {% if store.is_active %}bg-gray-100 text-gray-700 hover:bg-gray-200{% else %}bg-green-100 text-green-700 hover:bg-green-200{% endif %}">
-                    {% if store.is_active %}⏸️ 停用店家{% else %}▶️ 啟用店家{% endif %}
+                    {% if store.is_active %}<i class="ti ti-player-pause"></i>️ 停用店家{% else %}▶️ 啟用店家{% endif %}
                 </button>
             </form>
             <a href="/admin/stores/{{ store.id }}/menus" 
@@ -312,9 +312,9 @@
                 <i class="ti ti-inbox"></i> 匯入新菜單
             </a>
             <form action="/admin/stores/{{ store.id }}/delete" method="post" class="inline"
-                  onsubmit="return confirm('⚠️ 確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
+                  onsubmit="return confirm('<i class="ti ti-alert-triangle"></i>️ 確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
                 <button type="submit" class="px-4 py-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg text-sm font-medium">
-                    🗑️ 刪除店家
+                    <i class="ti ti-trash"></i>️ 刪除店家
                 </button>
             </form>
         </div>

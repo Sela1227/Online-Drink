@@ -46,7 +46,7 @@
         <!-- 訂單統計 -->
         <div class="flex items-center gap-2 text-xs">
             {% if group.submitted_count > 0 %}
-            <span class="text-green-600 font-medium">✓ {{ group.submitted_count }}</span>
+            <span class="text-green-600 font-medium"><i class="ti ti-check"></i> {{ group.submitted_count }}</span>
             {% endif %}
             {% if group.pending_count > 0 %}
             <span class="text-{{ accent }}-500"><i class="ti ti-shopping-cart"></i> {{ group.pending_count }}</span>

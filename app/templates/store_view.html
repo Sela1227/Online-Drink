@@ -42,13 +42,13 @@
                     {% if is_favorited %}
                     <form action="/favorites/{{ store.id }}/remove" method="post" class="inline">
                         <button type="submit" class="text-sm px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full hover:bg-orange-200">
-                            ⭐ 已收藏
+                            <i class="ti ti-star"></i> 已收藏
                         </button>
                     </form>
                     {% else %}
                     <form action="/favorites/{{ store.id }}/add" method="post" class="inline">
                         <button type="submit" class="text-sm px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">
-                            ☆ 收藏店家
+                            <i class="ti ti-star"></i> 收藏店家
                         </button>
                     </form>
                     {% endif %}
@@ -68,13 +68,13 @@
         <div class="px-5 pb-4 space-y-2 border-t pt-4">
             {% if store.phone %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">📞</span>
+                <span class="w-6 text-center"><i class="ti ti-phone"></i></span>
                 <a href="tel:{{ store.phone }}" class="text-blue-600 hover:underline">{{ store.phone }}</a>
             </div>
             {% endif %}
             {% if store.address %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">📍</span>
+                <span class="w-6 text-center"><i class="ti ti-map-pin"></i></span>
                 <span class="text-gray-600">{{ store.address }}</span>
             </div>
             {% endif %}
@@ -93,7 +93,7 @@
             {% if store.google_maps_url %}
             <a href="{{ store.google_maps_url }}" target="_blank"
                class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100">
-                🗺️ Google Maps
+                <i class="ti ti-map"></i>️ Google Maps
             </a>
             {% endif %}
             {% if store.ubereats_url %}
@@ -105,7 +105,7 @@
             {% if store.foodpanda_url %}
             <a href="{{ store.foodpanda_url }}" target="_blank"
                class="px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg text-sm hover:bg-pink-100">
-                🩷 foodpanda
+                <i class="ti ti-heart"></i> foodpanda
             </a>
             {% endif %}
         </div>
@@ -115,7 +115,7 @@
     <!-- 飲料店選項 -->
     {% if store.category and store.category.value == 'drink' and store.options %}
     <div class="bg-white rounded-xl shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🥤 甜度/冰塊</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 甜度/冰塊</h2>
         <div class="grid grid-cols-2 gap-3 text-sm">
             <div>
                 <div class="text-gray-500 mb-1.5">甜度</div>
@@ -161,7 +161,7 @@
                 <div>
                     <div class="font-medium text-gray-800">{{ branch.name }}</div>
                     {% if branch.phone %}
-                    <a href="tel:{{ branch.phone }}" class="text-sm text-blue-600 hover:underline">📞 {{ branch.phone }}</a>
+                    <a href="tel:{{ branch.phone }}" class="text-sm text-blue-600 hover:underline"><i class="ti ti-phone"></i> {{ branch.phone }}</a>
                     {% endif %}
                 </div>
             </div>
@@ -173,7 +173,7 @@
     <!-- 目前開放的團單 -->
     {% if active_groups %}
     <div class="bg-white rounded-xl shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🔥 目前開放的團</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-flame"></i> 目前開放的團</h2>
         <div class="space-y-2">
             {% for group in active_groups %}
             <a href="/groups/{{ group.id }}" class="block p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition">
@@ -201,7 +201,7 @@
     <div class="fixed bottom-20 left-0 right-0 px-4 max-w-lg mx-auto">
         <a href="/groups/new?store_id={{ store.id }}" 
            class="block w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-center rounded-xl font-medium shadow-lg">
-            🚀 用這間店開團
+            <i class="ti ti-rocket"></i> 用這間店開團
         </a>
     </div>
     
