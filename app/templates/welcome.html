@@ -19,7 +19,7 @@
             <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" 
                  class="w-20 h-20 rounded-full mx-auto shadow">
             {% else %}
-            <div class="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto text-3xl">
+            <div class="w-20 h-20 rounded-full bg-sela-100 flex items-center justify-center mx-auto text-3xl">
                 <i class="ti ti-user"></i>
             </div>
             {% endif %}
@@ -33,7 +33,7 @@
                 <input type="text" name="nickname" 
                        value="{{ user.display_name }}"
                        placeholder="輸入你想顯示的名稱"
-                       class="w-full border rounded-lg px-4 py-3 text-center text-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                       class="w-full border rounded-lg px-4 py-3 text-center text-lg focus:ring-2 focus:ring-sela-500 focus:border-sela-500">
                 <p class="text-xs text-gray-400 mt-2 text-center">
                     這個名稱會顯示在訂單和團單中<br>
                     之後可以在「個人資料」修改
@@ -41,7 +41,7 @@
             </div>
             
             <button type="submit" 
-                    class="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium text-lg transition">
+                    class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium text-lg transition">
                 開始使用 <i class="ti ti-confetti"></i>
             </button>
         </form>

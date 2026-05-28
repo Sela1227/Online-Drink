@@ -29,7 +29,7 @@
                 <option value="member">成員</option>
                 <option value="leader">小組長</option>
             </select>
-            <button type="submit" class="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 whitespace-nowrap">
+            <button type="submit" class="bg-sela-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
                 新增
             </button>
         </form>
@@ -50,7 +50,7 @@
                     <div class="font-medium text-gray-800">{{ m.user.show_name }}</div>
                     <div class="text-xs text-gray-400">
                         {% if m.role.value == 'leader' %}
-                        <span class="text-orange-500"><i class="ti ti-star"></i> 小組長</span>
+                        <span class="text-sela-500"><i class="ti ti-star"></i> 小組長</span>
                         {% else %}
                         成員
                         {% endif %}
@@ -101,7 +101,7 @@
                        {% if department.is_public %}checked{% endif %}>
                 <label for="is_public" class="text-sm text-gray-600">公開部門（所有人都可加入）</label>
             </div>
-            <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+            <button type="submit" class="bg-sela-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sela-600">
                 儲存
             </button>
         </form>

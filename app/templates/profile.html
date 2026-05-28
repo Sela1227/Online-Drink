@@ -23,7 +23,7 @@
             <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" 
                  class="w-20 h-20 rounded-full">
             {% else %}
-            <div class="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-2xl">
+            <div class="w-20 h-20 rounded-full bg-sela-100 flex items-center justify-center text-2xl">
                 <i class="ti ti-user"></i>
             </div>
             {% endif %}
@@ -33,7 +33,7 @@
                 <div class="text-sm text-gray-500">LINE: {{ user.display_name }}</div>
                 {% endif %}
                 {% if user.is_admin %}
-                <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded mt-1 inline-block">管理員</span>
+                <span class="text-xs bg-sela-100 text-sela-600 px-2 py-0.5 rounded mt-1 inline-block">管理員</span>
                 {% endif %}
             </div>
         </div>
@@ -41,11 +41,11 @@
         <!-- 統計 -->
         <div class="grid grid-cols-2 gap-4 mb-6">
             <div class="bg-gray-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-orange-600">{{ order_count }}</div>
+                <div class="text-2xl font-bold text-sela-600">{{ order_count }}</div>
                 <div class="text-xs text-gray-500">參與訂單</div>
             </div>
             <div class="bg-gray-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-orange-600">{{ group_count }}</div>
+                <div class="text-2xl font-bold text-sela-600">{{ group_count }}</div>
                 <div class="text-xs text-gray-500">開過的團</div>
             </div>
         </div>
@@ -65,7 +65,7 @@
             </div>
             
             <button type="submit" 
-                    class="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                    class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
                 儲存變更
             </button>
         </form>
@@ -90,9 +90,9 @@
     
     <!-- 快捷連結 -->
     <div class="bg-white rounded-lg shadow-sm divide-y">
-        <a href="/stats" class="flex items-center justify-between p-4 hover:bg-gray-50 bg-gradient-to-r from-orange-50 to-amber-50">
+        <a href="/stats" class="flex items-center justify-between p-4 hover:bg-gray-50 bg-gradient-to-r from-sela-50 to-amber-50">
             <span class="font-medium"><i class="ti ti-chart-bar"></i> 消費統計</span>
-            <span class="text-orange-400">→</span>
+            <span class="text-sela-400">→</span>
         </a>
         <a href="/my-orders" class="flex items-center justify-between p-4 hover:bg-gray-50">
             <span class="font-medium"><i class="ti ti-clipboard-list"></i> 我的訂單</span>

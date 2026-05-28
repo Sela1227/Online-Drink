@@ -16,7 +16,7 @@
     
     {% if selected_store %}
     <!-- 目標店家資訊 -->
-    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+    <div class="bg-sela-50 border border-sela-200 rounded-lg p-4 flex items-center gap-3">
         <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden">
             {% if selected_store.logo_url %}
             <img src="{{ selected_store.logo_url }}" alt="{{ selected_store.name }}" class="w-full h-full object-contain p-1">
@@ -30,7 +30,7 @@
         </div>
         <div>
             <div class="font-medium text-gray-800">{{ selected_store.name }}</div>
-            <div class="text-sm text-orange-600">菜單將匯入到此店家</div>
+            <div class="text-sm text-sela-600">菜單將匯入到此店家</div>
         </div>
     </div>
     {% endif %}
@@ -127,7 +127,7 @@
         <button type="submit" 
                 x-show="hasFile"
                 x-transition
-                class="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
             預覽匯入內容
         </button>
     </form>

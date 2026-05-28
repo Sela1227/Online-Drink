@@ -11,7 +11,7 @@
     </div>
     <div class="flex justify-end">
         <a href="/votes/new" 
-           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+           class="bg-sela-500 hover:bg-sela-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
             + 發起投票
         </a>
     </div>
@@ -61,7 +61,7 @@
                 <!-- 底部資訊 -->
                 <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                     <span class="text-xs text-purple-600 font-medium">{{ vote.total_votes }} 票</span>
-                    <span class="text-xs text-orange-600"
+                    <span class="text-xs text-sela-600"
                           x-data="countdown('{{ vote.deadline.isoformat() }}')"
                           x-text="display"></span>
                 </div>
@@ -72,7 +72,7 @@
         <div class="text-center text-gray-500 py-8 bg-white rounded-lg">
             <div class="text-4xl mb-2"><i class="ti ti-checkbox"></i>️</div>
             <p>目前沒有進行中的投票</p>
-            <a href="/votes/new" class="text-orange-500 hover:text-orange-600 text-sm">發起一個投票吧！</a>
+            <a href="/votes/new" class="text-sela-500 hover:text-sela-600 text-sm">發起一個投票吧！</a>
         </div>
         {% endif %}
     </section>

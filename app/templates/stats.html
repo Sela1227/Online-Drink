@@ -14,23 +14,23 @@
     <div class="bg-white rounded-lg shadow-sm p-4">
         <div class="flex flex-wrap gap-2 mb-3">
             <a href="/stats?period=month" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'month' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'month' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 這個月
             </a>
             <a href="/stats?period=last_month" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'last_month' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'last_month' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 過去30天
             </a>
             <a href="/stats?period=3months" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == '3months' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == '3months' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 過去3個月
             </a>
             <a href="/stats?period=year" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'year' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'year' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 今年
             </a>
             <a href="/stats?period=all" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'all' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'all' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 全部
             </a>
         </div>
@@ -38,7 +38,7 @@
         <!-- 自訂區間 -->
         <form action="/stats" method="get" class="flex flex-wrap items-center gap-2" x-data="{ showCustom: {{ 'true' if period == 'custom' else 'false' }} }">
             <button type="button" @click="showCustom = !showCustom" 
-                    class="px-3 py-1.5 rounded-full text-sm {% if period == 'custom' %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                    class="px-3 py-1.5 rounded-full text-sm {% if period == 'custom' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
                 <i class="ti ti-calendar"></i> 自訂區間
             </button>
             <div x-show="showCustom" x-cloak class="flex items-center gap-2 flex-wrap">
@@ -48,7 +48,7 @@
                 <span class="text-gray-400">~</span>
                 <input type="date" name="end_date" value="{{ end_date }}" 
                        class="border rounded px-2 py-1 text-sm">
-                <button type="submit" class="px-3 py-1 bg-orange-500 text-white rounded text-sm">查詢</button>
+                <button type="submit" class="px-3 py-1 bg-sela-500 text-white rounded text-sm">查詢</button>
             </div>
         </form>
         
@@ -58,7 +58,7 @@
     </div>
     
     <!-- 總覽 -->
-    <div class="bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl shadow-lg p-5 text-white">
+    <div class="bg-gradient-to-br from-sela-500 to-amber-500 rounded-xl shadow-lg p-5 text-white">
         <div class="text-sm opacity-80 mb-1">總消費金額</div>
         <div class="text-4xl font-bold mb-3">${{ "{:,.0f}".format(total_amount) }}</div>
         <div class="grid grid-cols-2 gap-4 text-sm">
@@ -105,10 +105,10 @@
             {% set max_amount = monthly_trend | map(attribute='amount') | max or 1 %}
             {% for month in monthly_trend %}
             <div class="flex-1 flex flex-col items-center">
-                <div class="w-full bg-orange-100 rounded-t relative" 
+                <div class="w-full bg-sela-100 rounded-t relative" 
                      style="height: {{ (month.amount / max_amount * 100) | int }}%">
                     {% if month.amount > 0 %}
-                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-orange-600 whitespace-nowrap">
+                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-sela-600 whitespace-nowrap">
                         {{ "{:,.0f}".format(month.amount) }}
                     </div>
                     {% endif %}
@@ -151,11 +151,11 @@
         <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-alarm"></i> 下單習慣</h2>
         <div class="grid grid-cols-2 gap-4">
             <div class="text-center">
-                <div class="text-3xl font-bold text-orange-600">{{ peak_hour }}:00</div>
+                <div class="text-3xl font-bold text-sela-600">{{ peak_hour }}:00</div>
                 <div class="text-sm text-gray-500">最常下單時間</div>
             </div>
             <div class="text-center">
-                <div class="text-3xl font-bold text-orange-600">週{{ peak_weekday }}</div>
+                <div class="text-3xl font-bold text-sela-600">週{{ peak_weekday }}</div>
                 <div class="text-sm text-gray-500">最常下單日</div>
             </div>
         </div>
@@ -199,7 +199,7 @@
             <div class="text-sm text-gray-500 mb-2">最愛加料</div>
             <div class="flex flex-wrap gap-2">
                 {% for t in topping_stats %}
-                <span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm">
+                <span class="px-2 py-1 bg-sela-100 text-sela-700 rounded text-sm">
                     {{ t.topping_name }} ({{ t.count }})
                 </span>
                 {% endfor %}
@@ -251,12 +251,12 @@
             <div class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-100{% endif %}">
                 <div class="flex items-center gap-2">
                     <span class="w-6 h-6 flex items-center justify-center text-sm 
-                        {% if loop.index <= 3 %}bg-orange-100 text-orange-600{% else %}bg-gray-100 text-gray-500{% endif %} 
+                        {% if loop.index <= 3 %}bg-sela-100 text-sela-600{% else %}bg-gray-100 text-gray-500{% endif %} 
                         rounded-full font-medium">{{ loop.index }}</span>
                     <span class="text-gray-800">{{ item.item_name }}</span>
                 </div>
                 <div class="text-sm">
-                    <span class="text-orange-600 font-medium">{{ item.total_qty|int }} 份</span>
+                    <span class="text-sela-600 font-medium">{{ item.total_qty|int }} 份</span>
                     <span class="text-gray-400 ml-2">${{ "{:,.0f}".format(item.total_spent or 0) }}</span>
                 </div>
             </div>

@@ -32,11 +32,11 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">您的名字</label>
                 <input type="text" name="guest_name" required
                        placeholder="輸入您的名字（方便團主識別）"
-                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-sela-500 focus:border-transparent">
             </div>
             
             <button type="submit" 
-                    class="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg transition">
+                    class="w-full bg-sela-500 hover:bg-sela-600 text-white font-medium py-3 rounded-lg transition">
                 {% if group.category.value == 'group_buy' %}進入下單{% else %}進入點餐{% endif %}
             </button>
         </form>
@@ -48,7 +48,7 @@
         
         <div class="text-center mt-4">
             <a href="/auth/login?next=/groups/{{ group.id }}" 
-               class="text-sm text-orange-500 hover:text-orange-600">
+               class="text-sm text-sela-500 hover:text-sela-600">
                 使用 LINE 登入 →
             </a>
         </div>

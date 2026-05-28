@@ -2,7 +2,7 @@
     <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
         我的訂單
         {% if order and order.items %}
-        <span class="text-sm font-normal text-orange-600 font-medium">${{ order.total_amount }}</span>
+        <span class="text-sm font-normal text-sela-600 font-medium">${{ order.total_amount }}</span>
         {% endif %}
         
         <!-- 狀態標籤 -->
@@ -56,7 +56,7 @@
                         class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-xs">+</button>
             </div>
             
-            <div class="text-orange-600 font-medium text-sm w-12 text-right">${{ item.subtotal }}</div>
+            <div class="text-sela-600 font-medium text-sm w-12 text-right">${{ item.subtotal }}</div>
             
             <button hx-delete="/orders/items/{{ item.id }}"
                     hx-target="#cart-content"
@@ -66,7 +66,7 @@
                     class="text-red-400 hover:text-red-600 text-sm"><i class="ti ti-x"></i></button>
             {% else %}
             <span class="text-gray-500 text-sm">x{{ item.quantity }}</span>
-            <div class="text-orange-600 font-medium text-sm">${{ item.subtotal }}</div>
+            <div class="text-sela-600 font-medium text-sm">${{ item.subtotal }}</div>
             {% endif %}
         </div>
         {% endfor %}
@@ -81,7 +81,7 @@
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
                 @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
-                class="flex-1 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                class="flex-1 py-2.5 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
             確定結單
         </button>
         {% if order.status.value == 'editing' %}

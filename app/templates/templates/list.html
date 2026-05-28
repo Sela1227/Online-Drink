@@ -13,7 +13,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <a href="/templates/new" 
-                   class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                   class="bg-sela-500 hover:bg-sela-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
                     + 新增
                 </a>
                 <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
@@ -26,7 +26,7 @@
         {% if my_templates %}
         <div class="space-y-3">
             {% for tpl in my_templates %}
-            <div class="border rounded-lg p-4 hover:border-orange-300 transition">
+            <div class="border rounded-lg p-4 hover:border-sela-300 transition">
                 <div class="flex items-start justify-between">
                     <div class="flex items-center gap-3">
                         {% if tpl.store.logo_url %}
@@ -59,7 +59,7 @@
                 <div class="flex gap-2 mt-3">
                     <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-1">
                         <button type="submit" 
-                                class="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+                                class="w-full py-2 bg-sela-500 hover:bg-sela-600 text-white rounded-lg text-sm font-medium">
                             <i class="ti ti-bolt"></i> 使用開團
                         </button>
                     </form>
@@ -79,7 +79,7 @@
             <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
             <p>還沒有儲存任何模板</p>
             <p class="text-sm mt-1">可從開團頁面新增，或從已開的團單儲存</p>
-            <a href="/templates/new" class="inline-block mt-4 text-orange-500 hover:text-orange-600">
+            <a href="/templates/new" class="inline-block mt-4 text-sela-500 hover:text-sela-600">
                 新增第一個模板 →
             </a>
         </div>

@@ -27,7 +27,7 @@
                 <div>
                     <span class="font-medium text-gray-800">{{ ud.department.name }}</span>
                     {% if ud.role.value == 'leader' %}
-                    <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded ml-2">小組長</span>
+                    <span class="text-xs bg-sela-100 text-sela-600 px-2 py-0.5 rounded ml-2">小組長</span>
                     {% endif %}
                 </div>
                 <form action="/my-departments/{{ ud.department_id }}/leave" method="POST"
@@ -57,7 +57,7 @@
                     <p class="text-xs text-gray-400 mt-1">{{ dept.member_count }} 位成員</p>
                 </div>
                 <form action="/my-departments/{{ dept.id }}/join" method="POST">
-                    <button type="submit" class="text-sm bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">
+                    <button type="submit" class="text-sm bg-sela-500 text-white px-3 py-1 rounded hover:bg-sela-600">
                         加入
                     </button>
                 </form>

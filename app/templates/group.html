@@ -21,7 +21,7 @@
                     <a href="/home" class="text-sm text-gray-500 hover:text-gray-700 flex-shrink-0">返回 →</a>
                 </div>
                 <div class="text-sm text-gray-500 flex items-center gap-1 flex-wrap">
-                    {{ store.name }}{% if branch %}<span class="text-orange-600">（{{ branch.name }}）</span>{% endif %} · {{ group.owner.show_name }}
+                    {{ store.name }}{% if branch %}<span class="text-sela-600">（{{ branch.name }}）</span>{% endif %} · {{ group.owner.show_name }}
                     <button onclick="toggleFavorite({{ store.id }})" 
                             id="fav-btn"
                             class="ml-2 flex items-center gap-0.5 hover:scale-105 transition-transform"
@@ -33,7 +33,7 @@
             </div>
             <div class="text-right">
                 {% if is_open %}
-                <div class="text-orange-600 font-medium"
+                <div class="text-sela-600 font-medium"
                      x-data="countdown('{{ group.deadline.isoformat() }}')"
                      x-text="display"></div>
                 {% else %}
@@ -202,7 +202,7 @@
                 {% if is_open %}
                 <form action="/groups/{{ group.id }}/close" method="post" class="inline"
                       onsubmit="return confirm('確定要提早結單嗎？結單後將無法再{% if group.category.value == 'group_buy' %}下單{% else %}點餐{% endif %}。')">
-                    <button type="submit" class="text-orange-600 hover:text-orange-700">提早結單</button>
+                    <button type="submit" class="text-sela-600 hover:text-sela-700">提早結單</button>
                 </form>
                 {% endif %}
                 <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
@@ -265,7 +265,7 @@
                                    value="{{ group.deadline.strftime('%Y-%m-%dT%H:%M') }}"
                                    class="w-full border rounded px-3 py-2 text-sm">
                         </div>
-                        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded text-sm">
+                        <button type="submit" class="w-full bg-sela-500 hover:bg-sela-600 text-white py-2 rounded text-sm">
                             儲存變更
                         </button>
                     </form>
@@ -463,14 +463,14 @@
             <div class="flex gap-2 mb-2">
                 {% if hot_items %}
                 <button @click="quickTab = 'hot'"
-                        :class="quickTab === 'hot' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
+                        :class="quickTab === 'hot' ? 'bg-sela-500 text-white' : 'bg-gray-100 text-gray-600'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
                     <i class="ti ti-flame"></i> 熱門
                 </button>
                 {% endif %}
                 {% if favorite_items %}
                 <button @click="quickTab = 'mine'"
-                        :class="quickTab === 'mine' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
+                        :class="quickTab === 'mine' ? 'bg-sela-500 text-white' : 'bg-gray-100 text-gray-600'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
                     <i class="ti ti-heart"></i>️ 我的最愛
                 </button>
@@ -494,8 +494,8 @@
             <div x-show="quickTab === 'mine'" class="flex flex-wrap gap-2">
                 {% for fav in favorite_items %}
                 <button onclick="scrollToItem({{ fav.menu_item_id }})"
-                        class="text-xs px-2.5 py-1.5 bg-orange-50 text-orange-700 rounded-full hover:bg-orange-100 transition">
-                    {{ fav.item_name }} <span class="text-orange-400">({{ fav.count }}次)</span>
+                        class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-700 rounded-full hover:bg-sela-100 transition">
+                    {{ fav.item_name }} <span class="text-sela-400">({{ fav.count }}次)</span>
                 </button>
                 {% endfor %}
             </div>
@@ -539,7 +539,7 @@
                                                 this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
                                                 this.textContent = '<i class="ti ti-check"></i>';
                                                 this.disabled = true;
-                                                this.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                                                this.classList.remove('bg-sela-500', 'hover:bg-sela-600');
                                                 this.classList.add('bg-gray-300');
                                                 if (window.Alpine) {
                                                     const comp = Alpine.$data(document.querySelector('[x-data]'));
@@ -549,7 +549,7 @@
                                                     }
                                                 }
                                             "
-                                            class="text-xs text-white bg-orange-500 hover:bg-orange-600 px-2 py-1 rounded transition">
+                                            class="text-xs text-white bg-sela-500 hover:bg-sela-600 px-2 py-1 rounded transition">
                                         跟單
                                     </button>
                                 </div>
@@ -592,7 +592,7 @@
                             {% endif %}
                         </div>
                         <div class="text-right">
-                            <div class="text-orange-600">${{ item.price }}</div>
+                            <div class="text-sela-600">${{ item.price }}</div>
                             <div class="text-xs text-gray-400">x{{ item.quantity }}</div>
                         </div>
                     </div>
@@ -626,7 +626,7 @@
                 <template x-if="randomResult">
                     <div>
                         <div class="text-xl font-bold text-gray-800 mb-1" x-text="randomResult.name"></div>
-                        <div class="text-orange-600 text-lg mb-4">$<span x-text="randomResult.price"></span></div>
+                        <div class="text-sela-600 text-lg mb-4">$<span x-text="randomResult.price"></span></div>
                     </div>
                 </template>
             </div>
@@ -637,7 +637,7 @@
                     <i class="ti ti-refresh"></i> 再抽一次
                 </button>
                 <button @click="goToRandomItem()"
-                        class="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm">
+                        class="flex-1 py-2 rounded-lg bg-sela-500 hover:bg-sela-600 text-white text-sm">
                     去點這個！
                 </button>
             </div>
@@ -652,11 +652,11 @@
         
         <!-- 分類快速導覽（固定在頂部） -->
         {% if menu.categories|length > 1 %}
-        <div class="sticky top-12 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-orange-200 shadow-sm z-10 overflow-x-auto">
+        <div class="sticky top-12 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
             <div class="flex gap-2 min-w-max">
                 {% for category in menu.categories %}
                 <button @click="scrollToCategory('category-{{ category.id }}')"
-                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white border-orange-300 text-orange-600 hover:bg-orange-50'"
+                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-sela-500 text-white border-sela-500 shadow-md' : 'bg-white border-sela-300 text-sela-600 hover:bg-sela-50'"
                         class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
                     {{ category.name }}
                 </button>
@@ -701,7 +701,7 @@
         <!-- 購物車按鈕（只有未結單時顯示） -->
         <button @click="showCart = true"
                 x-show="orderStatus !== 'submitted'"
-                class="bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center relative">
+                class="bg-sela-500 hover:bg-sela-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center relative">
             <span class="text-xl"><i class="ti ti-shopping-cart"></i></span>
             <span x-show="cartCount > 0"
                   class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
@@ -721,7 +721,7 @@
              x-transition:leave-end="translate-x-full">
             
             <!-- 購物車標題 -->
-            <div class="p-4 border-b flex items-center justify-between bg-orange-500 text-white">
+            <div class="p-4 border-b flex items-center justify-between bg-sela-500 text-white">
                 <h3 class="font-semibold text-lg">購物車</h3>
                 <button @click="showCart = false" class="text-white/80 hover:text-white text-2xl">&times;</button>
             </div>
@@ -810,13 +810,13 @@
                     <div class="flex gap-2">
                         <label class="cursor-pointer flex-1">
                             <input type="radio" name="size" value="M" x-model="selectedSize" class="peer hidden" checked>
-                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-sela-500 peer-checked:text-white peer-checked:border-sela-500">
                                 M <span x-text="'$' + selectedItem?.price"></span>
                             </span>
                         </label>
                         <label class="cursor-pointer flex-1">
                             <input type="radio" name="size" value="L" x-model="selectedSize" class="peer hidden">
-                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-sela-500 peer-checked:text-white peer-checked:border-sela-500">
                                 L <span x-text="'$' + selectedItem?.price_l"></span>
                             </span>
                         </label>
@@ -836,7 +836,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="sugar" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_sugar %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-white peer-checked:border-sela-500">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -857,7 +857,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="ice" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_ice %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-white peer-checked:border-sela-500">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -874,7 +874,7 @@
                         {% for topping in store.toppings if topping.is_active %}
                         <label class="cursor-pointer">
                             <input type="checkbox" name="toppings" value="{{ topping.id }}" class="peer hidden">
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500">
+                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-white peer-checked:border-sela-500">
                                 {{ topping.name }} {% if topping.price > 0 %}+${{ topping.price|int }}{% endif %}
                             </span>
                         </label>
@@ -917,7 +917,7 @@
                         取消
                     </button>
                     <button type="submit"
-                            class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+                            class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
                         加入購物車
                     </button>
                 </div>
@@ -1072,9 +1072,9 @@ function scrollToItem(itemId) {
     if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // 閃爍效果
-        el.classList.add('ring-2', 'ring-orange-400');
+        el.classList.add('ring-2', 'ring-sela-400');
         setTimeout(() => {
-            el.classList.remove('ring-2', 'ring-orange-400');
+            el.classList.remove('ring-2', 'ring-sela-400');
         }, 2000);
     }
 }

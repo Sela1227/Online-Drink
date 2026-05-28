@@ -9,13 +9,13 @@
     <div class="bg-white rounded-lg shadow-sm p-4">
         <div class="flex items-center justify-between mb-3">
             <h2 class="font-semibold text-gray-800"><i class="ti ti-bolt"></i> 快速開團</h2>
-            <a href="/templates" class="text-sm text-orange-500 hover:text-orange-600">管理模板</a>
+            <a href="/templates" class="text-sm text-sela-500 hover:text-sela-600">管理模板</a>
         </div>
         <div class="grid grid-cols-2 gap-2">
             {% for tpl in my_templates %}
             <form action="/templates/{{ tpl.id }}/use" method="post">
                 <button type="submit" 
-                        class="w-full p-3 text-left border rounded-lg hover:border-orange-300 hover:bg-orange-50 transition">
+                        class="w-full p-3 text-left border rounded-lg hover:border-sela-300 hover:bg-sela-50 transition">
                     <div class="flex items-center gap-2">
                         {% if tpl.store.logo_url %}
                         <img src="{{ tpl.store.logo_url }}" class="w-8 h-8 rounded object-contain">
@@ -328,7 +328,7 @@
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
-            <button type="submit" class="flex-1 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium">
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
                 開團
             </button>
         </div>

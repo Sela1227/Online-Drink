@@ -91,7 +91,7 @@
             <!-- 分類篩選 -->
             <div class="flex gap-2 mb-3">
                 <button type="button" @click="filterCategory = ''"
-                        :class="filterCategory === '' ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-gray-50 border-gray-200'"
+                        :class="filterCategory === '' ? 'bg-sela-100 text-sela-700 border-sela-300' : 'bg-gray-50 border-gray-200'"
                         class="px-3 py-1 rounded border text-sm">
                     全部
                 </button>
@@ -139,7 +139,7 @@
             </a>
             <button type="submit" 
                     :disabled="selectedCount < 2"
-                    :class="selectedCount < 2 ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'"
+                    :class="selectedCount < 2 ? 'bg-gray-300 cursor-not-allowed' : 'bg-sela-500 hover:bg-sela-600'"
                     class="flex-1 py-3 rounded-lg text-white font-medium">
                 發起投票
             </button>

@@ -4,7 +4,7 @@
         <span x-text="expanded ? '▼' : '▶'" class="text-gray-400 text-xs"></span>
         已結單
         <span class="text-sm font-normal text-gray-500">({{ submitted_orders|length }} 人)</span>
-        <span class="text-sm font-normal text-orange-600">${{ submitted_orders|sum(attribute='total_amount') }}</span>
+        <span class="text-sm font-normal text-sela-600">${{ submitted_orders|sum(attribute='total_amount') }}</span>
         {% if group.is_blind_mode and is_open %}
         <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded"><i class="ti ti-eye-off"></i> 盲點模式</span>
         {% endif %}

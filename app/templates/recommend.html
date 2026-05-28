@@ -26,13 +26,13 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">店家名稱 <span class="text-red-500">*</span></label>
                 <input type="text" name="store_name" required placeholder="例如：50嵐、麥當勞"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
             </div>
             
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">店家類型 <span class="text-red-500">*</span></label>
                 <select name="category" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
                     <option value="">請選擇</option>
                     <option value="drink"><i class="ti ti-cup"></i> 飲料店</option>
                     <option value="meal"><i class="ti ti-bowl"></i> 餐廳</option>
@@ -43,24 +43,24 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">菜單連結（選填）</label>
                 <input type="url" name="menu_url" placeholder="https://..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
                 <p class="text-xs text-gray-400 mt-1">可貼上官網、Uber Eats、foodpanda 等菜單連結</p>
             </div>
             
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">菜單圖片（選填）</label>
                 <input type="file" name="menu_image" accept="image/*"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-orange-50 file:text-orange-600">
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-sela-50 file:text-sela-600">
                 <p class="text-xs text-gray-400 mt-1">可拍照或上傳菜單圖片</p>
             </div>
             
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">備註（選填）</label>
                 <textarea name="note" rows="2" placeholder="例如：推薦他們的珍珠奶茶！"
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"></textarea>
             </div>
             
-            <button type="submit" class="w-full bg-orange-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-orange-600">
+            <button type="submit" class="w-full bg-sela-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-sela-600">
                 <i class="ti ti-rocket"></i> 送出推薦
             </button>
         </form>
@@ -112,7 +112,7 @@
                 {% endif %}
                 {% if rec.status == 'approved' and rec.created_store_id %}
                 <div class="mt-2">
-                    <a href="/stores/{{ rec.created_store_id }}" class="text-xs text-orange-600 hover:underline">
+                    <a href="/stores/{{ rec.created_store_id }}" class="text-xs text-sela-600 hover:underline">
                         查看店家 →
                     </a>
                 </div>
