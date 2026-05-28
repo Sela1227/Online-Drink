@@ -1,3 +1,62 @@
-log/
-*_bundle.txt
+# ============================================
+# SELA 快點來點餐 - .gitignore
+# 對齊 SELA-Starter-Kit V1.9.0 標準模板
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment（重要：含 LINE Login、JWT、Cloudinary 機密）
+.env
+.env.local
+*.local
+
+# Logs
 *.log
+logs/
+log/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (如未來引入)
+node_modules/
+
+# 專案特定
+*_bundle.txt
+*_bundle_*.txt
+.version_manager.json
+更新檔/
