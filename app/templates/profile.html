@@ -12,7 +12,7 @@
     
     {% if request.query_params.get('success') %}
     <div class="bg-green-50 text-green-700 px-4 py-3 rounded-lg">
-        ✅ 資料已更新
+        <i class="ti ti-check"></i> 資料已更新
     </div>
     {% endif %}
     
@@ -24,7 +24,7 @@
                  class="w-20 h-20 rounded-full">
             {% else %}
             <div class="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-2xl">
-                👤
+                <i class="ti ti-user"></i>
             </div>
             {% endif %}
             <div>
@@ -95,7 +95,7 @@
             <span class="text-orange-400">→</span>
         </a>
         <a href="/my-orders" class="flex items-center justify-between p-4 hover:bg-gray-50">
-            <span class="font-medium">📋 我的訂單</span>
+            <span class="font-medium"><i class="ti ti-clipboard-list"></i> 我的訂單</span>
             <span class="text-gray-400">→</span>
         </a>
         <a href="/my/groups" class="flex items-center justify-between p-4 hover:bg-gray-50">
@@ -107,7 +107,7 @@
             <span class="text-gray-400">→</span>
         </a>
         <a href="/my-departments" class="flex items-center justify-between p-4 hover:bg-gray-50">
-            <span class="font-medium">👥 我的部門</span>
+            <span class="font-medium"><i class="ti ti-users"></i> 我的部門</span>
             <span class="text-gray-400">→</span>
         </a>
         <a href="/favorites" class="flex items-center justify-between p-4 hover:bg-gray-50">

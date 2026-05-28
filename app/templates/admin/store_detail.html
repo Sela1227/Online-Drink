@@ -14,7 +14,7 @@
     <div class="flex justify-end gap-2">
         <a href="/admin/stores/{{ store.id }}/menus" 
            class="px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-medium">
-            📋 管理菜單
+            <i class="ti ti-clipboard-list"></i> 管理菜單
         </a>
         <a href="/admin/stores/{{ store.id }}/edit" 
            class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
@@ -46,7 +46,7 @@
                     <span class="text-xs bg-gray-200 text-gray-600 px-2.5 py-1 rounded-full font-medium">已停用</span>
                     {% endif %}
                     {% if store.is_public %}
-                    <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">🌐 公開</span>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-world"></i> 公開</span>
                     {% else %}
                     <span class="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium">🔒 限定部門</span>
                     {% endif %}
@@ -81,7 +81,7 @@
             {% endif %}
             {% if store.website_url %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="w-6 text-center">🌐</span>
+                <span class="w-6 text-center"><i class="ti ti-world"></i></span>
                 <a href="{{ store.website_url }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ store.website_url }}</a>
             </div>
             {% endif %}
@@ -156,7 +156,7 @@
     <!-- 分店管理 -->
     <div class="bg-white rounded-xl shadow-sm p-5" x-data="{ showAddForm: false }">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="font-semibold text-gray-800">🏪 分店管理 ({{ store.branches|length if store.branches else 0 }})</h2>
+            <h2 class="font-semibold text-gray-800"><i class="ti ti-building-store"></i> 分店管理 ({{ store.branches|length if store.branches else 0 }})</h2>
             <button @click="showAddForm = !showAddForm" 
                     class="text-sm px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200">
                 ➕ 新增分店
@@ -244,7 +244,7 @@
     
     <!-- 可見範圍設定 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-3">👥 可見範圍</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-users"></i> 可見範圍</h2>
         <form action="/admin/stores/{{ store.id }}/visibility" method="POST">
             <div class="space-y-3">
                 <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
@@ -252,7 +252,7 @@
                            {% if store.is_public %}checked{% endif %}
                            onchange="document.getElementById('dept-select').classList.add('hidden')">
                     <div>
-                        <div class="font-medium text-gray-700">🌐 公開</div>
+                        <div class="font-medium text-gray-700"><i class="ti ti-world"></i> 公開</div>
                         <div class="text-xs text-gray-500">所有人都可以看到此店家</div>
                     </div>
                 </label>
@@ -305,7 +305,7 @@
             </form>
             <a href="/admin/stores/{{ store.id }}/menus" 
                class="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-medium">
-                📋 管理菜單
+                <i class="ti ti-clipboard-list"></i> 管理菜單
             </a>
             <a href="/admin/import?store_id={{ store.id }}" 
                class="px-4 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg text-sm font-medium">

@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.2.0（三大分類圖示全站 Tabler 化 + 底部導航文字對齊）
+- **版本：** V1.3.0（標題列版本號 + 高頻 emoji 全站 Tabler 化）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -204,6 +204,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.3.0 | **標題列版本號 + 高頻 emoji 全站 Tabler 化**。base.html 在 `<body>` 後加 `{% set app_version = 'V1.3.0' %}`，「SELA」標題旁顯示 `{{ app_version }}` 灰色小字（10px mono）— 升版只需改 `{% set %}` 一行；標題列 ⚙️ 換 `ti-settings`；全站 37 檔 83 次替換：📋→`ti-clipboard-list`（27 次最多）、👥→`ti-users`、👤→`ti-user`、✅→`ti-check`、🎉→`ti-confetti`、📝→`ti-pencil`、🌐→`ti-world`、🏪→`ti-building-store`。 |
 | V1.2.0 | **三大分類圖示全站 Tabler 化 + 底部導航文字對齊**。三大分類 emoji 全站 1:1 替換：🧋 → `<i class="ti ti-cup"></i>`（23 檔 103 次）、🍱 → `ti-bowl`、🛒 → `ti-shopping-cart`。`<i>` 自動繼承外層 span/button 的字級，不需逐處調 size。底部導航另外把 4 個圖示也包進 `w-9 h-9` 容器，所有 `<a>` 區塊高度一致，文字底線對齊。 |
 | V1.1.3 | **Hotfix：中央 + 圓圈對齊**。V1.1.0 我把圓圈尺寸從原版 48px 改成 52px 並用 inline style `margin-top: -26px` 試圖配合，但實機上沒生效（圓圈貼底而不是浮出於導航條）。退回原版 `w-12 h-12 -mt-6` 經驗證能用的 Tailwind 寫法，內部 + 字體用 24px。**教訓：不要為了讓 Tabler + 看起來大 4px 就動已驗證 work 的尺寸組合**。 |
 | V1.1.2 | **Hotfix：base.html 401 redirect 寫死錯誤 endpoint `/login`，改為 `/auth/login`**（坑 #12）。V1.1.1 部署後使用者用無痕視窗測試踩到 — `/login` 不存在（真實是 `/auth/login`）。base.html 第 57/157/164 行三處 hardcode 全改。**這個 bug 早於 V1.1.x，潛伏多時** — 30 人都用已登入 cookie 從沒被 401 踢過。 |
@@ -218,8 +219,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-1. **V1.3.0：剩餘高頻 emoji → Tabler**（📋 19 檔 / 👥 11 檔 / 👤 9 檔 / ✅ 8 檔 / 🎉 7 檔 / 📝 6 檔 / 🌐 6 檔 / 🏪 6 檔 等）。同樣 1:1 替換策略，每個 emoji 自動繼承外層字級
-2. **V1.4.0：admin 後台系統圖示**（管理用：⚙ ✏ 💾 🗑 ➕ 📁 等）— 你自己後台用，順序排在用戶可見之後
+1. **V1.4.0：admin 後台系統圖示**（管理用：⚙ ✏ 💾 🗑 ➕ 📁 等）— 你自己後台用，順序排在用戶可見之後
 3. **V1.5.0：其餘 emoji 全清**（投票 🗳 / 慶祝 🎊 🎉 / 警告 ⚠ / 鎖 🔒 等收尾）
 4. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖
 5. 訂單匯出 Excel — 原本 backlog
@@ -233,6 +233,17 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 ---
 
 ## 八、升版必讀
+
+### 版本號管理（V1.3.0 起）
+
+- 版本號定義在 `app/templates/base.html` 的 `{% set app_version = 'VX.Y.Z' %}`（緊跟 `<body>` 標籤）
+- 升版時**只需改這一行**，所有頁面標題列自動更新
+- **升版 SOP：**
+  1. 改 `base.html` 內 `{% set app_version = ... %}`
+  2. 改 `CLAUDE.md` 第〇章「當前狀態」的版本字串
+  3. `CLAUDE.md` 第六章「版本歷程」加新一列
+  4. 打包 zip 命名 `Online-Drink VX.Y.Z.zip`
+- 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作
 

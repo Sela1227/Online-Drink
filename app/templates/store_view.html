@@ -56,7 +56,7 @@
                     {% if active_menu %}
                     <a href="/stores/{{ store.id }}/menu" 
                        class="text-sm px-3 py-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200">
-                        📋 查看菜單
+                        <i class="ti ti-clipboard-list"></i> 查看菜單
                     </a>
                     {% endif %}
                 </div>
@@ -87,7 +87,7 @@
             {% if store.website_url %}
             <a href="{{ store.website_url }}" target="_blank"
                class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">
-                🌐 官網
+                <i class="ti ti-world"></i> 官網
             </a>
             {% endif %}
             {% if store.google_maps_url %}
@@ -154,7 +154,7 @@
     <!-- 分店列表 -->
     {% if store.branches %}
     <div class="bg-white rounded-xl shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🏪 分店 ({{ store.branches|length }})</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-building-store"></i> 分店 ({{ store.branches|length }})</h2>
         <div class="space-y-2">
             {% for branch in store.branches %}
             <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">

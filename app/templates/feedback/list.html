@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
-    <h1 class="text-xl font-bold text-gray-800 mb-4">📝 問題回報</h1>
+    <h1 class="text-xl font-bold text-gray-800 mb-4"><i class="ti ti-pencil"></i> 問題回報</h1>
     
     <!-- 新增回報表單 -->
     <div class="bg-white rounded-xl shadow p-4 mb-6">
@@ -15,7 +15,7 @@
                 <select name="type" class="w-full border rounded-lg px-3 py-2">
                     <option value="bug">🐛 功能異常</option>
                     <option value="suggestion">💡 建議功能</option>
-                    <option value="other">📋 其他</option>
+                    <option value="other"><i class="ti ti-clipboard-list"></i> 其他</option>
                 </select>
             </div>
             <div>
@@ -51,7 +51,7 @@
                     {% elif fb.type.value == 'suggestion' %}
                     <span class="text-blue-500">💡</span>
                     {% else %}
-                    <span class="text-gray-500">📋</span>
+                    <span class="text-gray-500"><i class="ti ti-clipboard-list"></i></span>
                     {% endif %}
                     <span class="font-medium">{{ fb.title }}</span>
                 </div>

@@ -30,7 +30,7 @@
     
     {% if request.query_params.get('logout_all') == 'success' %}
     <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
-        ✅ 已成功登出所有用戶，所有人需重新登入。
+        <i class="ti ti-check"></i> 已成功登出所有用戶，所有人需重新登入。
     </div>
     {% endif %}
     
@@ -44,7 +44,7 @@
                     {% if u.picture_url %}
                     <img src="{{ u.picture_url }}" alt="{{ u.display_name }}" class="w-full h-full object-cover">
                     {% else %}
-                    <span class="text-lg">👤</span>
+                    <span class="text-lg"><i class="ti ti-user"></i></span>
                     {% endif %}
                 </div>
                 <!-- 在線指示燈 -->
@@ -102,7 +102,7 @@
     </div>
     {% else %}
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
-        <div class="text-4xl mb-2">👥</div>
+        <div class="text-4xl mb-2"><i class="ti ti-users"></i></div>
         <p>還沒有任何使用者</p>
     </div>
     {% endif %}

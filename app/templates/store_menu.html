@@ -20,7 +20,7 @@
             </div>
             <div>
                 <h1 class="text-lg font-bold text-gray-800">{{ store.name }}</h1>
-                <div class="text-xs text-gray-500">📋 菜單</div>
+                <div class="text-xs text-gray-500"><i class="ti ti-clipboard-list"></i> 菜單</div>
             </div>
         </div>
         <a href="/stores/{{ store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回店家 →</a>
@@ -60,7 +60,7 @@
     </div>
     {% else %}
     <div class="bg-white rounded-lg shadow-sm p-8 text-center text-gray-500">
-        <div class="text-4xl mb-2">📋</div>
+        <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
         <p>此菜單暫無品項</p>
     </div>
     {% endif %}

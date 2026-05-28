@@ -12,7 +12,7 @@
     
     <!-- 基本資訊表單 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4">📝 基本資訊</h2>
+        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-pencil"></i> 基本資訊</h2>
         <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
             <!-- Logo -->
             <div class="flex items-center gap-4">
@@ -82,7 +82,7 @@
             <!-- 連結 -->
             <div class="space-y-3 pt-2">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">🌐 官網</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-world"></i> 官網</label>
                     <input type="url" name="website_url" value="{{ store.website_url or '' }}" placeholder="https://..."
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
@@ -169,7 +169,7 @@
     
     <!-- 分店管理 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4">🏪 分店管理</h2>
+        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-building-store"></i> 分店管理</h2>
         
         {% if store.branches %}
         <div class="space-y-2 mb-4">

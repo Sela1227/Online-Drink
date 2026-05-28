@@ -74,7 +74,7 @@
             {% if store.website_url %}
             <a href="{{ store.website_url }}" target="_blank"
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full text-sm hover:bg-gray-100 transition">
-                🌐 官網
+                <i class="ti ti-world"></i> 官網
             </a>
             {% endif %}
             {% if store.ubereats_url %}
@@ -95,7 +95,7 @@
         <!-- 備註顯示 -->
         {% if group.note %}
         <div class="mt-3 p-3 bg-amber-50 rounded-lg text-sm text-amber-800">
-            📝 {{ group.note }}
+            <i class="ti ti-pencil"></i> {{ group.note }}
         </div>
         {% endif %}
         
@@ -111,7 +111,7 @@
             🎊 <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
             {% if not is_open and group.lucky_winner_ids %}
             <div class="mt-2 font-bold text-lg">
-                🎉 恭喜 
+                <i class="ti ti-confetti"></i> 恭喜 
                 {% for winner_id in group.lucky_winner_ids.split(',') %}
                     {% for order in submitted_orders if order.user_id == winner_id|int %}
                         {{ order.user.show_name }}{% if not loop.last %}、{% endif %}
@@ -191,7 +191,7 @@
             <div class="flex gap-3">
                 <button @click="copyLink()" class="text-gray-600 hover:text-gray-800">複製連結</button>
                 <button @click="showQR = true" class="text-gray-600 hover:text-gray-800">QR Code</button>
-                <button @click="showSaveTemplate = true" class="text-purple-600 hover:text-purple-700">📋 存模板</button>
+                <button @click="showSaveTemplate = true" class="text-purple-600 hover:text-purple-700"><i class="ti ti-clipboard-list"></i> 存模板</button>
             </div>
             {% if is_owner or is_admin %}
             <div class="flex gap-3 items-center">
@@ -295,7 +295,7 @@
                 
                 <!-- 訪客連結 -->
                 <div class="border rounded-lg p-3" x-data="{ showGuestLink: false, guestLink: '' }">
-                    <h4 class="font-medium text-gray-800 mb-2">👤 訪客連結</h4>
+                    <h4 class="font-medium text-gray-800 mb-2"><i class="ti ti-user"></i> 訪客連結</h4>
                     <p class="text-xs text-gray-500 mb-3">讓非系統成員也能臨時參與此團</p>
                     <button type="button" 
                             @click="fetch('/groups/{{ group.id }}/guest-link', {method: 'POST'}).then(r => r.json()).then(d => { guestLink = d.link; showGuestLink = true; })"
@@ -437,7 +437,7 @@
             {% if last_order and last_order_items %}
             <button @click="showLastOrder = true"
                     class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition">
-                📋 上次訂單
+                <i class="ti ti-clipboard-list"></i> 上次訂單
             </button>
             {% endif %}
             
@@ -574,7 +574,7 @@
          @click.self="showLastOrder = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
-                <h3 class="font-semibold text-gray-800">📋 上次在 {{ store.name }} 的訂單</h3>
+                <h3 class="font-semibold text-gray-800"><i class="ti ti-clipboard-list"></i> 上次在 {{ store.name }} 的訂單</h3>
                 <p class="text-xs text-gray-400 mt-1">{{ last_order.created_at.strftime('%Y/%m/%d') }}</p>
             </div>
             
@@ -765,7 +765,7 @@
          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
          @click.self="showSaveTemplate = false">
         <div class="bg-white rounded-lg p-6 w-full max-w-sm mx-4">
-            <h3 class="font-semibold text-lg mb-4">📋 儲存為開團模板</h3>
+            <h3 class="font-semibold text-lg mb-4"><i class="ti ti-clipboard-list"></i> 儲存為開團模板</h3>
             <form action="/templates/save-from-group/{{ group.id }}" method="post">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">模板名稱</label>

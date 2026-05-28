@@ -45,7 +45,7 @@
     <section x-data="{ open: false, filter: 'all' }">
         <button @click="open = !open" class="w-full flex items-center justify-between py-2">
             <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
-                <span>🏪</span> 店家
+                <span><i class="ti ti-building-store"></i></span> 店家
                 <span class="text-sm font-normal text-gray-400">({{ stores|length }})</span>
             </h2>
             <span class="text-gray-400 text-sm" x-text="open ? '收起' : '展開'"></span>

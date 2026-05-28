@@ -44,7 +44,7 @@
                 {% if m.user.picture_url %}
                 <img src="{{ m.user.picture_url }}" class="w-10 h-10 rounded-full">
                 {% else %}
-                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">👤</div>
+                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center"><i class="ti ti-user"></i></div>
                 {% endif %}
                 <div>
                     <div class="font-medium text-gray-800">{{ m.user.show_name }}</div>

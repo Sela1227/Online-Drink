@@ -134,12 +134,12 @@
                 <label class="flex items-center gap-2">
                     <input type="radio" name="visibility" value="public" checked
                            @change="isPublic = true">
-                    <span class="text-sm">🌐 公開（所有人可見）</span>
+                    <span class="text-sm"><i class="ti ti-world"></i> 公開（所有人可見）</span>
                 </label>
                 <label class="flex items-center gap-2">
                     <input type="radio" name="visibility" value="departments"
                            @change="isPublic = false">
-                    <span class="text-sm">👥 限定部門</span>
+                    <span class="text-sm"><i class="ti ti-users"></i> 限定部門</span>
                 </label>
             </div>
             
@@ -233,7 +233,7 @@
         <div x-show="storeId" x-cloak class="p-4 bg-purple-50 rounded-lg" x-data="{ showFunOptions: false }">
             <button type="button" @click="showFunOptions = !showFunOptions"
                     class="flex items-center justify-between w-full text-left">
-                <h3 class="font-medium text-purple-700">🎉 趣味功能（選用）</h3>
+                <h3 class="font-medium text-purple-700"><i class="ti ti-confetti"></i> 趣味功能（選用）</h3>
                 <span class="text-purple-500" x-text="showFunOptions ? '▲' : '▼'"></span>
             </button>
             

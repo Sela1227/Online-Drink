@@ -41,7 +41,7 @@
                         setTimeout(() => copied = false, 2000);
                     " class="text-xs px-3 py-1 rounded border transition"
                        :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'">
-                        <span x-show="!copied">📋 複製</span>
+                        <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
                         <span x-show="copied" x-cloak>✓ 已複製</span>
                     </button>
                     
@@ -62,7 +62,7 @@
     </div>
     {% else %}
     <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
-        <div class="text-4xl mb-2">🎉</div>
+        <div class="text-4xl mb-2"><i class="ti ti-confetti"></i></div>
         <p>目前沒有問題回報</p>
     </div>
     {% endif %}
@@ -105,7 +105,7 @@
                             setTimeout(() => copied = false, 2000);
                         " class="text-xs px-3 py-1 rounded border transition"
                            :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border-gray-300'">
-                            <span x-show="!copied">📋 複製</span>
+                            <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
                             <span x-show="copied" x-cloak>✓ 已複製</span>
                         </button>
                         

@@ -37,7 +37,7 @@
     
     <!-- 說明 -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-        <div class="font-medium mb-2">📝 匯入格式說明</div>
+        <div class="font-medium mb-2"><i class="ti ti-pencil"></i> 匯入格式說明</div>
         {% if selected_store %}
         <p>請上傳包含 <code>menu</code> 欄位的 JSON 檔案，菜單將匯入到 <strong>{{ selected_store.name }}</strong></p>
         {% else %}
@@ -51,7 +51,7 @@
     
     <!-- 範例格式 -->
     <details class="bg-white rounded-lg shadow-sm">
-        <summary class="p-4 cursor-pointer font-medium text-gray-700">📋 查看範例格式</summary>
+        <summary class="p-4 cursor-pointer font-medium text-gray-700"><i class="ti ti-clipboard-list"></i> 查看範例格式</summary>
         <div class="px-4 pb-4 space-y-4">
             <!-- 完整匯入範例 -->
             <div>
