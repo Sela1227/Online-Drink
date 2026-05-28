@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.1.2（V1.1.1 hotfix + /auth/login 路由修正）
+- **版本：** V1.1.3（中央 + 圓圈對齊修正）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -198,6 +198,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.1.3 | **Hotfix：中央 + 圓圈對齊**。V1.1.0 我把圓圈尺寸從原版 48px 改成 52px 並用 inline style `margin-top: -26px` 試圖配合，但實機上沒生效（圓圈貼底而不是浮出於導航條）。退回原版 `w-12 h-12 -mt-6` 經驗證能用的 Tailwind 寫法，內部 + 字體用 24px。**教訓：不要為了讓 Tabler + 看起來大 4px 就動已驗證 work 的尺寸組合**。 |
 | V1.1.2 | **Hotfix：base.html 401 redirect 寫死錯誤 endpoint `/login`，改為 `/auth/login`**（坑 #12）。V1.1.1 部署後使用者用無痕視窗測試踩到 — `/login` 不存在（真實是 `/auth/login`）。base.html 第 57/157/164 行三處 hardcode 全改。**這個 bug 早於 V1.1.x，潛伏多時** — 30 人都用已登入 cookie 從沒被 401 踢過。 |
 | V1.1.1 | **Hotfix：Tabler webfont CDN URL 修正**（坑 #11）。V1.1.0 寫的 `cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css` 在 cdnjs 上根本不存在（cdnjs 的 tabler-icons 是 2020 年舊 package），改為 `cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css`。**只動 base.html 一行**。 |
 | V1.1.0 | **北歐風圖示首登場（Tabler Icons 3.17.0）+ favicon 套組串接**。在 `base.html` `<head>` 加 Tabler webfont CDN、`apple-touch-icon` / favicon / webmanifest 四個 link 標籤；底部導航 5 個 emoji（🏠 🗳️ + 📮 👤）換成 Tabler 細線圖示（`ti-home` / `ti-checkbox` / `ti-plus` / `ti-mailbox` / `ti-user`）+「首頁」加 36×36px `bg-sela-50` 圓角方塊強調 active 樣態。**只動 1 個檔案（base.html）**。⚠ 部署後發現 Tabler CDN URL 錯誤造成圖示空白（坑 #11）— V1.1.1 修正。 |
