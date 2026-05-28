@@ -93,7 +93,8 @@ def humanize_validation_error(e: ValidationError) -> list[str]:
 
 
 def _render_import_result(request, user, *, error_messages=None, data=None,
-                          is_full_import=False, existing_menu=None, json_str=None):
+                          is_full_import=False, existing_menu=None,
+                          duplicate_store=None, json_str=None):
     """render 匯入結果片段（htmx 用），錯誤或成功預覽二擇一"""
     return templates.TemplateResponse("admin/partials/import_result.html", {
         "request": request,
@@ -102,6 +103,7 @@ def _render_import_result(request, user, *, error_messages=None, data=None,
         "data": data,
         "is_full_import": is_full_import,
         "existing_menu": existing_menu,
+        "duplicate_store": duplicate_store,
         "json_str": json_str,
     })
 
@@ -299,6 +301,7 @@ async def import_preview(
 
     # 菜單匯入需確認店家存在
     existing_menu = None
+    duplicate_store = None
     if not is_full_import:
         store = db.query(Store).filter(Store.id == validated.store_id).first()
         if not store:
@@ -309,6 +312,9 @@ async def import_preview(
             Menu.store_id == validated.store_id,
             Menu.is_active == True
         ).first()
+    else:
+        # 完整匯入：偵測同名店家（完全比對）
+        duplicate_store = db.query(Store).filter(Store.name == validated.store.name).first()
 
     # 成功 → 回傳預覽片段
     return _render_import_result(
@@ -316,6 +322,7 @@ async def import_preview(
         data=validated,
         is_full_import=is_full_import,
         existing_menu=existing_menu,
+        duplicate_store=duplicate_store,
         json_str=json_str,
     )
 

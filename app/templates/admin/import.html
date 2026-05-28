@@ -34,18 +34,34 @@
     </div>
     {% endif %}
 
-    <!-- 說明 -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-        <div class="font-medium mb-2"><i class="ti ti-pencil"></i> 匯入格式說明</div>
-        {% if selected_store %}
-        <p>貼上或上傳包含 <code>menu</code> 欄位的 JSON，菜單將匯入到 <strong>{{ selected_store.name }}</strong></p>
-        {% else %}
-        <p class="mb-2">支援兩種匯入方式：</p>
-        <ol class="list-decimal list-inside space-y-1">
-            <li><strong>完整匯入</strong>：店家 + 菜單一起建立（含 <code>store</code> 欄位）</li>
-            <li><strong>菜單匯入</strong>：僅匯入菜單到既有店家（含 <code>store_id</code> 欄位）</li>
+    <!-- 用 AI 轉菜單（怎麼用 + 複製 prompt）-->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="font-medium mb-2 text-sm text-blue-800"><i class="ti ti-bulb"></i> 用 AI 把菜單照片轉成 JSON</div>
+        <ol class="list-decimal list-inside space-y-1 text-sm text-blue-800 mb-3">
+            <li>複製下方 prompt，貼給 ChatGPT / Claude</li>
+            <li>連同菜單照片一起傳給 AI</li>
+            <li>把 AI 回的 JSON 貼到下方框框</li>
         </ol>
-        {% endif %}
+        <div class="flex flex-col gap-2">
+            {% if not selected_store %}
+            <button type="button" @click="navigator.clipboard.writeText(promptNewStore); copied='new'; setTimeout(() => copied='', 2000)"
+                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
+                <div>
+                    <div class="text-sm font-medium text-gray-800">複製「新增店家」prompt</div>
+                    <div class="text-xs text-gray-500">店家是全新的，連店名一起建立</div>
+                </div>
+                <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'new' ? '已複製 ✓' : '複製'"></span>
+            </button>
+            {% endif %}
+            <button type="button" @click="navigator.clipboard.writeText({% if selected_store %}promptMenuForStore{% else %}promptMenu{% endif %}); copied='menu'; setTimeout(() => copied='', 2000)"
+                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
+                <div>
+                    <div class="text-sm font-medium text-gray-800">複製「{% if selected_store %}{{ selected_store.name }} 的菜單{% else %}既有店家加菜單{% endif %}」prompt</div>
+                    <div class="text-xs text-gray-500">{% if selected_store %}菜單轉成 JSON 後貼回{% else %}店家已存在，只補菜單{% endif %}</div>
+                </div>
+                <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'menu' ? '已複製 ✓' : '複製'"></span>
+            </button>
+        </div>
     </div>
 
     <!-- 分頁切換 -->
@@ -76,29 +92,12 @@
 
         <!-- 貼上 JSON 分頁 -->
         <div x-show="tab === 'paste'">
-            {% if not selected_store %}
-            <div class="flex gap-2 mb-2 flex-wrap">
-                <button type="button" @click="jsonText = fullExample"
-                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
-                    載入完整匯入範例
-                </button>
-                <button type="button" @click="jsonText = menuExample"
-                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
-                    載入菜單範例
-                </button>
+            <div class="flex gap-2 mb-2">
                 <button type="button" @click="jsonText = ''"
                         class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-400">
                     清空
                 </button>
             </div>
-            {% else %}
-            <div class="flex gap-2 mb-2">
-                <button type="button" @click="jsonText = menuExample"
-                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
-                    載入菜單範例
-                </button>
-            </div>
-            {% endif %}
             <textarea name="json_text" x-model="jsonText" rows="10"
                       placeholder="把 AI 轉好的 JSON 直接貼在這裡…"
                       class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
@@ -124,15 +123,40 @@
 
     <!-- 範例格式（摺疊參考）-->
     <details class="bg-white rounded-lg shadow-sm">
-        <summary class="p-4 cursor-pointer font-medium text-gray-700 text-sm"><i class="ti ti-clipboard-list"></i> 查看範例格式說明</summary>
+        <summary class="p-4 cursor-pointer font-medium text-gray-700 text-sm"><i class="ti ti-clipboard-list"></i> 查看 JSON 格式說明</summary>
         <div class="px-4 pb-4 space-y-4">
             <div>
                 <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto" x-text="fullExample"></pre>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+  "store": {
+    "name": "可不可熟成紅茶",
+    "category": "drink",
+    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
+    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]
+  },
+  "menu": {
+    "categories": [
+      { "name": "熟成紅茶", "items": [
+        { "name": "熟成紅茶", "price": 30, "price_l": 35 }
+      ]}
+    ]
+  }
+}</pre>
             </div>
             <div>
                 <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto" x-text="menuExample"></pre>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+  "store_id": 1,
+  "mode": "new",
+  "menu": {
+    "categories": [
+      { "name": "便當類", "items": [
+        { "name": "雞腿便當", "price": 100,
+          "options": [{ "name": "加飯", "price_diff": 10 }] }
+      ]}
+    ]
+  }
+}</pre>
             </div>
         </div>
     </details>
@@ -146,50 +170,91 @@ function importForm() {
         tab: 'paste',
         jsonText: '',
         fileName: '',
-        fullExample: [
+        copied: '',
+
+        promptNewStore: [
+            '你是菜單數位化助手。我會給你一張店家菜單照片，請幫我轉成下面格式的 JSON（這是「新增店家」用，店家是全新的）。',
+            '',
+            '【輸出規則】',
+            '1. 只輸出 JSON，不要任何說明文字、不要 markdown 的 ``` 標記。',
+            '2. category 只能是這三個值之一：drink（飲料店）、meal（餐廳/食物）、group_buy（團購）。',
+            '3. price 一律用純數字，不要加「元」「$」或文字。看不清楚或寫「時價」的品項，price 填 0。',
+            '4. 飲料若有大杯價，用 price_l 記錄（中杯放 price、大杯放 price_l）；沒有就省略 price_l。',
+            '5. 加價的選項放在該品項的 options，price_diff 是加價金額（純數字，不加價填 0）。',
+            '6. 飲料店請填 sugar_options（甜度）與 ice_options（冰塊）；餐廳/團購可省略這兩欄。',
+            '7. 依菜單分區整理 categories，每區一個 name 和它的 items。',
+            '',
+            '【輸出格式】',
             '{',
             '  "store": {',
-            '    "name": "可不可熟成紅茶",',
+            '    "name": "店家名稱",',
             '    "category": "drink",',
-            '    "logo_url": null,',
-            '    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],',
-            '    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]',
+            '    "sugar_options": ["正常糖","少糖","半糖","微糖","無糖"],',
+            '    "ice_options": ["正常冰","少冰","微冰","去冰","熱"]',
             '  },',
             '  "menu": {',
             '    "categories": [',
-            '      {',
-            '        "name": "熟成紅茶",',
-            '        "items": [',
-            '          { "name": "熟成紅茶", "price": 30, "price_l": 35 },',
-            '          { "name": "熟成冷露", "price": 35 }',
-            '        ]',
-            '      }',
+            '      { "name": "分類名", "items": [',
+            '        { "name": "品項名", "price": 30, "price_l": 35,',
+            '          "options": [ { "name": "加料名", "price_diff": 10 } ] }',
+            '      ]}',
             '    ]',
             '  }',
-            '}'
+            '}',
+            '',
+            '菜單照片如下，請開始轉換：'
         ].join('\n'),
-        menuExample: [
+
+        promptMenu: [
+            '你是菜單數位化助手。我會給你一張菜單照片，請幫我轉成下面格式的 JSON（這是「既有店家加菜單」用）。',
+            '',
+            '【輸出規則】',
+            '1. 只輸出 JSON，不要任何說明文字、不要 markdown 的 ``` 標記。',
+            '2. price 一律用純數字，不要加「元」「$」或文字。看不清楚或寫「時價」的品項，price 填 0。',
+            '3. 飲料若有大杯價，用 price_l 記錄；沒有就省略。',
+            '4. 加價選項放在該品項的 options，price_diff 是加價金額（純數字，不加價填 0）。',
+            '5. 依菜單分區整理 categories，每區一個 name 和它的 items。',
+            '6. store_id 我會自己填，你輸出時 store_id 先放 0。',
+            '',
+            '【輸出格式】',
             '{',
-            '  "store_id": 1,',
+            '  "store_id": 0,',
             '  "mode": "new",',
             '  "menu": {',
             '    "categories": [',
-            '      {',
-            '        "name": "便當類",',
-            '        "items": [',
-            '          {',
-            '            "name": "雞腿便當",',
-            '            "price": 100,',
-            '            "options": [',
-            '              { "name": "加飯", "price_diff": 10 },',
-            '              { "name": "不要香菜", "price_diff": 0 }',
-            '            ]',
-            '          }',
-            '        ]',
-            '      }',
+            '      { "name": "分類名", "items": [',
+            '        { "name": "品項名", "price": 100,',
+            '          "options": [ { "name": "加料名", "price_diff": 10 } ] }',
+            '      ]}',
             '    ]',
             '  }',
-            '}'
+            '}',
+            '',
+            '菜單照片如下，請開始轉換：'
+        ].join('\n'),
+
+        promptMenuForStore: [
+            '你是菜單數位化助手。我會給你一張菜單照片，請幫我轉成下面格式的 JSON。',
+            '',
+            '【輸出規則】',
+            '1. 只輸出 JSON，不要任何說明文字、不要 markdown 的 ``` 標記。',
+            '2. price 一律用純數字，不要加「元」「$」或文字。看不清楚或寫「時價」的品項，price 填 0。',
+            '3. 飲料若有大杯價用 price_l；沒有就省略。',
+            '4. 加價選項放 options，price_diff 是加價金額（純數字，不加價填 0）。',
+            '5. 依菜單分區整理 categories。',
+            '',
+            '【輸出格式】',
+            '{',
+            '  "menu": {',
+            '    "categories": [',
+            '      { "name": "分類名", "items": [',
+            '        { "name": "品項名", "price": 100 }',
+            '      ]}',
+            '    ]',
+            '  }',
+            '}',
+            '',
+            '菜單照片如下，請開始轉換：'
         ].join('\n')
     }
 }

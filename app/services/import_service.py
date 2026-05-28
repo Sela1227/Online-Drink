@@ -10,7 +10,23 @@ from app.schemas.menu import FullImport, MenuImport, MenuContent
 
 
 def import_store_and_menu(db: Session, data: FullImport) -> Store:
-    """匯入店家 + 菜單"""
+    """匯入店家 + 菜單
+
+    V1.8.0：偵測同名店家（完全比對 name）。
+    - 若同名店家已存在 → 不新增重複店家，改把菜單匯入既有店家；
+      既有菜單保留為舊版本（停用），新菜單啟用。
+    - 若不存在 → 正常新增店家 + 菜單。
+    """
+    # 完全比對店名，找既有同名店家
+    existing_store = db.query(Store).filter(Store.name == data.store.name).first()
+
+    if existing_store:
+        # 同名店家已存在 → 把舊菜單全部停用（保留為舊版本），建立新菜單啟用
+        db.query(Menu).filter(Menu.store_id == existing_store.id).update({"is_active": False})
+        db.flush()
+        _create_menu(db, existing_store.id, data.menu, is_active=True)
+        db.commit()
+        return existing_store
 
     # 建立店家
     store = Store(

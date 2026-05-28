@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.7.0（匯入體驗強化：貼上 JSON + 友善中文錯誤）
+- **版本：** V1.8.0（抬頭改快點來點餐 + AI prompt 複製 + 同名店家偵測 + 菜單匯入時間）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -226,6 +226,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.8.0 | **抬頭文字 + AI prompt 複製 + 同名店家偵測 + 菜單時間**。(1) base.html 抬頭「SELA」→「快點來點餐」（logo 圖與版本號不變）。(2) 匯入頁「載入範例」按鈕改為「複製 AI prompt」按鈕（新增店家 / 既有店家加菜單兩種），點了把完整 prompt 複製到剪貼簿（`navigator.clipboard`）— prompt 含格式規範、欄位限制（category 只能 drink/meal/group_buy、price 純數字、時價填 0、大杯 price_l）、輸出格式範例，配合「截圖菜單貼給 AI → 拿 JSON 貼回」工作流；加「怎麼用」三步驟說明。(3) `import_store_and_menu` 加**同名店家偵測**（完全比對 `Store.name`）：偵測到同名 → 不新增重複店家，菜單匯入既有店家，舊菜單停用保留為舊版本、新菜單啟用；預覽綠框顯示提示行（不跳視窗）。(4) admin/menus.html 菜單版本時間「建立於」→「匯入於」並套 `taipei` filter（原本顯示 UTC 差 8 小時）。 |
 | V1.7.0 | **匯入體驗強化：貼上 JSON + 友善中文錯誤**（功能優化首發，非視覺）。匯入頁加「貼上 JSON / 上傳檔案」分頁（預設貼上，符合「AI 轉 JSON 直接貼」工作流）；改 htmx 提交，**失敗不換頁**、中文錯誤紅框就地顯示（取代原本整頁噴 `{"detail":"..."}` JSON）；Pydantic `ValidationError` 翻成「第 N 個分類的第 M 個品項的價格：不是有效數字」這種看得懂的訊息（`humanize_validation_error` + `_translate_loc` + `_translate_error_type`）；JSONDecodeError 給行號提示；範例一鍵載入（textarea 帶入）；驗證通過後預覽摘要 + 明細就地展開。新增 partial `admin/partials/import_result.html`（錯誤/成功二擇一片段）。**保留上傳檔案舊功能**。價格容錯（「時價」「$30」自動處理）刻意留待下版單獨做。 |
 | V1.6.1 | **Hotfix：hardcode `orange-*` class 全換 `sela-*`（坑 #16）**。V1.6.0 只改了 `sela-*` 色階定義，但全站有 40 檔 / 237 處用 Tailwind 內建 `orange-*` class（按鈕 / 數字 / 標籤 / active / focus ring），不受 sela 色階影響 → 仍是橘色。全部 `-orange-{N}` → `-sela-{N}`（regex 精確匹配顏色 class）。色階補 `sela-800`(#1E2248) / `sela-900`(#141734) 以對應 orange-800。**保留 56 個 `amber-*`**（飲料分類語義色 + 暖色點綴，與餐廳綠 / 團購藍成套，作為藍紫主色的對比色）。 |
 | V1.6.0 | **主視覺換色 + 移除空狀態 logo**。`base.html` 的 `tailwind.config` `sela-*` 色階從橘色系整組換成 `#454c8c` 藍紫系（以 #454c8c 為 500 階，HSL 234°/34%/41%，固定 hue 調明度生成 50~700）— 全站用 `sela-*` class 的按鈕 / active / 連結 / 邊框一次全變藍紫。品牌 logo（`sela-logo.jpg` img）不受 CSS 影響保持橘色；`default-drink.svg` 預設飲料插圖刻意保留橘色（食慾暖色）。滾動條 thumb hardcode `#FDBA74`→`#8E95CC`（新 sela-300）。首頁空狀態橘色大 SELA logo 移除，換成低調 `ti-cup`（sela-400 配 sela-50 圓底）。 |

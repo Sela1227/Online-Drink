@@ -29,6 +29,11 @@
         {% endif %}
         · {{ cat_count }} 個分類 · {{ item_count.n }} 個品項
     </div>
+    {% if duplicate_store %}
+    <div class="mt-2 pt-2 border-t border-green-200 text-sm text-amber-700">
+        <i class="ti ti-info-circle"></i> 偵測到同名店家「{{ duplicate_store.name }}」已存在 — 將匯入菜單到既有店家（保留原菜單為舊版本，不新增重複店家）
+    </div>
+    {% endif %}
 </div>
 
 <!-- 菜單明細 -->
