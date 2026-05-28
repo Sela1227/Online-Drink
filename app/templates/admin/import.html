@@ -64,6 +64,30 @@
         </div>
     </div>
 
+    <!-- 生成店家 Logo（獨立區塊）-->
+    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="font-medium mb-2 text-sm text-purple-800"><i class="ti ti-photo"></i> 生成店家 Logo（選用）</div>
+        <p class="text-xs text-purple-700 mb-3">生成後下載圖片，到店家編輯頁的 logo 欄位上傳即可。</p>
+        <div class="flex flex-col gap-2">
+            <button type="button" @click="navigator.clipboard.writeText(promptLogoRestore); copied='logo1'; setTimeout(() => copied='', 2000)"
+                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 text-left">
+                <div>
+                    <div class="text-sm font-medium text-gray-800">複製「還原網路 Logo」prompt</div>
+                    <div class="text-xs text-gray-500">有原始 logo，提升解析度成正方形</div>
+                </div>
+                <span class="text-purple-600 text-sm whitespace-nowrap" x-text="copied === 'logo1' ? '已複製 ✓' : '複製'"></span>
+            </button>
+            <button type="button" @click="navigator.clipboard.writeText(promptLogoText); copied='logo2'; setTimeout(() => copied='', 2000)"
+                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 text-left">
+                <div>
+                    <div class="text-sm font-medium text-gray-800">複製「文字 Logo」prompt</div>
+                    <div class="text-xs text-gray-500">沒有 logo，用店名生成統一風格</div>
+                </div>
+                <span class="text-purple-600 text-sm whitespace-nowrap" x-text="copied === 'logo2' ? '已複製 ✓' : '複製'"></span>
+            </button>
+        </div>
+    </div>
+
     <!-- 分頁切換 -->
     <div class="flex gap-1 bg-gray-100 p-1 rounded-lg">
         <button type="button" @click="tab = 'paste'"
@@ -202,7 +226,8 @@ function importForm() {
             '  }',
             '}',
             '',
-            '菜單照片如下，請開始轉換：'
+            '菜單照片如下。請用我在下方填的店名（菜單上不一定有店名，若我沒填請先問我，不要自己亂猜）：',
+            '店名：'
         ].join('\n'),
 
         promptMenu: [
@@ -255,6 +280,32 @@ function importForm() {
             '}',
             '',
             '菜單照片如下，請開始轉換：'
+        ].join('\n'),
+
+        promptLogoRestore: [
+            '請幫我把這張店家 Logo 處理成可以正式使用的版本，規則如下：',
+            '',
+            '1. 盡量忠實還原原圖：文字、圖案、配色、排版都要和原圖一致，不要重新設計、不要改字、不要加減元素。',
+            '2. 去除雜訊、模糊、壓縮痕跡與背景雜點，讓線條乾淨、邊緣銳利。',
+            '3. 提升到高解析度、清晰的向量風格（乾淨色塊與線條）。',
+            '4. 輸出成正方形（1:1）。原圖若不是正方形，請取原圖邊緣的底色往外延伸填滿到正方形，讓補出來的區域顏色和原圖自然融合，不要留白、不要裁切到任何文字或圖案。',
+            '5. 背景保持原圖原本的底色。',
+            '',
+            '原始 Logo 圖片如下：'
+        ].join('\n'),
+
+        promptLogoText: [
+            '請幫我設計一個店家文字 Logo，規格固定如下，請嚴格遵守：',
+            '',
+            '1. 正方形（1:1）。',
+            '2. 背景：實心深藍紫色 #454c8c 填滿整個正方形。',
+            '3. 在背景內側留一圈細的白色外框（簡潔線框，留適當邊距）。',
+            '4. 框內置中放店名文字，白色字。',
+            '5. 字體：無襯線、細體、北歐極簡風格，乾淨俐落，不要花俏裝飾、不要陰影、不要漸層。',
+            '6. 只有外框和文字，不要其他圖案或裝飾。',
+            '7. 文字若較長請自動換行並維持置中平衡。',
+            '',
+            '店名：'
         ].join('\n')
     }
 }
