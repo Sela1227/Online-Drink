@@ -98,17 +98,17 @@
                 <button type="button" @click="filterCategory = 'drink'"
                         :class="filterCategory === 'drink' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-50 border-gray-200'"
                         class="px-3 py-1 rounded border text-sm">
-                    🧋 飲料
+                    <i class="ti ti-cup"></i> 飲料
                 </button>
                 <button type="button" @click="filterCategory = 'meal'"
                         :class="filterCategory === 'meal' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-50 border-gray-200'"
                         class="px-3 py-1 rounded border text-sm">
-                    🍱 餐廳
+                    <i class="ti ti-bowl"></i> 餐廳
                 </button>
                 <button type="button" @click="filterCategory = 'group_buy'"
                         :class="filterCategory === 'group_buy' ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 border-gray-200'"
                         class="px-3 py-1 rounded border text-sm">
-                    🛒 團購
+                    <i class="ti ti-shopping-cart"></i> 團購
                 </button>
             </div>
             
@@ -119,9 +119,9 @@
                     <input type="checkbox" name="store_ids" value="{{ store.id }}"
                            @change="updateSelectedCount()">
                     <span class="text-sm">
-                        {% if store.category.value == 'drink' %}🧋
-                        {% elif store.category.value == 'meal' %}🍱
-                        {% else %}🛒{% endif %}
+                        {% if store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                        {% elif store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                        {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                         {{ store.name }}
                     </span>
                 </label>

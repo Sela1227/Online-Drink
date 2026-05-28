@@ -21,9 +21,9 @@
                     <img src="{{ fav.store.logo_url }}" alt="{{ fav.store.name }}" class="w-full h-full object-contain">
                     {% else %}
                     <span class="text-2xl">
-                        {% if fav.store.category and fav.store.category.value == 'drink' %}🧋
-                        {% elif fav.store.category and fav.store.category.value == 'meal' %}🍱
-                        {% else %}🛒{% endif %}
+                        {% if fav.store.category and fav.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                        {% elif fav.store.category and fav.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                        {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                     </span>
                     {% endif %}
                 </div>

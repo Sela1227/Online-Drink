@@ -59,13 +59,13 @@
                         class="px-3 py-1.5 rounded-full text-xs font-medium">全部</button>
                 <button @click="filter = 'drink'" 
                         :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
-                        class="px-3 py-1.5 rounded-full text-xs font-medium">🧋 飲料</button>
+                        class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-cup"></i> 飲料</button>
                 <button @click="filter = 'meal'" 
                         :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
-                        class="px-3 py-1.5 rounded-full text-xs font-medium">🍱 餐廳</button>
+                        class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-bowl"></i> 餐廳</button>
                 <button @click="filter = 'group_buy'" 
                         :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
-                        class="px-3 py-1.5 rounded-full text-xs font-medium">🛒 團購</button>
+                        class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-shopping-cart"></i> 團購</button>
             </div>
             
             <!-- 店家網格 -->
@@ -79,9 +79,9 @@
                         <img src="{{ store.logo_url }}" class="w-10 h-10 object-contain">
                         {% else %}
                         <span class="text-xl">
-                            {% if store.category and store.category.value == 'drink' %}🧋
-                            {% elif store.category and store.category.value == 'group_buy' %}🛒
-                            {% else %}🍱{% endif %}
+                            {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                            {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                            {% else %}<i class="ti ti-bowl"></i>{% endif %}
                         </span>
                         {% endif %}
                     </div>
@@ -105,7 +105,7 @@
     {% if drink_groups %}
     <section>
         <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <span>🧋</span> 飲料
+            <span><i class="ti ti-cup"></i></span> 飲料
             <span class="text-sm font-normal text-gray-400">({{ drink_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
@@ -120,7 +120,7 @@
     {% if meal_groups %}
     <section>
         <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <span>🍱</span> 餐廳
+            <span><i class="ti ti-bowl"></i></span> 餐廳
             <span class="text-sm font-normal text-gray-400">({{ meal_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
@@ -135,7 +135,7 @@
     {% if groupbuy_groups %}
     <section>
         <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <span>🛒</span> 團購
+            <span><i class="ti ti-shopping-cart"></i></span> 團購
             <span class="text-sm font-normal text-gray-400">({{ groupbuy_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
@@ -174,9 +174,9 @@
                         <img src="{{ group.store.logo_url }}" class="w-12 h-12 object-contain grayscale">
                         {% else %}
                         <span class="text-2xl grayscale">
-                            {% if group.category.value == 'drink' %}🧋
-                            {% elif group.category.value == 'meal' %}🍱
-                            {% else %}🛒{% endif %}
+                            {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                            {% elif group.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                            {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                         </span>
                         {% endif %}
                     </div>

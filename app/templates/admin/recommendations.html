@@ -29,9 +29,9 @@
                                 {% if rec.category == 'drink' %}bg-amber-100 text-amber-600
                                 {% elif rec.category == 'meal' %}bg-green-100 text-green-600
                                 {% else %}bg-blue-100 text-blue-600{% endif %}">
-                                {% if rec.category == 'drink' %}🧋 飲料
-                                {% elif rec.category == 'meal' %}🍱 餐廳
-                                {% else %}🛒 團購{% endif %}
+                                {% if rec.category == 'drink' %}<i class="ti ti-cup"></i> 飲料
+                                {% elif rec.category == 'meal' %}<i class="ti ti-bowl"></i> 餐廳
+                                {% else %}<i class="ti ti-shopping-cart"></i> 團購{% endif %}
                             </span>
                         </div>
                         

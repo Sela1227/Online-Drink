@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.1.3（中央 + 圓圈對齊修正）
+- **版本：** V1.2.0（三大分類圖示全站 Tabler 化 + 底部導航文字對齊）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -160,6 +160,12 @@
     - 做法（V1.1.2 hotfix）：把 base.html 3 處 `'/login?next=` 全改成 `'/auth/login?next=`
     - 教訓：**hardcode 的 URL 字串要與 `main.py` 的 `include_router(prefix=...)` 對齊**。可考慮用 FastAPI `request.url_for("login")` 反查 endpoint，避免字串對不上
 
+13. **flex 排版中子元素高度不一致 → flex items-center 把它們各自垂直置中後，文字底線錯位**（V1.2.0 修正）
+    - 症狀：底部導航 5 個項目視覺上「圖示對齊但文字高低不一」
+    - 原因：「首頁」圖示有 `w-9 h-9 bg-sela-50` 容器（36px 高），其他 4 個是裸 `<i>`（24px 高）。`<nav class="h-14 flex items-center justify-around">` 把每個 `<a>` 區塊垂直置中 — 區塊高度不同 → 各自置中後文字 y 位置就不同
+    - 做法：所有圖示都包在相同尺寸的 `w-9 h-9 flex items-center justify-center` 容器內，active 才填底色（`bg-sela-50`）。所有 `<a>` 區塊等高 → 文字底線一致
+    - 通用原則：**flex 排版中要求子元素「視覺對齊」時，務必讓所有子元素總高度一致**，不能靠 padding 或 margin 補。差別在容器級別，不在內容級別
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -198,6 +204,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.2.0 | **三大分類圖示全站 Tabler 化 + 底部導航文字對齊**。三大分類 emoji 全站 1:1 替換：🧋 → `<i class="ti ti-cup"></i>`（23 檔 103 次）、🍱 → `ti-bowl`、🛒 → `ti-shopping-cart`。`<i>` 自動繼承外層 span/button 的字級，不需逐處調 size。底部導航另外把 4 個圖示也包進 `w-9 h-9` 容器，所有 `<a>` 區塊高度一致，文字底線對齊。 |
 | V1.1.3 | **Hotfix：中央 + 圓圈對齊**。V1.1.0 我把圓圈尺寸從原版 48px 改成 52px 並用 inline style `margin-top: -26px` 試圖配合，但實機上沒生效（圓圈貼底而不是浮出於導航條）。退回原版 `w-12 h-12 -mt-6` 經驗證能用的 Tailwind 寫法，內部 + 字體用 24px。**教訓：不要為了讓 Tabler + 看起來大 4px 就動已驗證 work 的尺寸組合**。 |
 | V1.1.2 | **Hotfix：base.html 401 redirect 寫死錯誤 endpoint `/login`，改為 `/auth/login`**（坑 #12）。V1.1.1 部署後使用者用無痕視窗測試踩到 — `/login` 不存在（真實是 `/auth/login`）。base.html 第 57/157/164 行三處 hardcode 全改。**這個 bug 早於 V1.1.x，潛伏多時** — 30 人都用已登入 cookie 從沒被 401 踢過。 |
 | V1.1.1 | **Hotfix：Tabler webfont CDN URL 修正**（坑 #11）。V1.1.0 寫的 `cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css` 在 cdnjs 上根本不存在（cdnjs 的 tabler-icons 是 2020 年舊 package），改為 `cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css`。**只動 base.html 一行**。 |
@@ -211,16 +218,17 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-1. **V1.1.1：三大分類圖示 emoji → Tabler**（🧋 drink / 🛒 group_buy / 🍱 meal 各 21 個檔案，但靠 `partials/store_logo.html` 或 `category_badge` 等 partial 統一改寫 1 處即可全站生效）。**為什麼是第 1 名：** V1.1.0 換完底部導航後，整體視覺最違和的就是這三個 emoji，使用者每次看店家清單都會看到
-2. **V1.2.0：admin 後台系統圖示**（19 個 admin/*.html + 含管理 emoji 如 📋 / 👥 / ⚙ / ✏ / 💾 / 🗑）— 你自己後台用，順序在用戶看到的之後
-3. **V1.3.0：其餘 emoji 全清**（投票、回報、個人頁、團單詳情等剩餘 emoji）
-4. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖；危險的事不急做，先做視覺
+1. **V1.3.0：剩餘高頻 emoji → Tabler**（📋 19 檔 / 👥 11 檔 / 👤 9 檔 / ✅ 8 檔 / 🎉 7 檔 / 📝 6 檔 / 🌐 6 檔 / 🏪 6 檔 等）。同樣 1:1 替換策略，每個 emoji 自動繼承外層字級
+2. **V1.4.0：admin 後台系統圖示**（管理用：⚙ ✏ 💾 🗑 ➕ 📁 等）— 你自己後台用，順序排在用戶可見之後
+3. **V1.5.0：其餘 emoji 全清**（投票 🗳 / 慶祝 🎊 🎉 / 警告 ⚠ / 鎖 🔒 等收尾）
+4. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖
 5. 訂單匯出 Excel — 原本 backlog
 6. 外送費分攤功能 — 原本 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
 7. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
 8. 菜單匯入開放 `group_buy` category（解坑 #9）
-9. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮 — 既有問題沿用未處理；改要用 `request.url.path` 判斷）
+9. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮）— 改要用 `request.url.path` 判斷
 10. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
+11. V1.1.2 的 `/auth/login` 修正尚未實機驗證 — 等下次自然踩到再確認
 
 ---
 

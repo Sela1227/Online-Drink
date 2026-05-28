@@ -19,18 +19,18 @@
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-2">
                 {% else %}
                 <span class="text-4xl">
-                    {% if store.category and store.category.value == 'drink' %}🧋
-                    {% elif store.category and store.category.value == 'group_buy' %}🛒
-                    {% else %}🍱{% endif %}
+                    {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
                 </span>
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs px-2 py-0.5 bg-gray-100 rounded">
-                        {% if store.category and store.category.value == 'drink' %}🧋 飲料店
-                        {% elif store.category and store.category.value == 'group_buy' %}🛒 團購
-                        {% else %}🍱 餐廳{% endif %}
+                        {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i> 飲料店
+                        {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i> 團購
+                        {% else %}<i class="ti ti-bowl"></i> 餐廳{% endif %}
                     </span>
                 </div>
                 {% if store.branches %}
@@ -140,7 +140,7 @@
     <!-- 加料選項 -->
     {% if store.toppings %}
     <div class="bg-white rounded-xl shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">🧋 加料選項</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 加料選項</h2>
         <div class="flex flex-wrap gap-2">
             {% for topping in store.toppings|sort(attribute='sort_order') if topping.is_active %}
             <span class="px-2.5 py-1 bg-orange-50 text-orange-700 rounded-lg text-sm">

@@ -77,21 +77,21 @@
     <div class="grid grid-cols-3 gap-3">
         <!-- 飲料 -->
         <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
-            <div class="text-2xl mb-1">🧋</div>
+            <div class="text-2xl mb-1"><i class="ti ti-cup"></i></div>
             <div class="text-xs text-amber-600 mb-1">飲料</div>
             <div class="text-lg font-bold text-amber-700">${{ "{:,.0f}".format(category_stats.drink.amount) }}</div>
             <div class="text-xs text-amber-500">{{ category_stats.drink.orders }} 筆</div>
         </div>
         <!-- 餐點 -->
         <div class="bg-green-50 rounded-lg p-3 border border-green-200">
-            <div class="text-2xl mb-1">🍱</div>
+            <div class="text-2xl mb-1"><i class="ti ti-bowl"></i></div>
             <div class="text-xs text-green-600 mb-1">餐點</div>
             <div class="text-lg font-bold text-green-700">${{ "{:,.0f}".format(category_stats.meal.amount) }}</div>
             <div class="text-xs text-green-500">{{ category_stats.meal.orders }} 筆</div>
         </div>
         <!-- 團購 -->
         <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
-            <div class="text-2xl mb-1">🛒</div>
+            <div class="text-2xl mb-1"><i class="ti ti-shopping-cart"></i></div>
             <div class="text-xs text-blue-600 mb-1">團購</div>
             <div class="text-lg font-bold text-blue-700">${{ "{:,.0f}".format(category_stats.group_buy.amount) }}</div>
             <div class="text-xs text-blue-500">{{ category_stats.group_buy.orders }} 筆</div>

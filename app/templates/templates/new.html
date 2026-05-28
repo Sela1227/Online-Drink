@@ -26,9 +26,9 @@
                 {% for store in stores %}
                 <option value="{{ store.id }}" 
                         data-category="{{ store.category.value }}">
-                    {% if store.category.value == 'drink' %}🧋
-                    {% elif store.category.value == 'meal' %}🍱
-                    {% else %}🛒{% endif %}
+                    {% if store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                    {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                     {{ store.name }}
                 </option>
                 {% endfor %}

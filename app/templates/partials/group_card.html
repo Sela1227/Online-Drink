@@ -19,9 +19,9 @@
             <img src="{{ group.store.logo_url }}" alt="{{ group.store.name }}" class="w-12 h-12 object-contain">
             {% else %}
             <span class="text-2xl">
-                {% if group.category.value == 'drink' %}🧋
-                {% elif group.category.value == 'meal' %}🍱
-                {% else %}🛒{% endif %}
+                {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                {% elif group.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
             </span>
             {% endif %}
         </div>
@@ -49,7 +49,7 @@
             <span class="text-green-600 font-medium">✓ {{ group.submitted_count }}</span>
             {% endif %}
             {% if group.pending_count > 0 %}
-            <span class="text-{{ accent }}-500">🛒 {{ group.pending_count }}</span>
+            <span class="text-{{ accent }}-500"><i class="ti ti-shopping-cart"></i> {{ group.pending_count }}</span>
             {% endif %}
             {% if group.submitted_count == 0 and group.pending_count == 0 %}
             <span class="text-gray-300">尚無訂單</span>

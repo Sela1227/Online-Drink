@@ -24,9 +24,9 @@
                     <img src="{{ order.group.store.logo_url }}" alt="{{ order.group.store.name }}" class="w-full h-full object-contain">
                     {% else %}
                     <span class="text-2xl">
-                        {% if order.group.category.value == 'drink' %}🧋
-                        {% elif order.group.category.value == 'meal' %}🍱
-                        {% else %}🛒{% endif %}
+                        {% if order.group.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                        {% elif order.group.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                        {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                     </span>
                     {% endif %}
                 </div>

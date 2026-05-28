@@ -104,9 +104,9 @@
                                 <img src="{{ opt.store.logo_url }}" class="w-8 h-8 rounded object-contain">
                                 {% else %}
                                 <span class="text-xl">
-                                    {% if opt.store.category.value == 'drink' %}🧋
-                                    {% elif opt.store.category.value == 'meal' %}🍱
-                                    {% else %}🛒{% endif %}
+                                    {% if opt.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                                    {% elif opt.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                                    {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                                 </span>
                                 {% endif %}
                                 <span class="font-medium">{{ opt.store.name }}</span>
@@ -145,9 +145,9 @@
                         <option value="">選擇店家...</option>
                         {% for store in available_stores %}
                         <option value="{{ store.id }}">
-                            {% if store.category.value == 'drink' %}🧋
-                            {% elif store.category.value == 'meal' %}🍱
-                            {% else %}🛒{% endif %}
+                            {% if store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                            {% elif store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                            {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                             {{ store.name }}
                         </option>
                         {% endfor %}
@@ -180,9 +180,9 @@
                     <img src="{{ opt.store.logo_url }}" class="w-8 h-8 rounded object-contain">
                     {% else %}
                     <span class="text-xl">
-                        {% if opt.store.category.value == 'drink' %}🧋
-                        {% elif opt.store.category.value == 'meal' %}🍱
-                        {% else %}🛒{% endif %}
+                        {% if opt.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                        {% elif opt.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                        {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                     </span>
                     {% endif %}
                     {% endif %}

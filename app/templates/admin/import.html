@@ -22,9 +22,9 @@
             <img src="{{ selected_store.logo_url }}" alt="{{ selected_store.name }}" class="w-full h-full object-contain p-1">
             {% else %}
             <span class="text-2xl">
-                {% if selected_store.category and selected_store.category.value == 'drink' %}🧋
-                {% elif selected_store.category and selected_store.category.value == 'group_buy' %}🛒
-                {% else %}🍱{% endif %}
+                {% if selected_store.category and selected_store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                {% elif selected_store.category and selected_store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                {% else %}<i class="ti ti-bowl"></i>{% endif %}
             </span>
             {% endif %}
         </div>

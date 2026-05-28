@@ -21,9 +21,9 @@
                         <img src="{{ tpl.store.logo_url }}" class="w-8 h-8 rounded object-contain">
                         {% else %}
                         <span class="text-lg">
-                            {% if tpl.store.category.value == 'drink' %}🧋
-                            {% elif tpl.store.category.value == 'meal' %}🍱
-                            {% else %}🛒{% endif %}
+                            {% if tpl.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                            {% elif tpl.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                            {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                         </span>
                         {% endif %}
                         <div class="min-w-0">
@@ -51,19 +51,19 @@
                 <button type="button" @click="selectCategory('drink')"
                         :class="selectedCategory === 'drink' ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
                         class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1">🧋</div>
+                    <div class="text-2xl mb-1"><i class="ti ti-cup"></i></div>
                     <div class="text-sm font-medium">飲料店</div>
                 </button>
                 <button type="button" @click="selectCategory('meal')"
                         :class="selectedCategory === 'meal' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
                         class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1">🍱</div>
+                    <div class="text-2xl mb-1"><i class="ti ti-bowl"></i></div>
                     <div class="text-sm font-medium">餐廳</div>
                 </button>
                 <button type="button" @click="selectCategory('group_buy')"
                         :class="selectedCategory === 'group_buy' ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'"
                         class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1">🛒</div>
+                    <div class="text-2xl mb-1"><i class="ti ti-shopping-cart"></i></div>
                     <div class="text-sm font-medium">團購</div>
                 </button>
             </div>

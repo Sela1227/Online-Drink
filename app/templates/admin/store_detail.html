@@ -31,9 +31,9 @@
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-2">
                 {% else %}
                 <span class="text-5xl">
-                    {% if store.category and store.category.value == 'drink' %}🧋
-                    {% elif store.category and store.category.value == 'group_buy' %}🛒
-                    {% else %}🍱{% endif %}
+                    {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
                 </span>
                 {% endif %}
             </div>
@@ -53,9 +53,9 @@
                 </div>
                 <div class="mt-2 flex items-center gap-3 text-sm text-gray-500">
                     <span class="px-2 py-0.5 bg-gray-100 rounded">
-                        {% if store.category and store.category.value == 'drink' %}🧋 飲料店
-                        {% elif store.category and store.category.value == 'group_buy' %}🛒 團購
-                        {% else %}🍱 餐廳{% endif %}
+                        {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i> 飲料店
+                        {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i> 團購
+                        {% else %}<i class="ti ti-bowl"></i> 餐廳{% endif %}
                     </span>
                     {% if store.branches %}
                     <span>{{ store.branches|length }} 間分店</span>
@@ -141,7 +141,7 @@
     <!-- 加料選項 -->
     {% if store.toppings %}
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-3">🧋 加料選項</h2>
+        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 加料選項</h2>
         <div class="flex flex-wrap gap-2">
             {% for topping in store.toppings|sort(attribute='sort_order') %}
             <span class="px-3 py-1.5 rounded-lg text-sm {% if topping.is_active %}bg-orange-50 text-orange-700{% else %}bg-gray-100 text-gray-400{% endif %}">

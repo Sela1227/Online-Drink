@@ -25,17 +25,17 @@
         <button @click="filter = 'drink'" 
                 :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            🧋 飲料店
+            <i class="ti ti-cup"></i> 飲料店
         </button>
         <button @click="filter = 'meal'" 
                 :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            🍱 餐廳
+            <i class="ti ti-bowl"></i> 餐廳
         </button>
         <button @click="filter = 'group_buy'" 
                 :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            🛒 團購
+            <i class="ti ti-shopping-cart"></i> 團購
         </button>
     </div>
     
@@ -54,9 +54,9 @@
                      class="w-full h-full object-contain p-4 group-hover:scale-105 transition">
                 {% else %}
                 <span class="text-5xl opacity-50">
-                    {% if store.category and store.category.value == 'drink' %}🧋
-                    {% elif store.category and store.category.value == 'group_buy' %}🛒
-                    {% else %}🍱{% endif %}
+                    {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
                 </span>
                 {% endif %}
                 

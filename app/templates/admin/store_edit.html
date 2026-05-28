@@ -21,9 +21,9 @@
                     <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-2">
                     {% else %}
                     <span class="text-4xl">
-                        {% if store.category and store.category.value == 'drink' %}🧋
-                        {% elif store.category and store.category.value == 'group_buy' %}🛒
-                        {% else %}🍱{% endif %}
+                        {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                        {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                        {% else %}<i class="ti ti-bowl"></i>{% endif %}
                     </span>
                     {% endif %}
                 </div>
@@ -48,19 +48,19 @@
                         <input type="radio" name="category" value="drink" 
                                {% if store.category and store.category.value == 'drink' %}checked{% endif %}
                                class="text-orange-500">
-                        <span>🧋 飲料店</span>
+                        <span><i class="ti ti-cup"></i> 飲料店</span>
                     </label>
                     <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-gray-50 has-[:checked]:bg-green-50 has-[:checked]:border-green-400">
                         <input type="radio" name="category" value="meal" 
                                {% if store.category and store.category.value == 'meal' %}checked{% endif %}
                                class="text-orange-500">
-                        <span>🍱 餐廳</span>
+                        <span><i class="ti ti-bowl"></i> 餐廳</span>
                     </label>
                     <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-gray-50 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400">
                         <input type="radio" name="category" value="group_buy" 
                                {% if store.category and store.category.value == 'group_buy' %}checked{% endif %}
                                class="text-orange-500">
-                        <span>🛒 團購</span>
+                        <span><i class="ti ti-shopping-cart"></i> 團購</span>
                     </label>
                 </div>
             </div>
@@ -120,7 +120,7 @@
     <!-- 加料管理 -->
     {% if store.category and store.category.value in ['drink', 'meal'] %}
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4">🧋 加料管理</h2>
+        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-cup"></i> 加料管理</h2>
         
         {% if store.toppings %}
         <div class="space-y-2 mb-4">

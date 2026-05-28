@@ -33,9 +33,9 @@
                         <img src="{{ tpl.store.logo_url }}" class="w-10 h-10 rounded object-contain">
                         {% else %}
                         <div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xl">
-                            {% if tpl.store.category.value == 'drink' %}🧋
-                            {% elif tpl.store.category.value == 'meal' %}🍱
-                            {% else %}🛒{% endif %}
+                            {% if tpl.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                            {% elif tpl.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
+                            {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                         </div>
                         {% endif %}
                         <div>

@@ -702,7 +702,7 @@
         <button @click="showCart = true"
                 x-show="orderStatus !== 'submitted'"
                 class="bg-orange-500 hover:bg-orange-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center relative">
-            <span class="text-xl">🛒</span>
+            <span class="text-xl"><i class="ti ti-shopping-cart"></i></span>
             <span x-show="cartCount > 0"
                   class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
                   x-text="cartCount"></span>
