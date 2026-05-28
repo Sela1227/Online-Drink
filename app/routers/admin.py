@@ -33,6 +33,79 @@ def to_taipei_time(dt):
 templates.env.filters['taipei'] = to_taipei_time
 
 
+# ===== 匯入錯誤中文化（V1.7.0）=====
+_FIELD_NAMES = {
+    "store": "店家", "name": "名稱", "category": "分類", "logo_url": "logo 網址",
+    "sugar_options": "甜度選項", "ice_options": "冰塊選項", "toppings": "加料",
+    "menu": "菜單", "categories": "分類", "items": "品項", "uncategorized": "未分類品項",
+    "price": "價格", "price_l": "大杯價格", "options": "加購選項",
+    "price_diff": "加購價差", "store_id": "店家編號", "mode": "匯入模式",
+}
+
+
+def _translate_loc(loc: tuple) -> str:
+    """把 Pydantic 的 loc 路徑翻成中文，如 ('menu','categories',0,'items',3,'price') → 第 1 個分類的第 4 個品項的價格"""
+    parts = []
+    i = 0
+    while i < len(loc):
+        key = loc[i]
+        if isinstance(key, int):
+            i += 1
+            continue
+        cn = _FIELD_NAMES.get(str(key), str(key))
+        if i + 1 < len(loc) and isinstance(loc[i + 1], int):
+            parts.append(f"第 {loc[i + 1] + 1} 個{cn}")
+            i += 2
+        else:
+            parts.append(cn)
+            i += 1
+    return "的".join(parts) if parts else "資料"
+
+
+def _translate_error_type(err: dict) -> str:
+    """把 Pydantic 錯誤類型翻成中文"""
+    t = err.get("type", "")
+    if t == "missing":
+        return "缺少此必填欄位"
+    if "decimal" in t or "float" in t:
+        return "不是有效的數字（例如「時價」「$30」需改成純數字 30）"
+    if "int" in t:
+        return "不是有效的整數"
+    if t == "literal_error" or "enum" in t:
+        return "值不在允許範圍內（分類只能是 drink / meal / group_buy）"
+    if "string" in t:
+        return "應該是文字"
+    if "list" in t:
+        return "應該是清單格式"
+    if "dict" in t or "model" in t:
+        return "格式結構不正確"
+    return err.get("msg", "格式錯誤")
+
+
+def humanize_validation_error(e: ValidationError) -> list[str]:
+    """把 Pydantic ValidationError 轉成一串中文錯誤訊息"""
+    msgs = []
+    for err in e.errors():
+        loc_cn = _translate_loc(err.get("loc", ()))
+        msg_cn = _translate_error_type(err)
+        msgs.append(f"{loc_cn}：{msg_cn}")
+    return msgs
+
+
+def _render_import_result(request, user, *, error_messages=None, data=None,
+                          is_full_import=False, existing_menu=None, json_str=None):
+    """render 匯入結果片段（htmx 用），錯誤或成功預覽二擇一"""
+    return templates.TemplateResponse("admin/partials/import_result.html", {
+        "request": request,
+        "user": user,
+        "error_messages": error_messages,
+        "data": data,
+        "is_full_import": is_full_import,
+        "existing_menu": existing_menu,
+        "json_str": json_str,
+    })
+
+
 @router.get("")
 async def admin_home(request: Request, db: Session = Depends(get_db)):
     """後台首頁"""
@@ -166,70 +239,85 @@ async def import_page(request: Request, store_id: int = None, db: Session = Depe
 @router.post("/import/preview")
 async def import_preview(
     request: Request,
-    json_file: UploadFile = File(...),
+    json_text: str = Form(None),
+    json_file: UploadFile = File(None),
     store_id: int = Form(None),
     db: Session = Depends(get_db),
 ):
-    """匯入預覽"""
+    """匯入預覽（V1.7.0：htmx 片段，支援貼上 JSON / 上傳檔案，友善中文錯誤）"""
     user = await get_admin_user(request, db)
-    
-    # 取得 JSON 內容
-    if not json_file or not json_file.filename:
-        raise HTTPException(status_code=400, detail="請上傳 JSON 檔案")
-    
-    content = await json_file.read()
-    json_str = content.decode("utf-8")
-    
+
+    # 取得 JSON 字串：貼上優先，否則讀上傳檔案
+    json_str = None
+    if json_text and json_text.strip():
+        json_str = json_text.strip()
+    elif json_file and json_file.filename:
+        content = await json_file.read()
+        try:
+            json_str = content.decode("utf-8")
+        except UnicodeDecodeError:
+            return _render_import_result(request, user, error_messages=[
+                "檔案編碼不是 UTF-8，請另存成 UTF-8 編碼的 JSON 檔再上傳"
+            ])
+    if not json_str:
+        return _render_import_result(request, user, error_messages=[
+            "請貼上 JSON 內容，或切換到「上傳檔案」分頁選擇檔案"
+        ])
+
+    # 解析 JSON
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"JSON 格式錯誤: {e}")
-    
+        return _render_import_result(request, user, error_messages=[
+            f"JSON 格式有誤（第 {e.lineno} 行第 {e.colno} 字附近）：常見原因是少了逗號、引號或大括號沒有成對"
+        ])
+
     # 判斷匯入類型
-    # 如果有 store_id（更新菜單模式），忽略 JSON 中的 store 欄位
     if store_id:
-        # 取出 menu 部分（如果有 store + menu 結構，忽略 store）
         menu_data = data.get("menu", data)
-        data = {
-            "store_id": store_id,
-            "mode": "replace",
-            "menu": menu_data
-        }
+        data = {"store_id": store_id, "mode": "replace", "menu": menu_data}
         json_str = json.dumps(data, ensure_ascii=False)
         is_full_import = False
     elif "store" in data:
-        # 完整匯入模式（新增店家 + 菜單）
         is_full_import = True
+    elif "store_id" in data:
+        is_full_import = False
     else:
-        raise HTTPException(status_code=400, detail="JSON 缺少 store（新增店家）或請選擇店家（更新菜單）")
-    
+        return _render_import_result(request, user, error_messages=[
+            "JSON 需要包含 store 欄位（新增店家），或 store_id 欄位（更新既有店家的菜單）；"
+            "也可以先選擇店家再匯入菜單"
+        ])
+
+    # Pydantic 驗證
     try:
         if is_full_import:
             validated = FullImport(**data)
         else:
             validated = MenuImport(**data)
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=f"資料驗證錯誤: {e}")
-    
-    # 如果是菜單匯入，取得現有菜單做比較
+        return _render_import_result(request, user, error_messages=humanize_validation_error(e))
+
+    # 菜單匯入需確認店家存在
     existing_menu = None
     if not is_full_import:
         store = db.query(Store).filter(Store.id == validated.store_id).first()
         if not store:
-            raise HTTPException(status_code=404, detail="店家不存在")
+            return _render_import_result(request, user, error_messages=[
+                f"找不到店家編號 {validated.store_id}，請確認 store_id 是否正確"
+            ])
         existing_menu = db.query(Menu).filter(
             Menu.store_id == validated.store_id,
             Menu.is_active == True
         ).first()
-    
-    return templates.TemplateResponse("admin/import_preview.html", {
-        "request": request,
-        "user": user,
-        "data": validated,
-        "is_full_import": is_full_import,
-        "existing_menu": existing_menu,
-        "json_str": json_str,
-    })
+
+    # 成功 → 回傳預覽片段
+    return _render_import_result(
+        request, user,
+        data=validated,
+        is_full_import=is_full_import,
+        existing_menu=existing_menu,
+        json_str=json_str,
+    )
 
 
 @router.post("/import")

@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.6.1（hotfix：hardcode orange class 全換 sela）
+- **版本：** V1.7.0（匯入體驗強化：貼上 JSON + 友善中文錯誤）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -226,6 +226,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.7.0 | **匯入體驗強化：貼上 JSON + 友善中文錯誤**（功能優化首發，非視覺）。匯入頁加「貼上 JSON / 上傳檔案」分頁（預設貼上，符合「AI 轉 JSON 直接貼」工作流）；改 htmx 提交，**失敗不換頁**、中文錯誤紅框就地顯示（取代原本整頁噴 `{"detail":"..."}` JSON）；Pydantic `ValidationError` 翻成「第 N 個分類的第 M 個品項的價格：不是有效數字」這種看得懂的訊息（`humanize_validation_error` + `_translate_loc` + `_translate_error_type`）；JSONDecodeError 給行號提示；範例一鍵載入（textarea 帶入）；驗證通過後預覽摘要 + 明細就地展開。新增 partial `admin/partials/import_result.html`（錯誤/成功二擇一片段）。**保留上傳檔案舊功能**。價格容錯（「時價」「$30」自動處理）刻意留待下版單獨做。 |
 | V1.6.1 | **Hotfix：hardcode `orange-*` class 全換 `sela-*`（坑 #16）**。V1.6.0 只改了 `sela-*` 色階定義，但全站有 40 檔 / 237 處用 Tailwind 內建 `orange-*` class（按鈕 / 數字 / 標籤 / active / focus ring），不受 sela 色階影響 → 仍是橘色。全部 `-orange-{N}` → `-sela-{N}`（regex 精確匹配顏色 class）。色階補 `sela-800`(#1E2248) / `sela-900`(#141734) 以對應 orange-800。**保留 56 個 `amber-*`**（飲料分類語義色 + 暖色點綴，與餐廳綠 / 團購藍成套，作為藍紫主色的對比色）。 |
 | V1.6.0 | **主視覺換色 + 移除空狀態 logo**。`base.html` 的 `tailwind.config` `sela-*` 色階從橘色系整組換成 `#454c8c` 藍紫系（以 #454c8c 為 500 階，HSL 234°/34%/41%，固定 hue 調明度生成 50~700）— 全站用 `sela-*` class 的按鈕 / active / 連結 / 邊框一次全變藍紫。品牌 logo（`sela-logo.jpg` img）不受 CSS 影響保持橘色；`default-drink.svg` 預設飲料插圖刻意保留橘色（食慾暖色）。滾動條 thumb hardcode `#FDBA74`→`#8E95CC`（新 sela-300）。首頁空狀態橘色大 SELA logo 移除，換成低調 `ti-cup`（sela-400 配 sela-50 圓底）。 |
 | V1.5.0 | **emoji 收尾全清 + 底部導航動態 active**。剩餘 52 種 emoji 全站 1:1 替換（33 檔 149 次）：⭐☆→`ti-star` / 📞→`ti-phone` / 💝🩷❤→`ti-heart` / 🗳→`ti-checkbox` / 🙈→`ti-eye-off` / ⏰→`ti-alarm` / 📍→`ti-map-pin` / ⚡→`ti-bolt` / 🎊🥳→`ti-confetti` / 🔥→`ti-flame` / ✓→`ti-check` / 🗺→`ti-map` / ⚠→`ti-alert-triangle` / 🎯→`ti-target` / ➕→`ti-plus` / 🎲→`ti-dice` / 🚀→`ti-rocket` / 🥤→`ti-cup` / 📭→`ti-mailbox` / ❌✕→`ti-x` / 💾→`ti-device-floppy` / 🏆→`ti-trophy` / 📊→`ti-chart-bar` / 📈→`ti-chart-line` / 📂→`ti-folder-open` / 📁→`ti-folder` / 📦→`ti-package` / 👀→`ti-eye` / ⚙→`ti-settings` / 🗑→`ti-trash` / ⏸→`ti-player-pause` / 🔒🔐→`ti-lock` / 🐛→`ti-bug` / 🔄→`ti-refresh` / 🚗→`ti-car` / 🥇🥈🥉→`ti-medal` / 📅→`ti-calendar` / 👑→`ti-crown` / 📜→`ti-scroll` / ⚫→`ti-circle-filled` / 💬→`ti-message` / 🔗→`ti-link` / 🚨→`ti-alert-octagon` / ⏱→`ti-stopwatch`。**保留 `→`（49 次）與 `↑`（1 次）純文字箭頭不換**。另外底部導航改用 `request.url.path` 動態判斷 active（坑 #15）：之前 hardcode「首頁」恆亮，現在依當前頁高亮對應項目（home/votes/feedback/profile，用 `path.startswith` 涵蓋子頁）。**全站零裝飾 emoji 達成**。 |
@@ -248,7 +249,8 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 > **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為功能性 backlog。
 
-1. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
+1. **匯入價格容錯**（V1.7.0 預告的下一步）— `schemas/menu.py` + `import_service.py` 處理「時價」「$30」「30元」「全形數字」等非純數字輸入：能解析的自動轉（$30→30），不能解析的（時價）給明確提示或存為 0 + 標記。單獨做、單獨測，不跟其他混
+2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
 2. 訂單匯出 Excel — 原本 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
 3. 外送費分攤功能 — `scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
 4. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊

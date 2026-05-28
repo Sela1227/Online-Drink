@@ -3,7 +3,7 @@
 {% block title %}匯入{% if selected_store %}菜單 - {{ selected_store.name }}{% else %}店家/菜單{% endif %} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-<div class="space-y-4">
+<div class="space-y-4" x-data="importForm()">
     <div class="flex items-center justify-between">
         {% if selected_store %}
         <h1 class="text-xl font-bold text-gray-800">匯入菜單</h1>
@@ -13,9 +13,8 @@
         <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
         {% endif %}
     </div>
-    
+
     {% if selected_store %}
-    <!-- 目標店家資訊 -->
     <div class="bg-sela-50 border border-sela-200 rounded-lg p-4 flex items-center gap-3">
         <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden">
             {% if selected_store.logo_url %}
@@ -34,102 +33,165 @@
         </div>
     </div>
     {% endif %}
-    
+
     <!-- 說明 -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
         <div class="font-medium mb-2"><i class="ti ti-pencil"></i> 匯入格式說明</div>
         {% if selected_store %}
-        <p>請上傳包含 <code>menu</code> 欄位的 JSON 檔案，菜單將匯入到 <strong>{{ selected_store.name }}</strong></p>
+        <p>貼上或上傳包含 <code>menu</code> 欄位的 JSON，菜單將匯入到 <strong>{{ selected_store.name }}</strong></p>
         {% else %}
         <p class="mb-2">支援兩種匯入方式：</p>
         <ol class="list-decimal list-inside space-y-1">
-            <li><strong>完整匯入</strong>：店家 + 菜單一起建立（包含 <code>store</code> 欄位）</li>
-            <li><strong>菜單匯入</strong>：僅匯入菜單到既有店家（包含 <code>store_id</code> 欄位）</li>
+            <li><strong>完整匯入</strong>：店家 + 菜單一起建立（含 <code>store</code> 欄位）</li>
+            <li><strong>菜單匯入</strong>：僅匯入菜單到既有店家（含 <code>store_id</code> 欄位）</li>
         </ol>
         {% endif %}
     </div>
-    
-    <!-- 範例格式 -->
-    <details class="bg-white rounded-lg shadow-sm">
-        <summary class="p-4 cursor-pointer font-medium text-gray-700"><i class="ti ti-clipboard-list"></i> 查看範例格式</summary>
-        <div class="px-4 pb-4 space-y-4">
-            <!-- 完整匯入範例 -->
-            <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
-  "store": {
-    "name": "可不可熟成紅茶",
-    "category": "drink",
-    "logo_url": null,
-    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
-    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]
-  },
-  "menu": {
-    "categories": [
-      {
-        "name": "熟成紅茶",
-        "items": [
-          { "name": "熟成紅茶", "price": 30, "price_l": 35 },
-          { "name": "熟成冷露", "price": 35 }
-        ]
-      }
-    ]
-  }
-}</pre>
-            </div>
-            
-            <!-- 菜單匯入範例 -->
-            <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
-  "store_id": 1,
-  "mode": "new",
-  "menu": {
-    "categories": [
-      {
-        "name": "便當類",
-        "items": [
-          {
-            "name": "雞腿便當",
-            "price": 100,
-            "options": [
-              { "name": "加飯", "price_diff": 10 },
-              { "name": "不要香菜", "price_diff": 0 }
-            ]
-          }
-        ]
-      }
-    ]
-  }
-}</pre>
-            </div>
-        </div>
-    </details>
-    
+
+    <!-- 分頁切換 -->
+    <div class="flex gap-1 bg-gray-100 p-1 rounded-lg">
+        <button type="button" @click="tab = 'paste'"
+                :class="tab === 'paste' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
+                class="flex-1 py-2 rounded-md text-sm font-medium transition">
+            <i class="ti ti-clipboard"></i> 貼上 JSON
+        </button>
+        <button type="button" @click="tab = 'upload'"
+                :class="tab === 'upload' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
+                class="flex-1 py-2 rounded-md text-sm font-medium transition">
+            <i class="ti ti-upload"></i> 上傳檔案
+        </button>
+    </div>
+
     <!-- 匯入表單 -->
-    <form action="/admin/import/preview" method="post" enctype="multipart/form-data" 
-          class="bg-white rounded-lg shadow-sm p-4 space-y-4"
-          x-data="{ hasFile: false, fileName: '' }">
-        
+    <form hx-post="/admin/import/preview"
+          hx-target="#import-result"
+          hx-swap="innerHTML"
+          hx-encoding="multipart/form-data"
+          hx-indicator="#import-loading"
+          class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+
         {% if selected_store_id %}
         <input type="hidden" name="store_id" value="{{ selected_store_id }}">
         {% endif %}
-        
-        <!-- 檔案上傳 -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">上傳 JSON 檔案</label>
-            <input type="file" name="json_file" accept=".json" required
-                   @change="hasFile = $event.target.files.length > 0; fileName = $event.target.files[0]?.name || ''"
+
+        <!-- 貼上 JSON 分頁 -->
+        <div x-show="tab === 'paste'">
+            {% if not selected_store %}
+            <div class="flex gap-2 mb-2 flex-wrap">
+                <button type="button" @click="jsonText = fullExample"
+                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
+                    載入完整匯入範例
+                </button>
+                <button type="button" @click="jsonText = menuExample"
+                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
+                    載入菜單範例
+                </button>
+                <button type="button" @click="jsonText = ''"
+                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-400">
+                    清空
+                </button>
+            </div>
+            {% else %}
+            <div class="flex gap-2 mb-2">
+                <button type="button" @click="jsonText = menuExample"
+                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
+                    載入菜單範例
+                </button>
+            </div>
+            {% endif %}
+            <textarea name="json_text" x-model="jsonText" rows="10"
+                      placeholder="把 AI 轉好的 JSON 直接貼在這裡…"
+                      class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+        </div>
+
+        <!-- 上傳檔案分頁 -->
+        <div x-show="tab === 'upload'" x-cloak>
+            <input type="file" name="json_file" accept=".json"
+                   @change="fileName = $event.target.files[0]?.name || ''"
                    class="w-full border rounded-lg px-3 py-2">
             <p x-show="fileName" class="text-sm text-gray-500 mt-1" x-text="'已選擇：' + fileName"></p>
         </div>
-        
-        <button type="submit" 
-                x-show="hasFile"
-                x-transition
+
+        <button type="submit"
                 class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
-            預覽匯入內容
+            <span id="import-loading" class="htmx-indicator">驗證中…</span>
+            <span>預覽匯入內容</span>
         </button>
     </form>
+
+    <!-- 結果區（htmx 填入：錯誤紅框 或 成功預覽）-->
+    <div id="import-result"></div>
+
+    <!-- 範例格式（摺疊參考）-->
+    <details class="bg-white rounded-lg shadow-sm">
+        <summary class="p-4 cursor-pointer font-medium text-gray-700 text-sm"><i class="ti ti-clipboard-list"></i> 查看範例格式說明</summary>
+        <div class="px-4 pb-4 space-y-4">
+            <div>
+                <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto" x-text="fullExample"></pre>
+            </div>
+            <div>
+                <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
+                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto" x-text="menuExample"></pre>
+            </div>
+        </div>
+    </details>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function importForm() {
+    return {
+        tab: 'paste',
+        jsonText: '',
+        fileName: '',
+        fullExample: [
+            '{',
+            '  "store": {',
+            '    "name": "可不可熟成紅茶",',
+            '    "category": "drink",',
+            '    "logo_url": null,',
+            '    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],',
+            '    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]',
+            '  },',
+            '  "menu": {',
+            '    "categories": [',
+            '      {',
+            '        "name": "熟成紅茶",',
+            '        "items": [',
+            '          { "name": "熟成紅茶", "price": 30, "price_l": 35 },',
+            '          { "name": "熟成冷露", "price": 35 }',
+            '        ]',
+            '      }',
+            '    ]',
+            '  }',
+            '}'
+        ].join('\n'),
+        menuExample: [
+            '{',
+            '  "store_id": 1,',
+            '  "mode": "new",',
+            '  "menu": {',
+            '    "categories": [',
+            '      {',
+            '        "name": "便當類",',
+            '        "items": [',
+            '          {',
+            '            "name": "雞腿便當",',
+            '            "price": 100,',
+            '            "options": [',
+            '              { "name": "加飯", "price_diff": 10 },',
+            '              { "name": "不要香菜", "price_diff": 0 }',
+            '            ]',
+            '          }',
+            '        ]',
+            '      }',
+            '    ]',
+            '  }',
+            '}'
+        ].join('\n')
+    }
+}
+</script>
 {% endblock %}
