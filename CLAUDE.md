@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.4.0（admin 後台 emoji Tabler 化）
+- **版本：** V1.4.1（未登入訪問需登入頁導向登入頁 hotfix）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -166,6 +166,14 @@
     - 做法：所有圖示都包在相同尺寸的 `w-9 h-9 flex items-center justify-center` 容器內，active 才填底色（`bg-sela-50`）。所有 `<a>` 區塊等高 → 文字底線一致
     - 通用原則：**flex 排版中要求子元素「視覺對齊」時，務必讓所有子元素總高度一致**，不能靠 padding 或 margin 補。差別在容器級別，不在內容級別
 
+14. **未登入直接開需登入頁面 → 顯示 401 JSON 而非導向登入頁**（坑 #12 的後端版，V1.4.1 修正）
+    - 症狀：新使用者用沒登入過的手機/瀏覽器直接訪問 `/home`（或任何需登入頁）→ 看到 `{"detail":"請先登入"}` JSON，無法進到 LINE 登入畫面
+    - 原因：`services/auth.py` 的 `get_current_user` 未登入時 `raise HTTPException(401, "請先登入")`。瀏覽器 GET 請求時 FastAPI 把它轉成 JSON 回應，不會 redirect
+    - 與坑 #12 的關係：坑 #12 修的是「htmx 背景請求 401」（base.html JS handler），這條修的是「瀏覽器直接 GET 需登入頁」（後端例外處理）。兩條是同一問題的前端 / 後端兩面
+    - 做法（V1.4.1）：在 `main.py` 加全域 `@app.exception_handler(StarletteHTTPException)`：401 + 非 htmx + `Accept: text/html` → `RedirectResponse('/auth/login?next=...')`；其他維持 JSON
+    - 判斷依據：`HX-Request` header 區分 htmx，`Accept` header 區分瀏覽器 vs API
+    - 教訓：**SSR 應用的「需登入」保護要區分請求來源** — 瀏覽器要 redirect、API/htmx 要 JSON。單純 raise 401 只對 API 友善，對直接開頁面的使用者是死路
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -204,6 +212,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.4.1 | **Hotfix：未登入訪問需登入頁 → 導向 LINE 登入（坑 #14）**。新使用者用沒登入過的手機直接開 `/home` 看到 `{"detail":"請先登入"}` JSON 而非登入頁。在 `main.py` 加全域 401 例外處理器：瀏覽器開頁面（Accept: text/html 且非 htmx）→ `RedirectResponse` 到 `/auth/login`；htmx/API → 維持 401 JSON。**只動 main.py（加 handler）+ base.html 版本號**。 |
 | V1.4.0 | **admin 後台 9 種 emoji → Tabler**。16 檔 37 次替換：🟢→`ti-circle-filled`（保留綠色 inline style）/ 📮→`ti-mailbox` / 💡→`ti-bulb` / 📢→`ti-speakerphone` / 📥→`ti-inbox` / ⏳→`ti-hourglass` / ✨→`ti-sparkles` / ✏→`ti-pencil`（與 V1.3.0 📝 一致）/ 📌→`ti-pin`。🟢 特別處理：用 inline style `color: #22c55e` 保留綠色語義，避免 Tabler 圖示 currentColor 失去狀態色 |
 | V1.3.0 | **標題列版本號 + 高頻 emoji 全站 Tabler 化**。base.html 在 `<body>` 後加 `{% set app_version = 'V1.3.0' %}`，「SELA」標題旁顯示 `{{ app_version }}` 灰色小字（10px mono）— 升版只需改 `{% set %}` 一行；標題列 ⚙️ 換 `ti-settings`；全站 37 檔 83 次替換：📋→`ti-clipboard-list`（27 次最多）、👥→`ti-users`、👤→`ti-user`、✅→`ti-check`、🎉→`ti-confetti`、📝→`ti-pencil`、🌐→`ti-world`、🏪→`ti-building-store`。 |
 | V1.2.0 | **三大分類圖示全站 Tabler 化 + 底部導航文字對齊**。三大分類 emoji 全站 1:1 替換：🧋 → `<i class="ti ti-cup"></i>`（23 檔 103 次）、🍱 → `ti-bowl`、🛒 → `ti-shopping-cart`。`<i>` 自動繼承外層 span/button 的字級，不需逐處調 size。底部導航另外把 4 個圖示也包進 `w-9 h-9` 容器，所有 `<a>` 區塊高度一致，文字底線對齊。 |
@@ -228,7 +237,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 6. 菜單匯入開放 `group_buy` category（解坑 #9）
 7. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮）— 改要用 `request.url.path` 判斷
 8. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
-9. V1.1.2 的 `/auth/login` 修正尚未實機驗證 — 等下次自然踩到再確認
+9. V1.1.2 的 htmx 401 redirect 與 V1.4.1 的後端 401 redirect 尚未在「session 過期」情境實機驗證 — 等自然觸發確認
 
 ## 八、升版必讀
 

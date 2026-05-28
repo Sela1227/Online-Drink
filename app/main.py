@@ -246,6 +246,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 401 未登入處理（V1.4.1）：
+# - 瀏覽器直接開需登入頁面 → 導向 /auth/login（而非顯示 JSON 錯誤）
+# - htmx 背景請求 / API 呼叫 → 維持 401 JSON，交給前端 JS handler 處理
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(StarletteHTTPException)
+async def auth_aware_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 401:
+        is_htmx = request.headers.get("HX-Request") == "true"
+        wants_html = "text/html" in request.headers.get("accept", "")
+        if not is_htmx and wants_html:
+            return RedirectResponse(
+                url=f"/auth/login?next={request.url.path}",
+                status_code=302,
+            )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
