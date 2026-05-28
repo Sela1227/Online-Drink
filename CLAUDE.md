@@ -8,7 +8,7 @@
 > 2. 本專案刻意不對齊 Kit 的部分：
 >    - **不使用 Alembic**（Kit `tech-stack-lessons.md` 1.1 建議第一天就 `alembic init`） — 本專案已用「SQLAlchemy `create_all` + 手動 raw SQL 遷移 + `ADD COLUMN IF NOT EXISTS` 模式」運作超過一年，30 人線上穩定。改用 Alembic = 風險大於收益，且過去引入 Alembic 造成過部署失敗（坑 #1）。
 >    - **PostgreSQL Enum 值固定大寫**（坑 #2 持續警戒）
->    - **logo 仍使用 `app/static/images/sela-logo.jpg|svg`**（4 個現有模板引用中） — V1.0.0 加入了 Kit 完整 favicon 套組到 `app/static/favicon/`，但 base.html 尚未串接，列為下版候選
+>    - **logo 同時用兩套**：`app/static/images/sela-logo.jpg|svg`（4 個現有模板沿用中）與 `app/static/sela.svg` + `favicon/` 套組（Kit 標準，V1.1.0 已串接到 base.html `<head>`）。既有引用不動。
 > 3. **不要為對齊 Kit 而動既有設計** — 已驗證的就是事實標準
 > 4. 版號規則照 Kit（部署版無後綴、備份版 -source）
 > 5. **下次完成版本時記得評估 SELA-handoff.md**（鐵律 #0 — 完整見 Kit master CLAUDE.md）
@@ -22,11 +22,11 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.0.0（首次對齊 Kit V1.9.0 規範 + 含 starlette hotfix）
+- **版本：** V1.1.0（北歐風圖示初登場 — base.html 底部導航 + favicon 套組串接）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
-- **一句話定位：** LINE Login 認證的團體飲料／餐點／團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
-- **技術棧：** Python 3.11 + FastAPI 0.104.1 + Starlette 0.27.0 + SQLAlchemy 2.0.23 + PostgreSQL + Jinja2 3.1.2 + Tailwind（CDN）+ Alpine.js + HTMX
+- **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
+- **技術棧：** Python 3.11 + FastAPI 0.104.1 + Starlette 0.27.0 + SQLAlchemy 2.0.23 + PostgreSQL + Jinja2 3.1.2 + Tailwind（CDN）+ Alpine.js + HTMX + **Tabler Icons 3.7.0（CDN webfont，V1.1.0 引入）**
 - **部署：** Railway（Dockerfile 模式，不用 Nixpacks）
 - **認證：** LINE Login
 - **圖片上傳：** Cloudinary
@@ -182,6 +182,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.1.0 | **北歐風圖示首登場（Tabler Icons 3.7.0）+ favicon 套組串接**。在 `base.html` `<head>` 加 Tabler webfont CDN（`cdnjs.cloudflare.com/ajax/libs/tabler-icons`）、`apple-touch-icon` / favicon / webmanifest 四個 link 標籤；底部導航 5 個 emoji（🏠 🗳️ + 📮 👤）換成 Tabler 細線圖示（`ti-home` / `ti-checkbox` / `ti-plus` / `ti-mailbox` / `ti-user`）+「首頁」加 36×36px `bg-sela-50` 圓角方塊強調 active 樣態。**只動 1 個檔案（base.html）**。 |
 | V1.0.0 | **首次對齊 SELA-Starter-Kit V1.9.0 + Starlette hotfix**。新增根目錄 `CLAUDE.md` / `README.md` / `SELA-handoff.md`；換用 Kit 標準 `.gitignore`；加入完整 favicon 套組到 `app/static/favicon/`；移除 commit 進去的 `.DS_Store` 與重複的 `gitignore`（無點）；**`requirements.txt` 從 `>=` 改為 `==` 精確鎖版本**（坑 #10 救火）。**零業務邏輯變更** — 純文件 / 資產對齊 + 依賴鎖版本。 |
 | 對齊前 | （無正式版號制度）30 人線上運作中；功能含 LINE Login、店家／菜單／團單／訂單 CRUD、甜冰選項、加料系統、QR Code 分享、部門系統、公告、投票、消費統計、JSON 匯入 |
 
@@ -191,41 +192,42 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-1. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把所有 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完就能放寬版本鎖。**為什麼是第 1 名：** 坑 #10 是定時炸彈，目前靠鎖版本擋住，但鎖版本意味著未來無法享受套件安全更新與新功能
-2. **base.html 串接 Kit favicon 套組** — V1.0.0 只把資產放進 `app/static/favicon/`，但 `base.html` 還沒加 `<link rel="icon">`。串接後瀏覽器分頁會顯示 SELA logo
-3. 訂單匯出 Excel — 原本就在 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
-4. 外送費分攤功能 — 原本就在 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
-5. 多尺寸定價 — 之前因 bug 回滾過，重做時注意 schema 三方對齊
-6. 菜單匯入開放 `group_buy` category（解坑 #9）
-7. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
+1. **V1.1.1：三大分類圖示 emoji → Tabler**（🧋 drink / 🛒 group_buy / 🍱 meal 各 21 個檔案，但靠 `partials/store_logo.html` 或 `category_badge` 等 partial 統一改寫 1 處即可全站生效）。**為什麼是第 1 名：** V1.1.0 換完底部導航後，整體視覺最違和的就是這三個 emoji，使用者每次看店家清單都會看到
+2. **V1.2.0：admin 後台系統圖示**（19 個 admin/*.html + 含管理 emoji 如 📋 / 👥 / ⚙ / ✏ / 💾 / 🗑）— 你自己後台用，順序在用戶看到的之後
+3. **V1.3.0：其餘 emoji 全清**（投票、回報、個人頁、團單詳情等剩餘 emoji）
+4. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖；危險的事不急做，先做視覺
+5. 訂單匯出 Excel — 原本 backlog
+6. 外送費分攤功能 — 原本 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
+7. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
+8. 菜單匯入開放 `group_buy` category（解坑 #9）
+9. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮 — 既有問題沿用未處理；改要用 `request.url.path` 判斷）
+10. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
 
 ---
 
 ## 八、升版必讀
 
-V1.0.0 屬「文件對齊 + 依賴鎖版本」 → **有部署注意事項**：
+### V1.1.0 部署動作
 
-### V1.0.0 部署動作
-
-- [ ] 用 Git Pusher 匯入 `Online-Drink V1.0.0.zip` 上 GitHub
+- [ ] 用 Git Pusher 匯入 `Online-Drink V1.1.0.zip` 上 GitHub
 - [ ] **不需要動 Railway Variables**（沒改任何環境變數）
-- [ ] **不需要動第三方 Console**（LINE / Cloudinary callback 都沒變）
+- [ ] **不需要動第三方 Console**
 - [ ] **不需要跑 migration**（沒改 schema）
-- [ ] Railway 自動 redeploy 時會抓鎖版本依賴（**約 60-120 秒** — 比 cold start 慢，因為要重新解析鎖死的依賴樹）
+- [ ] **不需要重新解析依賴樹**（沒改 requirements.txt），Railway redeploy 較快（30-60 秒）
 - [ ] 部署後驗收：
-    - 訪問 `/` 確認首頁正常（不再 500）
-    - 用無痕視窗走一次 LINE Login
-    - 進一個團單頁面確認訂單牆正常
-    - Railway log 應該 0 個 `TypeError: unhashable`
+    - 用無痕視窗訪問 `/home`，確認底部導航顯示 5 個 Tabler 細線圖示（不是 emoji）
+    - 確認「首頁」圖示底下有淡橘色 `bg-sela-50` 圓角方塊背景
+    - 點中央橘色大圓圈 → 應導向開團頁
+    - 瀏覽器分頁標題列／書籤應顯示 SELA logo（favicon 生效）
+    - iOS 加到主畫面測試：圖示應為 Kit 標準 SELA 圖示
 
 ### 風險提醒
 
-- **這次部署會觸發 Railway 抓全新依賴樹（鎖版本第一次拉）**，cold start 較慢
-- 如果部署失敗，Railway 會保留舊 container 繼續服務（fallback 機制），不會中斷 30 人使用
-- 失敗時看 Railway deploy log，常見原因：套件版本被 PyPI 撤下（極少見）→ 改用 `==` 接近版本
+- 首次依賴 Tabler webfont CDN（`cdnjs.cloudflare.com`），若 CDN 故障圖示會變空白 — 不影響功能但會難看。Cloudflare CDN 全球可用性極高，風險可接受
+- **底部導航 active 樣式仍 hardcode 寫死「首頁」恆亮**（V1.0.0 既有設計沿用，V1.1.0 沒動）— 在 /votes / /feedback 等頁面也會看到「首頁」是亮的。列入下版候選 #9
 
 ---
 
 ## 九、一句話總結
 
-V1.0.0 完成了首次對齊 SELA-Starter-Kit V1.9.0，**並順便救了一次 Starlette 升版破壞 API 的緊急 bug**（坑 #10 — `requirements.txt` 鎖版本）。**下版第一優先：27 處 `TemplateResponse` 改新 API**，徹底解決坑 #10 後就能放寬版本鎖。
+V1.1.0 開始視覺風格升級 — base.html 底部導航 5 個 emoji 換成 Tabler 北歐風細線圖示 + 順手串接 V1.0.0 留下的 favicon 套組。**只動 1 個檔（base.html），所有業務邏輯零變更**。下版第一優先：**V1.1.1 改三大分類圖示（🧋 🛒 🍱）**，整站視覺風格就會統一八成。

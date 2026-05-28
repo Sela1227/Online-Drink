@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}SELA 快點來點餐{% endblock %}</title>
+    <!-- Favicon 套組（對齊 Kit V1.9.0 標準資產）-->
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/static/favicon/site.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -27,6 +32,8 @@
     </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Tabler Icons（北歐極簡線條圖示，V1.1.0 引入）-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css">
     <style>
         [x-cloak] { display: none !important; }
         
@@ -97,29 +104,31 @@
         {% block content %}{% endblock %}
     </main>
     
-    <!-- 底部導航（手機友善） -->
+    <!-- 底部導航（手機友善・V1.1.0 換 Tabler 北歐風） -->
     {% if user %}
     <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-sela-100 z-40 safe-area-pb">
         <div class="max-w-lg mx-auto px-6 h-14 flex items-center justify-around">
-            <a href="/home" class="flex flex-col items-center gap-0.5 text-sela-600">
-                <span class="text-xl">🏠</span>
+            <a href="/home" class="flex flex-col items-center gap-1 text-sela-600">
+                <div class="w-9 h-9 bg-sela-50 rounded-xl flex items-center justify-center">
+                    <i class="ti ti-home" style="font-size: 22px;" aria-hidden="true"></i>
+                </div>
                 <span class="text-[10px] font-medium">首頁</span>
             </a>
-            <a href="/votes" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
-                <span class="text-xl">🗳️</span>
+            <a href="/votes" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
+                <i class="ti ti-checkbox" style="font-size: 24px;" aria-hidden="true"></i>
                 <span class="text-[10px]">投票</span>
             </a>
-            <a href="/groups/new" class="flex flex-col items-center gap-0.5">
-                <div class="w-12 h-12 -mt-6 bg-sela-500 rounded-full flex items-center justify-center shadow-lg">
-                    <span class="text-white text-2xl">+</span>
+            <a href="/groups/new" class="flex flex-col items-center">
+                <div style="width: 52px; height: 52px; margin-top: -26px;" class="bg-sela-500 rounded-full flex items-center justify-center shadow-lg">
+                    <i class="ti ti-plus text-white" style="font-size: 28px;" aria-hidden="true"></i>
                 </div>
             </a>
-            <a href="/feedback" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
-                <span class="text-xl">📮</span>
+            <a href="/feedback" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
+                <i class="ti ti-mailbox" style="font-size: 24px;" aria-hidden="true"></i>
                 <span class="text-[10px]">回報</span>
             </a>
-            <a href="/profile" class="flex flex-col items-center gap-0.5 text-gray-400 hover:text-sela-500">
-                <span class="text-xl">👤</span>
+            <a href="/profile" class="flex flex-col items-center gap-1 text-gray-400 hover:text-sela-500">
+                <i class="ti ti-user" style="font-size: 24px;" aria-hidden="true"></i>
                 <span class="text-[10px]">我的</span>
             </a>
         </div>
