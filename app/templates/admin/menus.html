@@ -16,12 +16,12 @@
     
     {% if menus %}
     <div class="bg-white rounded-lg shadow-sm divide-y">
-        {% for menu in menus %}
+        {% for menu, version in menu_versions %}
         <div class="p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <div class="font-medium text-gray-900">
-                        版本 #{{ menu.id }}
+                        第 {{ version }} 版
                         {% if menu.is_active %}
                         <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded ml-2">使用中</span>
                         {% endif %}

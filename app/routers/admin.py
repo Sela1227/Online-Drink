@@ -191,12 +191,17 @@ async def menu_list(store_id: int, request: Request, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="店家不存在")
     
     menus = db.query(Menu).filter(Menu.store_id == store_id).order_by(Menu.created_at.desc()).all()
-    
+
+    # 計算店內版本序號（最舊 = 第 1 版）。menus 是新到舊排序，所以最新的序號 = 總數
+    total = len(menus)
+    menu_versions = [(menu, total - idx) for idx, menu in enumerate(menus)]
+
     return templates.TemplateResponse("admin/menus.html", {
         "request": request,
         "user": user,
         "store": store,
         "menus": menus,
+        "menu_versions": menu_versions,
     })
 
 

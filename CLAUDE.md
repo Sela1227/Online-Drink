@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.8.0（抬頭改快點來點餐 + AI prompt 複製 + 同名店家偵測 + 菜單匯入時間）
+- **版本：** V1.8.1（hotfix：菜單版本號用店內序號，不用全域 id）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -188,6 +188,12 @@
     - 教訓：**換主題色前先全站 grep `orange-` `amber-` `red-` 等內建色 class**，確認哪些是「該跟主色變的主視覺」、哪些是「語義色該保留」。只改自訂色階會漏掉所有 hardcode 內建色的地方
     - 預防：理想上整個專案的主視覺色都該走同一個自訂色階（`sela-*`），不要混用 Tailwind 內建 `orange-*`
 
+17. **菜單「版本號」誤用全域主鍵 `Menu.id`**（V1.8.1 修正）
+    - 症狀：新建店家的第一份菜單顯示「版本 #29」之類的大數字；同店多版本跳號（#5 / #18 / #29）
+    - 原因：menus.html 顯示 `版本 #{{ menu.id }}`，但 `Menu.id` 是全資料表自增主鍵（跨所有店家累加），不是「這家店的第幾版」
+    - 做法（V1.8.1）：menu_list 路由算店內序號 `menu_versions = [(menu, total - idx) for idx, menu in enumerate(menus)]`（menus 是 created_at desc，所以最新序號=總數、最舊=1），template 顯示「第 N 版」
+    - 教訓：**呈現給使用者的「序號 / 編號」不要直接用 DB 主鍵** — 主鍵是全域的、會跳號、洩漏其他資料量。要的是「在這個範圍內的第幾個」就現場 enumerate
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -226,6 +232,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.8.1 | **Hotfix：菜單版本號顯示店內序號（坑 #17）**。原本 menus.html 顯示「版本 #{{ menu.id }}」用的是 Menu 全域自增主鍵 — 新店第一份菜單可能顯示「#29」（全系統第 29 筆），多版本也會跳號（#5/#18/#29）看不出第幾版。改為在 menu_list 路由算「店內版本序號」（最舊=第 1 版，用 `total - idx` 因 created_at desc 排序），template 顯示「第 N 版」。 |
 | V1.8.0 | **抬頭文字 + AI prompt 複製 + 同名店家偵測 + 菜單時間**。(1) base.html 抬頭「SELA」→「快點來點餐」（logo 圖與版本號不變）。(2) 匯入頁「載入範例」按鈕改為「複製 AI prompt」按鈕（新增店家 / 既有店家加菜單兩種），點了把完整 prompt 複製到剪貼簿（`navigator.clipboard`）— prompt 含格式規範、欄位限制（category 只能 drink/meal/group_buy、price 純數字、時價填 0、大杯 price_l）、輸出格式範例，配合「截圖菜單貼給 AI → 拿 JSON 貼回」工作流；加「怎麼用」三步驟說明。(3) `import_store_and_menu` 加**同名店家偵測**（完全比對 `Store.name`）：偵測到同名 → 不新增重複店家，菜單匯入既有店家，舊菜單停用保留為舊版本、新菜單啟用；預覽綠框顯示提示行（不跳視窗）。(4) admin/menus.html 菜單版本時間「建立於」→「匯入於」並套 `taipei` filter（原本顯示 UTC 差 8 小時）。 |
 | V1.7.0 | **匯入體驗強化：貼上 JSON + 友善中文錯誤**（功能優化首發，非視覺）。匯入頁加「貼上 JSON / 上傳檔案」分頁（預設貼上，符合「AI 轉 JSON 直接貼」工作流）；改 htmx 提交，**失敗不換頁**、中文錯誤紅框就地顯示（取代原本整頁噴 `{"detail":"..."}` JSON）；Pydantic `ValidationError` 翻成「第 N 個分類的第 M 個品項的價格：不是有效數字」這種看得懂的訊息（`humanize_validation_error` + `_translate_loc` + `_translate_error_type`）；JSONDecodeError 給行號提示；範例一鍵載入（textarea 帶入）；驗證通過後預覽摘要 + 明細就地展開。新增 partial `admin/partials/import_result.html`（錯誤/成功二擇一片段）。**保留上傳檔案舊功能**。價格容錯（「時價」「$30」自動處理）刻意留待下版單獨做。 |
 | V1.6.1 | **Hotfix：hardcode `orange-*` class 全換 `sela-*`（坑 #16）**。V1.6.0 只改了 `sela-*` 色階定義，但全站有 40 檔 / 237 處用 Tailwind 內建 `orange-*` class（按鈕 / 數字 / 標籤 / active / focus ring），不受 sela 色階影響 → 仍是橘色。全部 `-orange-{N}` → `-sela-{N}`（regex 精確匹配顏色 class）。色階補 `sela-800`(#1E2248) / `sela-900`(#141734) 以對應 orange-800。**保留 56 個 `amber-*`**（飲料分類語義色 + 暖色點綴，與餐廳綠 / 團購藍成套，作為藍紫主色的對比色）。 |
