@@ -19,9 +19,10 @@
 
 | 層 | 技術 |
 |----|------|
-| 後端 | FastAPI + SQLAlchemy 2.0 |
+| 後端 | FastAPI 0.104.1 + SQLAlchemy 2.0.23 |
+| Web 框架核心 | Starlette 0.27.0（鎖版本，見 CLAUDE.md 坑 #10） |
 | 資料庫 | PostgreSQL |
-| 前端 | Jinja2 + Tailwind CSS（CDN）+ Alpine.js + HTMX |
+| 前端 | Jinja2 3.1.2 + Tailwind CSS（CDN）+ Alpine.js + HTMX |
 | 認證 | LINE Login |
 | 圖片 | Cloudinary |
 | 部署 | Railway（Dockerfile 模式） |
@@ -35,11 +36,10 @@
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 2. 裝依賴
+# 2. 裝依賴（鎖版本）
 pip install -r requirements.txt
 
 # 3. 準備環境變數（建立 .env，內容見下）
-cp .env.example .env  # 如有
 # 編輯 .env 填入機密
 
 # 4. 啟動
@@ -90,7 +90,7 @@ CLOUDINARY_API_SECRET=xxx
 ├── examples/                範例 JSON
 ├── menu/                    各店家菜單 JSON 範本
 ├── scripts/                 種子資料、SQL 工具
-├── requirements.txt
+├── requirements.txt         依賴（== 鎖版本，坑 #10）
 ├── railway.toml             Railway 部署設定（Dockerfile 模式）
 ├── Dockerfile
 ├── start.sh
@@ -132,7 +132,9 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 ```
 
-⚠ **本專案刻意不用 Alembic**，schema 演進走 `app/main.py` startup 內的 raw SQL（`ADD COLUMN IF NOT EXISTS` 模式）。理由與細節見 `CLAUDE.md` 衝突仲裁區塊與坑 #1。
+⚠ **重要**：
+- 本專案刻意不用 Alembic，schema 演進走 `app/main.py` startup 內的 raw SQL（見 CLAUDE.md 坑 #1）
+- `requirements.txt` 必須維持 `==` 精確版本鎖死，否則 Railway rebuild 時會抓到不相容的 Starlette 新版（見 CLAUDE.md 坑 #10）
 
 ---
 
@@ -140,7 +142,7 @@ restartPolicyMaxRetries = 3
 
 更詳細的踩坑與規範見：
 
-- `CLAUDE.md` — 給 AI 看的工作上下文（含 9 條已驗證踩坑紀錄）
+- `CLAUDE.md` — 給 AI 看的工作上下文（含 10 條已驗證踩坑紀錄）
 - `docs/SELA-開發指導手冊.md` — 完整開發規範
 - `docs/SELA-常見錯誤與解決方案.md` — 錯誤對應表
 - `docs/SELA-部署檢查清單.md` — 部署前必跑檢查
