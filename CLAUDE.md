@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.3.0（標題列版本號 + 高頻 emoji 全站 Tabler 化）
+- **版本：** V1.4.0（admin 後台 emoji Tabler 化）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -204,6 +204,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.4.0 | **admin 後台 9 種 emoji → Tabler**。16 檔 37 次替換：🟢→`ti-circle-filled`（保留綠色 inline style）/ 📮→`ti-mailbox` / 💡→`ti-bulb` / 📢→`ti-speakerphone` / 📥→`ti-inbox` / ⏳→`ti-hourglass` / ✨→`ti-sparkles` / ✏→`ti-pencil`（與 V1.3.0 📝 一致）/ 📌→`ti-pin`。🟢 特別處理：用 inline style `color: #22c55e` 保留綠色語義，避免 Tabler 圖示 currentColor 失去狀態色 |
 | V1.3.0 | **標題列版本號 + 高頻 emoji 全站 Tabler 化**。base.html 在 `<body>` 後加 `{% set app_version = 'V1.3.0' %}`，「SELA」標題旁顯示 `{{ app_version }}` 灰色小字（10px mono）— 升版只需改 `{% set %}` 一行；標題列 ⚙️ 換 `ti-settings`；全站 37 檔 83 次替換：📋→`ti-clipboard-list`（27 次最多）、👥→`ti-users`、👤→`ti-user`、✅→`ti-check`、🎉→`ti-confetti`、📝→`ti-pencil`、🌐→`ti-world`、🏪→`ti-building-store`。 |
 | V1.2.0 | **三大分類圖示全站 Tabler 化 + 底部導航文字對齊**。三大分類 emoji 全站 1:1 替換：🧋 → `<i class="ti ti-cup"></i>`（23 檔 103 次）、🍱 → `ti-bowl`、🛒 → `ti-shopping-cart`。`<i>` 自動繼承外層 span/button 的字級，不需逐處調 size。底部導航另外把 4 個圖示也包進 `w-9 h-9` 容器，所有 `<a>` 區塊高度一致，文字底線對齊。 |
 | V1.1.3 | **Hotfix：中央 + 圓圈對齊**。V1.1.0 我把圓圈尺寸從原版 48px 改成 52px 並用 inline style `margin-top: -26px` 試圖配合，但實機上沒生效（圓圈貼底而不是浮出於導航條）。退回原版 `w-12 h-12 -mt-6` 經驗證能用的 Tailwind 寫法，內部 + 字體用 24px。**教訓：不要為了讓 Tabler + 看起來大 4px 就動已驗證 work 的尺寸組合**。 |
@@ -219,18 +220,15 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-1. **V1.4.0：admin 後台系統圖示**（管理用：⚙ ✏ 💾 🗑 ➕ 📁 等）— 你自己後台用，順序排在用戶可見之後
-3. **V1.5.0：其餘 emoji 全清**（投票 🗳 / 慶祝 🎊 🎉 / 警告 ⚠ / 鎖 🔒 等收尾）
-4. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖
-5. 訂單匯出 Excel — 原本 backlog
-6. 外送費分攤功能 — 原本 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
-7. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
-8. 菜單匯入開放 `group_buy` category（解坑 #9）
-9. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮）— 改要用 `request.url.path` 判斷
-10. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
-11. V1.1.2 的 `/auth/login` 修正尚未實機驗證 — 等下次自然踩到再確認
-
----
+1. **V1.5.0：剩餘 emoji 收尾**（💾 儲存 / 🗑 刪除 / ➕ 新增 / 📁 📂 資料夾 / ⚠ 警告 / 📞 電話 / 📍 位置 / 🗺 地圖 / 🩷 ❤ 愛心 / 🔒 🔐 鎖 / 🔗 連結 / 💬 訊息 / 🚨 警報 / 🐛 bug / 🔥 熱門 / ⚡ 快速 / 🙈 盲訂 / 💝 請客 / 🎲 隨機 / 🎯 目標 / 🚀 啟動 / 👀 觀察 / 🥤 杯子 / ⭐ ☆ 收藏 / 🎊 慶祝 / 👑 🥇 🥈 🥉 名次 / 📜 歷史 / 📅 日曆 / 📊 📈 圖表 / ▶ ▼ ▲ 箭頭 / ✓ ✕ ❌ 標記） — 收尾後全站零 emoji
+2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 改完才能放寬 `requirements.txt` 版本鎖
+3. 訂單匯出 Excel — 原本 backlog
+4. 外送費分攤功能 — 原本 backlog；`scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
+5. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
+6. 菜單匯入開放 `group_buy` category（解坑 #9）
+7. 動態判斷底部導航 active 頁面（V1.1.0 仍 hardcode「首頁」恆亮）— 改要用 `request.url.path` 判斷
+8. 評估是否要把 `taipei` filter 抽到共用 templates 模組（解坑 #6，但要評估重構成本）
+9. V1.1.2 的 `/auth/login` 修正尚未實機驗證 — 等下次自然踩到再確認
 
 ## 八、升版必讀
 

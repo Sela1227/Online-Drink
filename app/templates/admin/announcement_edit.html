@@ -6,7 +6,7 @@
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">✏️ 編輯公告</h1>
+        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-pencil"></i> 編輯公告</h1>
         <a href="/admin/announcements" class="text-sm text-gray-500 hover:text-gray-700">返回公告管理 →</a>
     </div>
     
@@ -27,7 +27,7 @@
             <div class="flex flex-wrap gap-4 text-sm">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="is_pinned" value="true" {% if announcement.is_pinned %}checked{% endif %}>
-                    <span class="text-gray-600">📌 置頂</span>
+                    <span class="text-gray-600"><i class="ti ti-pin"></i> 置頂</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="is_active" value="true" {% if announcement.is_active %}checked{% endif %}>

@@ -34,7 +34,7 @@
                     <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
                     {% endif %}
                     {% if target_user.is_online %}
-                    <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-1">🟢 在線</span>
+                    <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-1"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線</span>
                     {% endif %}
                 </div>
                 {% if target_user.nickname %}
@@ -91,7 +91,7 @@
             <div class="flex justify-between py-2">
                 <span class="text-gray-500">在線狀態</span>
                 <span class="{% if target_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
-                    {% if target_user.is_online %}🟢 在線{% else %}⚫ 離線{% endif %}
+                    {% if target_user.is_online %}<i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線{% else %}⚫ 離線{% endif %}
                 </span>
             </div>
         </div>

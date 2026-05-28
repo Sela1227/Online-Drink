@@ -6,7 +6,7 @@
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">📢 公告管理</h1>
+        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-speakerphone"></i> 公告管理</h1>
         <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
     </div>
     
@@ -25,7 +25,7 @@
             <div class="flex flex-wrap gap-4 text-sm">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="is_pinned" value="true">
-                    <span class="text-gray-600">📌 置頂</span>
+                    <span class="text-gray-600"><i class="ti ti-pin"></i> 置頂</span>
                 </label>
                 <div class="flex items-center gap-2">
                     <span class="text-gray-600">過期時間（選填）</span>
@@ -55,7 +55,7 @@
                     <div class="flex-1">
                         <div class="flex items-center gap-2 mb-1">
                             {% if ann.is_pinned %}
-                            <span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">📌 置頂</span>
+                            <span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded"><i class="ti ti-pin"></i> 置頂</span>
                             {% endif %}
                             {% if ann.is_active %}
                             <span class="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded">顯示中</span>
@@ -75,7 +75,7 @@
                     <div class="flex flex-col gap-1">
                         <a href="/admin/announcements/{{ ann.id }}/edit" 
                            class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full text-center">
-                            ✏️ 編輯
+                            <i class="ti ti-pencil"></i> 編輯
                         </a>
                         <form action="/admin/announcements/{{ ann.id }}/toggle" method="POST">
                             <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
@@ -85,7 +85,7 @@
                         {% if ann.is_active and not ann.is_pinned %}
                         <form action="/admin/announcements/{{ ann.id }}/pin" method="POST">
                             <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-gray-50 w-full">
-                                📌 置頂
+                                <i class="ti ti-pin"></i> 置頂
                             </button>
                         </form>
                         {% elif ann.is_pinned %}
@@ -108,7 +108,7 @@
         </div>
         {% else %}
         <div class="p-8 text-center text-gray-500">
-            <div class="text-4xl mb-2">📢</div>
+            <div class="text-4xl mb-2"><i class="ti ti-speakerphone"></i></div>
             <p>尚未發布任何公告</p>
         </div>
         {% endif %}

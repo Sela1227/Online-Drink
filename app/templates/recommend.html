@@ -6,7 +6,7 @@
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">💡 我想要推薦店家</h1>
+        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-bulb"></i> 我想要推薦店家</h1>
         <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
     </div>
     
@@ -97,7 +97,7 @@
                     </div>
                     <div class="flex-shrink-0">
                         {% if rec.status == 'pending' %}
-                        <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">⏳ 審核中</span>
+                        <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700"><i class="ti ti-hourglass"></i> 審核中</span>
                         {% elif rec.status == 'approved' %}
                         <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"><i class="ti ti-check"></i> 已通過</span>
                         {% else %}

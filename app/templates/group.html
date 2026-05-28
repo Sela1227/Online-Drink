@@ -80,7 +80,7 @@
             {% if store.ubereats_url %}
             <a href="{{ store.ubereats_url }}" target="_blank"
                class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100 transition">
-                🟢 Uber Eats
+                <i class="ti ti-circle-filled" style="color: #22c55e;"></i> Uber Eats
             </a>
             {% endif %}
             {% if store.foodpanda_url %}
@@ -196,7 +196,7 @@
             {% if is_owner or is_admin %}
             <div class="flex gap-3 items-center">
                 {% if is_open and pending_count > 0 %}
-                <button @click="showReminder = true" class="text-amber-600 hover:text-amber-700">📢 催單</button>
+                <button @click="showReminder = true" class="text-amber-600 hover:text-amber-700"><i class="ti ti-speakerphone"></i> 催單</button>
                 {% endif %}
                 <button @click="showSettings = true" class="text-blue-600 hover:text-blue-700">修改</button>
                 {% if is_open %}
@@ -207,7 +207,7 @@
                 {% endif %}
                 <a href="/groups/{{ group.id }}/export/order" class="text-gray-600 hover:text-gray-800">店家明細</a>
                 <a href="/groups/{{ group.id }}/export/payment" class="text-gray-600 hover:text-gray-800">個人明細</a>
-                <a href="/groups/{{ group.id }}/export/excel" class="text-green-600 hover:text-green-700">📥 Excel</a>
+                <a href="/groups/{{ group.id }}/export/excel" class="text-green-600 hover:text-green-700"><i class="ti ti-inbox"></i> Excel</a>
             </div>
             {% endif %}
         </div>
@@ -342,7 +342,7 @@
          @click.self="showReminder = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
-                <h3 class="font-semibold text-gray-800">📢 催單提醒</h3>
+                <h3 class="font-semibold text-gray-800"><i class="ti ti-speakerphone"></i> 催單提醒</h3>
             </div>
             
             <div class="p-4">
