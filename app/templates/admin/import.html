@@ -112,6 +112,20 @@
 
         {% if selected_store_id %}
         <input type="hidden" name="store_id" value="{{ selected_store_id }}">
+        {% else %}
+        <!-- 選填：匯菜單到既有店家（選了就用這家，覆蓋 JSON 裡的 store_id）-->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <label class="block text-sm font-medium text-amber-800 mb-1">
+                <i class="ti ti-building-store"></i> 匯入「菜單」到既有店家？
+            </label>
+            <p class="text-xs text-amber-700 mb-2">如果你貼的是「既有店家加菜單」的 JSON（store_id 模式），在這裡選店家就好，不用管 JSON 裡的 store_id。新增店家的完整 JSON 則留空。</p>
+            <select name="store_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">— 不指定（新增店家／JSON 自帶 store_id）—</option>
+                {% for s in stores %}
+                <option value="{{ s.id }}">{{ s.name }}（編號 {{ s.id }}）</option>
+                {% endfor %}
+            </select>
+        </div>
         {% endif %}
 
         <!-- 貼上 JSON 分頁 -->

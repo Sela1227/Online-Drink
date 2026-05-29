@@ -248,11 +248,16 @@ async def import_preview(
     request: Request,
     json_text: str = Form(None),
     json_file: UploadFile = File(None),
-    store_id: int = Form(None),
+    store_id: str = Form(None),
     db: Session = Depends(get_db),
 ):
     """匯入預覽（V1.7.0：htmx 片段，支援貼上 JSON / 上傳檔案，友善中文錯誤）"""
     user = await get_admin_user(request, db)
+
+    # store_id 可能是空字串（下拉選「不指定」）或數字字串 → 安全轉 int
+    store_id_int = None
+    if store_id and str(store_id).strip().isdigit():
+        store_id_int = int(store_id)
 
     # 取得 JSON 字串：貼上優先，否則讀上傳檔案
     json_str = None
@@ -280,9 +285,9 @@ async def import_preview(
         ])
 
     # 判斷匯入類型
-    if store_id:
+    if store_id_int:
         menu_data = data.get("menu", data)
-        data = {"store_id": store_id, "mode": "replace", "menu": menu_data}
+        data = {"store_id": store_id_int, "mode": "replace", "menu": menu_data}
         json_str = json.dumps(data, ensure_ascii=False)
         is_full_import = False
     elif "store" in data:
@@ -308,10 +313,22 @@ async def import_preview(
     existing_menu = None
     duplicate_store = None
     if not is_full_import:
+        # store_id 還是 0（prompt 佔位值沒改）→ 給明確指引
+        if validated.store_id == 0:
+            return _render_import_result(request, user, error_messages=[
+                "這份 JSON 的 store_id 還是 0（AI 產生的佔位值）。請從以下二擇一：",
+                "方法一（推薦）：回到該店家頁面，點「匯入菜單」按鈕進來，系統會自動帶入正確店家，不用管 store_id。",
+                "方法二：手動把 JSON 裡的 store_id 從 0 改成正確的店家編號（在店家列表可查到）。",
+            ])
         store = db.query(Store).filter(Store.id == validated.store_id).first()
         if not store:
+            # 列出現有店家供對照
+            stores = db.query(Store).order_by(Store.id).all()
+            store_list = "、".join(f"{s.id}={s.name}" for s in stores[:20]) or "目前沒有店家"
             return _render_import_result(request, user, error_messages=[
-                f"找不到店家編號 {validated.store_id}，請確認 store_id 是否正確"
+                f"找不到店家編號 {validated.store_id}。",
+                f"現有店家編號對照：{store_list}",
+                "或回到該店家頁面點「匯入菜單」按鈕，系統會自動帶入正確店家。",
             ])
         existing_menu = db.query(Menu).filter(
             Menu.store_id == validated.store_id,

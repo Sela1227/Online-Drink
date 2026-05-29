@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.11.0（修圖示亂碼：i 標籤誤入 JS 字串 + 放大團單頁 logo）
+- **版本：** V1.11.1（匯入 store_id=0 友善指引 + 貼上分頁可選目標店家）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -251,6 +251,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.11.1 | **匯入 store_id=0 友善指引 + 貼上分頁可選目標店家**。menu-only JSON 的 store_id 是 prompt 佔位值 0，直接貼會「找不到店家編號 0」。改善：(1) 偵測 store_id==0 給明確兩方法指引（回店家頁點匯入／手動改編號）；找不到其他編號時列出現有店家對照表。(2) 貼上分頁加「選填目標店家」下拉（沒從店家頁進來時顯示），選了就覆蓋 JSON 的 store_id，不用手動改 JSON。(3) preview 路由 store_id 參數改 `str` 安全轉 int（下拉「不指定」傳空字串，避免 int 轉換 422）。 |
 | V1.11.0 | **修圖示亂碼 + 放大團單頁 logo（坑 #19）**。(1) 倒數計時等 6 處把 `<i class="ti ...">` 標籤塞進「會被當純文字的位置」（Alpine `x-text`、JS `textContent`、JS `confirm()`、Jinja2 autoescape 的 `{{ }}`），導致畫面顯示原始 HTML 字串亂碼。修法：`x-text` 改「固定圖示 + span」、`textContent`→`innerHTML`、`confirm()` 去掉標籤留純文字、Jinja2 字串陣列改直接寫標籤。涵蓋倒數計時/送單勾勾/收藏星星/排名獎牌/刪除確認。(2) 團單頁 store logo 容器 48→64px、圖 40→56px。(3) 順手把漏網的 `group.category_icon` emoji（model property 🧋🍱🛒）在 group.html / guest_entry.html 的 fallback 換成 Tabler 字串比較版。 |
 | V1.10.2 | **修正 JSON 匯入只能兩種分類的 bug（解坑 #9）**。系統 CategoryType enum 有三種（drink/meal/group_buy）、後台手動新增店家表單也有三種 radio、import_service `CategoryType(...)` 也支援三種，**唯獨 `schemas/store.py` 的 `StoreImport.category` 與 `StoreCreate.category` 寫死 `Literal["drink","meal"]`，把 group_buy 擋在驗證階段** → JSON 匯入團購店一律失敗。修法：兩處 Literal 補上 "group_buy"。prompt 的 category 規範改回三種 + 加判斷準則（團購/預購/宅配/農場直送/箱購→group_buy）+ 補 group_buy 完整範例。三種分類匯入都實測通過。 |
 | V1.10.1 | **匯入 prompt 對齊真實 schema + 完整範例**。重寫 promptNewStore / promptMenu，依實際 Pydantic schema（schemas/menu.py + store.py）逐欄位規範。**修正關鍵錯誤：原 prompt 寫 category 可填 group_buy，但 `StoreImport.category` 是 `Literal["drink","meal"]` 根本不收 group_buy（坑 #9）— 會讓 AI 產出系統拒絕的 JSON**。新 prompt：category 明確只能 drink/meal + 判斷準則、所有 price 純數字「時價」填 0、store 各欄位（logo_url 填 null、sugar/ice/toppings 規則）、item 的 price_l/options 何時填 null、附「drink 完整範例 + meal 範例」兩個可直接用的範例。promptMenu 同樣附完整範例。**三個範例都用真實 schema 驗證過能通過匯入**。 |
