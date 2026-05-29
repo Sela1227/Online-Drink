@@ -16,8 +16,8 @@
             <div class="flex items-center gap-3">
                 <!-- Logo -->
                 <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {% if group.store.logo_url %}
-                    <img src="{{ group.store.logo_url }}" alt="{{ group.store.name }}" class="w-8 h-8 object-contain">
+                    {% if group.store and group.store.logo_url %}
+                    <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-8 h-8 object-contain">
                     {% else %}
                     <span class="text-xl">
                         {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>{% else %}<i class="ti ti-bowl"></i>{% endif %}
@@ -29,7 +29,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="font-medium text-gray-900 truncate">{{ group.name }}</div>
                     <div class="text-sm text-gray-500">
-                        {{ group.store.name }} ・ {{ group.owner.display_name }}
+                        {{ group.store_display_name }} ・ {{ group.owner.display_name }}
                     </div>
                     <div class="text-xs text-gray-400">
                         {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}

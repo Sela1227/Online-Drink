@@ -54,6 +54,20 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "note", "TEXT")
     add_column_if_not_exists("groups", "delivery_fee", "NUMERIC(10,2)")
     add_column_if_not_exists("groups", "is_public", "BOOLEAN DEFAULT TRUE")
+    add_column_if_not_exists("groups", "store_name", "VARCHAR(100)")  # V1.10.0 店名快照
+    # V1.10.0：store_id / menu_id 改可為 NULL（刪店家後斷開連結但保留團單）
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE groups ALTER COLUMN store_id DROP NOT NULL"))
+        print("groups.store_id set nullable")
+    except Exception:
+        print("groups.store_id nullable check: OK")
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE groups ALTER COLUMN menu_id DROP NOT NULL"))
+        print("groups.menu_id set nullable")
+    except Exception:
+        print("groups.menu_id nullable check: OK")
     add_column_if_not_exists("users", "nickname", "VARCHAR(100)")
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")

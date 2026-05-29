@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.9.0（匯入頁加 Logo 生成 prompt + 新增店家 prompt 補店名填空）
+- **版本：** V1.10.0（刪店家不再被舊團單擋：斷開連結保留團單）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -194,6 +194,12 @@
     - 做法（V1.8.1）：menu_list 路由算店內序號 `menu_versions = [(menu, total - idx) for idx, menu in enumerate(menus)]`（menus 是 created_at desc，所以最新序號=總數、最舊=1），template 顯示「第 N 版」
     - 教訓：**呈現給使用者的「序號 / 編號」不要直接用 DB 主鍵** — 主鍵是全域的、會跳號、洩漏其他資料量。要的是「在這個範圍內的第幾個」就現場 enumerate
 
+18. **刪父資料時，子資料的多個外鍵都要一起斷，否則 flush 撞 NOT NULL**（V1.10.0 經驗）
+    - 情境：刪店家改成「斷開團單連結但保留團單」。原本只斷 `group.store_id=None`，但團單還有 `menu_id` 指向該店菜單；刪 menu 時 SQLAlchemy 想把 `group.menu_id` 設 NULL，撞上 menu_id NOT NULL → IntegrityError
+    - 解法：(1) `store_id` 和 `menu_id` 都改 nullable；(2) 斷開時兩個都設 None；(3) 用 `with db.no_autoflush:` 包整段，並在斷開後手動 `db.flush()`，再刪 menu/store，避免自動 flush 在錯的時間點觸發
+    - 通用原則：**改「保留子資料、刪父資料」的軟參照前，先列出子資料所有指向父資料樹的外鍵**（這裡 group→store 直接、group→menu 間接但 menu 屬於 store），每一條都要 nullable + 斷開。漏一條就會在 flush 時爆
+    - 顯示層配套：加 `xxx_display_name` property（關聯在用關聯、不在用快照欄位），模板全改用它，且 `if obj.relation and obj.relation.field` 防 None
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -232,6 +238,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.10.0 | **刪店家改為「軟參照」：斷開連結保留團單**。原本店家有團單就 `raise HTTPException` 擋刪（整頁噴 JSON）。改為：刪店家時把該店所有團單的店名存進新欄位 `groups.store_name`（快照）、`store_id` 與 `menu_id` 設 NULL（斷開），再刪店家 + 菜單。團單與歷史完整保留，只是不再指向店家。Model：`store_id`/`menu_id` 改 nullable + 新增 `store_name` 欄位 + `store_display_name` property（關聯優先、刪除後用快照）。6 個模板 `group.store.name`→`group.store_display_name`、`group.store.logo_url` 加 `group.store and` 防 None。main.py 加 3 條遷移（store_name 欄位 + store_id/menu_id DROP NOT NULL）。刪除用 `db.no_autoflush` 避免 flush 時序撞 NOT NULL。 |
 | V1.9.0 | **Logo 生成 prompt + 店名填空**。(1) 匯入頁新增「生成店家 Logo」獨立區塊（紫色），兩顆複製 prompt 按鈕：`promptLogoRestore`（有原始 logo → 忠實還原 + 去雜訊 + 提升解析度 + 取邊緣底色補滿正方形不留白不裁切）、`promptLogoText`（無 logo → 店名生成北歐極簡文字 logo：#454c8c 底、白字、白色細外框、無襯線細體、正方形，結尾留「店名：」填空）。logo 生成後走現有店家編輯頁上傳流程（prompt 只負責生圖）。(2) 實測發現菜單照片常無店名，`promptNewStore` 結尾補「店名：」填空 + 指示 AI 不要亂猜。 |
 | V1.8.1 | **Hotfix：菜單版本號顯示店內序號（坑 #17）**。原本 menus.html 顯示「版本 #{{ menu.id }}」用的是 Menu 全域自增主鍵 — 新店第一份菜單可能顯示「#29」（全系統第 29 筆），多版本也會跳號（#5/#18/#29）看不出第幾版。改為在 menu_list 路由算「店內版本序號」（最舊=第 1 版，用 `total - idx` 因 created_at desc 排序），template 顯示「第 N 版」。 |
 | V1.8.0 | **抬頭文字 + AI prompt 複製 + 同名店家偵測 + 菜單時間**。(1) base.html 抬頭「SELA」→「快點來點餐」（logo 圖與版本號不變）。(2) 匯入頁「載入範例」按鈕改為「複製 AI prompt」按鈕（新增店家 / 既有店家加菜單兩種），點了把完整 prompt 複製到剪貼簿（`navigator.clipboard`）— prompt 含格式規範、欄位限制（category 只能 drink/meal/group_buy、price 純數字、時價填 0、大杯 price_l）、輸出格式範例，配合「截圖菜單貼給 AI → 拿 JSON 貼回」工作流；加「怎麼用」三步驟說明。(3) `import_store_and_menu` 加**同名店家偵測**（完全比對 `Store.name`）：偵測到同名 → 不新增重複店家，菜單匯入既有店家，舊菜單停用保留為舊版本、新菜單啟用；預覽綠框顯示提示行（不跳視窗）。(4) admin/menus.html 菜單版本時間「建立於」→「匯入於」並套 `taipei` filter（原本顯示 UTC 差 8 小時）。 |

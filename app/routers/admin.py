@@ -411,26 +411,32 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
     store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 檢查是否有關聯的團單
-    group_count = db.query(Group).filter(Group.store_id == store_id).count()
-    if group_count > 0:
-        raise HTTPException(status_code=400, detail=f"無法刪除：此店家有 {group_count} 個團單")
-    
-    # 刪除相關資料（菜單、選項）
-    for menu in store.menus:
-        for item in menu.items:
-            for opt in item.options:
-                db.delete(opt)
-            db.delete(item)
-        for category in menu.categories:
-            db.delete(category)
-        db.delete(menu)
-    
-    for option in store.options:
-        db.delete(option)
-    
-    db.delete(store)
+
+    # V1.10.0：有關聯團單時，不擋刪除 —— 斷開連結但保留團單
+    # 把該店所有團單的店名存為快照、store_id / menu_id 設為 NULL（歷史紀錄保留，不再指向店家）
+    with db.no_autoflush:
+        related_groups = db.query(Group).filter(Group.store_id == store_id).all()
+        for g in related_groups:
+            if not g.store_name:
+                g.store_name = store.name
+            g.store_id = None
+            g.menu_id = None
+        db.flush()
+
+        # 刪除相關資料（菜單、選項）
+        for menu in store.menus:
+            for item in menu.items:
+                for opt in item.options:
+                    db.delete(opt)
+                db.delete(item)
+            for category in menu.categories:
+                db.delete(category)
+            db.delete(menu)
+
+        for option in store.options:
+            db.delete(option)
+
+        db.delete(store)
     db.commit()
     
     return RedirectResponse(url="/admin/stores", status_code=302)
