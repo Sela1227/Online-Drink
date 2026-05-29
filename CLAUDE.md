@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.11.2（修使用者回報：個人明細與店家明細金額不符）
+- **版本：** V1.12.0（團單頁頂部與首頁卡片版面重排：縮圖放大、文字分行）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -258,6 +258,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.12.0 | **團單頁頂部 + 首頁卡片版面重排**。(1) 團單頁頂部：原本縮圖/店名/店家/老闆/收藏/倒數全擠一排。改為「返回 + 倒數」獨立頂行（返回改 `ti-arrow-left` 左置），下方大縮圖（64→80px）+ 店名獨立大字一行、店家/老闆/收藏分行不擠。(2) 首頁開團卡片（group_card）：縮圖 56→72px、店名從 `truncate`（截斷一行）改 `line-clamp-2`（可換兩行不截）。 |
 | V1.11.2 | **修金額 bug：個人明細 vs 店家明細不符（使用者回報，坑 #20）**。`export_service.generate_order_text`（店家明細）算單項價時 `unit_price + options_total` **漏了 `toppings_total`（加料費）**，而 `generate_payment_text`（個人明細）用 `OrderItem.subtotal` 含加料 → 有人點加料時兩邊金額對不上。修：店家明細補 `+ item.toppings_total`，與 subtotal 算法一致；彙總 key 也補加料（`+珍珠`）避免同品項不同加料被合併後價格被覆蓋。註：export_service 內的 💰🚗👥⚠️ emoji **刻意保留**（純文字匯出給店家貼 LINE 用，非 HTML，不可換 Tabler）。 |
 | V1.11.1 | **匯入 store_id=0 友善指引 + 貼上分頁可選目標店家**。menu-only JSON 的 store_id 是 prompt 佔位值 0，直接貼會「找不到店家編號 0」。改善：(1) 偵測 store_id==0 給明確兩方法指引（回店家頁點匯入／手動改編號）；找不到其他編號時列出現有店家對照表。(2) 貼上分頁加「選填目標店家」下拉（沒從店家頁進來時顯示），選了就覆蓋 JSON 的 store_id，不用手動改 JSON。(3) preview 路由 store_id 參數改 `str` 安全轉 int（下拉「不指定」傳空字串，避免 int 轉換 422）。 |
 | V1.11.0 | **修圖示亂碼 + 放大團單頁 logo（坑 #19）**。(1) 倒數計時等 6 處把 `<i class="ti ...">` 標籤塞進「會被當純文字的位置」（Alpine `x-text`、JS `textContent`、JS `confirm()`、Jinja2 autoescape 的 `{{ }}`），導致畫面顯示原始 HTML 字串亂碼。修法：`x-text` 改「固定圖示 + span」、`textContent`→`innerHTML`、`confirm()` 去掉標籤留純文字、Jinja2 字串陣列改直接寫標籤。涵蓋倒數計時/送單勾勾/收藏星星/排名獎牌/刪除確認。(2) 團單頁 store logo 容器 48→64px、圖 40→56px。(3) 順手把漏網的 `group.category_icon` emoji（model property 🧋🍱🛒）在 group.html / guest_entry.html 的 fallback 換成 Tabler 字串比較版。 |
