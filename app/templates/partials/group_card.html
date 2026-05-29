@@ -15,8 +15,8 @@
     <div class="flex gap-3">
         <!-- Logo -->
         <div class="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-            {% if group.store.logo_url %}
-            <img src="{{ group.store.logo_url }}" alt="{{ group.store.name }}" class="w-12 h-12 object-contain">
+            {% if group.store and group.store.logo_url %}
+            <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-12 h-12 object-contain">
             {% else %}
             <span class="text-2xl">
                 {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>
@@ -29,7 +29,7 @@
         <!-- 資訊 -->
         <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-gray-800 truncate">{{ group.name }}</div>
-            <div class="text-xs text-gray-500 truncate">{{ group.store.name }}</div>
+            <div class="text-xs text-gray-500 truncate">{{ group.store_display_name }}</div>
             <div class="text-xs text-gray-400 mt-0.5">{{ group.owner.show_name }}</div>
         </div>
     </div>

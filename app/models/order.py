@@ -42,8 +42,8 @@ class OrderItem(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
-    menu_item_id: Mapped[int] = mapped_column(ForeignKey("menu_items.id"))
-    item_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲
+    menu_item_id: Mapped[int | None] = mapped_column(ForeignKey("menu_items.id"), nullable=True)
+    item_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲（菜單刪除後仍保留顯示）
     size: Mapped[str | None] = mapped_column(String(10), nullable=True)  # M 或 L
     sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -78,7 +78,7 @@ class OrderItemOption(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.id"))
-    item_option_id: Mapped[int] = mapped_column(ForeignKey("item_options.id"))
+    item_option_id: Mapped[int | None] = mapped_column(ForeignKey("item_options.id"), nullable=True)
     option_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲
     price_diff: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 冗餘存儲
     

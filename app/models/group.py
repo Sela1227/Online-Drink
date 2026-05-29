@@ -10,8 +10,9 @@ class Group(Base):
     __tablename__ = "groups"
     
     id: Mapped[int] = mapped_column(primary_key=True)
-    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
-    menu_id: Mapped[int] = mapped_column(ForeignKey("menus.id"))
+    store_id: Mapped[int | None] = mapped_column(ForeignKey("stores.id"), nullable=True)
+    store_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 店名快照（店家刪除後保留顯示）
+    menu_id: Mapped[int | None] = mapped_column(ForeignKey("menus.id"), nullable=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     branch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 分店 ID
     name: Mapped[str] = mapped_column(String(100))
@@ -107,6 +108,13 @@ class Group(Base):
         )
         return subtotal + (self.delivery_fee or Decimal("0"))
     
+    @property
+    def store_display_name(self) -> str:
+        """店家顯示名稱：店家還在用關聯名稱，店家已刪除則用快照名稱"""
+        if self.store is not None:
+            return self.store.name
+        return self.store_name or "（店家已移除）"
+
     @property
     def category_icon(self) -> str:
         """分類圖示"""

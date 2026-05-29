@@ -54,6 +54,33 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "note", "TEXT")
     add_column_if_not_exists("groups", "delivery_fee", "NUMERIC(10,2)")
     add_column_if_not_exists("groups", "is_public", "BOOLEAN DEFAULT TRUE")
+    add_column_if_not_exists("groups", "store_name", "VARCHAR(100)")  # V1.10.0 店名快照
+    # V1.10.0：store_id / menu_id 改可為 NULL（刪店家後斷開連結但保留團單）
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE groups ALTER COLUMN store_id DROP NOT NULL"))
+        print("groups.store_id set nullable")
+    except Exception:
+        print("groups.store_id nullable check: OK")
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE groups ALTER COLUMN menu_id DROP NOT NULL"))
+        print("groups.menu_id set nullable")
+    except Exception:
+        print("groups.menu_id nullable check: OK")
+    # V1.10.0：訂單明細外鍵改可空（刪店家斷開但保留訂單；已有 item_name/option_name 快照）
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE order_items ALTER COLUMN menu_item_id DROP NOT NULL"))
+        print("order_items.menu_item_id set nullable")
+    except Exception:
+        print("order_items.menu_item_id nullable check: OK")
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE order_item_options ALTER COLUMN item_option_id DROP NOT NULL"))
+        print("order_item_options.item_option_id set nullable")
+    except Exception:
+        print("order_item_options.item_option_id nullable check: OK")
     add_column_if_not_exists("users", "nickname", "VARCHAR(100)")
     add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
     add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
