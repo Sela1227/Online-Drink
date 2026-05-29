@@ -8,11 +8,15 @@
     <div class="bg-white rounded-lg shadow-sm p-4">
         <!-- 簡潔的團單資訊 -->
         <div class="flex items-center gap-3">
-            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-10 h-10 object-contain">
+                <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-14 h-14 object-contain">
                 {% else %}
-                <span class="text-2xl">{{ group.category_icon }}</span>
+                <span class="text-3xl text-gray-400">
+                    {% if group.category and group.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif group.category and group.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
+                </span>
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">
@@ -34,8 +38,10 @@
             <div class="text-right">
                 {% if is_open %}
                 <div class="text-sela-600 font-medium"
-                     x-data="countdown('{{ group.deadline.isoformat() }}')"
-                     x-text="display"></div>
+                     x-data="countdown('{{ group.deadline.isoformat() }}')">
+                    <i class="ti ti-alarm" x-show="!isClosed"></i>
+                    <span x-text="display"></span>
+                </div>
                 {% else %}
                 <div class="text-gray-500">已截止</div>
                 {% endif %}
@@ -537,7 +543,7 @@
                                             hx-swap="innerHTML"
                                             hx-on::after-request="
                                                 this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
-                                                this.textContent = '<i class="ti ti-check"></i>';
+                                                this.innerHTML = '<i class="ti ti-check"></i>';
                                                 this.disabled = true;
                                                 this.classList.remove('bg-sela-500', 'hover:bg-sela-600');
                                                 this.classList.add('bg-gray-300');
@@ -1028,6 +1034,7 @@ function orderPage() {
 function countdown(deadline) {
     return {
         display: '',
+        isClosed: false,
         init() {
             this.update();
             setInterval(() => this.update(), 1000);
@@ -1039,6 +1046,7 @@ function countdown(deadline) {
             
             if (diff <= 0) {
                 this.display = '已截止';
+                this.isClosed = true;
                 return;
             }
             
@@ -1046,10 +1054,10 @@ function countdown(deadline) {
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             
             if (hours > 0) {
-                this.display = `<i class="ti ti-alarm"></i> ${hours}h ${minutes}m`;
+                this.display = `${hours}h ${minutes}m`;
             } else {
                 const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                this.display = `<i class="ti ti-alarm"></i> ${minutes}m ${seconds}s`;
+                this.display = `${minutes}m ${seconds}s`;
             }
         }
     }
@@ -1129,11 +1137,11 @@ async function toggleFavorite(storeId) {
         const btn = document.getElementById('fav-btn');
         const text = document.getElementById('fav-text');
         if (data.status === 'added') {
-            btn.querySelector('span:first-child').textContent = '<i class="ti ti-star"></i>';
+            btn.querySelector('span:first-child').innerHTML = '<i class="ti ti-star"></i>';
             btn.title = '取消收藏';
             if (text) text.textContent = '已收藏';
         } else {
-            btn.querySelector('span:first-child').textContent = '<i class="ti ti-star"></i>';
+            btn.querySelector('span:first-child').innerHTML = '<i class="ti ti-star"></i>';
             btn.title = '收藏店家';
             if (text) text.textContent = '收藏';
         }

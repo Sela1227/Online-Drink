@@ -312,7 +312,7 @@
                 <i class="ti ti-inbox"></i> 匯入新菜單
             </a>
             <form action="/admin/stores/{{ store.id }}/delete" method="post" class="inline"
-                  onsubmit="return confirm('<i class="ti ti-alert-triangle"></i>️ 確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
+                  onsubmit="return confirm('確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
                 <button type="submit" class="px-4 py-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg text-sm font-medium">
                     <i class="ti ti-trash"></i>️ 刪除店家
                 </button>
