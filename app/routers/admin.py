@@ -405,40 +405,66 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
 
 @router.post("/stores/{store_id}/delete")
 async def delete_store(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """刪除店家"""
+    """刪除店家（V1.10.0：斷開團單/訂單連結但保留歷史，不再被舊團單擋）"""
     user = await get_admin_user(request, db)
-    
+
     store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
 
-    # V1.10.0：有關聯團單時，不擋刪除 —— 斷開連結但保留團單
-    # 把該店所有團單的店名存為快照、store_id / menu_id 設為 NULL（歷史紀錄保留，不再指向店家）
-    with db.no_autoflush:
-        related_groups = db.query(Group).filter(Group.store_id == store_id).all()
-        for g in related_groups:
-            if not g.store_name:
-                g.store_name = store.name
-            g.store_id = None
-            g.menu_id = None
-        db.flush()
+    store_name = store.name
 
-        # 刪除相關資料（菜單、選項）
-        for menu in store.menus:
-            for item in menu.items:
-                for opt in item.options:
-                    db.delete(opt)
-                db.delete(item)
-            for category in menu.categories:
-                db.delete(category)
-            db.delete(menu)
+    # 用 raw SQL 依「子→父」順序斷開外鍵、刪除資料。
+    # 訂單明細（order_items / order_item_options）已有 item_name / option_name 等快照欄位，
+    # 斷開 FK 後歷史訂單仍可完整顯示。團單保留，store_id/menu_id 設 NULL + 店名快照。
+    from sqlalchemy import text as _sql
+    sid = store_id
+    db.execute(_sql("""
+        UPDATE order_items SET menu_item_id = NULL
+        WHERE menu_item_id IN (
+            SELECT mi.id FROM menu_items mi
+            JOIN menus m ON mi.menu_id = m.id
+            WHERE m.store_id = :sid
+        )
+    """), {"sid": sid})
+    db.execute(_sql("""
+        UPDATE order_item_options SET item_option_id = NULL
+        WHERE item_option_id IN (
+            SELECT io.id FROM item_options io
+            JOIN menu_items mi ON io.menu_item_id = mi.id
+            JOIN menus m ON mi.menu_id = m.id
+            WHERE m.store_id = :sid
+        )
+    """), {"sid": sid})
+    # 加料快照：store_toppings 被刪後，order_item_toppings.store_topping_id 已是 nullable，直接斷開
+    db.execute(_sql("""
+        UPDATE order_item_toppings SET store_topping_id = NULL
+        WHERE store_topping_id IN (
+            SELECT id FROM store_toppings WHERE store_id = :sid
+        )
+    """), {"sid": sid})
+    # 團單：填店名快照 + 斷開 store_id / menu_id
+    db.execute(_sql("""
+        UPDATE groups SET store_name = COALESCE(store_name, :sname), store_id = NULL, menu_id = NULL
+        WHERE store_id = :sid
+    """), {"sid": sid, "sname": store_name})
 
-        for option in store.options:
-            db.delete(option)
+    # 刪菜單樹（item_options → menu_items → menu_categories → menus）
+    db.execute(_sql("""
+        DELETE FROM item_options WHERE menu_item_id IN (
+            SELECT mi.id FROM menu_items mi JOIN menus m ON mi.menu_id = m.id WHERE m.store_id = :sid
+        )
+    """), {"sid": sid})
+    db.execute(_sql("DELETE FROM menu_items WHERE menu_id IN (SELECT id FROM menus WHERE store_id = :sid)"), {"sid": sid})
+    db.execute(_sql("DELETE FROM menu_categories WHERE menu_id IN (SELECT id FROM menus WHERE store_id = :sid)"), {"sid": sid})
+    db.execute(_sql("DELETE FROM menus WHERE store_id = :sid"), {"sid": sid})
+    # 刪店家加料、店家選項、分店、店家本身
+    db.execute(_sql("DELETE FROM store_toppings WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("DELETE FROM store_options WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("DELETE FROM store_branches WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("DELETE FROM stores WHERE id = :sid"), {"sid": sid})
 
-        db.delete(store)
     db.commit()
-    
     return RedirectResponse(url="/admin/stores", status_code=302)
 
 
