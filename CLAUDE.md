@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.10.0（刪店家不再被舊團單擋：斷開連結保留團單）
+- **版本：** V1.13.0（提高主題色比例：背景淡藍紫 + 頂部 header 染色）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -203,6 +203,23 @@
     - **最終解法**：放棄 ORM 逐層 delete（cascade flush 時序難控），改用 **raw SQL 依「子→父」順序** UPDATE 斷開所有 FK（order_items.menu_item_id、order_item_options.item_option_id、order_item_toppings.store_topping_id、groups.store_id/menu_id）再 DELETE 菜單樹與店家。訂單明細靠既有「冗餘存儲」快照欄位（item_name/unit_price/option_name/price_diff/topping_name/price）保留完整可讀的歷史
     - 需改 nullable 的欄位總清單：groups.store_id、groups.menu_id、order_items.menu_item_id、order_item_options.item_option_id（order_item_toppings.store_topping_id 原本就 nullable）
 
+19. **`<i>` 圖示標籤塞進「會被當純文字的位置」→ 畫面顯示原始 HTML 字串亂碼**（V1.11.0 修正）
+    - 症狀：emoji 換 Tabler `<i class="ti ...">` 後，某些地方畫面直接顯示 `<i class="ti ti-alarm"></i>` 這串文字而非圖示（如團單頁倒數計時旁）
+    - 原因：這些位置會把內容當純文字、不渲染 HTML：(a) Alpine `x-text`（安全機制只填文字）、(b) JS `element.textContent`（同理）、(c) JS `confirm('...')` 對話框（純文字視窗）、(d) Jinja2 `{{ }}` autoescape（HTML 被轉義成 `&lt;i&gt;`）
+    - 修法對照：
+      - `x-text="display"`（display 含 `<i>`）→ HTML 固定放 `<i>` + 旁邊 `<span x-text="display">`，JS 字串只留文字
+      - `el.textContent = '<i>'` → `el.innerHTML = '<i>'`（程式控制的固定字串無 XSS 風險才可）
+      - `confirm('<i> 確定…')` → `confirm('確定…')`（純文字視窗，圖示無意義，直接拿掉）
+      - Jinja2 `{{ ['<i>'][x] }}` → 直接寫 `<i>` 標籤（autoescape 只作用在 `{{ }}` 內的值）
+    - 教訓：**全站 emoji→`<i>` 替換時，凡是 emoji 原本在 JS 字串、x-text、confirm、或會 autoescape 的 `{{ }}` 內，不能直接換成 `<i>` 標籤** — 要改該位置的渲染方式。批次替換後務必 grep `\`<i class` / `"<i class` / `textContent.*<i` / `x-text.*<i` 複查
+    - **另注意純文字匯出**：`export_service.py` 產生的是給店家複製到 LINE 的純文字訊息，裡面的 emoji（💰🚗👥⚠️）**要保留**，不可換 Tabler `<i>`（純文字訊息裡會變字面亂碼）
+
+20. **同一筆金額有兩條計算路徑，改了一條沒同步另一條 → 對帳不符**（使用者回報，V1.11.2）
+    - 症狀：使用者回報「個人明細金額與店家明細金額不同」
+    - 根因：金額有兩個產生函數。`OrderItem.subtotal`（個人明細用）= `(unit_price + options_total + toppings_total) * quantity` 含加料；但 `generate_order_text`（店家明細）自己重算成 `unit_price + options_total`，**漏了 toppings_total**。有人點加料時兩邊就差加料費
+    - 修：店家明細補 toppings_total，並把加料納入彙總 key
+    - 通用原則：**同一個金額概念只該有一個 single source of truth**。OrderItem.subtotal 已是權威算法，匯出 / 統計 / 顯示都應呼叫它，而非各自重算。各自重算遲早因為新增欄位（如後加的 toppings）而不同步。未來若再有金額計算，先找有沒有現成 property 可用
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -241,6 +258,13 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.13.0 | **提高主題色比例（A+B）**。使用者覺得白色太多。(A) `<body>` 背景 `bg-sela-50/30`→`bg-sela-50`（完整淡藍紫，卡片白色浮其上）。(B) 頂部 header 從白底改 `bg-sela-600` 藍紫底：logo 文字 / 齒輪改白、版本號 white/50、開團按鈕改白底藍紫字（在深色 header 上對比足夠）、頭像邊框改 white/60。底部導航維持白底（浮在淡藍紫背景上）。 |
+| V1.12.0 | **團單頁頂部 + 首頁卡片版面重排**。(1) 團單頁頂部：原本縮圖/店名/店家/老闆/收藏/倒數全擠一排。改為「返回 + 倒數」獨立頂行（返回改 `ti-arrow-left` 左置），下方大縮圖（64→80px）+ 店名獨立大字一行、店家/老闆/收藏分行不擠。(2) 首頁開團卡片（group_card）：縮圖 56→72px、店名從 `truncate`（截斷一行）改 `line-clamp-2`（可換兩行不截）。 |
+| V1.11.2 | **修金額 bug：個人明細 vs 店家明細不符（使用者回報，坑 #20）**。`export_service.generate_order_text`（店家明細）算單項價時 `unit_price + options_total` **漏了 `toppings_total`（加料費）**，而 `generate_payment_text`（個人明細）用 `OrderItem.subtotal` 含加料 → 有人點加料時兩邊金額對不上。修：店家明細補 `+ item.toppings_total`，與 subtotal 算法一致；彙總 key 也補加料（`+珍珠`）避免同品項不同加料被合併後價格被覆蓋。註：export_service 內的 💰🚗👥⚠️ emoji **刻意保留**（純文字匯出給店家貼 LINE 用，非 HTML，不可換 Tabler）。 |
+| V1.11.1 | **匯入 store_id=0 友善指引 + 貼上分頁可選目標店家**。menu-only JSON 的 store_id 是 prompt 佔位值 0，直接貼會「找不到店家編號 0」。改善：(1) 偵測 store_id==0 給明確兩方法指引（回店家頁點匯入／手動改編號）；找不到其他編號時列出現有店家對照表。(2) 貼上分頁加「選填目標店家」下拉（沒從店家頁進來時顯示），選了就覆蓋 JSON 的 store_id，不用手動改 JSON。(3) preview 路由 store_id 參數改 `str` 安全轉 int（下拉「不指定」傳空字串，避免 int 轉換 422）。 |
+| V1.11.0 | **修圖示亂碼 + 放大團單頁 logo（坑 #19）**。(1) 倒數計時等 6 處把 `<i class="ti ...">` 標籤塞進「會被當純文字的位置」（Alpine `x-text`、JS `textContent`、JS `confirm()`、Jinja2 autoescape 的 `{{ }}`），導致畫面顯示原始 HTML 字串亂碼。修法：`x-text` 改「固定圖示 + span」、`textContent`→`innerHTML`、`confirm()` 去掉標籤留純文字、Jinja2 字串陣列改直接寫標籤。涵蓋倒數計時/送單勾勾/收藏星星/排名獎牌/刪除確認。(2) 團單頁 store logo 容器 48→64px、圖 40→56px。(3) 順手把漏網的 `group.category_icon` emoji（model property 🧋🍱🛒）在 group.html / guest_entry.html 的 fallback 換成 Tabler 字串比較版。 |
+| V1.10.2 | **修正 JSON 匯入只能兩種分類的 bug（解坑 #9）**。系統 CategoryType enum 有三種（drink/meal/group_buy）、後台手動新增店家表單也有三種 radio、import_service `CategoryType(...)` 也支援三種，**唯獨 `schemas/store.py` 的 `StoreImport.category` 與 `StoreCreate.category` 寫死 `Literal["drink","meal"]`，把 group_buy 擋在驗證階段** → JSON 匯入團購店一律失敗。修法：兩處 Literal 補上 "group_buy"。prompt 的 category 規範改回三種 + 加判斷準則（團購/預購/宅配/農場直送/箱購→group_buy）+ 補 group_buy 完整範例。三種分類匯入都實測通過。 |
+| V1.10.1 | **匯入 prompt 對齊真實 schema + 完整範例**。重寫 promptNewStore / promptMenu，依實際 Pydantic schema（schemas/menu.py + store.py）逐欄位規範。**修正關鍵錯誤：原 prompt 寫 category 可填 group_buy，但 `StoreImport.category` 是 `Literal["drink","meal"]` 根本不收 group_buy（坑 #9）— 會讓 AI 產出系統拒絕的 JSON**。新 prompt：category 明確只能 drink/meal + 判斷準則、所有 price 純數字「時價」填 0、store 各欄位（logo_url 填 null、sugar/ice/toppings 規則）、item 的 price_l/options 何時填 null、附「drink 完整範例 + meal 範例」兩個可直接用的範例。promptMenu 同樣附完整範例。**三個範例都用真實 schema 驗證過能通過匯入**。 |
 | V1.10.0 | **刪店家改為「軟參照」：斷開連結保留團單**。原本店家有團單就 `raise HTTPException` 擋刪（整頁噴 JSON）。改為：刪店家時把該店所有團單的店名存進新欄位 `groups.store_name`（快照）、`store_id` 與 `menu_id` 設 NULL（斷開），再刪店家 + 菜單。團單與歷史完整保留，只是不再指向店家。Model：`store_id`/`menu_id` 改 nullable + 新增 `store_name` 欄位 + `store_display_name` property（關聯優先、刪除後用快照）。6 個模板 `group.store.name`→`group.store_display_name`、`group.store.logo_url` 加 `group.store and` 防 None。main.py 加 3 條遷移（store_name 欄位 + store_id/menu_id DROP NOT NULL）。刪除用 `db.no_autoflush` 避免 flush 時序撞 NOT NULL。 |
 | V1.9.0 | **Logo 生成 prompt + 店名填空**。(1) 匯入頁新增「生成店家 Logo」獨立區塊（紫色），兩顆複製 prompt 按鈕：`promptLogoRestore`（有原始 logo → 忠實還原 + 去雜訊 + 提升解析度 + 取邊緣底色補滿正方形不留白不裁切）、`promptLogoText`（無 logo → 店名生成北歐極簡文字 logo：#454c8c 底、白字、白色細外框、無襯線細體、正方形，結尾留「店名：」填空）。logo 生成後走現有店家編輯頁上傳流程（prompt 只負責生圖）。(2) 實測發現菜單照片常無店名，`promptNewStore` 結尾補「店名：」填空 + 指示 AI 不要亂猜。 |
 | V1.8.1 | **Hotfix：菜單版本號顯示店內序號（坑 #17）**。原本 menus.html 顯示「版本 #{{ menu.id }}」用的是 Menu 全域自增主鍵 — 新店第一份菜單可能顯示「#29」（全系統第 29 筆），多版本也會跳號（#5/#18/#29）看不出第幾版。改為在 menu_list 路由算「店內版本序號」（最舊=第 1 版，用 `total - idx` 因 created_at desc 排序），template 顯示「第 N 版」。 |
@@ -273,7 +297,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 2. 訂單匯出 Excel — 原本 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
 3. 外送費分攤功能 — `scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
 4. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
-5. 菜單匯入開放 `group_buy` category（解坑 #9）
+5. ~~菜單匯入開放 group_buy category~~（✅ V1.10.2 已解坑 #9）
 6. 評估把 `taipei` filter 抽到共用 templates 模組（解坑 #6，評估重構成本）
 7. 整體視覺巡檢 — (a) emoji 換 Tabler 後檢查圖示大小 / 對齊 / 顏色語義；(b) **V1.6.0 換主色後巡檢**：原本搭配橘色設計的局部（如分類篩選按鈕 amber/green/blue、各種 hardcode 顏色）在藍紫主色下是否協調；admin 統計數字色（橘/紫/綠/藍）是否需重新搭配
 

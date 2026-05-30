@@ -11,7 +11,11 @@
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-16 h-16 object-contain">
                 {% else %}
-                <span class="text-4xl">{{ group.category_icon }}</span>
+                <span class="text-4xl text-gray-400">
+                    {% if group.category and group.category.value == 'drink' %}<i class="ti ti-cup"></i>
+                    {% elif group.category and group.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
+                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
+                </span>
                 {% endif %}
             </div>
             <h1 class="text-xl font-bold text-gray-800">{{ group.name }}</h1>

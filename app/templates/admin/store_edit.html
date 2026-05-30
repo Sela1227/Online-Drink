@@ -216,7 +216,7 @@
                 </button>
             </form>
             <form action="/admin/stores/{{ store.id }}/delete" method="post" class="inline"
-                  onsubmit="return confirm('<i class="ti ti-alert-triangle"></i>️ 確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
+                  onsubmit="return confirm('確定要刪除「{{ store.name }}」嗎？\n\n此操作將同時刪除所有相關的菜單、訂單資料，且無法復原！')">
                 <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium">
                     <i class="ti ti-trash"></i>️ 永久刪除店家
                 </button>

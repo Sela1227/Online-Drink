@@ -58,12 +58,15 @@ def generate_order_text(db: Session, group: Group) -> str:
                 key_parts.append(item.ice)
             for opt in item.selected_options:
                 key_parts.append(opt.option_name)
+            for top in item.selected_toppings:
+                key_parts.append(f"+{top.topping_name}")
             if item.note:
                 key_parts.append(f"備註:{item.note}")
             
             key = " / ".join(key_parts)
             item_summary[key]["quantity"] += item.quantity
-            item_summary[key]["price"] = item.unit_price + item.options_total
+            # 單項價 = 單價 + 選項加價 + 加料加價（與 OrderItem.subtotal 一致，先前漏了加料）
+            item_summary[key]["price"] = item.unit_price + item.options_total + item.toppings_total
     
     # 輸出品項
     total_quantity = 0
