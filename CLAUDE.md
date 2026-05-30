@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.13.0（提高主題色比例：背景淡藍紫 + 頂部 header 染色）
+- **版本：** V1.13.1（主題色換 #710ced 紫）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -258,6 +258,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.13.1 | **主題色換 #710ced（紫）**。使用者覺得 #454c8c 太藍。`sela-*` 色階整組重新生成（以 #710ced 為 500，HSL 267°/90%/49%，固定 hue 調明度生成 50~900）。滾動條 hardcode #8E95CC→#B179F6（新 sela-300）；文字 logo prompt 的 #454c8c→#710ced。 |
 | V1.13.0 | **提高主題色比例（A+B）**。使用者覺得白色太多。(A) `<body>` 背景 `bg-sela-50/30`→`bg-sela-50`（完整淡藍紫，卡片白色浮其上）。(B) 頂部 header 從白底改 `bg-sela-600` 藍紫底：logo 文字 / 齒輪改白、版本號 white/50、開團按鈕改白底藍紫字（在深色 header 上對比足夠）、頭像邊框改 white/60。底部導航維持白底（浮在淡藍紫背景上）。 |
 | V1.12.0 | **團單頁頂部 + 首頁卡片版面重排**。(1) 團單頁頂部：原本縮圖/店名/店家/老闆/收藏/倒數全擠一排。改為「返回 + 倒數」獨立頂行（返回改 `ti-arrow-left` 左置），下方大縮圖（64→80px）+ 店名獨立大字一行、店家/老闆/收藏分行不擠。(2) 首頁開團卡片（group_card）：縮圖 56→72px、店名從 `truncate`（截斷一行）改 `line-clamp-2`（可換兩行不截）。 |
 | V1.11.2 | **修金額 bug：個人明細 vs 店家明細不符（使用者回報，坑 #20）**。`export_service.generate_order_text`（店家明細）算單項價時 `unit_price + options_total` **漏了 `toppings_total`（加料費）**，而 `generate_payment_text`（個人明細）用 `OrderItem.subtotal` 含加料 → 有人點加料時兩邊金額對不上。修：店家明細補 `+ item.toppings_total`，與 subtotal 算法一致；彙總 key 也補加料（`+珍珠`）避免同品項不同加料被合併後價格被覆蓋。註：export_service 內的 💰🚗👥⚠️ emoji **刻意保留**（純文字匯出給店家貼 LINE 用，非 HTML，不可換 Tabler）。 |

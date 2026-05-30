@@ -16,16 +16,16 @@
                 extend: {
                     colors: {
                         sela: {
-                            50: '#F0F1F9',
-                            100: '#DBDDF0',
-                            200: '#B8BCE0',
-                            300: '#8E95CC',
-                            400: '#636BB6',
-                            500: '#454C8C',
-                            600: '#373D77',
-                            700: '#292F60',
-                            800: '#1E2248',
-                            900: '#141734',
+                            50: '#F4ECFD',
+                            100: '#E9D9FC',
+                            200: '#D3B4F9',
+                            300: '#B179F6',
+                            400: '#8A34F4',
+                            500: '#710CED',
+                            600: '#610DC9',
+                            700: '#4F0DA0',
+                            800: '#3D0C79',
+                            900: '#2A0953',
                         }
                     }
                 }
@@ -42,7 +42,7 @@
         /* 北歐風滾動條 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #8E95CC; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #B179F6; border-radius: 4px; }
         
         /* 平滑過渡 */
         * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
@@ -52,7 +52,7 @@
     </style>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V1.13.0' %}
+{% set app_version = 'V1.13.1' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
