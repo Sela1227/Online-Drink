@@ -22,7 +22,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.12.0（團單頁頂部與首頁卡片版面重排：縮圖放大、文字分行）
+- **版本：** V1.13.3（主題色換 #7528d4 低彩度紫）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -220,6 +220,12 @@
     - 修：店家明細補 toppings_total，並把加料納入彙總 key
     - 通用原則：**同一個金額概念只該有一個 single source of truth**。OrderItem.subtotal 已是權威算法，匯出 / 統計 / 顯示都應呼叫它，而非各自重算。各自重算遲早因為新增欄位（如後加的 toppings）而不同步。未來若再有金額計算，先找有沒有現成 property 可用
 
+21. **用 HSL 重組生成色階會讓主色偏色**（V1.13.2 修正）
+    - 症狀：使用者指定主色 #710ced，但實際生成的 500 階是 #662ab0（偏暗偏濁），色票一比就看出落差
+    - 原因：生成色階時用 colorsys 把指定色拆成 HSL，只保留 hue，明度/飽和度用自訂的 scale_config 數值重算 500 階 → 等於「重新調過」使用者的顏色，而非直接用
+    - 修法：**500 階（主色）必須是使用者指定的 hex 原值，不經任何轉換**。其餘深淺階用「原色 ↔ 白 / 黑 線性混合」（`mix(target, white, t)` / `mix(target, black, t)`）生成，這樣同色相、只變明暗，不會偏色
+    - 通用原則：換主題色時，使用者給的那個 hex 必須在成品裡一字不差地出現（500 階）。要驗證就 grep `500: '#XXXXXX'` 確認 == 指定值。淡濃階可以算，主色不能算
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -258,6 +264,11 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.13.4 | **Hotfix：Excel 匯出爆 500 + 訂單牆爆 500**。(1) `excel_service.py` 用了 OrderItem 不存在的 `item.toppings`（應為關聯 `selected_toppings`）和 `item.price`（應為 `subtotal`）→ `AttributeError`。修：規格組合改用 `selected_options`/`selected_toppings`、小計改 `item.subtotal`（與個人/店家明細一致含加料）；表頭橘 F97316→紫 7528D4；store.name 防 None。(2) `orders.py` 的 `order_wall` 路由沒傳 `group`/`is_open`，但 order_wall.html 第 8 行用到 → `UndefinedError: 'group' is undefined`。修：路由補查 group 並傳入 group + is_open。兩者端到端測試通過。 |
+| V1.13.3 | **主題色換 #7528d4（低彩度紫）**。沿用坑 #21 正解：500 階直接用 #7528d4 原值，其他階原色往白/黑線性混合。滾動條→sela-300、logo prompt 主色同步更新。 |
+| V1.13.2 | **Hotfix：色階生成偏色（坑 #21）**。V1.13.1 用 HSL 拆解再重組生成色階，只保留 hue、明度飽和度自訂 → 500 階算成 #662ab0（偏暗偏濁），與指定的 #710ced 有明顯落差。改法：**500 階直接寫死 #710ced 原色不經任何轉換**，其他階用「原色往白混（淡階）/往黑混（深階）」線性生成，色相零偏移。 |
+| V1.13.1 | **主題色換 #710ced（紫）**。使用者覺得 #454c8c 太藍。`sela-*` 色階整組重新生成（以 #710ced 為 500，HSL 267°/90%/49%，固定 hue 調明度生成 50~900）。滾動條 hardcode #8E95CC→#B179F6（新 sela-300）；文字 logo prompt 的 #454c8c→#710ced。 |
+| V1.13.0 | **提高主題色比例（A+B）**。使用者覺得白色太多。(A) `<body>` 背景 `bg-sela-50/30`→`bg-sela-50`（完整淡藍紫，卡片白色浮其上）。(B) 頂部 header 從白底改 `bg-sela-600` 藍紫底：logo 文字 / 齒輪改白、版本號 white/50、開團按鈕改白底藍紫字（在深色 header 上對比足夠）、頭像邊框改 white/60。底部導航維持白底（浮在淡藍紫背景上）。 |
 | V1.12.0 | **團單頁頂部 + 首頁卡片版面重排**。(1) 團單頁頂部：原本縮圖/店名/店家/老闆/收藏/倒數全擠一排。改為「返回 + 倒數」獨立頂行（返回改 `ti-arrow-left` 左置），下方大縮圖（64→80px）+ 店名獨立大字一行、店家/老闆/收藏分行不擠。(2) 首頁開團卡片（group_card）：縮圖 56→72px、店名從 `truncate`（截斷一行）改 `line-clamp-2`（可換兩行不截）。 |
 | V1.11.2 | **修金額 bug：個人明細 vs 店家明細不符（使用者回報，坑 #20）**。`export_service.generate_order_text`（店家明細）算單項價時 `unit_price + options_total` **漏了 `toppings_total`（加料費）**，而 `generate_payment_text`（個人明細）用 `OrderItem.subtotal` 含加料 → 有人點加料時兩邊金額對不上。修：店家明細補 `+ item.toppings_total`，與 subtotal 算法一致；彙總 key 也補加料（`+珍珠`）避免同品項不同加料被合併後價格被覆蓋。註：export_service 內的 💰🚗👥⚠️ emoji **刻意保留**（純文字匯出給店家貼 LINE 用，非 HTML，不可換 Tabler）。 |
 | V1.11.1 | **匯入 store_id=0 友善指引 + 貼上分頁可選目標店家**。menu-only JSON 的 store_id 是 prompt 佔位值 0，直接貼會「找不到店家編號 0」。改善：(1) 偵測 store_id==0 給明確兩方法指引（回店家頁點匯入／手動改編號）；找不到其他編號時列出現有店家對照表。(2) 貼上分頁加「選填目標店家」下拉（沒從店家頁進來時顯示），選了就覆蓋 JSON 的 store_id，不用手動改 JSON。(3) preview 路由 store_id 參數改 `str` 安全轉 int（下拉「不指定」傳空字串，避免 int 轉換 422）。 |

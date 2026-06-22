@@ -13,7 +13,7 @@ def export_orders_to_excel(group, orders) -> BytesIO:
     
     # 樣式
     header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="F97316", end_color="F97316", fill_type="solid")
+    header_fill = PatternFill(start_color="7528D4", end_color="7528D4", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
         left=Side(style='thin'),
@@ -28,7 +28,8 @@ def export_orders_to_excel(group, orders) -> BytesIO:
     ws['A1'].font = Font(bold=True, size=14)
     
     ws.merge_cells('A2:F2')
-    ws['A2'] = f"店家：{group.store.name} | 截止：{group.deadline.strftime('%Y/%m/%d %H:%M')}"
+    store_name = group.store.name if group.store else (group.store_name or "（店家已移除）")
+    ws['A2'] = f"店家：{store_name} | 截止：{group.deadline.strftime('%Y/%m/%d %H:%M')}"
     ws['A2'].font = Font(size=10, color="666666")
     
     # 表頭
@@ -53,7 +54,7 @@ def export_orders_to_excel(group, orders) -> BytesIO:
             ws.cell(row=row, column=2, value=item.item_name).border = thin_border
             ws.cell(row=row, column=3, value=item.quantity).border = thin_border
             
-            # 規格
+            # 規格（size/sugar/ice 是欄位，選項與加料是關聯物件）
             specs = []
             if item.size:
                 specs.append(item.size)
@@ -61,13 +62,16 @@ def export_orders_to_excel(group, orders) -> BytesIO:
                 specs.append(item.sugar)
             if item.ice:
                 specs.append(item.ice)
-            if item.toppings:
-                specs.append(item.toppings)
+            for opt in item.selected_options:
+                specs.append(opt.option_name)
+            for top in item.selected_toppings:
+                specs.append(f"+{top.topping_name}")
             ws.cell(row=row, column=4, value=" / ".join(specs) if specs else "-").border = thin_border
             
             ws.cell(row=row, column=5, value=item.note or "-").border = thin_border
             
-            subtotal = float(item.price) * item.quantity
+            # 小計用 OrderItem.subtotal（已含單價+選項+加料+數量），與個人/店家明細一致
+            subtotal = float(item.subtotal)
             ws.cell(row=row, column=6, value=subtotal).border = thin_border
             ws.cell(row=row, column=6).number_format = '$#,##0'
             

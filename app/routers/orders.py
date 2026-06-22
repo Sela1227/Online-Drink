@@ -52,7 +52,11 @@ def get_or_create_order(db: Session, group_id: int, user_id: int) -> Order:
 async def order_wall(group_id: int, request: Request, db: Session = Depends(get_db)):
     """訂單牆片段（HTMX）"""
     user = await get_current_user(request, db)
-    
+
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+
     submitted_orders = db.query(Order).filter(
         Order.group_id == group_id,
         Order.status == OrderStatus.SUBMITTED,
@@ -60,11 +64,16 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
         joinedload(Order.user),
         joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).all()
-    
+
+    from datetime import datetime
+    is_open = group.deadline > datetime.utcnow() if group.deadline else True
+
     return templates.TemplateResponse("partials/order_wall.html", {
         "request": request,
         "submitted_orders": submitted_orders,
         "group_id": group_id,
+        "group": group,
+        "is_open": is_open,
     })
 
 

@@ -16,16 +16,16 @@
                 extend: {
                     colors: {
                         sela: {
-                            50: '#F0F1F9',
-                            100: '#DBDDF0',
-                            200: '#B8BCE0',
-                            300: '#8E95CC',
-                            400: '#636BB6',
-                            500: '#454C8C',
-                            600: '#373D77',
-                            700: '#292F60',
-                            800: '#1E2248',
-                            900: '#141734',
+                            50: '#F4EEFC',
+                            100: '#E9DDF8',
+                            200: '#D3BAF1',
+                            300: '#B78FE9',
+                            400: '#965CDE',
+                            500: '#7528D4',
+                            600: '#6222B2',
+                            700: '#4D1A8C',
+                            800: '#3A146A',
+                            900: '#280E48',
                         }
                     }
                 }
@@ -42,7 +42,7 @@
         /* 北歐風滾動條 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #8E95CC; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #B78FE9; border-radius: 4px; }
         
         /* 平滑過渡 */
         * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
@@ -51,8 +51,8 @@
         body { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
-<body class="bg-sela-50/30 min-h-screen antialiased">
-{% set app_version = 'V1.12.0' %}
+<body class="bg-sela-50 min-h-screen antialiased">
+{% set app_version = 'V1.13.4' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
@@ -63,13 +63,13 @@
     </script>
     
     <!-- Header - 簡潔北歐風 -->
-    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-40 border-b border-sela-100">
+    <header class="bg-sela-600 sticky top-0 z-40 shadow-sm">
         <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
             <!-- Logo -->
             <a href="/home" class="flex items-center gap-2">
                 <img src="/static/images/sela-logo.jpg" alt="SELA" class="h-9 w-9 rounded-lg">
-                <span class="font-bold text-sela-600 text-lg tracking-tight">快點來點餐</span>
-                <span class="text-[10px] text-gray-400 font-mono leading-none">{{ app_version }}</span>
+                <span class="font-bold text-white text-lg tracking-tight">快點來點餐</span>
+                <span class="text-[10px] text-white/50 font-mono leading-none">{{ app_version }}</span>
             </a>
             
             <!-- 右側操作 -->
@@ -77,23 +77,23 @@
                 {% if user %}
                 <!-- 管理（管理員限定） -->
                 {% if user.is_admin %}
-                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-sela-50 transition-colors">
+                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/15 transition-colors">
                     <i class="ti ti-settings" style="font-size: 20px;" aria-hidden="true"></i>
                 </a>
                 {% endif %}
                 
                 <!-- 開團按鈕 -->
                 <a href="/groups/new" 
-                   class="h-9 px-4 bg-sela-500 hover:bg-sela-600 text-white text-sm font-medium rounded-full flex items-center gap-1 transition-colors shadow-sm">
+                   class="h-9 px-4 bg-white hover:bg-sela-50 text-sela-600 text-sm font-medium rounded-full flex items-center gap-1 transition-colors shadow-sm">
                     <span class="text-base">+</span> 開團
                 </a>
                 
                 <!-- 個人頭像 -->
-                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-sela-200 hover:border-sela-400 transition-colors">
+                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-white/60 hover:border-white transition-colors">
                     {% if user.picture_url %}
                     <img src="{{ user.picture_url }}" class="w-full h-full object-cover">
                     {% else %}
-                    <div class="w-full h-full bg-sela-100 flex items-center justify-center text-sela-500 text-sm font-bold">
+                    <div class="w-full h-full bg-white flex items-center justify-center text-sela-600 text-sm font-bold">
                         {{ user.show_name[:1] }}
                     </div>
                     {% endif %}
