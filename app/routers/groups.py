@@ -796,6 +796,66 @@ async def export_excel(request: Request, group_id: int, db: Session = Depends(ge
     )
 
 
+@router.get("/{group_id}/export/receipt.pdf")
+async def export_receipt_pdf(request: Request, group_id: int, db: Session = Depends(get_db)):
+    """匯出訂單核對單 PDF（給團主跟店家核對）"""
+    user = await get_current_user(request, db)
+
+    group = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.orders).joinedload(Order.user),
+        joinedload(Group.orders).joinedload(Order.items),
+    ).filter(Group.id == group_id).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以匯出")
+
+    from app.services.receipt_service import generate_receipt_pdf
+    pdf_file = generate_receipt_pdf(db, group)
+
+    filename = f"{group.name}_核對單_{group.deadline.strftime('%Y%m%d')}.pdf"
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        pdf_file,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+    )
+
+
+@router.get("/{group_id}/export/receipt.png")
+async def export_receipt_png(request: Request, group_id: int, db: Session = Depends(get_db)):
+    """匯出訂單核對單 PNG（方便貼 LINE 給店家）"""
+    user = await get_current_user(request, db)
+
+    group = db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.orders).joinedload(Order.user),
+        joinedload(Group.orders).joinedload(Order.items),
+    ).filter(Group.id == group_id).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以匯出")
+
+    from app.services.receipt_service import generate_receipt_png
+    png_file = generate_receipt_png(db, group)
+
+    filename = f"{group.name}_核對單_{group.deadline.strftime('%Y%m%d')}.png"
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        png_file,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+    )
+
+
 # ============ 訪客模式 ============
 
 @router.post("/{group_id}/guest-link")

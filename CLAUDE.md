@@ -264,6 +264,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.14.0 | **新功能：訂單核對單匯出（PDF + PNG，含店家 logo）**。給團主跟店家核對用。新 service `receipt_service.py`：上半「店家總項」（彙總相同品項，店家照此製作）、下半「每人明細」（團主對帳）、頂部店家 logo + 店名 + 截止時間。技術選型路線 B（伺服器生檔，部署穩）：**PDF 用 reportlab 內建 CID 中文字型 `STSong-Light`（零外部字型檔，避免打包肥大 TTF 或在 Docker 裝字型）**；PNG 用 pypdfium2 將 PDF render 成 2.5x 高解析圖（同源、貼 LINE 清晰）。彙總邏輯複用 export_service 規則（含加料、與 OrderItem.subtotal 一致）。logo 下載後用 Pillow 縮圖到 200px 再嵌入（避免 1.4MB 肥檔 → 降到 62KB）；logo 下載失敗 try/except fallback（不因 Cloudinary 抽風而 500）。團單頁加「核對單PDF / 核對單圖」兩連結（團主/管理員限定）。requirements 加 reportlab==4.4.10、pypdfium2==5.6.0。邊界測試：有logo/壞網址/店家已刪三情境全過。 |
 | V1.13.4 | **Hotfix：Excel 匯出爆 500 + 訂單牆爆 500**。(1) `excel_service.py` 用了 OrderItem 不存在的 `item.toppings`（應為關聯 `selected_toppings`）和 `item.price`（應為 `subtotal`）→ `AttributeError`。修：規格組合改用 `selected_options`/`selected_toppings`、小計改 `item.subtotal`（與個人/店家明細一致含加料）；表頭橘 F97316→紫 7528D4；store.name 防 None。(2) `orders.py` 的 `order_wall` 路由沒傳 `group`/`is_open`，但 order_wall.html 第 8 行用到 → `UndefinedError: 'group' is undefined`。修：路由補查 group 並傳入 group + is_open。兩者端到端測試通過。 |
 | V1.13.3 | **主題色換 #7528d4（低彩度紫）**。沿用坑 #21 正解：500 階直接用 #7528d4 原值，其他階原色往白/黑線性混合。滾動條→sela-300、logo prompt 主色同步更新。 |
 | V1.13.2 | **Hotfix：色階生成偏色（坑 #21）**。V1.13.1 用 HSL 拆解再重組生成色階，只保留 hue、明度飽和度自訂 → 500 階算成 #662ab0（偏暗偏濁），與指定的 #710ced 有明顯落差。改法：**500 階直接寫死 #710ced 原色不經任何轉換**，其他階用「原色往白混（淡階）/往黑混（深階）」線性生成，色相零偏移。 |
