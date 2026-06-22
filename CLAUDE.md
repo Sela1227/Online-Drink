@@ -1,7 +1,7 @@
 # CLAUDE.md — SELA 快點來點餐（線上訂餐）
 
 > **⚠ 給同時拿到 SELA-Starter-Kit 的 Claude：**
-> 這是**已對齊 Kit V1.9.0 的成熟線上專案**（30 人團隊每日使用），不是新專案。
+> 這是**已對齊 Kit V1.18.0 的成熟線上專案**（30 人團隊每日使用），不是新專案。
 >
 > 衝突仲裁規則：
 > 1. **以本專案 CLAUDE.md 為主、Kit 為輔**
@@ -9,9 +9,12 @@
 >    - **不使用 Alembic**（Kit `tech-stack-lessons.md` 1.1 建議第一天就 `alembic init`） — 本專案已用「SQLAlchemy `create_all` + 手動 raw SQL 遷移 + `ADD COLUMN IF NOT EXISTS` 模式」運作超過一年，30 人線上穩定。改用 Alembic = 風險大於收益，且過去引入 Alembic 造成過部署失敗（坑 #1）。
 >    - **PostgreSQL Enum 值固定大寫**（坑 #2 持續警戒）
 >    - **logo 同時用兩套**：`app/static/images/sela-logo.jpg|svg`（4 個現有模板沿用中）與 `app/static/sela.svg` + `favicon/` 套組（Kit 標準，V1.1.0 已串接到 base.html `<head>`）。既有引用不動。
+>    - **打包嵌入式中文字型** `app/static/fonts/cjk-font.ttf`（6MB，V1.14.1）— 核對單 PDF/PNG 需要嵌入字型才能 render 出中文，reportlab 內建 CID 字型不嵌入會導致 PNG 空白。這是必要資產，不是可移除的肥檔。
 > 3. **不要為對齊 Kit 而動既有設計** — 已驗證的就是事實標準
 > 4. 版號規則照 Kit（部署版無後綴、備份版 -source）
 > 5. **下次完成版本時記得評估 SELA-handoff.md**（鐵律 #0 — 完整見 Kit master CLAUDE.md）
+> 6. **優化體檢（對齊 Kit V1.18.0 時做）**：對照 `optimizations.md` 4 條 OPT，本專案無中招值得改項 — OPT-1（threading.Timer 排程）不適用（自動催單是前端提示+手動催單，非後端定時任務）；OPT-2/3/4（種子 JSON、outbox、自我驗證迴圈）情境不符。體檢通過，無需改 code。
+> 7. **對齊歷程**：V1.0.0 首次對齊 Kit V1.9.0；V1.16.0 對齊升級至 Kit V1.18.0（更新此區塊 + 補回漏更新的開頭版本號 V1.13.3→V1.16.0 + 優化體檢 + app logo）。
 
 > **這份文件是給下次 Claude 看的工作上下文，不是文件。**
 > 判斷標準：下次 Claude 讀完，能不能直接動手？
@@ -22,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.13.3（主題色換 #7528d4 低彩度紫）
+- **版本：** V1.17.0（對齊 Kit V1.18.0：優化體檢 + app logo prompt + 修版本號疏漏）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -264,6 +267,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.17.0 | **對齊 SELA-Starter-Kit V1.18.0**（從 V1.9.0 升級對齊）。🔴 更新衝突仲裁區塊 Kit 版本；🔴 修正 §〇 當前狀態版本號 V1.13.3→V1.16.0（V1.13.4 起用 git clone 改版漏更新開頭，補回）；🟡 優化體檢（Kit V1.17.0 鐵律）對照 optimizations.md 4 條 OPT 無中招值得改項，通過；🟡 app logo（Kit V1.13.0 雙軌）SELA 同意做專屬 logo，依 §17 產出 `SELA-logo-prompt.md`（範本 A、背景色 #653985、待 SELA 生圖後走 §10.2 轉檔）；更新 SELA-handoff.md 加 V1.16.0 對齊升級增補段 + 2 條 Kit 回流發現。零業務邏輯變更。 |
 | V1.16.0 | **主題色換 #653985（北歐低彩度紫）**。沿用坑 #21 正解：500 階直接 #653985 原值。北歐低彩度做法：淡階往「帶紫灰的暖白 #F5F4F6」混（非純白，保留灰調、彩度壓到 17-24%）、深階往「帶紫的暖黑 #1A1620」混，整體沉穩不鮮豔。**全站同步**：base.html 色階 + 滾動條、admin/import.html 的 logo prompt 主色、excel_service 表頭色（7528D4→653985）、receipt_service 主題色 THEME/THEME_LIGHT/ZEBRA 都換。grep 確認無殘留舊主色 hex。 |
 | V1.15.0 | **團單頁 UI 優化：按鈕區重整 + 購物車不被遮**。(1) 底部操作按鈕原本 10 個擠一排、文字直排凌亂（加核對單後更擠）。重新設計：主動作（複製連結/QR/存模板/匯出單據）改 4 欄網格、圖示在上文字在下；團主管理動作（催單/修改/提早結單）改膠囊按鈕橫排；5 個匯出（核對單PDF/圖、店家/個人明細、Excel）收進「匯出單據」展開區（Alpine showExport，分「給店家核對」與「其他格式」兩組）。(2) 購物車浮動按鈕 `bottom-4`→`bottom-20`，避開底部導航列遮擋。(3) 分類捲動間距 `scroll-mt-28`→`scroll-mt-32`，避免品項標題被 sticky 分類標籤蓋住。 |
 | V1.14.1 | **Hotfix：核對單 PNG 中文空白 + 改斑馬紋（坑 #22）**。(1) **PNG 完全沒中文**：reportlab 內建 CID 字型 STSong-Light 只「引用」不「嵌入」PDF，pypdfium2 render 時找不到字型 → 中文變空白（PDF 在有該字型的電腦看正常，但 render 圖就缺字）。修：改用**嵌入式 TrueType 字型**（打包 `app/static/fonts/cjk-font.ttf` 進專案，6MB），嵌入後 render PNG 中文正常。(2) 店家總項原本畫分隔細線會錯位產生「奇怪的線」，改成**斑馬紋**（隔行淺紫底 #F7F4FB）對齊更清楚。 |
