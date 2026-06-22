@@ -19,7 +19,9 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
+
+import os
 
 from app.models.group import Group
 from app.models.order import Order, OrderStatus
@@ -29,15 +31,17 @@ THEME = colors.HexColor("#7528D4")
 THEME_LIGHT = colors.HexColor("#F4EEFC")
 GRAY = colors.HexColor("#666666")
 LIGHT_GRAY = colors.HexColor("#999999")
+ZEBRA = colors.HexColor("#F7F4FB")  # 斑馬紋淺色列
 
-_FONT = "STSong-Light"
+_FONT = "CJKFont"
+_FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "static", "fonts", "cjk-font.ttf")
 _font_registered = False
 
 
 def _ensure_font():
     global _font_registered
     if not _font_registered:
-        pdfmetrics.registerFont(UnicodeCIDFont(_FONT))
+        pdfmetrics.registerFont(TTFont(_FONT, _FONT_PATH))
         _font_registered = True
 
 
@@ -170,6 +174,7 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
     y -= 8 * mm
 
     c.setFont(_FONT, 10)
+    row_idx = 0
     for key, info in data["summary"]:
         if y < 40 * mm:
             c.showPage()
@@ -177,19 +182,20 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             y = H - margin
         qty = info["quantity"]
         line_total = qty * info["unit"]
+        row_h = 7 * mm
+        # 斑馬紋：奇數列淺底
+        if row_idx % 2 == 1:
+            c.setFillColor(ZEBRA)
+            c.rect(x, y - 2 * mm, W - 2 * margin, row_h, fill=1, stroke=0)
         c.setFillColor(colors.black)
-        # 品項名（過長截斷）
         name = key if len(key) <= 32 else key[:31] + "…"
         c.drawString(x + 2 * mm, y, name)
         c.setFillColor(THEME)
         c.drawRightString(W - margin - 22 * mm, y, f"×{qty}")
         c.setFillColor(GRAY)
         c.drawRightString(W - margin - 2 * mm, y, f"${int(line_total)}")
-        y -= 6 * mm
-        # 分隔細線
-        c.setStrokeColor(colors.HexColor("#EEEEEE"))
-        c.setLineWidth(0.3)
-        c.line(x, y + 2 * mm, W - margin, y + 2 * mm)
+        y -= row_h
+        row_idx += 1
 
     # 總計列
     y -= 2 * mm
