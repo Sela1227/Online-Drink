@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.18.1（折扣改為店家優惠：店家總項也折後）
+- **版本：** V1.18.2（hotfix：折扣路由 404，路徑缺 /groups）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -267,6 +267,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.18.2 | **Hotfix：折扣送出 404 跳黑頁**。V1.18.0 把折扣路由加在 `orders_extra.py`，但該 router 掛載方式與表單 URL 對不上，且表單寫 `/{group_id}/orders/{order_id}/discount` 缺 `/groups` 前綴 → POST 404 Not Found。修：路由移到 `groups.py`（與 copy-last 同檔，groups.router 在 main.py 以 `prefix="/groups"` 註冊，自動補前綴）、改用 groups.py 慣例的 `await get_current_user(request, db)`；表單 action 改 `/groups/{group_id}/orders/{order_id}/discount`。教訓：加路由前先確認該 router 的 mount prefix，表單 URL 要跟「prefix + 路由 path」完整對齊。 |
 | V1.18.1 | **折扣修正為「店家優惠」：店家總項也跟著減**。V1.18.0 原假設「折扣是團主自行吸收」→ 店家總項顯示原價。使用者指正：絕大部分是**店家給的優惠**，店家實收也該折後。修正：核對單店家總項總計改顯示「原價小計 / 店家優惠 -$X / 實收」三行（無折扣時維持單行「總計」）；店家明細純文字（generate_order_text）總額同樣加「原價/店家優惠/實收」。`_collect` 加 items_total（折前）+ total_discount（總優惠）+ total_amount（實收=折後）。**三方一致達成**：店家實收 = 團體總額 = 每人加總（端到端測 268 原價、優惠 10、三方都 258）。Excel 合計 V1.18.0 已扣折扣不需再改。教訓：折扣語意要先問清楚「誰買單」（店家優惠 vs 團主吸收），影響店家總項算不算。 |
 | V1.18.0 | **新功能：團主手動按人折扣**。需求源於「搭主餐折10元」這類優惠。不做自動判斷（規則難猜易算錯），改團主/管理員手動對每個人的訂單填「折扣金額 + 說明」。**單一真相設計**：Order 加 `discount_amount`/`discount_note` 欄位，`total_amount` property 改為「品項原價總和 - 折扣」（>0 保護），所有用 order.total_amount 的地方（訂單牆、團體總額 group.total_amount、個人明細、核對單、Excel）**自動連動**。**重要概念區分**：折扣只影響「每人應付」與「團體應收」，**不影響核對單的「店家總項」總額**（店家做的餐沒少，原價結算；折扣是團主跟成員間的事）。UI：order_wall.html 加團主折扣表單（數字+說明，Alpine 展開）；折扣顯示用紅字區隔。路由 `POST /{group_id}/orders/{order_id}/discount`（團主/管理員限定、折扣不超過原價）。各匯出（核對單紅字折扣行、個人明細折扣行、Excel 折扣列扣合計）全部顯示折扣。main.py 加 2 欄遷移。 |
 | V1.17.3 | **核對單每人明細色塊留白修勻**。原色塊高度計算與文字繪製位置對不齊，導致上下留白不對稱（有的緊貼姓名、有的鬆）、外框框太緊。重寫成乾淨 padding 模型：定義明確常數（上內距 5mm／姓名 6mm／品項 5mm／下內距 4mm／人間外距 3mm），色塊高度 = 上下內距 + 內容、文字從色塊頂依序往下排。每個人色塊留白一致、外框留足。 |

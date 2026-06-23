@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 import qrcode
 import io
@@ -605,6 +606,49 @@ async def copy_last_order(group_id: int, request: Request, db: Session = Depends
     
     db.commit()
     
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
+@router.post("/{group_id}/orders/{order_id}/discount")
+async def set_order_discount(
+    group_id: int,
+    order_id: int,
+    request: Request,
+    discount_amount: str = Form(""),
+    discount_note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """團主/管理員對某人訂單設定折扣（店家優惠，連動所有金額處）"""
+    user = await get_current_user(request, db)
+
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    # 權限：只有團主或管理員
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以調整折扣")
+
+    order = db.query(Order).filter(Order.id == order_id, Order.group_id == group_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="訂單不存在")
+
+    # 解析折扣金額（空字串或 0 = 取消折扣）
+    amt = Decimal("0")
+    if discount_amount and discount_amount.strip():
+        try:
+            amt = Decimal(discount_amount.strip())
+        except (InvalidOperation, ValueError):
+            raise HTTPException(status_code=400, detail="折扣金額必須是數字")
+    if amt < 0:
+        amt = Decimal("0")
+    # 折扣不可超過原價
+    if amt > order.items_subtotal:
+        amt = order.items_subtotal
+
+    order.discount_amount = amt
+    order.discount_note = (discount_note.strip()[:100] or None) if amt > 0 else None
+    db.commit()
+
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
 
 

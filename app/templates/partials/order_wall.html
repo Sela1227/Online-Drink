@@ -80,7 +80,7 @@
                         <i class="ti ti-discount-2"></i> {% if order.discount_amount and order.discount_amount > 0 %}修改折扣{% else %}加折扣{% endif %}
                     </button>
                     <form x-show="open" x-transition method="post"
-                          action="/{{ group.id }}/orders/{{ order.id }}/discount"
+                          action="/groups/{{ group.id }}/orders/{{ order.id }}/discount"
                           class="mt-2 p-2 bg-sela-50 rounded-lg flex flex-wrap items-center gap-2">
                         <span class="text-xs text-gray-500">折</span>
                         <input type="number" name="discount_amount" min="0" step="1"
