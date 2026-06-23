@@ -31,7 +31,7 @@ THEME = colors.HexColor("#653985")
 THEME_LIGHT = colors.HexColor("#EBE7EE")
 GRAY = colors.HexColor("#666666")
 LIGHT_GRAY = colors.HexColor("#999999")
-ZEBRA = colors.HexColor("#F2EEF5")  # 斑馬紋淺色列
+ZEBRA = colors.HexColor("#ECE5F2")  # 一人一色區底色（比原 F2EEF5 略深，核對更清楚）
 
 _FONT = "CJKFont"
 _FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "static", "fonts", "cjk-font.ttf")
@@ -118,7 +118,7 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
     y = H - margin
 
     # ===== 頂部標題列（主題色底）=====
-    header_h = 22 * mm
+    header_h = 36 * mm
     c.setFillColor(THEME)
     c.rect(0, H - header_h, W, header_h, fill=1, stroke=0)
 
@@ -129,31 +129,31 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             import urllib.request
             with urllib.request.urlopen(group.store.logo_url, timeout=5) as resp:
                 logo_data = resp.read()
-            # 縮圖避免大圖塞進 PDF（最長邊 200px）
+            # 縮圖避免大圖塞進 PDF（最長邊 400px，logo 放大後解析度要夠）
             from PIL import Image
             pil_logo = Image.open(BytesIO(logo_data)).convert("RGBA")
-            pil_logo.thumbnail((200, 200))
+            pil_logo.thumbnail((400, 400))
             logo_buf = BytesIO()
             pil_logo.save(logo_buf, format="PNG")
             logo_buf.seek(0)
             from reportlab.lib.utils import ImageReader
             logo_img = ImageReader(logo_buf)
-            logo_size = 14 * mm
+            logo_size = 30 * mm
             c.setFillColor(colors.white)
             c.roundRect(margin, H - header_h + (header_h - logo_size) / 2,
-                        logo_size, logo_size, 2 * mm, fill=1, stroke=0)
-            c.drawImage(logo_img, margin + 1 * mm, H - header_h + (header_h - logo_size) / 2 + 1 * mm,
-                        logo_size - 2 * mm, logo_size - 2 * mm, preserveAspectRatio=True, mask='auto')
+                        logo_size, logo_size, 3 * mm, fill=1, stroke=0)
+            c.drawImage(logo_img, margin + 2 * mm, H - header_h + (header_h - logo_size) / 2 + 2 * mm,
+                        logo_size - 4 * mm, logo_size - 4 * mm, preserveAspectRatio=True, mask='auto')
             logo_drawn = True
         except Exception:
             logo_drawn = False
 
-    text_x = margin + (18 * mm if logo_drawn else 0)
+    text_x = margin + (36 * mm if logo_drawn else 0)
     c.setFillColor(colors.white)
-    c.setFont(_FONT, 16)
-    c.drawString(text_x, H - 12 * mm, _store_display_name(group))
+    c.setFont(_FONT, 18)
+    c.drawString(text_x, H - 16 * mm, _store_display_name(group))
     c.setFont(_FONT, 10)
-    c.drawString(text_x, H - 18 * mm, f"訂單核對單　{group.deadline.strftime('%Y/%m/%d %H:%M')} 截止")
+    c.drawString(text_x, H - 23 * mm, f"訂單核對單　{group.deadline.strftime('%Y/%m/%d %H:%M')} 截止")
 
     y = H - header_h - 10 * mm
 
@@ -219,11 +219,24 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
     y -= 8 * mm
 
     c.setFont(_FONT, 10)
+    person_idx = 0
     for person in data["people"]:
-        if y < 30 * mm:
+        # 先算這個人區塊需要的高度（姓名列 + 各品項列 + 上下內距）
+        name_h = 7 * mm
+        items_h = len(person["items"]) * 5 * mm
+        block_h = name_h + items_h + 2 * mm
+        # 換頁判斷（整塊放不下就換頁）
+        if y - block_h < 18 * mm:
             c.showPage()
             _ensure_font()
             y = H - margin
+
+        block_top = y + 4 * mm  # 區塊頂緣（姓名列上方留白）
+        # 一人一色區塊：隔人交替底色（先畫底，內容畫在上面）
+        if person_idx % 2 == 1:
+            c.setFillColor(ZEBRA)
+            c.rect(x - 3 * mm, block_top - block_h, W - 2 * margin + 6 * mm, block_h, fill=1, stroke=0)
+
         # 姓名 + 金額
         c.setFillColor(colors.black)
         c.setFont(_FONT, 11)
@@ -233,12 +246,8 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
         y -= 6 * mm
         # 品項
         c.setFont(_FONT, 9)
-        c.setFillColor(GRAY)
         for it in person["items"]:
-            if y < 20 * mm:
-                c.showPage()
-                _ensure_font()
-                y = H - margin
+            c.setFillColor(GRAY)
             desc = it["desc"]
             if len(desc) > 36:
                 desc = desc[:35] + "…"
@@ -246,7 +255,8 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             c.drawString(x + 5 * mm, y, f"{desc}{qty_str}")
             c.drawRightString(W - margin - 2 * mm, y, f"${int(it['subtotal'])}")
             y -= 5 * mm
-        y -= 3 * mm
+        y -= 4 * mm
+        person_idx += 1
 
     # 頁尾
     c.setFillColor(LIGHT_GRAY)
