@@ -118,7 +118,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     
     store_count = db.query(Store).count()
     group_count = db.query(Group).count()
-    user_count = db.query(User).count()
+    user_count = db.query(User).filter(User.is_guest == False).count()
     
     # 計算在線人數
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -634,7 +634,7 @@ async def user_list(request: Request, db: Session = Depends(get_db)):
     from app.models.user import User, SystemSetting
     from datetime import datetime, timedelta
     
-    users = db.query(User).order_by(User.created_at.desc()).all()
+    users = db.query(User).filter(User.is_guest == False).order_by(User.created_at.desc()).all()
     
     # 計算在線人數（30分鐘內有活動）
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -684,8 +684,8 @@ async def users_duplicates(request: Request, db: Session = Depends(get_db)):
     from app.models.order import Order
     from collections import defaultdict
 
-    all_users = db.query(User).all()
-    # 依 show_name 分組
+    all_users = db.query(User).filter(User.is_guest == False).all()
+    # 依 show_name 分組（排除訪客帳號）
     by_name = defaultdict(list)
     for u in all_users:
         by_name[u.show_name].append(u)
@@ -1097,6 +1097,7 @@ async def department_detail(request: Request, dept_id: int, db: Session = Depend
     # 取得尚未加入此部門的用戶
     member_ids = [m.user_id for m in members]
     available_users = db.query(User).filter(
+        User.is_guest == False,
         ~User.id.in_(member_ids) if member_ids else True
     ).order_by(User.display_name).all()
     
