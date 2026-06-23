@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.19.1（找到重複根因：訪客帳號污染，隔離之）
+- **版本：** V1.19.2（關閉訪客功能，只用 LINE 登入）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -267,6 +267,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.19.2 | **關閉訪客功能（只用 LINE 登入）**。承 V1.19.1：訪客功能是空殼帳號的來源，且本系統只需 LINE 登入（使用者表示忘了當初有開訪客）。關閉：(1) 移除 group.html「產生訪客連結」前端區塊（團主無入口）。(2) 後端 3 個訪客路由（`/guest-link` POST、`/guest` GET、`/guest` POST）加 `GUEST_MODE_ENABLED = False` 開關，全部回 410「訪客功能已停用」—— 防舊訪客連結被點到時建新帳號（最關鍵是 POST /guest 那個 build User 的）。路由保留不刪（將來要恢復改開關即可）。既有訪客帳號與其歷史訂單保留（V1.19.1 已從正式列表隔離）。 |
 | V1.19.1 | **找到「重複用戶」根因 + 隔離訪客帳號**。診斷頁顯示那些「重複」全是 0 訂單/從未活躍/無頭像/同日註冊/暱稱=名稱、末碼都不同。追查發現兇手是 `groups.py` 訪客功能（guest_entry）：每次有人用訪客連結進來就建一個 `guest_{隨機hex}` 新帳號、display_name 用訪客自填的 guest_name → 有人填 0/測試/靜，且同人多次進來=多帳號。這些 `is_guest=True` 的臨時訪客**不該出現在正式員工列表**。修：部門可選用戶下拉、用戶管理列表、後台用戶統計、重複診斷頁全部加 `User.is_guest == False` 過濾，把訪客隔離（歷史訂單保留、不刪資料）。根因是訪客 vs 正式用戶混在同一張 users 表又沒在列表處區分。 |
 | V1.19.0 | **重複用戶診斷工具**。使用者反映部門管理選用戶下拉一堆「重複」（多個 0/測試/靜）。查 root cause：`line_user_id` model 上有 `unique=True`，登入走 `get_or_create_user`（用 line_user_id 查找），**同一 LINE 帳號不可能真重複**。所以「重複」實為不同 LINE 帳號剛好同名（show_name=nickname or display_name）。做診斷頁 `/admin/users-duplicates`（放 `/users/{user_id}` 前避免 int 路徑衝突）：同名分組，顯示各自 line_user_id 末碼（不同=不同人）、訂單數、註冊/活躍時間、有無頭像，並標記 true_dup（同組內 line_user_id 真的相同才算）。用戶管理頁加入口。讓團主自行判斷哪些是不同人（不刪）、哪些可能要處理。 |
 | V1.18.2 | **Hotfix：折扣送出 404 跳黑頁**。V1.18.0 把折扣路由加在 `orders_extra.py`，但該 router 掛載方式與表單 URL 對不上，且表單寫 `/{group_id}/orders/{order_id}/discount` 缺 `/groups` 前綴 → POST 404 Not Found。修：路由移到 `groups.py`（與 copy-last 同檔，groups.router 在 main.py 以 `prefix="/groups"` 註冊，自動補前綴）、改用 groups.py 慣例的 `await get_current_user(request, db)`；表單 action 改 `/groups/{group_id}/orders/{order_id}/discount`。教訓：加路由前先確認該 router 的 mount prefix，表單 URL 要跟「prefix + 路由 path」完整對齊。 |

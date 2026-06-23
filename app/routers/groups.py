@@ -900,39 +900,23 @@ async def export_receipt_png(request: Request, group_id: int, db: Session = Depe
     )
 
 
-# ============ 訪客模式 ============
+# ============ 訪客模式（已停用，本系統只用 LINE 登入）============
+# V1.19.2：訪客功能會建立空殼帳號污染用戶列表，且本系統只需 LINE 登入，故停用。
+# 路由保留但回傳停用訊息，避免舊訪客連結被點到時建立新帳號。
+GUEST_MODE_ENABLED = False
+
 
 @router.post("/{group_id}/guest-link")
 async def generate_guest_link(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """產生訪客連結"""
-    import secrets
-    import hashlib
-    
-    user = await get_current_user(request, db)
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    # 只有團主或管理員可以產生
-    if group.owner_id != user.id and not user.is_admin:
-        raise HTTPException(status_code=403, detail="只有團主可以產生訪客連結")
-    
-    # 產生一個基於 group_id 和時間的 token（簡單版）
-    # 實際上可以存到資料庫，這裡用 hash 簡化
-    secret = settings.secret_key or "default-secret"
-    raw = f"{group_id}-{secret}-guest"
-    token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    
-    base_url = str(request.base_url).rstrip("/")
-    link = f"{base_url}/groups/{group_id}/guest?token={token}"
-    
-    return {"link": link}
+    """產生訪客連結（已停用）"""
+    raise HTTPException(status_code=410, detail="訪客功能已停用，請使用 LINE 登入")
 
 
 @router.get("/{group_id}/guest")
 async def guest_access(group_id: int, token: str, request: Request, db: Session = Depends(get_db)):
-    """訪客存取團單"""
+    """訪客存取團單（已停用）"""
+    if not GUEST_MODE_ENABLED:
+        raise HTTPException(status_code=410, detail="訪客功能已停用，請使用 LINE 登入")
     import hashlib
     from fastapi.responses import Response
     
@@ -977,7 +961,9 @@ async def guest_enter(
     request: Request = None,
     db: Session = Depends(get_db)
 ):
-    """訪客輸入名字進入團單"""
+    """訪客輸入名字進入團單（已停用）"""
+    if not GUEST_MODE_ENABLED:
+        raise HTTPException(status_code=410, detail="訪客功能已停用，請使用 LINE 登入")
     import hashlib
     import secrets
     from app.models.user import User
