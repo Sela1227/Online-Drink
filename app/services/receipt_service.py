@@ -220,30 +220,35 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
 
     c.setFont(_FONT, 10)
     person_idx = 0
+    PAD_TOP = 5 * mm       # 色塊頂到姓名的內距
+    PAD_BOTTOM = 4 * mm    # 最後品項到色塊底的內距
+    NAME_H = 6 * mm        # 姓名列佔高
+    ITEM_H = 5 * mm        # 每品項列佔高
+    GAP_BETWEEN = 3 * mm   # 兩人色塊間的外距
     for person in data["people"]:
-        # 先算這個人區塊需要的高度（姓名列 + 各品項列 + 上下內距）
-        name_h = 7 * mm
-        items_h = len(person["items"]) * 5 * mm
-        block_h = name_h + items_h + 2 * mm
+        # 色塊總高 = 上內距 + 姓名 + 品項 + 下內距（留白對稱、外框留足）
+        block_h = PAD_TOP + NAME_H + len(person["items"]) * ITEM_H + PAD_BOTTOM
         # 換頁判斷（整塊放不下就換頁）
         if y - block_h < 18 * mm:
             c.showPage()
             _ensure_font()
             y = H - margin
 
-        block_top = y + 4 * mm  # 區塊頂緣（姓名列上方留白）
+        block_top = y          # 色塊從目前 y 往下畫
+        block_bottom = y - block_h
         # 一人一色區塊：隔人交替底色（先畫底，內容畫在上面）
         if person_idx % 2 == 1:
             c.setFillColor(ZEBRA)
-            c.rect(x - 3 * mm, block_top - block_h, W - 2 * margin + 6 * mm, block_h, fill=1, stroke=0)
+            c.rect(x - 4 * mm, block_bottom, W - 2 * margin + 8 * mm, block_h, fill=1, stroke=0)
 
-        # 姓名 + 金額
+        # 姓名 + 金額（從色塊頂往下 PAD_TOP + 一個字高的基線）
+        text_y = block_top - PAD_TOP - 4 * mm
         c.setFillColor(colors.black)
         c.setFont(_FONT, 11)
-        c.drawString(x, y, f"● {person['name']}")
+        c.drawString(x, text_y, f"● {person['name']}")
         c.setFillColor(THEME)
-        c.drawRightString(W - margin - 2 * mm, y, f"${int(person['total'])}")
-        y -= 6 * mm
+        c.drawRightString(W - margin - 2 * mm, text_y, f"${int(person['total'])}")
+        text_y -= NAME_H
         # 品項
         c.setFont(_FONT, 9)
         for it in person["items"]:
@@ -252,10 +257,11 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             if len(desc) > 36:
                 desc = desc[:35] + "…"
             qty_str = f" ×{it['qty']}" if it["qty"] > 1 else ""
-            c.drawString(x + 5 * mm, y, f"{desc}{qty_str}")
-            c.drawRightString(W - margin - 2 * mm, y, f"${int(it['subtotal'])}")
-            y -= 5 * mm
-        y -= 4 * mm
+            c.drawString(x + 5 * mm, text_y, f"{desc}{qty_str}")
+            c.drawRightString(W - margin - 2 * mm, text_y, f"${int(it['subtotal'])}")
+            text_y -= ITEM_H
+        # 移到下一個色塊頂（含兩人間外距）
+        y = block_bottom - GAP_BETWEEN
         person_idx += 1
 
     # 頁尾
