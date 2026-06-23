@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+            <div class="w-10 h-10 bg-sela-100 rounded-lg flex items-center justify-center overflow-hidden">
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-1">
                 {% else %}
@@ -19,11 +19,11 @@
                 {% endif %}
             </div>
             <div>
-                <h1 class="text-lg font-bold text-gray-800">{{ store.name }}</h1>
-                <div class="text-xs text-gray-500"><i class="ti ti-clipboard-list"></i> 菜單</div>
+                <h1 class="text-lg font-bold text-sela-800">{{ store.name }}</h1>
+                <div class="text-xs text-sela-800/60"><i class="ti ti-clipboard-list"></i> 菜單</div>
             </div>
         </div>
-        <a href="/stores/{{ store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回店家 →</a>
+        <a href="/stores/{{ store.id }}" class="text-sm text-sela-800/60 hover:text-sela-800/80">返回店家 →</a>
     </div>
     
     <!-- 菜單內容 -->
@@ -32,7 +32,7 @@
         {% for category in categories %}
         <div class="bg-white rounded-lg shadow-sm overflow-hidden">
             <div class="bg-gradient-to-r from-sela-50 to-amber-50 px-4 py-3 border-b">
-                <h2 class="font-semibold text-gray-800">{{ category.name }}</h2>
+                <h2 class="font-semibold text-sela-800">{{ category.name }}</h2>
             </div>
             
             <div class="divide-y">
@@ -40,15 +40,15 @@
                 <div class="px-4 py-3">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
-                            <div class="font-medium text-gray-800">{{ item.name }}</div>
+                            <div class="font-medium text-sela-800">{{ item.name }}</div>
                             {% if item.description %}
-                            <div class="text-xs text-gray-500 mt-0.5">{{ item.description }}</div>
+                            <div class="text-xs text-sela-800/60 mt-0.5">{{ item.description }}</div>
                             {% endif %}
                         </div>
                         <div class="text-right flex-shrink-0">
                             <div class="text-sela-800 font-medium">${{ item.price|int }}</div>
                             {% if item.price_l %}
-                            <div class="text-xs text-gray-400">大杯 ${{ item.price_l|int }}</div>
+                            <div class="text-xs text-sela-800/45">大杯 ${{ item.price_l|int }}</div>
                             {% endif %}
                         </div>
                     </div>
@@ -59,7 +59,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="bg-white rounded-lg shadow-sm p-8 text-center text-gray-500">
+    <div class="bg-white rounded-lg shadow-sm p-8 text-center text-sela-800/60">
         <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
         <p>此菜單暫無品項</p>
     </div>

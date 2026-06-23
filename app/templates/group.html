@@ -5,10 +5,10 @@
 {% block content %}
 <div class="space-y-4" x-data="orderPage()">
     <!-- Header -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <!-- 頂行：返回 + 倒數計時 -->
         <div class="flex items-center justify-between mb-3">
-            <a href="/home" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <a href="/home" class="text-sm text-sela-800/60 hover:text-sela-800/80 flex items-center gap-1">
                 <i class="ti ti-arrow-left"></i> 返回
             </a>
             <div class="text-right">
@@ -19,18 +19,18 @@
                     <span x-text="display"></span>
                 </div>
                 {% else %}
-                <div class="text-gray-500">已截止</div>
+                <div class="text-sela-800/60">已截止</div>
                 {% endif %}
             </div>
         </div>
 
         <!-- 店家資訊：大縮圖 + 分行文字 -->
         <div class="flex items-start gap-4">
-            <div class="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <div class="w-20 h-20 bg-sela-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-1">
                 {% else %}
-                <span class="text-4xl text-gray-400">
+                <span class="text-4xl text-sela-800/45">
                     {% if group.category and group.category.value == 'drink' %}<i class="ti ti-cup"></i>
                     {% elif group.category and group.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
                     {% else %}<i class="ti ti-bowl"></i>{% endif %}
@@ -38,17 +38,17 @@
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">
-                <h1 class="font-bold text-lg text-gray-900 leading-snug mb-1">{{ group.name }}</h1>
-                <div class="text-sm text-gray-500">
+                <h1 class="font-bold text-lg text-sela-800 leading-snug mb-1">{{ group.name }}</h1>
+                <div class="text-sm text-sela-800/60">
                     {{ store.name }}{% if branch %}<span class="text-sela-800">（{{ branch.name }}）</span>{% endif %}
                 </div>
-                <div class="text-sm text-gray-400 mb-1">{{ group.owner.show_name }}</div>
+                <div class="text-sm text-sela-800/45 mb-1">{{ group.owner.show_name }}</div>
                 <button onclick="toggleFavorite({{ store.id }})"
                         id="fav-btn"
-                        class="flex items-center gap-0.5 hover:scale-105 transition-transform"
+                        class="flex items-center gap-0.5 active:scale-95 transition-transform"
                         title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
                     <span class="text-base text-sela-800"><i class="ti ti-star"></i></span>
-                    <span class="text-xs text-gray-400" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
+                    <span class="text-xs text-sela-800/45" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
                 </button>
             </div>
         </div>
@@ -58,45 +58,45 @@
         <div class="mt-3 flex flex-wrap gap-2">
             {% if branch and branch.phone %}
             <a href="tel:{{ branch.phone }}" 
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800 rounded-full text-sm active:bg-sela-100 transition">
                 <i class="ti ti-phone"></i> {{ branch.phone }}
             </a>
             {% elif store.phone %}
             <a href="tel:{{ store.phone }}" 
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800 rounded-full text-sm active:bg-sela-100 transition">
                 <i class="ti ti-phone"></i> 撥打電話
             </a>
             {% endif %}
             {% if branch and branch.address %}
-            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-full text-sm">
+            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800/70 rounded-full text-sm">
                 <i class="ti ti-map-pin"></i> {{ branch.address }}
             </span>
             {% elif store.address %}
-            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-full text-sm">
+            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800/70 rounded-full text-sm">
                 <i class="ti ti-map-pin"></i> {{ store.address }}
             </span>
             {% endif %}
             {% if store.google_maps_url %}
             <a href="{{ store.google_maps_url }}" target="_blank"
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800 rounded-full text-sm active:bg-sela-100 transition">
                 <i class="ti ti-map"></i>️ Google 地圖
             </a>
             {% endif %}
             {% if store.website_url %}
             <a href="{{ store.website_url }}" target="_blank"
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full text-sm hover:bg-gray-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800/80 rounded-full text-sm hover:bg-sela-100 transition">
                 <i class="ti ti-world"></i> 官網
             </a>
             {% endif %}
             {% if store.ubereats_url %}
             <a href="{{ store.ubereats_url }}" target="_blank"
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800 rounded-full text-sm active:bg-sela-100 transition">
                 <i class="ti ti-circle-filled" style="color: #22c55e;"></i> Uber Eats
             </a>
             {% endif %}
             {% if store.foodpanda_url %}
             <a href="{{ store.foodpanda_url }}" target="_blank"
-               class="inline-flex items-center gap-1 px-3 py-1.5 bg-pink-50 text-pink-700 rounded-full text-sm hover:bg-pink-100 transition">
+               class="inline-flex items-center gap-1 px-3 py-1.5 bg-sela-50 text-sela-800 rounded-full text-sm active:bg-sela-100 transition">
                 <i class="ti ti-heart"></i> foodpanda
             </a>
             {% endif %}
@@ -118,7 +118,7 @@
         {% endif %}
         
         {% if group.enable_lucky_draw %}
-        <div class="mt-3 p-3 bg-pink-50 rounded-lg text-sm text-pink-800">
+        <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800">
             <i class="ti ti-confetti"></i> <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
             {% if not is_open and group.lucky_winner_ids %}
             <div class="mt-2 font-bold text-lg">
@@ -135,7 +135,7 @@
         {% endif %}
         
         {% if group.treat_user_id %}
-        <div class="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-800 flex items-center justify-between">
+        <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
             <div>
                 <i class="ti ti-heart"></i> <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單
             </div>
@@ -159,7 +159,7 @@
                 <span class="text-yellow-600">還差 {{ group.members_needed }} 人</span>
                 {% endif %}
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="w-full bg-sela-100 rounded-full h-2">
                 {% set progress = (group.submitted_count / group.min_members * 100) | int %}
                 {% set progress = [progress, 100] | min %}
                 <div class="h-2 rounded-full {% if group.has_enough_members %}bg-green-500{% else %}bg-yellow-500{% endif %}"
@@ -168,7 +168,7 @@
             <div class="text-xs mt-1 text-center">
                 {{ group.submitted_count }} / {{ group.min_members }} 人
                 {% if group.auto_extend and not group.has_enough_members %}
-                <span class="text-gray-500">（未達人數將自動延長）</span>
+                <span class="text-sela-800/60">（未達人數將自動延長）</span>
                 {% endif %}
             </div>
         </div>
@@ -183,11 +183,11 @@
         
         <!-- 外送費顯示 -->
         {% if group.delivery_fee %}
-        <div class="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800 flex items-center justify-between">
+        <div class="mt-2 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
             <div>
                 <i class="ti ti-car"></i> 外送費：${{ group.delivery_fee|int }}
             </div>
-            <div class="text-blue-600">
+            <div class="text-sela-800/70">
                 {% if group.submitted_count > 0 %}
                 每人分攤 ${{ group.delivery_fee_per_person|int }}（{{ group.submitted_count }} 人）
                 {% else %}
@@ -201,20 +201,20 @@
         <div class="mt-3 pt-3 border-t" x-data="{ showExport: false }">
             <!-- 主動作：圖示在上、文字在下，網格排列 -->
             <div class="grid grid-cols-4 gap-2 sm:gap-3">
-                <button @click="copyLink()" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-gray-50 text-gray-600">
+                <button @click="copyLink()" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-sela-50 text-sela-800/70">
                     <i class="ti ti-link text-lg"></i>
                     <span class="text-xs">複製連結</span>
                 </button>
-                <button @click="showQR = true" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-gray-50 text-gray-600">
+                <button @click="showQR = true" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-sela-50 text-sela-800/70">
                     <i class="ti ti-qrcode text-lg"></i>
                     <span class="text-xs">QR Code</span>
                 </button>
-                <button @click="showSaveTemplate = true" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-gray-50 text-sela-800">
+                <button @click="showSaveTemplate = true" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-sela-50 text-sela-800">
                     <i class="ti ti-clipboard-list text-lg"></i>
                     <span class="text-xs">存模板</span>
                 </button>
                 {% if is_owner or is_admin %}
-                <button @click="showExport = !showExport" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-gray-50 text-sela-800">
+                <button @click="showExport = !showExport" class="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-sela-50 text-sela-800">
                     <i class="ti ti-download text-lg"></i>
                     <span class="text-xs">匯出單據</span>
                 </button>
@@ -229,7 +229,7 @@
                     <i class="ti ti-speakerphone"></i> 催單
                 </button>
                 {% endif %}
-                <button @click="showSettings = true" class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs hover:bg-blue-100">
+                <button @click="showSettings = true" class="px-3 py-1.5 rounded-full bg-sela-100 text-sela-800 text-xs active:bg-sela-200">
                     <i class="ti ti-settings"></i> 修改
                 </button>
                 {% if is_open %}
@@ -244,7 +244,7 @@
 
             <!-- 匯出單據（展開）-->
             <div x-show="showExport" x-transition class="mt-2 p-3 bg-sela-50 rounded-lg">
-                <div class="text-xs text-gray-500 mb-2">給店家核對：</div>
+                <div class="text-xs text-sela-800/60 mb-2">給店家核對：</div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                     <a href="/groups/{{ group.id }}/export/receipt.pdf" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm hover:bg-sela-100">
                         <i class="ti ti-file-text"></i> 核對單 PDF
@@ -253,12 +253,12 @@
                         <i class="ti ti-photo"></i> 核對單圖片
                     </a>
                 </div>
-                <div class="text-xs text-gray-500 mb-2">其他格式：</div>
+                <div class="text-xs text-sela-800/60 mb-2">其他格式：</div>
                 <div class="grid grid-cols-3 gap-2">
-                    <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-gray-600 text-xs hover:bg-gray-100">
+                    <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-xs hover:bg-sela-100">
                         <i class="ti ti-building-store"></i> 店家明細
                     </a>
-                    <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-gray-600 text-xs hover:bg-gray-100">
+                    <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-xs hover:bg-sela-100">
                         <i class="ti ti-user"></i> 個人明細
                     </a>
                     <a href="/groups/{{ group.id }}/export/excel" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-green-600 text-xs hover:bg-green-50">
@@ -287,37 +287,37 @@
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto">
             <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
                 <h3 class="font-bold text-lg">團單設定</h3>
-                <button @click="showSettings = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                <button @click="showSettings = false" class="text-sela-800/45 hover:text-sela-800/70 text-2xl">&times;</button>
             </div>
             
             <div class="p-4 space-y-4">
                 <!-- 編輯團單 -->
                 <div class="border rounded-lg p-3">
-                    <h4 class="font-medium text-gray-800 mb-2">編輯團單</h4>
+                    <h4 class="font-medium text-sela-800 mb-2">編輯團單</h4>
                     <form action="/groups/{{ group.id }}/edit" method="post" class="space-y-3">
                         <div>
-                            <label class="block text-sm text-gray-600 mb-1">團名</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">團名</label>
                             <input type="text" name="name" value="{{ group.name }}" required
                                    class="w-full border rounded px-3 py-2 text-sm">
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-600 mb-1">備註</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">備註</label>
                             <textarea name="note" rows="2" class="w-full border rounded px-3 py-2 text-sm"
                                       placeholder="取餐地點等">{{ group.note or '' }}</textarea>
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-600 mb-1">外送費</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">外送費</label>
                             <div class="flex items-center gap-2">
-                                <span class="text-gray-500">$</span>
+                                <span class="text-sela-800/60">$</span>
                                 <input type="number" name="delivery_fee" min="0" step="1"
                                        value="{{ group.delivery_fee|int if group.delivery_fee else '' }}"
                                        placeholder="0"
                                        class="w-24 border rounded px-3 py-2 text-sm">
-                                <span class="text-xs text-gray-400">自動分攤</span>
+                                <span class="text-xs text-sela-800/45">自動分攤</span>
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-600 mb-1">截止時間</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">截止時間</label>
                             <input type="datetime-local" name="deadline" 
                                    value="{{ group.deadline.strftime('%Y-%m-%dT%H:%M') }}"
                                    class="w-full border rounded px-3 py-2 text-sm">
@@ -330,11 +330,11 @@
                 
                 <!-- 轉移團主 -->
                 <div class="border rounded-lg p-3">
-                    <h4 class="font-medium text-gray-800 mb-2">轉移團主</h4>
+                    <h4 class="font-medium text-sela-800 mb-2">轉移團主</h4>
                     <form action="/groups/{{ group.id }}/transfer" method="post"
                           onsubmit="return confirm('確定要將團主轉移給選擇的用戶嗎？')">
                         <div class="mb-3">
-                            <label class="block text-sm text-gray-600 mb-1">選擇新團主</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">選擇新團主</label>
                             <select name="new_owner_id" required class="w-full border rounded px-3 py-2 text-sm">
                                 <option value="">請選擇...</option>
                                 {% for u in all_users %}
@@ -344,7 +344,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded text-sm">
+                        <button type="submit" class="w-full bg-sela-800 active:bg-sela-900 text-white py-2 rounded-lg text-sm">
                             轉移團主
                         </button>
                     </form>
@@ -379,13 +379,13 @@
          @click.self="showReminder = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
-                <h3 class="font-semibold text-gray-800"><i class="ti ti-speakerphone"></i> 催單提醒</h3>
+                <h3 class="font-semibold text-sela-800"><i class="ti ti-speakerphone"></i> 催單提醒</h3>
             </div>
             
             <div class="p-4">
-                <p class="text-sm text-gray-600 mb-3">以下 {{ pending_orders|length }} 人尚未結單：</p>
+                <p class="text-sm text-sela-800/70 mb-3">以下 {{ pending_orders|length }} 人尚未結單：</p>
                 
-                <div class="bg-gray-50 rounded-lg p-3 mb-4 max-h-60 overflow-y-auto">
+                <div class="bg-sela-50 rounded-lg p-3 mb-4 max-h-60 overflow-y-auto">
                     <div class="space-y-2">
                         {% for order in pending_orders %}
                         <div class="flex items-center gap-2 text-sm">
@@ -393,7 +393,7 @@
                             <img src="{{ order.user.picture_url }}" class="w-6 h-6 rounded-full">
                             {% endif %}
                             <span class="font-medium">{{ order.user.show_name }}</span>
-                            <span class="text-gray-400">（{{ order.items|length }} 項，${{ order.total_amount }}）</span>
+                            <span class="text-sela-800/45">（{{ order.items|length }} 項，${{ order.total_amount }}）</span>
                         </div>
                         {% endfor %}
                     </div>
@@ -401,27 +401,27 @@
                 
                 <!-- 複製名單 -->
                 <div class="mb-4">
-                    <label class="block text-sm text-gray-600 mb-1">複製名單</label>
+                    <label class="block text-sm text-sela-800/70 mb-1">複製名單</label>
                     <div class="flex gap-2">
                         <input type="text" id="pending-names" readonly
                                value="{% for order in pending_orders %}{{ order.user.show_name }}{% if not loop.last %}、{% endif %}{% endfor %}"
-                               class="flex-1 border rounded px-3 py-2 text-sm bg-gray-50">
+                               class="flex-1 border rounded px-3 py-2 text-sm bg-sela-50">
                         <button type="button" onclick="copyPendingNames()"
-                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                                class="px-4 py-2 bg-sela-100 active:bg-sela-100 rounded text-sm">
                             複製
                         </button>
                     </div>
                 </div>
                 
                 <!-- 提示文字 -->
-                <p class="text-xs text-gray-400 mb-4">
+                <p class="text-xs text-sela-800/45 mb-4">
                     你可以複製名單，貼到 LINE 群組提醒大家結單
                 </p>
             </div>
             
-            <div class="p-4 border-t bg-gray-50 rounded-b-lg">
+            <div class="p-4 border-t bg-sela-50 rounded-b-lg">
                 <button @click="showReminder = false"
-                        class="w-full py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                        class="w-full py-2 rounded-lg border hover:bg-sela-100 text-sm">
                     關閉
                 </button>
             </div>
@@ -445,8 +445,8 @@
 
     <!-- 我的訂單（已結單時顯示在頁面上） -->
     <div id="my-order-display" x-show="orderStatus === 'submitted'">
-        <div class="bg-white rounded-lg shadow-sm p-4">
-            <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div class="bg-white rounded-2xl shadow-sm p-4">
+            <h2 class="font-semibold text-sela-800 mb-3 flex items-center gap-2">
                 我的訂單
                 <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">已結單</span>
                 {% if not group.treat_user_id %}
@@ -466,14 +466,14 @@
 
     <!-- 快速下單（團開放中且尚未結單時顯示） -->
     {% if is_open %}
-    <div class="bg-white rounded-lg shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-bolt"></i> {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-bolt"></i> {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
         
         <div class="flex flex-wrap gap-2 mb-3">
             <!-- 複製上次訂單 -->
             {% if last_order and last_order_items %}
             <button @click="showLastOrder = true"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition">
+                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
                 <i class="ti ti-clipboard-list"></i> 上次訂單
             </button>
             {% endif %}
@@ -481,14 +481,14 @@
             <!-- 看別人點什麼（盲點模式下隱藏） -->
             {% if submitted_orders|length > 0 and not group.is_blind_mode %}
             <button @click="showOthersOrders = true"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition">
+                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
                 <i class="ti ti-eye"></i> 看別人點什麼
             </button>
             {% endif %}
             
             <!-- 隨機選擇器 -->
             <button @click="randomPick()"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm hover:bg-sela-100 transition">
+                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
                 <i class="ti ti-dice"></i> 隨機選
             </button>
         </div>
@@ -500,14 +500,14 @@
             <div class="flex gap-2 mb-2">
                 {% if hot_items %}
                 <button @click="quickTab = 'hot'"
-                        :class="quickTab === 'hot' ? 'bg-sela-500 text-sela-800' : 'bg-gray-100 text-gray-600'"
+                        :class="quickTab === 'hot' ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
                     <i class="ti ti-flame"></i> 熱門
                 </button>
                 {% endif %}
                 {% if favorite_items %}
                 <button @click="quickTab = 'mine'"
-                        :class="quickTab === 'mine' ? 'bg-sela-500 text-sela-800' : 'bg-gray-100 text-gray-600'"
+                        :class="quickTab === 'mine' ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
                     <i class="ti ti-heart"></i>️ 我的最愛
                 </button>
@@ -519,8 +519,8 @@
             <div x-show="quickTab === 'hot'" class="flex flex-wrap gap-2">
                 {% for item in hot_items %}
                 <button onclick="scrollToItem({{ item.menu_item_id }})"
-                        class="text-xs px-2.5 py-1.5 bg-red-50 text-red-700 rounded-full hover:bg-red-100 transition">
-                    {{ item.item_name }} <span class="text-red-400">({{ item.total_qty|int }}份)</span>
+                        class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-800 rounded-full active:bg-sela-100 transition">
+                    {{ item.item_name }} <span class="text-sela-800/50">({{ item.total_qty|int }}份)</span>
                 </button>
                 {% endfor %}
             </div>
@@ -548,27 +548,27 @@
          @click.self="showOthersOrders = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 max-h-[80vh] flex flex-col">
             <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="font-semibold text-gray-800"><i class="ti ti-eye"></i> 大家都點什麼</h3>
-                <button @click="showOthersOrders = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                <h3 class="font-semibold text-sela-800"><i class="ti ti-eye"></i> 大家都點什麼</h3>
+                <button @click="showOthersOrders = false" class="text-sela-800/45 hover:text-sela-800/70 text-xl">&times;</button>
             </div>
             
             <div class="p-4 overflow-y-auto flex-1">
                 <div class="space-y-3">
                     {% for order in submitted_orders %}
                     {% if order.user_id != user.id %}
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="font-medium text-gray-800 mb-2">{{ order.user.show_name }}</div>
+                    <div class="bg-sela-50 rounded-lg p-3">
+                        <div class="font-medium text-sela-800 mb-2">{{ order.user.show_name }}</div>
                         <div class="space-y-2">
                             {% for item in order.items %}
                             <div class="flex items-center justify-between text-sm gap-2">
                                 <div class="flex-1 min-w-0">
-                                    <span class="text-gray-700">{{ item.item_name }}</span>
+                                    <span class="text-sela-800/80">{{ item.item_name }}</span>
                                     {% if item.sugar or item.ice %}
-                                    <span class="text-gray-400 text-xs">({{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }})</span>
+                                    <span class="text-sela-800/45 text-xs">({{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }})</span>
                                     {% endif %}
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0">
-                                    <span class="text-gray-400">×{{ item.quantity }}</span>
+                                    <span class="text-sela-800/45">×{{ item.quantity }}</span>
                                     <button hx-post="/groups/{{ group.id }}/orders/follow/{{ item.id }}"
                                             hx-target="#my-order"
                                             hx-swap="innerHTML"
@@ -577,7 +577,7 @@
                                                 this.innerHTML = '<i class="ti ti-check"></i>';
                                                 this.disabled = true;
                                                 this.classList.remove('bg-sela-500', 'hover:bg-sela-600');
-                                                this.classList.add('bg-gray-300');
+                                                this.classList.add('bg-sela-200');
                                                 if (window.Alpine) {
                                                     const comp = Alpine.$data(document.querySelector('[x-data]'));
                                                     if (comp) {
@@ -598,7 +598,7 @@
                     {% endfor %}
                 </div>
                 
-                <p class="text-xs text-gray-400 text-center mt-4">點 +1 直接加入購物車</p>
+                <p class="text-xs text-sela-800/45 text-center mt-4">點 +1 直接加入購物車</p>
             </div>
         </div>
     </div>
@@ -611,40 +611,40 @@
          @click.self="showLastOrder = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
-                <h3 class="font-semibold text-gray-800"><i class="ti ti-clipboard-list"></i> 上次在 {{ store.name }} 的訂單</h3>
-                <p class="text-xs text-gray-400 mt-1">{{ last_order.created_at.strftime('%Y/%m/%d') }}</p>
+                <h3 class="font-semibold text-sela-800"><i class="ti ti-clipboard-list"></i> 上次在 {{ store.name }} 的訂單</h3>
+                <p class="text-xs text-sela-800/45 mt-1">{{ last_order.created_at.strftime('%Y/%m/%d') }}</p>
             </div>
             
             <div class="p-4 max-h-60 overflow-y-auto">
                 <div class="space-y-2">
                     {% for item in last_order_items %}
-                    <div class="flex justify-between items-center text-sm bg-gray-50 rounded p-2">
+                    <div class="flex justify-between items-center text-sm bg-sela-50 rounded p-2">
                         <div>
                             <div class="font-medium">{{ item.item_name }}</div>
                             {% if item.sugar or item.ice %}
-                            <div class="text-xs text-gray-500">{{ item.sugar }} / {{ item.ice }}</div>
+                            <div class="text-xs text-sela-800/60">{{ item.sugar }} / {{ item.ice }}</div>
                             {% endif %}
                             {% if item.note %}
-                            <div class="text-xs text-gray-400">{{ item.note }}</div>
+                            <div class="text-xs text-sela-800/45">{{ item.note }}</div>
                             {% endif %}
                         </div>
                         <div class="text-right">
                             <div class="text-sela-800">${{ item.price }}</div>
-                            <div class="text-xs text-gray-400">x{{ item.quantity }}</div>
+                            <div class="text-xs text-sela-800/45">x{{ item.quantity }}</div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
             </div>
             
-            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex gap-2">
+            <div class="p-4 border-t bg-sela-50 rounded-b-lg flex gap-2">
                 <button @click="showLastOrder = false"
-                        class="flex-1 py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                        class="flex-1 py-2 rounded-lg border hover:bg-sela-100 text-sm">
                     取消
                 </button>
                 <form action="/groups/{{ group.id }}/orders/copy-last" method="post" class="flex-1">
                     <button type="submit"
-                            class="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm">
+                            class="w-full py-2 rounded-lg bg-sela-800 active:bg-sela-900 text-white text-sm">
                         複製到購物車
                     </button>
                 </form>
@@ -662,15 +662,15 @@
                 <div class="text-5xl mb-4"><i class="ti ti-dice"></i></div>
                 <template x-if="randomResult">
                     <div>
-                        <div class="text-xl font-bold text-gray-800 mb-1" x-text="randomResult.name"></div>
+                        <div class="text-xl font-bold text-sela-800 mb-1" x-text="randomResult.name"></div>
                         <div class="text-sela-800 text-lg mb-4">$<span x-text="randomResult.price"></span></div>
                     </div>
                 </template>
             </div>
             
-            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex gap-2">
+            <div class="p-4 border-t bg-sela-50 rounded-b-lg flex gap-2">
                 <button @click="randomPick()"
-                        class="flex-1 py-2 rounded-lg border hover:bg-gray-100 text-sm">
+                        class="flex-1 py-2 rounded-lg border hover:bg-sela-100 text-sm">
                     <i class="ti ti-refresh"></i> 再抽一次
                 </button>
                 <button @click="goToRandomItem()"
@@ -684,16 +684,16 @@
 
     <!-- 菜單 -->
     {% if is_open %}
-    <div class="bg-white rounded-lg shadow-sm p-4 pb-24" x-data="menuNav()">
-        <h2 class="font-semibold text-gray-800 mb-3">菜單</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 pb-24" x-data="menuNav()">
+        <h2 class="font-semibold text-sela-800 mb-3">菜單</h2>
         
         <!-- 分類快速導覽（固定在頂部） -->
         {% if menu.categories|length > 1 %}
-        <div class="sticky top-12 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
+        <div class="sticky top-14 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
             <div class="flex gap-2 min-w-max">
                 {% for category in menu.categories %}
                 <button @click="scrollToCategory('category-{{ category.id }}')"
-                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-sela-500 text-sela-800 border-sela-500 shadow-md' : 'bg-white border-sela-300 text-sela-800 hover:bg-sela-50'"
+                        :class="activeCategory === 'category-{{ category.id }}' ? 'bg-sela-800 text-white border-sela-800 shadow-sm' : 'bg-white border-sela-300 text-sela-800 active:bg-sela-50'"
                         class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
                     {{ category.name }}
                 </button>
@@ -704,7 +704,7 @@
         
         {% for category in menu.categories %}
         <div id="category-{{ category.id }}" class="mb-4 scroll-mt-32 category-section">
-            <h3 class="text-sm font-medium text-gray-600 mb-2 pt-2">{{ category.name }}</h3>
+            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2">{{ category.name }}</h3>
             <div class="space-y-2">
                 {% for item in category.items %}
                 {% include "partials/menu_item.html" %}
@@ -778,9 +778,9 @@
         <div class="bg-white rounded-lg p-6 mx-4 max-w-sm w-full text-center">
             <h3 class="font-semibold mb-4">掃碼加入團購</h3>
             <div hx-get="/groups/{{ group.id }}/qrcode" hx-trigger="load" class="flex justify-center">
-                <div class="animate-pulse bg-gray-200 w-48 h-48"></div>
+                <div class="animate-pulse bg-sela-100 w-48 h-48"></div>
             </div>
-            <button @click="showQR = false" class="mt-4 text-gray-500 hover:text-gray-700">關閉</button>
+            <button @click="showQR = false" class="mt-4 text-sela-800/60 hover:text-sela-800/80">關閉</button>
         </div>
     </div>
 
@@ -797,12 +797,12 @@
                            placeholder="例：每週三下午茶"
                            class="w-full border rounded-lg px-3 py-2">
                 </div>
-                <div class="text-xs text-gray-500 mb-4 p-3 bg-gray-50 rounded">
+                <div class="text-xs text-sela-800/60 mb-4 p-3 bg-sela-50 rounded">
                     將儲存：店家、團名、備註、甜度冰塊設定、趣味功能設定
                 </div>
                 <div class="flex gap-2">
                     <button type="button" @click="showSaveTemplate = false"
-                            class="flex-1 py-2 rounded-lg border hover:bg-gray-50">
+                            class="flex-1 py-2 rounded-lg border hover:bg-sela-50">
                         取消
                     </button>
                     <button type="submit"
@@ -852,7 +852,7 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-sela-800 mb-2">甜度</label>
                     {% if group.lock_sugar %}
-                    <div class="text-gray-600">{{ group.default_sugar }} (已鎖定)</div>
+                    <div class="text-sela-800/70">{{ group.default_sugar }} (已鎖定)</div>
                     <input type="hidden" name="sugar" value="{{ group.default_sugar }}">
                     {% else %}
                     <div class="flex flex-wrap gap-2">
@@ -873,7 +873,7 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-sela-800 mb-2">冰塊</label>
                     {% if group.lock_ice %}
-                    <div class="text-gray-600">{{ group.default_ice }} (已鎖定)</div>
+                    <div class="text-sela-800/70">{{ group.default_ice }} (已鎖定)</div>
                     <input type="hidden" name="ice" value="{{ group.default_ice }}">
                     {% else %}
                     <div class="flex flex-wrap gap-2">
@@ -1050,7 +1050,7 @@ function orderPage() {
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="options" value="${opt.id}" class="rounded">
                     <span>${opt.name}</span>
-                    ${opt.price_diff > 0 ? `<span class="text-gray-500">+$${opt.price_diff}</span>` : ''}
+                    ${opt.price_diff > 0 ? `<span class="text-sela-800/60">+$${opt.price_diff}</span>` : ''}
                 </label>
             `).join('');
         }
