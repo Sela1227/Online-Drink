@@ -26,12 +26,15 @@ import os
 from app.models.group import Group
 from app.models.order import Order, OrderStatus
 
-# 主題色（#653985 北歐低彩度紫）
-THEME = colors.HexColor("#653985")
-THEME_LIGHT = colors.HexColor("#EBE7EE")
-GRAY = colors.HexColor("#666666")
-LIGHT_GRAY = colors.HexColor("#999999")
-ZEBRA = colors.HexColor("#ECE5F2")  # 一人一色區底色（比原 F2EEF5 略深，核對更清楚）
+# 主題色（經典奶茶：淺底深字）
+THEME = colors.HexColor("#5B4733")        # 深咖啡：白底上的標題/價格文字、色塊上的字
+THEME_FILL = colors.HexColor("#E8D9C0")   # 奶茶淺底：頂部標題列 & 實收色塊
+THEME_LIGHT = colors.HexColor("#EFE0CC")  # 更淺奶茶：表頭列底
+GRAY = colors.HexColor("#5F5344")         # 暖灰：次要文字/金額
+LIGHT_GRAY = colors.HexColor("#9C8E79")   # 暖淺灰：頁尾
+ZEBRA = colors.HexColor("#F7F1E6")        # 斑馬紋/一人一色淺底
+THEME_BAR = colors.HexColor("#D8C09A")    # 奶茶深一階：實收色塊底（比表頭略深，跳出白頁）
+DIVIDER = colors.HexColor("#DCC8A6")      # 奶茶分隔線：淺色表頭/logo 框的界線
 
 _FONT = "CJKFont"
 _FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "static", "fonts", "cjk-font.ttf")
@@ -133,10 +136,14 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
     x = margin
     y = H - margin
 
-    # ===== 頂部標題列（主題色底）=====
+    # ===== 頂部標題列（奶茶淺底 + 深字）=====
     header_h = 36 * mm
-    c.setFillColor(THEME)
+    c.setFillColor(THEME_FILL)
     c.rect(0, H - header_h, W, header_h, fill=1, stroke=0)
+    # 底部細分隔線：淺色表頭不會跟白頁面糊在一起
+    c.setStrokeColor(DIVIDER)
+    c.setLineWidth(1)
+    c.line(0, H - header_h, W, H - header_h)
 
     # 店家 logo（若有，畫在左側白底圓角框）
     logo_drawn = False
@@ -156,8 +163,10 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             logo_img = ImageReader(logo_buf)
             logo_size = 30 * mm
             c.setFillColor(colors.white)
+            c.setStrokeColor(DIVIDER)
+            c.setLineWidth(0.8)
             c.roundRect(margin, H - header_h + (header_h - logo_size) / 2,
-                        logo_size, logo_size, 3 * mm, fill=1, stroke=0)
+                        logo_size, logo_size, 3 * mm, fill=1, stroke=1)
             c.drawImage(logo_img, margin + 2 * mm, H - header_h + (header_h - logo_size) / 2 + 2 * mm,
                         logo_size - 4 * mm, logo_size - 4 * mm, preserveAspectRatio=True, mask='auto')
             logo_drawn = True
@@ -165,9 +174,10 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             logo_drawn = False
 
     text_x = margin + (36 * mm if logo_drawn else 0)
-    c.setFillColor(colors.white)
+    c.setFillColor(THEME)
     c.setFont(_FONT, 18)
     c.drawString(text_x, H - 16 * mm, _store_display_name(group))
+    c.setFillColor(GRAY)
     c.setFont(_FONT, 10)
     c.drawString(text_x, H - 23 * mm, f"訂單核對單　{group.deadline.strftime('%Y/%m/%d %H:%M')} 截止")
 
@@ -227,10 +237,10 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
         c.drawRightString(W - margin - 2 * mm, y, f"-${int(data['total_discount'])}")
         # 實收紫條從 y-1mm 往上長 8mm（頂端在 y+7mm），間距須 > 7mm 才不蓋到「店家優惠」
         y -= 10 * mm
-    # 總計實收（主題色塊）
-    c.setFillColor(THEME)
+    # 總計實收（奶茶色塊 + 深字）
+    c.setFillColor(THEME_BAR)
     c.rect(x, y - 1 * mm, W - 2 * margin, 8 * mm, fill=1, stroke=0)
-    c.setFillColor(colors.white)
+    c.setFillColor(THEME)
     c.setFont(_FONT, 11)
     label = f"實收 {data['total_qty']} 份" if data["total_discount"] > 0 else f"總計 {data['total_qty']} 份"
     c.drawString(x + 2 * mm, y + 1 * mm, label)

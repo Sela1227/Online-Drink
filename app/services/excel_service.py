@@ -12,8 +12,8 @@ def export_orders_to_excel(group, orders) -> BytesIO:
     ws.title = "訂單明細"
     
     # 樣式
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="653985", end_color="653985", fill_type="solid")
+    header_font = Font(bold=True, color="5B4733")
+    header_fill = PatternFill(start_color="C9A977", end_color="C9A977", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
         left=Side(style='thin'),

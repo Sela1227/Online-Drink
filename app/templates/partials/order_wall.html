@@ -4,15 +4,15 @@
         <span x-text="expanded ? '▼' : '▶'" class="text-gray-400 text-xs"></span>
         已結單
         <span class="text-sm font-normal text-gray-500">({{ submitted_orders|length }} 人)</span>
-        <span class="text-sm font-normal text-sela-600">${{ submitted_orders|sum(attribute='total_amount') }}</span>
+        <span class="text-sm font-normal text-sela-800">${{ submitted_orders|sum(attribute='total_amount') }}</span>
         {% if group.is_blind_mode and is_open %}
-        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded"><i class="ti ti-eye-off"></i> 盲點模式</span>
+        <span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded"><i class="ti ti-eye-off"></i> 盲點模式</span>
         {% endif %}
     </h2>
     
     {% if group.is_blind_mode and is_open %}
     <!-- 盲點模式：隱藏詳細內容 -->
-    <div class="text-sm text-purple-600 p-3 bg-purple-50 rounded-lg">
+    <div class="text-sm text-sela-800 p-3 bg-sela-50 rounded-lg">
         <i class="ti ti-eye-off"></i> 盲點模式進行中，截止後才能看到大家點了什麼！
         <div class="mt-2 text-gray-500 text-xs">
             已有 {{ submitted_orders|length }} 人結單，總金額 ${{ submitted_orders|sum(attribute='total_amount') }}
@@ -76,7 +76,7 @@
                 <!-- 團主折扣工具 -->
                 {% if is_owner or is_admin %}
                 <div x-data="{ open: false }" class="mt-1">
-                    <button @click="open = !open" class="text-xs text-sela-600 hover:text-sela-700">
+                    <button @click="open = !open" class="text-xs text-sela-800 hover:text-sela-800">
                         <i class="ti ti-discount-2"></i> {% if order.discount_amount and order.discount_amount > 0 %}修改折扣{% else %}加折扣{% endif %}
                     </button>
                     <form x-show="open" x-transition method="post"
@@ -90,7 +90,7 @@
                         <input type="text" name="discount_note" maxlength="20"
                                value="{{ order.discount_note or '' }}"
                                placeholder="說明（如搭主餐）" class="flex-1 min-w-24 border rounded px-2 py-1 text-sm">
-                        <button type="submit" class="px-3 py-1 bg-sela-600 text-white rounded text-sm">儲存</button>
+                        <button type="submit" class="px-3 py-1 bg-sela-600 text-sela-800 rounded text-sm">儲存</button>
                     </form>
                 </div>
                 {% endif %}

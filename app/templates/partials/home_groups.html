@@ -8,7 +8,7 @@
                 <span class="text-lg"><i class="ti ti-speakerphone"></i></span>
             </div>
             <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-sela-700 mb-1">公告</div>
+                <div class="text-sm font-medium text-sela-800 mb-1">公告</div>
                 <div class="text-sm text-gray-600 whitespace-pre-line">{{ announcement }}</div>
             </div>
         </div>
@@ -20,19 +20,19 @@
     <section>
         <div class="flex items-center justify-between mb-3">
             <h2 class="text-base font-semibold text-gray-800">投票中</h2>
-            <a href="/votes" class="text-sm text-sela-500 hover:text-sela-600">全部 →</a>
+            <a href="/votes" class="text-sm text-sela-800 hover:text-sela-800">全部 →</a>
         </div>
         <div class="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {% for vote in active_votes[:4] %}
             <a href="/votes/{{ vote.id }}" 
                class="flex-shrink-0 w-32 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-sela-200 transition-colors snap-start">
-                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-2">
+                <div class="w-10 h-10 rounded-full bg-sela-50 flex items-center justify-center mx-auto mb-2">
                     <span class="text-lg"><i class="ti ti-checkbox"></i>️</span>
                 </div>
                 <div class="text-sm font-medium text-gray-800 truncate text-center">{{ vote.title }}</div>
                 <div class="flex justify-between items-center mt-2 text-xs">
-                    <span class="text-purple-500">{{ vote.total_votes }}票</span>
-                    <span class="text-sela-500" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
+                    <span class="text-sela-800">{{ vote.total_votes }}票</span>
+                    <span class="text-sela-800" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
                 </div>
             </a>
             {% endfor %}
@@ -55,7 +55,7 @@
             <!-- 分類篩選 -->
             <div class="flex gap-2 mb-3">
                 <button @click="filter = 'all'" 
-                        :class="filter === 'all' ? 'bg-sela-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="filter === 'all' ? 'bg-sela-500 text-sela-800' : 'bg-white text-gray-600 border border-gray-200'"
                         class="px-3 py-1.5 rounded-full text-xs font-medium">全部</button>
                 <button @click="filter = 'drink'" 
                         :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
@@ -91,7 +91,7 @@
             </div>
             
             <!-- 推薦店家 -->
-            <a href="/recommend" class="mt-3 flex items-center justify-center gap-1 text-sm text-sela-500 hover:text-sela-600 py-2">
+            <a href="/recommend" class="mt-3 flex items-center justify-center gap-1 text-sm text-sela-800 hover:text-sela-800 py-2">
                 <span><i class="ti ti-bulb"></i></span> 我想推薦店家
             </a>
         </div>
@@ -150,7 +150,7 @@
     <!-- 無開放中的團 -->
     <div class="text-center py-16">
         <div class="w-20 h-20 mx-auto rounded-full bg-sela-50 flex items-center justify-center mb-4">
-            <i class="ti ti-cup text-sela-400" style="font-size: 38px;" aria-hidden="true"></i>
+            <i class="ti ti-cup text-sela-800" style="font-size: 38px;" aria-hidden="true"></i>
         </div>
         <p class="text-gray-500 mb-1">目前沒有開放中的團</p>
         <p class="text-sm text-gray-400">點擊「開團」開始揪人！</p>
@@ -185,7 +185,7 @@
                 </a>
                 {% endfor %}
             </div>
-            <a href="/history" class="block text-center text-sm text-gray-400 mt-3 py-2 hover:text-sela-500">
+            <a href="/history" class="block text-center text-sm text-gray-400 mt-3 py-2 hover:text-sela-800">
                 查看全部歷史 →
             </a>
         </div>

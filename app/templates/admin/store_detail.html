@@ -13,11 +13,11 @@
     <!-- 操作按鈕 -->
     <div class="flex justify-end gap-2">
         <a href="/admin/stores/{{ store.id }}/menus" 
-           class="px-4 py-2 bg-sela-100 text-sela-700 hover:bg-sela-200 rounded-lg text-sm font-medium">
+           class="px-4 py-2 bg-sela-100 text-sela-800 hover:bg-sela-200 rounded-lg text-sm font-medium">
             <i class="ti ti-clipboard-list"></i> 管理菜單
         </a>
         <a href="/admin/stores/{{ store.id }}/edit" 
-           class="px-4 py-2 bg-sela-500 hover:bg-sela-600 text-white rounded-lg text-sm font-medium">
+           class="px-4 py-2 bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-lg text-sm font-medium">
             <i class="ti ti-pencil"></i> 修改
         </a>
     </div>
@@ -48,7 +48,7 @@
                     {% if store.is_public %}
                     <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-world"></i> 公開</span>
                     {% else %}
-                    <span class="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-lock"></i> 限定部門</span>
+                    <span class="text-xs bg-sela-100 text-sela-800 px-2.5 py-1 rounded-full font-medium"><i class="ti ti-lock"></i> 限定部門</span>
                     {% endif %}
                 </div>
                 <div class="mt-2 flex items-center gap-3 text-sm text-gray-500">
@@ -144,7 +144,7 @@
         <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 加料選項</h2>
         <div class="flex flex-wrap gap-2">
             {% for topping in store.toppings|sort(attribute='sort_order') %}
-            <span class="px-3 py-1.5 rounded-lg text-sm {% if topping.is_active %}bg-sela-50 text-sela-700{% else %}bg-gray-100 text-gray-400{% endif %}">
+            <span class="px-3 py-1.5 rounded-lg text-sm {% if topping.is_active %}bg-sela-50 text-sela-800{% else %}bg-gray-100 text-gray-400{% endif %}">
                 {{ topping.name }} +${{ topping.price|int }}
                 {% if not topping.is_active %}<span class="text-xs">(停用)</span>{% endif %}
             </span>
@@ -158,7 +158,7 @@
         <div class="flex items-center justify-between mb-3">
             <h2 class="font-semibold text-gray-800"><i class="ti ti-building-store"></i> 分店管理 ({{ store.branches|length if store.branches else 0 }})</h2>
             <button @click="showAddForm = !showAddForm" 
-                    class="text-sm px-3 py-1 bg-sela-100 text-sela-700 rounded-lg hover:bg-sela-200">
+                    class="text-sm px-3 py-1 bg-sela-100 text-sela-800 rounded-lg hover:bg-sela-200">
                 <i class="ti ti-plus"></i> 新增分店
             </button>
         </div>
@@ -185,7 +185,7 @@
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="showAddForm = false" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded">取消</button>
-                    <button type="submit" class="px-3 py-1.5 text-sm bg-sela-500 text-white rounded hover:bg-sela-600">新增</button>
+                    <button type="submit" class="px-3 py-1.5 text-sm bg-sela-500 text-sela-800 rounded hover:bg-sela-600">新增</button>
                 </div>
             </form>
         </div>
@@ -231,7 +231,7 @@
                            class="w-28 border rounded px-2 py-1 text-sm">
                     <input type="text" name="address" value="{{ branch.address or '' }}" placeholder="地址"
                            class="flex-1 border rounded px-2 py-1 text-sm">
-                    <button type="submit" class="text-xs px-2 py-1 bg-sela-500 text-white rounded">儲存</button>
+                    <button type="submit" class="text-xs px-2 py-1 bg-sela-500 text-sela-800 rounded">儲存</button>
                     <button type="button" @click="editing = false" class="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded">取消</button>
                 </form>
             </div>
@@ -267,12 +267,12 @@
                 </label>
                 
                 <!-- 部門選擇 -->
-                <div id="dept-select" class="{% if store.is_public %}hidden{% endif %} mt-3 p-4 bg-purple-50 rounded-lg">
-                    <div class="text-sm font-medium text-purple-800 mb-2">選擇可見的部門：</div>
+                <div id="dept-select" class="{% if store.is_public %}hidden{% endif %} mt-3 p-4 bg-sela-50 rounded-lg">
+                    <div class="text-sm font-medium text-sela-800 mb-2">選擇可見的部門：</div>
                     {% if departments %}
                     <div class="grid grid-cols-2 gap-2">
                         {% for dept in departments %}
-                        <label class="flex items-center gap-2 p-2 bg-white rounded cursor-pointer hover:bg-purple-100">
+                        <label class="flex items-center gap-2 p-2 bg-white rounded cursor-pointer hover:bg-sela-100">
                             <input type="checkbox" name="department_ids" value="{{ dept.id }}"
                                    {% if dept.id in store_dept_ids %}checked{% endif %}>
                             <span class="text-sm">{{ dept.name }}</span>
@@ -286,7 +286,7 @@
                 </div>
             </div>
             <div class="mt-4 flex justify-end">
-                <button type="submit" class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600">
+                <button type="submit" class="px-4 py-2 bg-sela-500 text-sela-800 rounded-lg text-sm font-medium hover:bg-sela-600">
                     <i class="ti ti-device-floppy"></i> 儲存設定
                 </button>
             </div>
@@ -308,7 +308,7 @@
                 <i class="ti ti-clipboard-list"></i> 管理菜單
             </a>
             <a href="/admin/import?store_id={{ store.id }}" 
-               class="px-4 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg text-sm font-medium">
+               class="px-4 py-2 bg-sela-100 text-sela-800 hover:bg-sela-200 rounded-lg text-sm font-medium">
                 <i class="ti ti-inbox"></i> 匯入新菜單
             </a>
             <form action="/admin/stores/{{ store.id }}/delete" method="post" class="inline"

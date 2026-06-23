@@ -47,7 +47,7 @@
             {% for item in category.items %}
             <div class="flex items-center gap-2 py-1 flex-wrap">
                 <span>{{ item.name }}</span>
-                <span class="text-sela-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
+                <span class="text-sela-800">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
                 {% if item.options %}
                 <span class="text-xs text-gray-400">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>
                 {% endif %}
@@ -62,7 +62,7 @@
         {% for item in data.menu.items %}
         <div class="flex items-center gap-2 py-1 flex-wrap">
             <span>{{ item.name }}</span>
-            <span class="text-sela-600">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
+            <span class="text-sela-800">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
             {% if item.options %}
             <span class="text-xs text-gray-400">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>
             {% endif %}
@@ -75,7 +75,7 @@
 <!-- 確認匯入（一般 POST，成功後 redirect /admin）-->
 <form action="/admin/import" method="post" class="mt-3">
     <input type="hidden" name="json_str" value="{{ json_str | e }}">
-    <button type="submit" class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
+    <button type="submit" class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
         確認匯入
     </button>
 </form>

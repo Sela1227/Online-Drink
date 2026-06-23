@@ -20,7 +20,7 @@
             <span>{{ vote.creator.show_name }} 發起</span>
             <span>{{ vote.total_votes }} 票</span>
             {% if vote.is_multiple %}
-            <span class="text-purple-600">可多選</span>
+            <span class="text-sela-800">可多選</span>
             {% endif %}
         </div>
         
@@ -50,7 +50,7 @@
             {% if vote.is_open %}
             <form action="/votes/{{ vote.id }}/close" method="post" class="inline"
                   onsubmit="return confirm('確定要結束投票嗎？')">
-                <button type="submit" class="text-sela-600 hover:text-sela-700">結束投票</button>
+                <button type="submit" class="text-sela-800 hover:text-sela-800">結束投票</button>
             </form>
             {% endif %}
             {% if not vote.is_open and vote.winner_store_id and not vote.created_group_id %}
@@ -117,7 +117,7 @@
                         </div>
                         
                         <div class="text-right">
-                            <div class="font-bold text-sela-600">{{ opt.vote_count }}</div>
+                            <div class="font-bold text-sela-800">{{ opt.vote_count }}</div>
                             <div class="text-xs text-gray-400">票</div>
                         </div>
                     </div>
@@ -126,7 +126,7 @@
             </div>
             
             <button type="submit" 
-                    class="w-full mt-4 py-3 bg-sela-500 hover:bg-sela-600 text-white rounded-lg font-medium">
+                    class="w-full mt-4 py-3 bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-lg font-medium">
                 投票
             </button>
         </form>

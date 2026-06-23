@@ -9,7 +9,7 @@
     <div class="bg-white rounded-lg shadow-sm p-4">
         <div class="flex items-center justify-between mb-3">
             <h2 class="font-semibold text-gray-800"><i class="ti ti-bolt"></i> 快速開團</h2>
-            <a href="/templates" class="text-sm text-sela-500 hover:text-sela-600">管理模板</a>
+            <a href="/templates" class="text-sm text-sela-800 hover:text-sela-800">管理模板</a>
         </div>
         <div class="grid grid-cols-2 gap-2">
             {% for tpl in my_templates %}
@@ -230,11 +230,11 @@
         </div>
         
         <!-- 趣味功能設定 -->
-        <div x-show="storeId" x-cloak class="p-4 bg-purple-50 rounded-lg" x-data="{ showFunOptions: false }">
+        <div x-show="storeId" x-cloak class="p-4 bg-sela-50 rounded-lg" x-data="{ showFunOptions: false }">
             <button type="button" @click="showFunOptions = !showFunOptions"
                     class="flex items-center justify-between w-full text-left">
-                <h3 class="font-medium text-purple-700"><i class="ti ti-confetti"></i> 趣味功能（選用）</h3>
-                <span class="text-purple-500" x-text="showFunOptions ? '▲' : '▼'"></span>
+                <h3 class="font-medium text-sela-800"><i class="ti ti-confetti"></i> 趣味功能（選用）</h3>
+                <span class="text-sela-800" x-text="showFunOptions ? '▲' : '▼'"></span>
             </button>
             
             <div x-show="showFunOptions" x-cloak class="mt-4 space-y-4">
@@ -328,7 +328,7 @@
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
                 取消
             </a>
-            <button type="submit" class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
+            <button type="submit" class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
                 開團
             </button>
         </div>
