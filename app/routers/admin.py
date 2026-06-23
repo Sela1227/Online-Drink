@@ -725,7 +725,57 @@ async def users_duplicates(request: Request, db: Session = Depends(get_db)):
         "user": admin,
         "dup_groups": dup_groups,
         "total_users": len(all_users),
+        "guest_count": db.query(User).filter(User.is_guest == True).count(),
     })
+
+
+@router.post("/users-cleanup-guests")
+async def cleanup_guest_users(request: Request, db: Session = Depends(get_db)):
+    """清理訪客空殼帳號（徹底刪除，含其訂單；使用者確認舊訪客訂單不重要）"""
+    admin = await get_admin_user(request, db)
+
+    from app.models.user import User
+    from app.models.group import Group
+    from sqlalchemy import text as _sql, bindparam
+
+    # 找出所有訪客帳號 id（排除有開團的，避免動到團單擁有權）
+    all_guest_ids = [g.id for g in db.query(User).filter(User.is_guest == True).all()]
+    owner_ids = {gid for (gid,) in db.query(Group.owner_id).filter(Group.owner_id.in_(all_guest_ids)).all()} if all_guest_ids else set()
+    guest_ids = [gid for gid in all_guest_ids if gid not in owner_ids]
+    if not guest_ids:
+        return RedirectResponse(url="/admin/users-duplicates?cleaned=0", status_code=302)
+
+    params = {"ids": tuple(guest_ids)}
+    def _exec(sql):
+        db.execute(_sql(sql).bindparams(bindparam("ids", expanding=True)), params)
+
+    # 依子→父順序斷鏈刪除（訪客的訂單樹）
+    _exec("""
+        DELETE FROM order_item_toppings WHERE order_item_id IN (
+            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
+            WHERE o.user_id IN :ids
+        )
+    """)
+    _exec("""
+        DELETE FROM order_item_options WHERE order_item_id IN (
+            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
+            WHERE o.user_id IN :ids
+        )
+    """)
+    _exec("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN :ids)")
+    _exec("DELETE FROM orders WHERE user_id IN :ids")
+    for tbl in ["user_departments", "user_favorites", "user_presets"]:
+        try:
+            _exec(f"DELETE FROM {tbl} WHERE user_id IN :ids")
+        except Exception:
+            pass
+    _exec("DELETE FROM users WHERE id IN :ids")
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/users-duplicates?cleaned={len(guest_ids)}",
+        status_code=302
+    )
 
 
 @router.get("/users/{user_id}")

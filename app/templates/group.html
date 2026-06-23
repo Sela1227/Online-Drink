@@ -1045,8 +1045,9 @@ function orderPage() {
         },
         
         copyLink() {
+            // 複製團單網址。對方點了若未登入會自動導向 LINE 登入，登入後用自己身分跟團
             navigator.clipboard.writeText(window.location.href);
-            alert('連結已複製！');
+            alert('團單連結已複製！分享給要跟團的人，他們點開後用自己的 LINE 登入即可一起點餐。');
         },
         
         renderOptions() {
