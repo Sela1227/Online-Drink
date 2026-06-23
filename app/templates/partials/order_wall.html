@@ -64,6 +64,36 @@
                     </div>
                     {% endfor %}
                 </div>
+
+                <!-- 折扣顯示（有折扣才顯示）-->
+                {% if order.discount_amount and order.discount_amount > 0 %}
+                <div class="mt-1 text-sm text-red-600 flex items-center justify-between">
+                    <span><i class="ti ti-discount"></i> 折扣{% if order.discount_note %}（{{ order.discount_note }}）{% endif %}</span>
+                    <span>-${{ order.discount_amount }}</span>
+                </div>
+                {% endif %}
+
+                <!-- 團主折扣工具 -->
+                {% if is_owner or is_admin %}
+                <div x-data="{ open: false }" class="mt-1">
+                    <button @click="open = !open" class="text-xs text-sela-600 hover:text-sela-700">
+                        <i class="ti ti-discount-2"></i> {% if order.discount_amount and order.discount_amount > 0 %}修改折扣{% else %}加折扣{% endif %}
+                    </button>
+                    <form x-show="open" x-transition method="post"
+                          action="/{{ group.id }}/orders/{{ order.id }}/discount"
+                          class="mt-2 p-2 bg-sela-50 rounded-lg flex flex-wrap items-center gap-2">
+                        <span class="text-xs text-gray-500">折</span>
+                        <input type="number" name="discount_amount" min="0" step="1"
+                               value="{{ order.discount_amount|int if order.discount_amount else '' }}"
+                               placeholder="0" class="w-16 border rounded px-2 py-1 text-sm">
+                        <span class="text-xs text-gray-500">元</span>
+                        <input type="text" name="discount_note" maxlength="20"
+                               value="{{ order.discount_note or '' }}"
+                               placeholder="說明（如搭主餐）" class="flex-1 min-w-24 border rounded px-2 py-1 text-sm">
+                        <button type="submit" class="px-3 py-1 bg-sela-600 text-white rounded text-sm">儲存</button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

@@ -20,6 +20,8 @@ class Order(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.DRAFT)
     snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # 修改時保留原訂單
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)  # 團主手動折扣金額
+    discount_note: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 折扣說明（如「搭主餐」）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -29,8 +31,15 @@ class Order(Base):
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     
     @property
-    def total_amount(self) -> Decimal:
+    def items_subtotal(self) -> Decimal:
+        """折扣前的品項原價總和"""
         return sum(item.subtotal for item in self.items)
+
+    @property
+    def total_amount(self) -> Decimal:
+        """應付金額 = 品項原價總和 - 團主折扣（單一真相，所有顯示處共用）"""
+        total = self.items_subtotal - (self.discount_amount or Decimal("0"))
+        return total if total > 0 else Decimal("0")
     
     @property
     def total_quantity(self) -> int:

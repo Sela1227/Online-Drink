@@ -77,6 +77,20 @@ def export_orders_to_excel(group, orders) -> BytesIO:
             
             total_amount += subtotal
             row += 1
+
+        # 折扣列（有折扣才加）
+        if order.discount_amount and order.discount_amount > 0:
+            ws.cell(row=row, column=1, value=order.user.show_name).border = thin_border
+            note = f"折扣（{order.discount_note}）" if order.discount_note else "折扣"
+            ws.cell(row=row, column=2, value=note).border = thin_border
+            ws.cell(row=row, column=4, value="-").border = thin_border
+            ws.cell(row=row, column=5, value="-").border = thin_border
+            disc = -float(order.discount_amount)
+            ws.cell(row=row, column=6, value=disc).border = thin_border
+            ws.cell(row=row, column=6).number_format = '$#,##0'
+            ws.cell(row=row, column=6).font = Font(color="C0392B")
+            total_amount += disc
+            row += 1
     
     # 合計
     row += 1

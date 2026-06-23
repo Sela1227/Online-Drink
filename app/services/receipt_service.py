@@ -65,7 +65,14 @@ def _collect(db: Session, group: Group):
     people = []
 
     for order in sorted(orders, key=lambda o: o.user.show_name):
-        person = {"name": order.user.show_name, "items": [], "total": order.total_amount}
+        person = {
+            "name": order.user.show_name,
+            "items": [],
+            "subtotal": order.items_subtotal,       # 折扣前
+            "discount": order.discount_amount or Decimal("0"),
+            "discount_note": order.discount_note,
+            "total": order.total_amount,            # 折扣後應付
+        }
         for item in order.items:
             parts = [item.item_name]
             if item.size:
@@ -93,13 +100,22 @@ def _collect(db: Session, group: Group):
         people.append(person)
 
     total_qty = sum(v["quantity"] for v in summary.values())
-    total_amount = sum(v["quantity"] * v["unit"] for v in summary.values())
+    items_total = sum(v["quantity"] * v["unit"] for v in summary.values())
+    # 總折扣（所有人的店家優惠加總）— 店家實收要扣掉
+    total_discount = sum(
+        (o.discount_amount or Decimal("0")) for o in orders
+    )
+    total_amount = items_total - total_discount
+    if total_amount < 0:
+        total_amount = Decimal("0")
 
     return {
         "summary": sorted(summary.items()),
         "people": people,
         "total_qty": total_qty,
-        "total_amount": total_amount,
+        "items_total": items_total,        # 折扣前品項原價
+        "total_discount": total_discount,  # 總優惠
+        "total_amount": total_amount,      # 店家實收（折後）
         "people_count": len(people),
     }
 
@@ -199,11 +215,24 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
 
     # 總計列
     y -= 2 * mm
+    if data["total_discount"] > 0:
+        # 有店家優惠：先顯示原價、優惠各一行（細），再總計實收
+        c.setFillColor(GRAY)
+        c.setFont(_FONT, 9)
+        c.drawString(x + 2 * mm, y, "原價小計")
+        c.drawRightString(W - margin - 2 * mm, y, f"${int(data['items_total'])}")
+        y -= 5 * mm
+        c.setFillColor(colors.HexColor("#C0392B"))
+        c.drawString(x + 2 * mm, y, "店家優惠")
+        c.drawRightString(W - margin - 2 * mm, y, f"-${int(data['total_discount'])}")
+        y -= 6 * mm
+    # 總計實收（主題色塊）
     c.setFillColor(THEME)
     c.rect(x, y - 1 * mm, W - 2 * margin, 8 * mm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont(_FONT, 11)
-    c.drawString(x + 2 * mm, y + 1 * mm, f"總計 {data['total_qty']} 份")
+    label = f"實收 {data['total_qty']} 份" if data["total_discount"] > 0 else f"總計 {data['total_qty']} 份"
+    c.drawString(x + 2 * mm, y + 1 * mm, label)
     c.drawRightString(W - margin - 2 * mm, y + 1 * mm, f"${int(data['total_amount'])}")
     y -= 14 * mm
 
@@ -226,8 +255,10 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
     ITEM_H = 5 * mm        # 每品項列佔高
     GAP_BETWEEN = 3 * mm   # 兩人色塊間的外距
     for person in data["people"]:
-        # 色塊總高 = 上內距 + 姓名 + 品項 + 下內距（留白對稱、外框留足）
-        block_h = PAD_TOP + NAME_H + len(person["items"]) * ITEM_H + PAD_BOTTOM
+        has_discount = person["discount"] > 0
+        # 色塊總高 = 上內距 + 姓名 + 品項 + (折扣行) + 下內距
+        extra = ITEM_H if has_discount else 0
+        block_h = PAD_TOP + NAME_H + len(person["items"]) * ITEM_H + extra + PAD_BOTTOM
         # 換頁判斷（整塊放不下就換頁）
         if y - block_h < 18 * mm:
             c.showPage()
@@ -241,7 +272,7 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             c.setFillColor(ZEBRA)
             c.rect(x - 4 * mm, block_bottom, W - 2 * margin + 8 * mm, block_h, fill=1, stroke=0)
 
-        # 姓名 + 金額（從色塊頂往下 PAD_TOP + 一個字高的基線）
+        # 姓名 + 金額（折扣後應付）
         text_y = block_top - PAD_TOP - 4 * mm
         c.setFillColor(colors.black)
         c.setFont(_FONT, 11)
@@ -259,6 +290,13 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
             qty_str = f" ×{it['qty']}" if it["qty"] > 1 else ""
             c.drawString(x + 5 * mm, text_y, f"{desc}{qty_str}")
             c.drawRightString(W - margin - 2 * mm, text_y, f"${int(it['subtotal'])}")
+            text_y -= ITEM_H
+        # 折扣行（有折扣才畫）
+        if has_discount:
+            c.setFillColor(colors.HexColor("#C0392B"))  # 折扣用紅字區隔
+            note = f"折扣（{person['discount_note']}）" if person["discount_note"] else "折扣"
+            c.drawString(x + 5 * mm, text_y, note)
+            c.drawRightString(W - margin - 2 * mm, text_y, f"-${int(person['discount'])}")
             text_y -= ITEM_H
         # 移到下一個色塊頂（含兩人間外距）
         y = block_bottom - GAP_BETWEEN

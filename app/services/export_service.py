@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal
 
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderStatus
@@ -84,7 +85,18 @@ def generate_order_text(db: Session, group: Group) -> str:
     
     lines.append("=" * 30)
     lines.append(f"總杯數：{total_quantity}")
-    lines.append(f"總金額：${total_amount}")
+    # 店家優惠（所有人折扣加總）
+    total_discount = sum(
+        (o.discount_amount or Decimal("0"))
+        for o in group.orders
+        if o.status == OrderStatus.SUBMITTED
+    )
+    if total_discount > 0:
+        lines.append(f"原價：${total_amount}")
+        lines.append(f"店家優惠：-${total_discount}")
+        lines.append(f"實收：${total_amount - total_discount}")
+    else:
+        lines.append(f"總金額：${total_amount}")
     
     return "\n".join(lines)
 
@@ -151,6 +163,10 @@ def generate_payment_text(db: Session, group: Group) -> str:
             if item.quantity > 1:
                 item_desc += f" x{item.quantity}"
             lines.append(f"   - {item_desc} ${item.subtotal}")
+        # 折扣行（有折扣才顯示）
+        if order.discount_amount and order.discount_amount > 0:
+            note = f"（{order.discount_note}）" if order.discount_note else ""
+            lines.append(f"   - 折扣{note} -${order.discount_amount}")
         lines.append("")
     
     # 未結單
