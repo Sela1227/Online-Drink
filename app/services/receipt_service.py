@@ -225,7 +225,8 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
         c.setFillColor(colors.HexColor("#C0392B"))
         c.drawString(x + 2 * mm, y, "店家優惠")
         c.drawRightString(W - margin - 2 * mm, y, f"-${int(data['total_discount'])}")
-        y -= 6 * mm
+        # 實收紫條從 y-1mm 往上長 8mm（頂端在 y+7mm），間距須 > 7mm 才不蓋到「店家優惠」
+        y -= 10 * mm
     # 總計實收（主題色塊）
     c.setFillColor(THEME)
     c.rect(x, y - 1 * mm, W - 2 * margin, 8 * mm, fill=1, stroke=0)
@@ -314,14 +315,35 @@ def generate_receipt_pdf(db: Session, group: Group) -> BytesIO:
 
 
 def generate_receipt_png(db: Session, group: Group) -> BytesIO:
-    """產生核對單 PNG（由 PDF render，零額外字型）"""
+    """產生核對單 PNG（由 PDF render，零額外字型）
+
+    人多時核對單 PDF 會超過一頁；全部頁面 render 後直向拼接成「一張長圖」，
+    團主貼 LINE 一次就能分享完整內容（避免只剩第一頁、每人明細不見）。
+    """
     pdf_buf = generate_receipt_pdf(db, group)
     import pypdfium2 as pdfium
+    from PIL import Image
+
     pdf = pdfium.PdfDocument(pdf_buf.getvalue())
-    page = pdf[0]
-    bitmap = page.render(scale=2.5)  # 2.5x 高解析，貼 LINE 清晰
-    pil_image = bitmap.to_pil()
+    images = []
+    for i in range(len(pdf)):
+        bitmap = pdf[i].render(scale=2.5)  # 2.5x 高解析，貼 LINE 清晰
+        im = bitmap.to_pil()
+        images.append(im.convert("RGB") if im.mode != "RGB" else im)
+
+    if len(images) == 1:
+        merged = images[0]
+    else:
+        # 多頁直向拼接（白底，各頁等寬置中）
+        width = max(im.width for im in images)
+        total_h = sum(im.height for im in images)
+        merged = Image.new("RGB", (width, total_h), (255, 255, 255))
+        y_off = 0
+        for im in images:
+            merged.paste(im, ((width - im.width) // 2, y_off))
+            y_off += im.height
+
     out = BytesIO()
-    pil_image.save(out, format="PNG")
+    merged.save(out, format="PNG")
     out.seek(0)
     return out
