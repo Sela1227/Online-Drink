@@ -731,54 +731,41 @@
                 x-init="window.addEventListener('scroll', () => showTop = window.scrollY > 300)"
                 x-show="showTop"
                 x-transition
-                class="bg-gray-500 hover:bg-gray-600 text-white rounded-full w-12 h-12 shadow-lg flex items-center justify-center">
-            <span class="text-lg">↑</span>
+                class="bg-white text-sela-700 border border-sela-200 rounded-full w-11 h-11 shadow-md active:scale-90 transition flex items-center justify-center" aria-label="返回頂端">
+            <i class="ti ti-arrow-up" style="font-size:20px;"></i>
         </button>
         
         <!-- 購物車按鈕（只有未結單時顯示） -->
         <button @click="showCart = true"
                 x-show="orderStatus !== 'submitted'"
-                class="bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-full w-14 h-14 shadow-lg flex items-center justify-center relative">
-            <span class="text-xl"><i class="ti ti-shopping-cart"></i></span>
+                class="bg-sela-800 text-white rounded-full w-14 h-14 shadow-lg active:scale-90 transition flex items-center justify-center relative" aria-label="購物車">
+            <i class="ti ti-shopping-cart" style="font-size:24px;"></i>
             <span x-show="cartCount > 0"
-                  class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                  class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center ring-2 ring-white"
                   x-text="cartCount"></span>
         </button>
     </div>
     
-    <!-- 購物車側欄（只有未結單時使用） -->
+    <!-- 購物車（底部 sheet・只有未結單時使用）-->
     <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
-        <div class="absolute inset-0 bg-black/30" @click="showCart = false"></div>
-        <div class="absolute right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-xl flex flex-col"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="translate-x-full"
-             x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="translate-x-0"
-             x-transition:leave-end="translate-x-full">
-            
-            <!-- 購物車標題 -->
-            <div class="p-4 border-b flex items-center justify-between bg-sela-500 text-sela-800">
-                <h3 class="font-semibold text-lg">購物車</h3>
-                <button @click="showCart = false" class="text-sela-800/80 hover:text-sela-900 text-2xl">&times;</button>
+        <div class="absolute inset-0 bg-black/40" @click="showCart = false"
+             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
+        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[88vh]"
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
+            <!-- 抓握條 -->
+            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
+            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-shopping-cart"></i> 購物車</h3>
+                <button @click="showCart = false" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
+                    <i class="ti ti-x" style="font-size:20px;"></i>
+                </button>
             </div>
-            
-            <!-- 購物車內容 -->
-            <div class="flex-1 overflow-y-auto" id="cart-content"
-                 hx-get="/groups/{{ group.id }}/orders/mine" 
-                 hx-trigger="load, orderUpdated from:body"
-                 hx-swap="innerHTML">
+            <!-- 內容（my_order 內含自動釘底的結帳列）-->
+            <div class="flex-1 overflow-y-auto px-3 pt-1" id="cart-content"
+                 hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body" hx-swap="innerHTML">
                 {% include "partials/my_order.html" %}
-            </div>
-            
-            <!-- 購物車底部 -->
-            <div class="p-4 border-t bg-gray-50">
-                <div class="flex gap-2">
-                    <button @click="showCart = false" 
-                            class="flex-1 py-2.5 rounded-lg border hover:bg-gray-100 font-medium">
-                        {% if group.category.value == 'group_buy' %}繼續下單{% else %}繼續點餐{% endif %}
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -805,7 +792,7 @@
             <h3 class="font-semibold text-lg mb-4"><i class="ti ti-clipboard-list"></i> 儲存為開團模板</h3>
             <form action="/templates/save-from-group/{{ group.id }}" method="post">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">模板名稱</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">模板名稱</label>
                     <input type="text" name="template_name" required
                            placeholder="例：每週三下午茶"
                            class="w-full border rounded-lg px-3 py-2">
@@ -843,17 +830,17 @@
                 
                 <!-- 尺寸選擇 -->
                 <div x-show="selectedItem?.price_l" class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">尺寸</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">尺寸</label>
                     <div class="flex gap-2">
                         <label class="cursor-pointer flex-1">
                             <input type="radio" name="size" value="M" x-model="selectedSize" class="peer hidden" checked>
-                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-sela-500 peer-checked:text-sela-800 peer-checked:border-sela-500">
+                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 text-center peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
                                 M <span x-text="'$' + selectedItem?.price"></span>
                             </span>
                         </label>
                         <label class="cursor-pointer flex-1">
                             <input type="radio" name="size" value="L" x-model="selectedSize" class="peer hidden">
-                            <span class="block px-3 py-2 rounded border text-center peer-checked:bg-sela-500 peer-checked:text-sela-800 peer-checked:border-sela-500">
+                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 text-center peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
                                 L <span x-text="'$' + selectedItem?.price_l"></span>
                             </span>
                         </label>
@@ -863,7 +850,7 @@
                 <!-- 甜度 -->
                 {% if group.category.value == 'drink' %}
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">甜度</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">甜度</label>
                     {% if group.lock_sugar %}
                     <div class="text-gray-600">{{ group.default_sugar }} (已鎖定)</div>
                     <input type="hidden" name="sugar" value="{{ group.default_sugar }}">
@@ -873,7 +860,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="sugar" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_sugar %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-sela-800 peer-checked:border-sela-500">
+                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -884,7 +871,7 @@
                 
                 <!-- 冰塊 -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">冰塊</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">冰塊</label>
                     {% if group.lock_ice %}
                     <div class="text-gray-600">{{ group.default_ice }} (已鎖定)</div>
                     <input type="hidden" name="ice" value="{{ group.default_ice }}">
@@ -894,7 +881,7 @@
                         <label class="cursor-pointer">
                             <input type="radio" name="ice" value="{{ opt.option_value }}" 
                                    class="peer hidden" {% if opt.option_value == group.default_ice %}checked{% endif %}>
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-sela-800 peer-checked:border-sela-500">
+                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
                                 {{ opt.option_value }}
                             </span>
                         </label>
@@ -906,12 +893,13 @@
                 <!-- 加料選項（飲料店） -->
                 {% if store.toppings %}
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">加料</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">加料</label>
                     <div class="flex flex-wrap gap-2">
                         {% for topping in store.toppings if topping.is_active %}
                         <label class="cursor-pointer">
-                            <input type="checkbox" name="toppings" value="{{ topping.id }}" class="peer hidden">
-                            <span class="block px-3 py-1.5 rounded border peer-checked:bg-sela-500 peer-checked:text-sela-800 peer-checked:border-sela-500">
+                            <input type="checkbox" name="toppings" value="{{ topping.id }}" class="peer hidden"
+                                   @change="extraToppings += $event.target.checked ? {{ topping.price|int }} : -{{ topping.price|int }}">
+                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
                                 {{ topping.name }} {% if topping.price > 0 %}+${{ topping.price|int }}{% endif %}
                             </span>
                         </label>
@@ -923,40 +911,37 @@
                 
                 <!-- 加購選項 -->
                 <div x-show="selectedItem?.options?.length > 0" class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">加購選項</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">加購選項</label>
                     <div class="space-y-2" x-html="renderOptions()"></div>
                 </div>
                 
                 <!-- 數量 -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">數量</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">數量</label>
                     <div class="flex items-center gap-3">
-                        <button type="button" @click="quantity = Math.max(1, quantity - 1)"
-                                class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-xl">−</button>
-                        <input type="number" name="quantity" x-model="quantity" min="1" 
-                               class="w-16 text-center border rounded py-2">
-                        <button type="button" @click="quantity++"
-                                class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-xl">+</button>
+                        <button type="button" @click="quantity = Math.max(1, quantity - 1)" class="stepper" aria-label="減少數量">−</button>
+                        <input type="number" name="quantity" x-model="quantity" min="1"
+                               class="w-16 text-center border border-sela-300 rounded-xl py-2.5 text-sela-800 font-medium">
+                        <button type="button" @click="quantity++" class="stepper" aria-label="增加數量">+</button>
                     </div>
                 </div>
                 
                 <!-- 備註 -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">備註</label>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">備註</label>
                     <input type="text" name="note" placeholder="特殊需求..." 
                            class="w-full border rounded px-3 py-2">
                 </div>
                 
+                <!-- 本品小計 -->
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <span class="text-sm text-sela-700/70">本品小計</span>
+                    <span class="text-lg font-bold text-sela-800" x-text="'$' + itemSubtotal()"></span>
+                </div>
                 <!-- 按鈕 -->
                 <div class="flex gap-2">
-                    <button type="button" @click="showAddItem = false"
-                            class="flex-1 py-3 rounded-lg border hover:bg-gray-50">
-                        取消
-                    </button>
-                    <button type="submit"
-                            class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
-                        加入購物車
-                    </button>
+                    <button type="button" @click="showAddItem = false" class="btn btn-secondary flex-1">取消</button>
+                    <button type="submit" class="btn btn-primary flex-1">加入購物車</button>
                 </div>
             </form>
         </div>
@@ -990,6 +975,7 @@ function orderPage() {
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
+        extraToppings: 0,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
         orderStatus: '{{ my_order.status.value if my_order else "none" }}',
         showRandom: false,
@@ -1027,6 +1013,7 @@ function orderPage() {
             this.selectedItem = item;
             this.selectedSize = 'M';
             this.quantity = 1;
+            this.extraToppings = 0;
             this.showAddItem = true;
         },
         
@@ -1035,6 +1022,13 @@ function orderPage() {
             this.updateCartCount();
             this.orderStatus = 'draft';
             document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+        },
+        
+        itemSubtotal() {
+            if (!this.selectedItem) return 0;
+            const base = (this.selectedSize === 'L' && this.selectedItem.price_l) ? this.selectedItem.price_l : this.selectedItem.price;
+            const q = Math.max(1, parseInt(this.quantity) || 1);
+            return (base + this.extraToppings) * q;
         },
         
         updateCartCount() {
