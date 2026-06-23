@@ -675,6 +675,59 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
     return RedirectResponse(url="/admin/users", status_code=302)
 
 
+@router.get("/users-duplicates")
+async def users_duplicates(request: Request, db: Session = Depends(get_db)):
+    """診斷：找出同名用戶（判斷是否真重複帳號）"""
+    admin = await get_admin_user(request, db)
+
+    from app.models.user import User
+    from app.models.order import Order
+    from collections import defaultdict
+
+    all_users = db.query(User).all()
+    # 依 show_name 分組
+    by_name = defaultdict(list)
+    for u in all_users:
+        by_name[u.show_name].append(u)
+
+    # 只保留有重複名稱的組
+    dup_groups = []
+    for name, users in by_name.items():
+        if len(users) > 1:
+            rows = []
+            for u in users:
+                order_count = db.query(Order).filter(Order.user_id == u.id).count()
+                rows.append({
+                    "id": u.id,
+                    "line_tail": u.line_user_id[-6:] if u.line_user_id else "（無）",
+                    "line_full": u.line_user_id or "",
+                    "display_name": u.display_name,
+                    "nickname": u.nickname,
+                    "created_at": u.created_at,
+                    "last_active_at": u.last_active_at,
+                    "order_count": order_count,
+                    "has_picture": bool(u.picture_url),
+                })
+            # 同組內若有「相同 line_user_id」才是真重複（理論上 unique 不該發生）
+            line_ids = [u.line_user_id for u in users]
+            true_dup = len(line_ids) != len(set(line_ids))
+            dup_groups.append({
+                "name": name,
+                "count": len(users),
+                "rows": sorted(rows, key=lambda r: r["order_count"], reverse=True),
+                "true_dup": true_dup,
+            })
+
+    dup_groups.sort(key=lambda g: g["count"], reverse=True)
+
+    return templates.TemplateResponse("admin/users_duplicates.html", {
+        "request": request,
+        "user": admin,
+        "dup_groups": dup_groups,
+        "total_users": len(all_users),
+    })
+
+
 @router.get("/users/{user_id}")
 async def user_detail(user_id: int, request: Request, db: Session = Depends(get_db)):
     """使用者詳細資訊頁面"""
