@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.20.0（主題色 紫 #653985 → 經典奶茶；全站淺底深字）
+- **版本：** V1.20.1（換上奶茶版 ORDER logo 全套 + 修 manifest 橘色殘留）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -274,6 +274,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.20.1 | **換上奶茶版 ORDER logo 全套 + 修 manifest 橘色殘留**。使用者提供 AI 生成的 ORDER logo（原為紫底白圖），因主題已是奶茶，先攔下避免紫色擺回奶茶表頭。flat 雙色 logo 程式改色：flood fill 遮罩外圈白 → 方塊內 紫→奶茶 tan `#C9A977`、白圖→深咖啡 `#5B4733`、外圈透明。照規範切全套：頁首 `images/sela-logo.jpg`（壓 `#E8D9C0` 表頭底）、favicon `16/32/192/512`（透明圓角 PNG）、`apple-touch-icon`（壓 `#E8D9C0` 不透明，iOS 用）、`favicon.ico`（16/32/48）。另外發現 `site.webmanifest` 的 `theme_color`/`background_color` 還是橘色 `#F36825`（橘色時代殘留，當初換紫＋這次換奶茶都漏，且不在前次 grep 的副檔名範圍內）→ 改 `#C9A977`/`#E8D9C0`。教訓：**改主題色時 grep 範圍要含 `.webmanifest`/`.json`/`.svg`**，PWA 顏色與圖示資產容易漏。 |
 | V1.20.0 | **主題色全面更換：紫 #653985 → 經典奶茶（淺底深字）**。原因：有人反映紫色影響食慾，改用偏白的奶茶暖色。`sela` 色階全部換成奶茶（500 = `#C9A977`、200 = `#E8D9C0`、800 = `#5B4733`，一字不差、淡濃階用算的）；網頁端從「深底白字」反轉成「淺底深字」（`header bg-sela-600`→`bg-sela-200` + `border-sela-300`、`text-white`→`text-sela-800`，約 40 個模板＋scrollbar 一起掃）。收尾三個缺口：(a) `receipt_service.py` 版型翻成淺底深字（表頭 `THEME_FILL #E8D9C0` 底＋底部 `DIVIDER #DCC8A6` 分隔線、店名/實收文字改深咖啡、實收條 `THEME_BAR #D8C09A`、logo 白框加 divider 描邊）；(b) `excel_service.py` 匯出表頭 紫底白字 → `#C9A977` 底深字；(c) `import.html` 生 logo 的 AI 提示詞 紫底白框 → 奶茶底深咖啡框。語意色（amber/yellow 狀態徽章、收藏星、分類 filter）**刻意保留**，非紫色殘留。全站 grep 紫色 hex 歸零；receipt render 像素取樣驗證表頭 = #E8D9C0、實收條 = #D8C09A。 |
 | V1.19.4 | **Hotfix：核對單兩個顯示 bug（坑 #23）**。使用者回報截圖。(1) **折扣行被實收紫條蓋住**：店家總項有店家優惠時的「店家優惠 -$X」那行，畫完只往下移 6mm，但底下「實收」紫色塊是從 `y-1mm` 往上長 8mm（頂端在 `y+7mm`），7mm 上緣蓋過只隔 6mm 的折扣文字。改 `y -= 6mm` → `y -= 10mm`（間距須 > 7mm）。(2) **PNG 只出第一頁**：`generate_receipt_png` 寫死 `page = pdf[0]`，人多溢頁時每人明細整段不見。改為 render 全部頁面、白底等寬置中直向拼成「一張長圖」（貼 LINE 一次分享完整）。兩處皆獨立測試重現＋修復確認（折扣行與紫條分離、3 頁拼接成 6315px 長圖）。只動 `receipt_service.py`。 |
 | V1.19.3 | **分享連結改走 LINE 登入 + 訪客清理**。承 V1.19.2 關閉訪客後，使用者要的「分享連結」其實是「分享團單網址、對方點了沒登入就導 LINE 登入」（用自己身分跟團）。發現**既有的「複製連結」按鈕（copyLink 複製 window.location.href = /groups/{id}）就是這個需求** —— 對方點開未登入會被坑 #14 的 401 redirect 導去 LINE 登入。只改提示文字講清楚（「分享給跟團的人，他們用自己 LINE 登入即可一起點餐」），不需新功能。訪客清理：診斷頁清理按鈕 + `/admin/users-cleanup-guests` 路由（依子→父斷鏈刪訪客訂單樹，排除有開團的訪客）已完備，使用者確認舊訪客訂單不重要、直接清。端到端測：3 訪客清光、正式用戶保留。 |
