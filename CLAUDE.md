@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.0.0（導覽盤點：全頁可返回・里程碑版）
+- **版本：** V2.0.1（修：開團模板返回錨點回到個人資料）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -274,6 +274,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.0.1 | **修：開團模板返回錨點**。使用者實機回報「我的（個人資料）」頁進入的 6 項，返回應一律回到該頁。盤點發現 5 項（消費統計／我的訂單／我參與過的團／我的部門／收藏店家）已正確返回 `/profile`，僅 **開團模板（templates/list）** 返回 `/home`（因它也可從開團頁的「管理模板」進入，當初設成首頁）；改為返回 `/profile`，與其他項一致。 |
 | **V2.0.0** | **里程碑版・導覽返回鍵全站盤點**。逐頁盤點「點進去回不了上一頁」的情況：全部 41 個頁面模板檢查返回鍵，結果只有 6 個沒有——其中 `home`/`login`/`welcome`/`feedback/list`（底部 nav 根頁）/`guest_entry`（訪客外部入口）本來就不需要返回鍵；真正缺的只有 **`group_new`（開團頁，從 FAB 進入）→ 補返回 /home** 與 **`my_groups`（我的團單，從個人頁進入）→ 補返回 /profile**。另確認外部連結（外送/地圖/官網）皆有 `target="_blank"`、不會把使用者帶離 App；所有現有 `nav.back` 目的地正確。至此**全站無導覽死路**：每個子頁左上都有統一返回鍵、根頁有底部 nav。此版總結 V1.19→V2.0 的成果：收據修正、奶茶主題、結帳重做、全站視覺統一、返回鍵統一（前後台）、手機優化、加入回饋/無重載結帳/再來一杯、匯入頁重設計、清除測試團、使用者排序、我的進行中、常點一鍵、截止急迫感、SVG 空狀態插圖。 |
 | V1.27.0 | **我的進行中 + 常點一鍵 + 截止急迫感 + SVG 空狀態插圖**。(1) **首頁「我的進行中」**（#3）：home.py 從已 eager-load 的開放團算出「我是團主或已下單」的團（`my_active`，狀態 submitted/draft/editing/owner），home.html 頂部新增區塊＋狀態徽章（已結單綠／待點餐琥珀／未送出 sela），一進首頁就看到自己在哪些團、點了沒。(2) **常點一鍵**（#6）：groups.py 新增個人常點查詢（`OrderItem` 依 `menu_item_id` 彙總此使用者在此店家的數量，前 8，再對應到目前菜單可點的前 4），group.html 快速點餐區頂部加「你的常點」深咖啡 chips，點一下開客製 sheet（與 V1.25 的「再來一杯」串起來＝開窗即帶上次糖冰）。(3) **截止急迫感**（#1）：`countdown()`（home.html + group.html）加 `urgent` 旗標（剩 <15 分），group_card 與 group 頭部倒數在急迫時變紅底＋`animate-pulse`＋火焰圖示，平時時鐘圖示。(4) **SVG 空狀態**（#2，絕不用 emoji）：空購物車換成奶茶杯內嵌 SVG 插圖（杯身/杯蓋/吸管/珍珠）、首頁無團換成飲料杯＋蒸氣餐碗場景 SVG，皆用品牌奶茶色階。全站確認無 emoji（一律 Tabler icon webfont 或 inline SVG）。後端 home.py/groups.py 編譯通過、全模板解析通過。 |
 | V1.26.0 | **標題版本號 + 清除測試團 + 使用者排序**。(1) **版本號回到標題旁**：header logo 右側「快點來點餐」下方加小字版本號（`{{ app_version }}`，text-[10px] 暖灰），方便確認部署是否更新（Phase 1 曾移除，現依需求以低調樣式加回）。(2) **清除測試團**（admin）：`admin.py` 新增 `_delete_group_cascade()`（照抄 groups.py 既有 FK 連鎖刪除：TreatRecord→GroupDepartment→Order 的 OrderItemOption/OrderItemTopping/OrderItem→Order→Group）＋ `POST /admin/groups/cleanup-test`（刪除「所有訂單都屬團主、或無訂單」的團，條件 `all(o.user_id == g.owner_id for o in g.orders)`）＋ `POST /admin/groups/{id}/delete`（管理員刪單一團，導回 /admin/groups）。admin/groups.html 加「清除測試團」卡片＋清除數提示，每列改結構（原整列 `<a>` → 連結與操作並列，表單不能塞進 `<a>`），加「測試團」標記與刪除鈕。(3) **使用者排序**：`GET /admin/users` 加 `sort` 參數（created／last_login／last_active／name，用 `nullslast()` 處理未登入者），users.html 加分頁式排序控制。教訓：刪團 FK 連鎖務必重用既有經驗證的刪除順序，不可只 `db.delete(group)`（PostgreSQL 會因 FK 失敗）。 |
