@@ -1,16 +1,18 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}匯入{% if selected_store %}菜單 - {{ selected_store.name }}{% else %}店家/菜單{% endif %} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{% if selected_store %}{{ nav.back('/admin/stores/' ~ selected_store.id, selected_store.name) }}{% else %}{{ nav.back('/admin', '管理後台') }}{% endif %}
 <div class="space-y-4" x-data="importForm()">
     <div class="flex items-center justify-between">
         {% if selected_store %}
-        <h1 class="text-xl font-bold text-gray-800">匯入菜單</h1>
-        <a href="/admin/stores/{{ selected_store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回 {{ selected_store.name }} →</a>
+        <h1 class="text-xl font-bold text-sela-800">匯入菜單</h1>
+        
         {% else %}
-        <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+        <h1 class="text-xl font-bold text-sela-800">匯入店家/菜單</h1>
+        
         {% endif %}
     </div>
 
@@ -28,7 +30,7 @@
             {% endif %}
         </div>
         <div>
-            <div class="font-medium text-gray-800">{{ selected_store.name }}</div>
+            <div class="font-medium text-sela-800">{{ selected_store.name }}</div>
             <div class="text-sm text-sela-800">菜單將匯入到此店家</div>
         </div>
     </div>
@@ -47,8 +49,8 @@
             <button type="button" @click="navigator.clipboard.writeText(promptNewStore); copied='new'; setTimeout(() => copied='', 2000)"
                     class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「新增店家」prompt</div>
-                    <div class="text-xs text-gray-500">店家是全新的，連店名一起建立</div>
+                    <div class="text-sm font-medium text-sela-800">複製「新增店家」prompt</div>
+                    <div class="text-xs text-sela-800/60">店家是全新的，連店名一起建立</div>
                 </div>
                 <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'new' ? '已複製 ✓' : '複製'"></span>
             </button>
@@ -56,8 +58,8 @@
             <button type="button" @click="navigator.clipboard.writeText({% if selected_store %}promptMenuForStore{% else %}promptMenu{% endif %}); copied='menu'; setTimeout(() => copied='', 2000)"
                     class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「{% if selected_store %}{{ selected_store.name }} 的菜單{% else %}既有店家加菜單{% endif %}」prompt</div>
-                    <div class="text-xs text-gray-500">{% if selected_store %}菜單轉成 JSON 後貼回{% else %}店家已存在，只補菜單{% endif %}</div>
+                    <div class="text-sm font-medium text-sela-800">複製「{% if selected_store %}{{ selected_store.name }} 的菜單{% else %}既有店家加菜單{% endif %}」prompt</div>
+                    <div class="text-xs text-sela-800/60">{% if selected_store %}菜單轉成 JSON 後貼回{% else %}店家已存在，只補菜單{% endif %}</div>
                 </div>
                 <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'menu' ? '已複製 ✓' : '複製'"></span>
             </button>
@@ -72,16 +74,16 @@
             <button type="button" @click="navigator.clipboard.writeText(promptLogoRestore); copied='logo1'; setTimeout(() => copied='', 2000)"
                     class="flex items-center justify-between px-3 py-2.5 bg-white border border-sela-300 rounded-lg hover:bg-sela-50 text-left">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「還原網路 Logo」prompt</div>
-                    <div class="text-xs text-gray-500">有原始 logo，提升解析度成正方形</div>
+                    <div class="text-sm font-medium text-sela-800">複製「還原網路 Logo」prompt</div>
+                    <div class="text-xs text-sela-800/60">有原始 logo，提升解析度成正方形</div>
                 </div>
                 <span class="text-sela-800 text-sm whitespace-nowrap" x-text="copied === 'logo1' ? '已複製 ✓' : '複製'"></span>
             </button>
             <button type="button" @click="navigator.clipboard.writeText(promptLogoText); copied='logo2'; setTimeout(() => copied='', 2000)"
                     class="flex items-center justify-between px-3 py-2.5 bg-white border border-sela-300 rounded-lg hover:bg-sela-50 text-left">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「文字 Logo」prompt</div>
-                    <div class="text-xs text-gray-500">沒有 logo，用店名生成統一風格</div>
+                    <div class="text-sm font-medium text-sela-800">複製「文字 Logo」prompt</div>
+                    <div class="text-xs text-sela-800/60">沒有 logo，用店名生成統一風格</div>
                 </div>
                 <span class="text-sela-800 text-sm whitespace-nowrap" x-text="copied === 'logo2' ? '已複製 ✓' : '複製'"></span>
             </button>
@@ -89,14 +91,14 @@
     </div>
 
     <!-- 分頁切換 -->
-    <div class="flex gap-1 bg-gray-100 p-1 rounded-lg">
+    <div class="flex gap-1 bg-sela-100 p-1 rounded-lg">
         <button type="button" @click="tab = 'paste'"
-                :class="tab === 'paste' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
+                :class="tab === 'paste' ? 'bg-white text-sela-800 shadow-sm' : 'text-sela-800/60'"
                 class="flex-1 py-2 rounded-md text-sm font-medium transition">
             <i class="ti ti-clipboard"></i> 貼上 JSON
         </button>
         <button type="button" @click="tab = 'upload'"
-                :class="tab === 'upload' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
+                :class="tab === 'upload' ? 'bg-white text-sela-800 shadow-sm' : 'text-sela-800/60'"
                 class="flex-1 py-2 rounded-md text-sm font-medium transition">
             <i class="ti ti-upload"></i> 上傳檔案
         </button>
@@ -108,7 +110,7 @@
           hx-swap="innerHTML"
           hx-encoding="multipart/form-data"
           hx-indicator="#import-loading"
-          class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+          class="bg-white rounded-2xl shadow-sm p-4 space-y-3">
 
         {% if selected_store_id %}
         <input type="hidden" name="store_id" value="{{ selected_store_id }}">
@@ -132,7 +134,7 @@
         <div x-show="tab === 'paste'">
             <div class="flex gap-2 mb-2">
                 <button type="button" @click="jsonText = ''"
-                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-400">
+                        class="text-xs px-2 py-1 border border-sela-300 rounded hover:bg-sela-50 text-sela-800/45">
                     清空
                 </button>
             </div>
@@ -146,7 +148,7 @@
             <input type="file" name="json_file" accept=".json"
                    @change="fileName = $event.target.files[0]?.name || ''"
                    class="w-full border rounded-lg px-3 py-2">
-            <p x-show="fileName" class="text-sm text-gray-500 mt-1" x-text="'已選擇：' + fileName"></p>
+            <p x-show="fileName" class="text-sm text-sela-800/60 mt-1" x-text="'已選擇：' + fileName"></p>
         </div>
 
         <button type="submit"
@@ -160,12 +162,12 @@
     <div id="import-result"></div>
 
     <!-- 範例格式（摺疊參考）-->
-    <details class="bg-white rounded-lg shadow-sm">
-        <summary class="p-4 cursor-pointer font-medium text-gray-700 text-sm"><i class="ti ti-clipboard-list"></i> 查看 JSON 格式說明</summary>
+    <details class="bg-white rounded-2xl shadow-sm">
+        <summary class="p-4 cursor-pointer font-medium text-sela-800/80 text-sm"><i class="ti ti-clipboard-list"></i> 查看 JSON 格式說明</summary>
         <div class="px-4 pb-4 space-y-4">
             <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+                <div class="text-sm font-medium text-sela-800/70 mb-2">完整匯入（店家 + 菜單）</div>
+                <pre class="text-xs bg-sela-50 p-3 rounded overflow-x-auto">{
   "store": {
     "name": "可不可熟成紅茶",
     "category": "drink",
@@ -182,8 +184,8 @@
 }</pre>
             </div>
             <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+                <div class="text-sm font-medium text-sela-800/70 mb-2">菜單匯入（既有店家）</div>
+                <pre class="text-xs bg-sela-50 p-3 rounded overflow-x-auto">{
   "store_id": 1,
   "mode": "new",
   "menu": {

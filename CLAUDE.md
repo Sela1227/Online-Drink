@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.23.0（UI Phase 3：返回鍵全站統一左上＋次要頁彩虹收尾）
+- **版本：** V1.23.1（後台管理介面返回鍵統一＋灰字暖化）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -274,6 +274,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.23.1 | **後台管理介面返回鍵統一 + 灰字暖化**。使用者回報後台返回鍵位置仍亂。Phase 3 為控風險未掃 admin，本版補上：17 個後台頁全部套用 `nav.back()` macro（左上角、chevron + 目的地、統一樣式），移除原本散落 header 右側的 `返回XXX →`（灰、往前箭頭）；`import.html` 的條件式雙返回（有/無選定店家）改成條件式 `nav.back`。後台 18 檔灰字暖化（coffee 墨色階）、卡片圓角統一 `rounded-2xl`，後台 gray 歸零。後台的狀態色（啟用/停用/角色/審核狀態）屬語意色，保留。全模板 Jinja 解析通過。至此**前台＋後台返回鍵與文字色系全站一致**。 |
 | V1.23.0 | **UI 優化 Phase 3：返回鍵全站統一 + 次要頁收尾**。使用者回報「按鍵位置跳來跳去、尤其返回鍵」。盤點發現返回鍵根本各做各的：位置有左有右、圖示 `←`／`‹`／往前的 `→` 混用、文案「返回首頁／個人頁面／店家／投票列表…」不一、顏色 gray/sela 混。**統一方案（iOS 風）**：新增 `partials/nav.html` 的 `nav.back(href, label)` macro + base.html `.back-link` 樣式（左上、chevron + 目的地、44pt 可點）；16 個頁面一律在 `{% block content %}` 後第一個元素放 `{{ nav.back(...) }}`（永遠左上角），移除原本散落的返回連結；group.html 自身返回鍵也對齊同款。**次要頁彩虹收尾**：stats（資料頁全收品牌）、votes/*（投票選擇器→深咖啡實心、進度條→sela）、feedback 列表（blue→sela，保留 green=已解決/red=緊急）、guest_entry、templates/* 的灰字暖化＋彩虹收斂。卡片圓角統一 `rounded-2xl`。至此**消費端 gray 與非語意彩虹全部歸零**（green/amber/red 僅留語意）。全模板 Jinja 解析通過。教訓：返回鍵這種全站重複元件，應一開始就做成 macro+共用 class，不要每頁各寫一份——否則位置/圖示/文案必然漂移。 |
 | V1.22.0 | **UI 優化 Phase 2：全頁視覺統一**。把 Phase 1 的設計地基套到所有消費端頁面。(1) **灰字暖化**——全站 `text-gray-*` → coffee 墨色不同透明度（`text-sela-800` 系，900/800→800、700→800/80、600→800/70、500→800/60、400→800/45），`bg-gray-*`/`border-gray-*` → `sela`，`hover:bg-gray` → `active:bg-sela`（觸控回饋）。(2) **彩虹收斂**——分類三色（飲料 amber／餐廳 green／團購 blue）全收成品牌 sela；首頁篩選、團卡、快速點餐分頁、sticky 分類列的選中態統一成深咖啡實心 `bg-sela-800 text-white`；店家連結 pill（電話綠/地圖藍/UberEats emerald/foodpanda 粉）、功能橫幅（免單粉/請客紅/外送費藍）、糖冰晶片（amber/blue）全部統一 sela。**語意三色保留**：green=成功（已結單/送出數/資料已更新）、amber=提醒（備註）、red=危險（刪除/登出）。(3) **登入頁＋welcome 重做**——原本冷灰離題、掛舊 `sela-logo.svg`；改奶茶配色＋換上透明版新 ORDER logo（`images/order-logo.png`），LINE 綠鈕保留（品牌色）、加 LINE 圖示。(4) **結構細節**——`查看菜單` 升為主要 CTA、`返回首頁 →`（往前箭頭當返回）改成左 chevron `‹ 首頁`、profile 列表 `→` 改 `ti-chevron-right`、卡片圓角統一 `rounded-2xl`、group.html sticky 分類列 offset `top-12`→`top-14`。涉及約 25 個消費端模板與 partials，全數 Jinja 解析通過。**Phase 3 待辦**：stats／votes/*／feedback 列表／guest_entry 的彩虹收斂（次要頁，另版）。教訓：批次換色用 `text-sela-800/<opacity>` 做暖灰階，比硬挑 sela 中階好看且統一；語意色（成功/提醒/危險）要逐檔判斷保留，不能一律收成品牌色。 |
 | V1.21.0 | **UI 優化 Phase 1：設計地基 + 結帳重做（功能優先）**。背景：以 iOS 設計師視角逐頁體檢，列出系統性問題（冷灰文字／配色失控／主鈕太弱／hover 當回饋／觸控過小／圓角不一）。本版先做地基與最痛的結帳：(1) **設計地基**——base.html `<style>` 加元件層（純 CSS hex，不依賴 Tailwind 編譯）：`.btn-primary`（深咖啡實心高對比主鈕）/`.btn-secondary`/`.btn-danger`、`.card`、`.chip`+選中態深咖啡實心、`.stepper`（44pt）、`#cart-content .order-actions` 釘底結帳列。(2) **結帳**——購物車從右抽屜改**底部 sheet**（抓握條、滑入）；`my_order.html` 重寫：**合計＋確定結單釘在底部**（捲動仍可見，用 `position:sticky` 範圍鎖在 `#cart-content` 內，頁面版顯示不受影響）、±從 24px 放大到 36/44pt、文字暖化、主鈕高對比；客製 sheet 加**本品小計即時計算**（Alpine `extraToppings`+`itemSubtotal()`，反應 size／加料／數量）、糖冰加料選中態改深咖啡實心。(3) 全域：拿掉 header 版本號、底部 nav 未選色暖化（gray-400→sela-400）＋選中態加強（sela-50→sela-100）、購物車 FAB 改深咖啡高對比。`menu_item` 暖化＋按壓態。**注意**：`location.reload()` 暫留（送出/修改要切換頁面狀態，移除需實機測 Alpine 同步，列為後續）。Phase 2/3＝首頁/店家/個人/登入頁配色收斂與灰字暖化（大面積掃，另版）。教訓：`my_order.html` 同時用於購物車與頁面顯示，sticky 須用 `#cart-content` 範圍鎖定，避免頁面版蓋到底部 nav。 |
