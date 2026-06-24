@@ -1,54 +1,85 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}所有團單 - 團購系統{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin', '管理後台') }}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">所有團單</h1>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+        <h1 class="text-xl font-bold text-sela-800">所有團單</h1>
+        
     </div>
-    
+
+    {% if request.query_params.get('cleaned') %}
+    <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800 text-sm">
+        <i class="ti ti-check"></i> 已清除 {{ request.query_params.get('cleaned') }} 個測試團
+    </div>
+    {% endif %}
+
+    <!-- 清除測試團 -->
+    <div class="bg-white rounded-2xl shadow-sm p-4 flex items-center justify-between gap-3">
+        <div>
+            <div class="font-medium text-sela-800 text-sm">清除測試團</div>
+            <div class="text-xs text-sela-800/60">刪除「沒有人下單」或「只有團主自己下單」的團</div>
+        </div>
+        <form action="/admin/groups/cleanup-test" method="post"
+              onsubmit="return confirm('確定清除所有測試團（無人下單／只有團主下單）嗎？\n此動作無法復原。')">
+            <button type="submit" class="btn btn-danger whitespace-nowrap"><i class="ti ti-trash"></i> 清除</button>
+        </form>
+    </div>
+
     {% if groups %}
-    <div class="bg-white rounded-lg shadow-sm divide-y">
+    <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for group in groups %}
-        <a href="/groups/{{ group.id }}" class="block p-4 hover:bg-gray-50">
+        <div class="p-4 active:bg-sela-50 transition">
             <div class="flex items-center gap-3">
-                <!-- Logo -->
-                <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {% if group.store and group.store.logo_url %}
-                    <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-8 h-8 object-contain">
+                <a href="/groups/{{ group.id }}" class="flex items-center gap-3 flex-1 min-w-0">
+                    <!-- Logo -->
+                    <div class="w-10 h-10 bg-sela-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        {% if group.store and group.store.logo_url %}
+                        <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-8 h-8 object-contain">
+                        {% else %}
+                        <span class="text-xl">
+                            {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>{% else %}<i class="ti ti-bowl"></i>{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <!-- 內容 -->
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-sela-800 truncate">{{ group.name }}</div>
+                        <div class="text-sm text-sela-800/60 truncate">
+                            {{ group.store_display_name }} ・ {{ group.owner.display_name }}
+                        </div>
+                        <div class="text-xs text-sela-800/45">
+                            {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已結單
+                        </div>
+                    </div>
+                </a>
+
+                <!-- 狀態 + 操作 -->
+                <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                    {% if group.is_closed or group.is_expired %}
+                    <span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-1 rounded">已截止</span>
                     {% else %}
-                    <span class="text-xl">
-                        {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>{% else %}<i class="ti ti-bowl"></i>{% endif %}
-                    </span>
+                    <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">進行中</span>
                     {% endif %}
+                    {% set others = group.orders | rejectattr('user_id', 'equalto', group.owner_id) | list %}
+                    {% if others | length == 0 %}
+                    <span class="text-[10px] bg-sela-100 text-sela-800/55 px-1.5 py-0.5 rounded">測試團</span>
+                    {% endif %}
+                    <form action="/admin/groups/{{ group.id }}/delete" method="post"
+                          onsubmit="return confirm('確定刪除「{{ group.name }}」？\n此動作無法復原。')">
+                        <button type="submit" class="text-xs text-red-500 active:text-red-700 px-1 py-0.5"><i class="ti ti-trash"></i> 刪除</button>
+                    </form>
                 </div>
-                
-                <!-- 內容 -->
-                <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-900 truncate">{{ group.name }}</div>
-                    <div class="text-sm text-gray-500">
-                        {{ group.store_display_name }} ・ {{ group.owner.display_name }}
-                    </div>
-                    <div class="text-xs text-gray-400">
-                        {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
-                        ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已結單
-                    </div>
-                </div>
-                
-                <!-- 狀態 -->
-                {% if group.is_closed or group.is_expired %}
-                <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">已截止</span>
-                {% else %}
-                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">進行中</span>
-                {% endif %}
             </div>
-        </a>
+        </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
+    <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
         <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
         <p>還沒有任何團單</p>
     </div>

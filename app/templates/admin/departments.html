@@ -1,26 +1,28 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}部門管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin', '管理後台') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-users"></i> 部門管理</h1>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-users"></i> 部門管理</h1>
+        
     </div>
     
     <!-- 新增部門 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-medium text-gray-800 mb-3"><i class="ti ti-plus"></i> 新增部門</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 新增部門</h2>
         <form action="/admin/departments" method="POST" class="flex flex-wrap gap-2">
             <input type="text" name="name" required
                    placeholder="部門名稱"
-                   class="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
+                   class="flex-1 min-w-[120px] border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
             <input type="text" name="description"
                    placeholder="說明（選填）"
-                   class="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
-            <button type="submit" class="bg-sela-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
+                   class="flex-1 min-w-[120px] border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
+            <button type="submit" class="bg-sela-500 text-sela-800 px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
                 新增
             </button>
         </form>
@@ -30,33 +32,33 @@
     {% if departments %}
     <div class="space-y-3">
         {% for dept in departments %}
-        <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm p-4">
             <div class="flex items-center justify-between">
                 <div class="flex-1">
                     <div class="flex items-center gap-2">
-                        <span class="font-medium text-gray-800">{{ dept.name }}</span>
+                        <span class="font-medium text-sela-800">{{ dept.name }}</span>
                         {% if dept.is_public %}
                         <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">公開</span>
                         {% endif %}
                         {% if not dept.is_active %}
-                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">已停用</span>
+                        <span class="text-xs bg-sela-100 text-sela-800/60 px-2 py-0.5 rounded">已停用</span>
                         {% endif %}
                     </div>
                     {% if dept.description %}
-                    <div class="text-sm text-gray-500 mt-1">{{ dept.description }}</div>
+                    <div class="text-sm text-sela-800/60 mt-1">{{ dept.description }}</div>
                     {% endif %}
-                    <div class="text-xs text-gray-400 mt-2">
+                    <div class="text-xs text-sela-800/45 mt-2">
                         {{ dept.member_count }} 位成員 · {{ dept.leader_count }} 位小組長
                     </div>
                 </div>
                 
                 <div class="flex items-center gap-2">
                     <a href="/admin/departments/{{ dept.id }}" 
-                       class="text-sm text-sela-500 hover:text-sela-600">
+                       class="text-sm text-sela-800 hover:text-sela-800">
                         管理成員
                     </a>
                     <form action="/admin/departments/{{ dept.id }}/toggle" method="POST" class="inline">
-                        <button type="submit" class="text-sm text-gray-500 hover:text-gray-700">
+                        <button type="submit" class="text-sm text-sela-800/60 hover:text-sela-800/80">
                             {% if dept.is_active %}停用{% else %}啟用{% endif %}
                         </button>
                     </form>
@@ -66,7 +68,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 text-gray-500">
+    <div class="text-center py-12 text-sela-800/60">
         <p>還沒有建立部門</p>
         <p class="text-sm mt-1">部門可用於區隔團單的可見範圍</p>
     </div>

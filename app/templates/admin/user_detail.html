@@ -1,20 +1,22 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}{{ target_user.display_name }} - 使用者詳情{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin/users', '使用者列表') }}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">使用者詳情</h1>
-        <a href="/admin/users" class="text-sm text-gray-500 hover:text-gray-700">返回使用者列表 →</a>
+        <h1 class="text-xl font-bold text-sela-800">使用者詳情</h1>
+        
     </div>
     
     <!-- 基本資訊 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex items-start gap-4">
             <!-- 頭像 -->
             <div class="relative w-16 h-16 flex-shrink-0">
-                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                <div class="w-16 h-16 bg-sela-100 rounded-full flex items-center justify-center overflow-hidden">
                     {% if target_user.picture_url %}
                     <img src="{{ target_user.picture_url }}" alt="{{ target_user.display_name }}" class="w-full h-full object-cover">
                     {% else %}
@@ -28,7 +30,7 @@
             
             <!-- 名稱與標籤 -->
             <div class="flex-1">
-                <div class="text-lg font-bold text-gray-900">
+                <div class="text-lg font-bold text-sela-800">
                     {{ target_user.show_name }}
                     {% if target_user.is_admin %}
                     <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
@@ -38,59 +40,59 @@
                     {% endif %}
                 </div>
                 {% if target_user.nickname %}
-                <div class="text-sm text-gray-500">LINE 名稱：{{ target_user.display_name }}</div>
+                <div class="text-sm text-sela-800/60">LINE 名稱：{{ target_user.display_name }}</div>
                 {% endif %}
             </div>
         </div>
         
         <!-- 統計 -->
         <div class="grid grid-cols-2 gap-4 mt-4">
-            <div class="bg-gray-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-sela-600">{{ order_count }}</div>
-                <div class="text-xs text-gray-500">參與訂單</div>
+            <div class="bg-sela-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-sela-800">{{ order_count }}</div>
+                <div class="text-xs text-sela-800/60">參與訂單</div>
             </div>
-            <div class="bg-gray-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-sela-600">{{ group_count }}</div>
-                <div class="text-xs text-gray-500">開過的團</div>
+            <div class="bg-sela-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-sela-800">{{ group_count }}</div>
+                <div class="text-xs text-sela-800/60">開過的團</div>
             </div>
         </div>
     </div>
     
     <!-- 登入資訊 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-lock"></i> 登入資訊</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-lock"></i> 登入資訊</h2>
         <div class="space-y-2 text-sm">
             <div class="flex justify-between py-2 border-b">
-                <span class="text-gray-500">LINE User ID</span>
-                <span class="text-gray-700 font-mono text-xs">{{ target_user.line_user_id }}</span>
+                <span class="text-sela-800/60">LINE User ID</span>
+                <span class="text-sela-800/80 font-mono text-xs">{{ target_user.line_user_id }}</span>
             </div>
             <div class="flex justify-between py-2 border-b">
-                <span class="text-gray-500">帳號建立時間</span>
-                <span class="text-gray-700">{{ (target_user.created_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                <span class="text-sela-800/60">帳號建立時間</span>
+                <span class="text-sela-800/80">{{ (target_user.created_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}</span>
             </div>
             <div class="flex justify-between py-2 border-b">
-                <span class="text-gray-500">最後登入時間</span>
-                <span class="text-gray-700">
+                <span class="text-sela-800/60">最後登入時間</span>
+                <span class="text-sela-800/80">
                     {% if target_user.last_login_at %}
                     {{ (target_user.last_login_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}
                     {% else %}
-                    <span class="text-gray-400">尚未記錄</span>
+                    <span class="text-sela-800/45">尚未記錄</span>
                     {% endif %}
                 </span>
             </div>
             <div class="flex justify-between py-2 border-b">
-                <span class="text-gray-500">最後活動時間</span>
-                <span class="text-gray-700">
+                <span class="text-sela-800/60">最後活動時間</span>
+                <span class="text-sela-800/80">
                     {% if target_user.last_active_at %}
                     {{ (target_user.last_active_at|taipei).strftime('%Y-%m-%d %H:%M:%S') }}
                     {% else %}
-                    <span class="text-gray-400">尚未記錄</span>
+                    <span class="text-sela-800/45">尚未記錄</span>
                     {% endif %}
                 </span>
             </div>
             <div class="flex justify-between py-2">
-                <span class="text-gray-500">在線狀態</span>
-                <span class="{% if target_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
+                <span class="text-sela-800/60">在線狀態</span>
+                <span class="{% if target_user.is_online %}text-green-600{% else %}text-sela-800/45{% endif %}">
                     {% if target_user.is_online %}<i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線{% else %}<i class="ti ti-circle-filled"></i> 離線{% endif %}
                 </span>
             </div>
@@ -99,18 +101,18 @@
     
     <!-- 最近開的團 -->
     {% if groups %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-clipboard-list"></i> 最近開的團（{{ group_count }}）</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-clipboard-list"></i> 最近開的團（{{ group_count }}）</h2>
         <div class="space-y-2">
             {% for g in groups %}
-            <a href="/groups/{{ g.id }}" class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+            <a href="/groups/{{ g.id }}" class="block p-3 bg-sela-50 rounded-lg hover:bg-sela-100 transition">
                 <div class="flex justify-between items-center">
                     <div>
-                        <div class="font-medium text-gray-800">{{ g.name }}</div>
-                        <div class="text-xs text-gray-500">{{ g.store.name }} · {{ g.created_at.strftime('%m/%d %H:%M') }}</div>
+                        <div class="font-medium text-sela-800">{{ g.name }}</div>
+                        <div class="text-xs text-sela-800/60">{{ g.store.name }} · {{ g.created_at.strftime('%m/%d %H:%M') }}</div>
                     </div>
                     <div class="text-xs px-2 py-1 rounded
-                        {% if g.is_open %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                        {% if g.is_open %}bg-green-100 text-green-700{% else %}bg-sela-100 text-sela-800/60{% endif %}">
                         {% if g.is_open %}進行中{% else %}已截止{% endif %}
                     </div>
                 </div>
@@ -122,20 +124,20 @@
     
     <!-- 最近訂單 -->
     {% if orders %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-shopping-cart"></i> 最近訂單（{{ order_count }}）</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-shopping-cart"></i> 最近訂單（{{ order_count }}）</h2>
         <div class="space-y-2">
             {% for order in orders %}
-            <a href="/groups/{{ order.group_id }}" class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+            <a href="/groups/{{ order.group_id }}" class="block p-3 bg-sela-50 rounded-lg hover:bg-sela-100 transition">
                 <div class="flex justify-between items-center">
                     <div>
-                        <div class="font-medium text-gray-800">{{ order.group.name }}</div>
-                        <div class="text-xs text-gray-500">{{ order.created_at.strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount }}</div>
+                        <div class="font-medium text-sela-800">{{ order.group.name }}</div>
+                        <div class="text-xs text-sela-800/60">{{ order.created_at.strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount }}</div>
                     </div>
                     <div class="text-xs px-2 py-1 rounded
                         {% if order.status.value == 'submitted' %}bg-green-100 text-green-700
                         {% elif order.status.value == 'editing' %}bg-amber-100 text-amber-700
-                        {% else %}bg-gray-100 text-gray-500{% endif %}">
+                        {% else %}bg-sela-100 text-sela-800/60{% endif %}">
                         {% if order.status.value == 'submitted' %}已結單
                         {% elif order.status.value == 'editing' %}修改中
                         {% else %}草稿{% endif %}
@@ -149,13 +151,13 @@
     
     <!-- 管理操作 -->
     {% if target_user.id != user.id %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-settings"></i>️ 管理操作</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-settings"></i>️ 管理操作</h2>
         <form action="/admin/users/{{ target_user.id }}/toggle-admin" method="post"
               onsubmit="return confirm('確定要{{ '移除' if target_user.is_admin else '設為' }}管理員嗎？')">
             <button type="submit" class="w-full py-2 rounded-lg text-sm font-medium transition
                 {% if target_user.is_admin %}
-                bg-gray-100 text-gray-700 hover:bg-gray-200
+                bg-sela-100 text-sela-800/80 active:bg-sela-100
                 {% else %}
                 bg-amber-50 text-amber-700 hover:bg-amber-100
                 {% endif %}">

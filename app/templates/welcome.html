@@ -4,55 +4,32 @@
 
 {% block content %}
 <div class="min-h-[70vh] flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-        <!-- Logo -->
-        <div class="mb-4">
-            <img src="/static/images/sela-logo.svg" alt="SELA" class="w-20 h-20 mx-auto">
-        </div>
-        
-        <h1 class="text-xl font-bold text-gray-800 mb-2">歡迎加入！</h1>
-        <p class="text-gray-500 text-sm mb-6">設定你在系統中顯示的名稱</p>
-        
-        <!-- 頭像 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-6 w-full max-w-sm text-center">
+        <img src="/static/images/order-logo.png" alt="ORDER" class="w-20 h-20 mx-auto mb-4">
+        <h1 class="text-xl font-bold text-sela-800 mb-2">歡迎加入！</h1>
+        <p class="text-sela-800/60 text-sm mb-6">設定你在系統中顯示的名稱</p>
+
         <div class="mb-6">
             {% if user.picture_url %}
-            <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" 
-                 class="w-20 h-20 rounded-full mx-auto shadow">
+            <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" class="w-20 h-20 rounded-full mx-auto shadow">
             {% else %}
-            <div class="w-20 h-20 rounded-full bg-sela-100 flex items-center justify-center mx-auto text-3xl">
-                <i class="ti ti-user"></i>
-            </div>
+            <div class="w-20 h-20 rounded-full bg-sela-100 flex items-center justify-center mx-auto text-3xl text-sela-800"><i class="ti ti-user"></i></div>
             {% endif %}
         </div>
-        
+
         <form action="/welcome" method="post" class="space-y-4">
             <div class="text-left">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    顯示名稱
-                </label>
-                <input type="text" name="nickname" 
-                       value="{{ user.display_name }}"
-                       placeholder="輸入你想顯示的名稱"
-                       class="w-full border rounded-lg px-4 py-3 text-center text-lg focus:ring-2 focus:ring-sela-500 focus:border-sela-500">
-                <p class="text-xs text-gray-400 mt-2 text-center">
-                    這個名稱會顯示在訂單和團單中<br>
-                    之後可以在「個人資料」修改
-                </p>
+                <label class="block text-sm font-medium text-sela-800 mb-2">顯示名稱</label>
+                <input type="text" name="nickname" value="{{ user.display_name }}" placeholder="輸入你想顯示的名稱"
+                       class="w-full border border-sela-300 rounded-xl px-4 py-3 text-center text-lg text-sela-800 focus:ring-2 focus:ring-sela-500 focus:border-sela-500">
+                <p class="text-xs text-sela-800/45 mt-2 text-center">這個名稱會顯示在訂單和團單中<br>之後可以在「個人資料」修改</p>
             </div>
-            
-            <button type="submit" 
-                    class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium text-lg transition">
-                開始使用 <i class="ti ti-confetti"></i>
-            </button>
+            <button type="submit" class="btn btn-primary w-full">開始使用 <i class="ti ti-confetti"></i></button>
         </form>
-        
-        <a href="/home" class="block mt-4 text-sm text-gray-400 hover:text-gray-600"
-           onclick="event.preventDefault(); document.getElementById('skip-form').submit();">
-            先跳過，使用 LINE 名稱
-        </a>
-        <form id="skip-form" action="/welcome" method="post" class="hidden">
-            <input type="hidden" name="nickname" value="">
-        </form>
+
+        <a href="/home" class="block mt-4 text-sm text-sela-800/45 active:text-sela-800"
+           onclick="event.preventDefault(); document.getElementById('skip-form').submit();">先跳過，使用 LINE 名稱</a>
+        <form id="skip-form" action="/welcome" method="post" class="hidden"><input type="hidden" name="nickname" value=""></form>
     </div>
 </div>
 {% endblock %}

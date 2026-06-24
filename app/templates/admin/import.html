@@ -1,26 +1,20 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}匯入{% if selected_store %}菜單 - {{ selected_store.name }}{% else %}店家/菜單{% endif %} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{% if selected_store %}{{ nav.back('/admin/stores/' ~ selected_store.id, selected_store.name) }}{% else %}{{ nav.back('/admin', '管理後台') }}{% endif %}
 <div class="space-y-4" x-data="importForm()">
-    <div class="flex items-center justify-between">
-        {% if selected_store %}
-        <h1 class="text-xl font-bold text-gray-800">匯入菜單</h1>
-        <a href="/admin/stores/{{ selected_store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回 {{ selected_store.name }} →</a>
-        {% else %}
-        <h1 class="text-xl font-bold text-gray-800">匯入店家/菜單</h1>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
-        {% endif %}
-    </div>
+    <h1 class="text-xl font-bold text-sela-800">匯入{% if selected_store %}菜單{% else %}店家/菜單{% endif %}</h1>
 
     {% if selected_store %}
-    <div class="bg-sela-50 border border-sela-200 rounded-lg p-4 flex items-center gap-3">
-        <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+    <div class="bg-sela-50 border border-sela-100 rounded-2xl p-3 flex items-center gap-3">
+        <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
             {% if selected_store.logo_url %}
             <img src="{{ selected_store.logo_url }}" alt="{{ selected_store.name }}" class="w-full h-full object-contain p-1">
             {% else %}
-            <span class="text-2xl">
+            <span class="text-2xl text-sela-800">
                 {% if selected_store.category and selected_store.category.value == 'drink' %}<i class="ti ti-cup"></i>
                 {% elif selected_store.category and selected_store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
                 {% else %}<i class="ti ti-bowl"></i>{% endif %}
@@ -28,144 +22,136 @@
             {% endif %}
         </div>
         <div>
-            <div class="font-medium text-gray-800">{{ selected_store.name }}</div>
-            <div class="text-sm text-sela-600">菜單將匯入到此店家</div>
+            <div class="font-medium text-sela-800">{{ selected_store.name }}</div>
+            <div class="text-sm text-sela-800/60">菜單將匯入到此店家</div>
         </div>
     </div>
     {% endif %}
 
-    <!-- 用 AI 轉菜單（怎麼用 + 複製 prompt）-->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div class="font-medium mb-2 text-sm text-blue-800"><i class="ti ti-bulb"></i> 用 AI 把菜單照片轉成 JSON</div>
-        <ol class="list-decimal list-inside space-y-1 text-sm text-blue-800 mb-3">
-            <li>複製下方 prompt，貼給 ChatGPT / Claude</li>
-            <li>連同菜單照片一起傳給 AI</li>
-            <li>把 AI 回的 JSON 貼到下方框框</li>
-        </ol>
+    <!-- 步驟 1：複製 prompt 給 AI -->
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <div class="flex items-center gap-2 mb-1.5">
+            <span class="w-6 h-6 rounded-full bg-sela-800 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">1</span>
+            <h2 class="font-semibold text-sela-800">複製 prompt，連菜單照片給 AI</h2>
+        </div>
+        <p class="text-sm text-sela-800/60 mb-3 pl-8">貼給 ChatGPT / Claude，附上菜單照片，AI 會回一段 JSON。</p>
         <div class="flex flex-col gap-2">
             {% if not selected_store %}
             <button type="button" @click="navigator.clipboard.writeText(promptNewStore); copied='new'; setTimeout(() => copied='', 2000)"
-                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
+                    class="flex items-center justify-between px-3 py-2.5 bg-sela-50 border border-sela-200 rounded-xl active:bg-sela-100 text-left transition">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「新增店家」prompt</div>
-                    <div class="text-xs text-gray-500">店家是全新的，連店名一起建立</div>
+                    <div class="text-sm font-medium text-sela-800">複製「新增店家」prompt</div>
+                    <div class="text-xs text-sela-800/60">店家是全新的，連店名一起建立</div>
                 </div>
-                <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'new' ? '已複製 ✓' : '複製'"></span>
+                <span class="text-sela-800 text-sm font-medium whitespace-nowrap" x-text="copied === 'new' ? '已複製 ✓' : '複製'"></span>
             </button>
             {% endif %}
             <button type="button" @click="navigator.clipboard.writeText({% if selected_store %}promptMenuForStore{% else %}promptMenu{% endif %}); copied='menu'; setTimeout(() => copied='', 2000)"
-                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 text-left">
+                    class="flex items-center justify-between px-3 py-2.5 bg-sela-50 border border-sela-200 rounded-xl active:bg-sela-100 text-left transition">
                 <div>
-                    <div class="text-sm font-medium text-gray-800">複製「{% if selected_store %}{{ selected_store.name }} 的菜單{% else %}既有店家加菜單{% endif %}」prompt</div>
-                    <div class="text-xs text-gray-500">{% if selected_store %}菜單轉成 JSON 後貼回{% else %}店家已存在，只補菜單{% endif %}</div>
+                    <div class="text-sm font-medium text-sela-800">複製「{% if selected_store %}{{ selected_store.name }} 的菜單{% else %}既有店家加菜單{% endif %}」prompt</div>
+                    <div class="text-xs text-sela-800/60">{% if selected_store %}菜單轉成 JSON 後貼回{% else %}店家已存在，只補菜單{% endif %}</div>
                 </div>
-                <span class="text-blue-600 text-sm whitespace-nowrap" x-text="copied === 'menu' ? '已複製 ✓' : '複製'"></span>
+                <span class="text-sela-800 text-sm font-medium whitespace-nowrap" x-text="copied === 'menu' ? '已複製 ✓' : '複製'"></span>
             </button>
         </div>
     </div>
 
-    <!-- 生成店家 Logo（獨立區塊）-->
-    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div class="font-medium mb-2 text-sm text-purple-800"><i class="ti ti-photo"></i> 生成店家 Logo（選用）</div>
-        <p class="text-xs text-purple-700 mb-3">生成後下載圖片，到店家編輯頁的 logo 欄位上傳即可。</p>
-        <div class="flex flex-col gap-2">
-            <button type="button" @click="navigator.clipboard.writeText(promptLogoRestore); copied='logo1'; setTimeout(() => copied='', 2000)"
-                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 text-left">
-                <div>
-                    <div class="text-sm font-medium text-gray-800">複製「還原網路 Logo」prompt</div>
-                    <div class="text-xs text-gray-500">有原始 logo，提升解析度成正方形</div>
-                </div>
-                <span class="text-purple-600 text-sm whitespace-nowrap" x-text="copied === 'logo1' ? '已複製 ✓' : '複製'"></span>
-            </button>
-            <button type="button" @click="navigator.clipboard.writeText(promptLogoText); copied='logo2'; setTimeout(() => copied='', 2000)"
-                    class="flex items-center justify-between px-3 py-2.5 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 text-left">
-                <div>
-                    <div class="text-sm font-medium text-gray-800">複製「文字 Logo」prompt</div>
-                    <div class="text-xs text-gray-500">沒有 logo，用店名生成統一風格</div>
-                </div>
-                <span class="text-purple-600 text-sm whitespace-nowrap" x-text="copied === 'logo2' ? '已複製 ✓' : '複製'"></span>
-            </button>
-        </div>
-    </div>
-
-    <!-- 分頁切換 -->
-    <div class="flex gap-1 bg-gray-100 p-1 rounded-lg">
-        <button type="button" @click="tab = 'paste'"
-                :class="tab === 'paste' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
-                class="flex-1 py-2 rounded-md text-sm font-medium transition">
-            <i class="ti ti-clipboard"></i> 貼上 JSON
-        </button>
-        <button type="button" @click="tab = 'upload'"
-                :class="tab === 'upload' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'"
-                class="flex-1 py-2 rounded-md text-sm font-medium transition">
-            <i class="ti ti-upload"></i> 上傳檔案
-        </button>
-    </div>
-
-    <!-- 匯入表單 -->
+    <!-- 步驟 2：貼 JSON → 預覽匯入 -->
     <form hx-post="/admin/import/preview"
           hx-target="#import-result"
           hx-swap="innerHTML"
           hx-encoding="multipart/form-data"
           hx-indicator="#import-loading"
-          class="bg-white rounded-lg shadow-sm p-4 space-y-3">
+          class="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+
+        <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sela-800 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">2</span>
+            <h2 class="font-semibold text-sela-800">把 AI 回的 JSON 貼回來</h2>
+        </div>
 
         {% if selected_store_id %}
         <input type="hidden" name="store_id" value="{{ selected_store_id }}">
         {% else %}
-        <!-- 選填：匯菜單到既有店家（選了就用這家，覆蓋 JSON 裡的 store_id）-->
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <label class="block text-sm font-medium text-amber-800 mb-1">
-                <i class="ti ti-building-store"></i> 匯入「菜單」到既有店家？
-            </label>
-            <p class="text-xs text-amber-700 mb-2">如果你貼的是「既有店家加菜單」的 JSON（store_id 模式），在這裡選店家就好，不用管 JSON 裡的 store_id。新增店家的完整 JSON 則留空。</p>
-            <select name="store_id" class="w-full border rounded-lg px-3 py-2 text-sm">
-                <option value="">— 不指定（新增店家／JSON 自帶 store_id）—</option>
+        <div>
+            <label class="block text-sm font-medium text-sela-800 mb-1"><i class="ti ti-building-store"></i> 匯到既有店家？（選填）</label>
+            <select name="store_id" class="w-full border border-sela-300 rounded-xl px-3 py-2.5 text-sela-800">
+                <option value="">— 新增店家／JSON 自帶 store_id —</option>
                 {% for s in stores %}
                 <option value="{{ s.id }}">{{ s.name }}（編號 {{ s.id }}）</option>
                 {% endfor %}
             </select>
+            <p class="text-xs text-sela-800/50 mt-1">貼「新增店家」JSON 留空；貼「既有店家菜單」JSON 在此選店家即可。</p>
         </div>
         {% endif %}
 
-        <!-- 貼上 JSON 分頁 -->
-        <div x-show="tab === 'paste'">
-            <div class="flex gap-2 mb-2">
-                <button type="button" @click="jsonText = ''"
-                        class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-400">
-                    清空
-                </button>
-            </div>
-            <textarea name="json_text" x-model="jsonText" rows="10"
-                      placeholder="把 AI 轉好的 JSON 直接貼在這裡…"
-                      class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+        <!-- 分頁：貼上 / 上傳 -->
+        <div class="flex gap-1 bg-sela-100 p-1 rounded-lg">
+            <button type="button" @click="tab = 'paste'"
+                    :class="tab === 'paste' ? 'bg-white text-sela-800 shadow-sm' : 'text-sela-800/60'"
+                    class="flex-1 py-2 rounded-md text-sm font-medium transition"><i class="ti ti-clipboard"></i> 貼上 JSON</button>
+            <button type="button" @click="tab = 'upload'"
+                    :class="tab === 'upload' ? 'bg-white text-sela-800 shadow-sm' : 'text-sela-800/60'"
+                    class="flex-1 py-2 rounded-md text-sm font-medium transition"><i class="ti ti-upload"></i> 上傳檔案</button>
         </div>
 
-        <!-- 上傳檔案分頁 -->
+        <div x-show="tab === 'paste'">
+            <div class="flex justify-end mb-1">
+                <button type="button" @click="jsonText = ''" class="text-xs px-2 py-1 text-sela-800/45 active:text-sela-800">清空</button>
+            </div>
+            <textarea name="json_text" x-model="jsonText" rows="9"
+                      placeholder="把 AI 轉好的 JSON 直接貼在這裡…"
+                      class="w-full border border-sela-300 rounded-xl px-3 py-2 font-mono text-xs"></textarea>
+        </div>
+
         <div x-show="tab === 'upload'" x-cloak>
             <input type="file" name="json_file" accept=".json"
                    @change="fileName = $event.target.files[0]?.name || ''"
-                   class="w-full border rounded-lg px-3 py-2">
-            <p x-show="fileName" class="text-sm text-gray-500 mt-1" x-text="'已選擇：' + fileName"></p>
+                   class="w-full border border-sela-300 rounded-xl px-3 py-2.5">
+            <p x-show="fileName" class="text-sm text-sela-800/60 mt-1" x-text="'已選擇：' + fileName"></p>
         </div>
 
-        <button type="submit"
-                class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
+        <button type="submit" class="btn btn-primary w-full">
             <span id="import-loading" class="htmx-indicator">驗證中…</span>
             <span>預覽匯入內容</span>
         </button>
     </form>
 
-    <!-- 結果區（htmx 填入：錯誤紅框 或 成功預覽）-->
     <div id="import-result"></div>
 
-    <!-- 範例格式（摺疊參考）-->
-    <details class="bg-white rounded-lg shadow-sm">
-        <summary class="p-4 cursor-pointer font-medium text-gray-700 text-sm"><i class="ti ti-clipboard-list"></i> 查看 JSON 格式說明</summary>
+    <!-- 選用：生成店家 Logo（摺疊，與菜單匯入無關）-->
+    <details class="bg-white rounded-2xl shadow-sm">
+        <summary class="p-4 cursor-pointer font-medium text-sela-800/80 text-sm"><i class="ti ti-photo"></i> 生成店家 Logo（選用）</summary>
+        <div class="px-4 pb-4">
+            <p class="text-xs text-sela-800/60 mb-3">生成後下載圖片，到店家編輯頁的 logo 欄位上傳即可。</p>
+            <div class="flex flex-col gap-2">
+                <button type="button" @click="navigator.clipboard.writeText(promptLogoRestore); copied='logo1'; setTimeout(() => copied='', 2000)"
+                        class="flex items-center justify-between px-3 py-2.5 bg-sela-50 border border-sela-200 rounded-xl active:bg-sela-100 text-left transition">
+                    <div>
+                        <div class="text-sm font-medium text-sela-800">複製「還原網路 Logo」prompt</div>
+                        <div class="text-xs text-sela-800/60">有原始 logo，提升解析度成正方形</div>
+                    </div>
+                    <span class="text-sela-800 text-sm font-medium whitespace-nowrap" x-text="copied === 'logo1' ? '已複製 ✓' : '複製'"></span>
+                </button>
+                <button type="button" @click="navigator.clipboard.writeText(promptLogoText); copied='logo2'; setTimeout(() => copied='', 2000)"
+                        class="flex items-center justify-between px-3 py-2.5 bg-sela-50 border border-sela-200 rounded-xl active:bg-sela-100 text-left transition">
+                    <div>
+                        <div class="text-sm font-medium text-sela-800">複製「文字 Logo」prompt</div>
+                        <div class="text-xs text-sela-800/60">沒有 logo，用店名生成統一風格</div>
+                    </div>
+                    <span class="text-sela-800 text-sm font-medium whitespace-nowrap" x-text="copied === 'logo2' ? '已複製 ✓' : '複製'"></span>
+                </button>
+            </div>
+        </div>
+    </details>
+
+    <!-- JSON 格式說明（摺疊參考）-->
+    <details class="bg-white rounded-2xl shadow-sm">
+        <summary class="p-4 cursor-pointer font-medium text-sela-800/80 text-sm"><i class="ti ti-clipboard-list"></i> 查看 JSON 格式說明</summary>
         <div class="px-4 pb-4 space-y-4">
             <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">完整匯入（店家 + 菜單）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+                <div class="text-sm font-medium text-sela-800/70 mb-2">完整匯入（店家 + 菜單）</div>
+                <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
   "store": {
     "name": "可不可熟成紅茶",
     "category": "drink",
@@ -182,8 +168,8 @@
 }</pre>
             </div>
             <div>
-                <div class="text-sm font-medium text-gray-600 mb-2">菜單匯入（既有店家）</div>
-                <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{
+                <div class="text-sm font-medium text-sela-800/70 mb-2">菜單匯入（既有店家）</div>
+                <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
   "store_id": 1,
   "mode": "new",
   "menu": {
@@ -404,8 +390,8 @@ function importForm() {
             '請幫我設計一個店家文字 Logo，規格固定如下，請嚴格遵守：',
             '',
             '1. 正方形（1:1）。',
-            '2. 背景：實心深紫色 #7528d4 填滿整個正方形。',
-            '3. 在背景內側留一圈細的白色外框（簡潔線框，留適當邊距）。',
+            '2. 背景：實心奶茶色 #C9A977 填滿整個正方形。',
+            '3. 在背景內側留一圈細的深咖啡色 #5B4733 外框（簡潔線框，留適當邊距）。',
             '4. 框內置中放店名文字，白色字。',
             '5. 字體：無襯線、細體、北歐極簡風格，乾淨俐落，不要花俏裝飾、不要陰影、不要漸層。',
             '6. 只有外框和文字，不要其他圖案或裝飾。',

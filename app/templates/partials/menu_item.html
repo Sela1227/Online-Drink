@@ -6,16 +6,16 @@
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
         })"
         data-menu-item-id="{{ item.id }}"
-        class="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition text-left">
+        class="w-full flex items-center justify-between p-3.5 bg-sela-50 active:bg-sela-100 active:scale-[0.99] rounded-xl transition text-left">
     <div>
-        <div class="font-medium text-gray-800">{{ item.name }}</div>
+        <div class="font-medium text-sela-800">{{ item.name }}</div>
         {% if item.options %}
-        <div class="text-xs text-gray-500">
+        <div class="text-xs text-sela-700/60">
             可加購：{% for opt in item.options %}{{ opt.name }}{% if not loop.last %}、{% endif %}{% endfor %}
         </div>
         {% endif %}
     </div>
-    <div class="text-sela-600 font-medium">
+    <div class="text-sela-800 font-medium">
         {% if item.price_l %}
         ${{ item.price }}/${{ item.price_l }}
         {% else %}

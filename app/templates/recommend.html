@@ -1,13 +1,15 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}我想要推薦店家 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-bulb"></i> 我想要推薦店家</h1>
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-bulb"></i> 我想要推薦店家</h1>
+        
     </div>
     
     <!-- 成功訊息 -->
@@ -18,21 +20,21 @@
     {% endif %}
     
     <!-- 推薦表單 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-medium text-gray-800 mb-3"><i class="ti ti-pencil"></i> 推薦新店家</h2>
-        <p class="text-sm text-gray-500 mb-4">發現好吃的店家？推薦給大家一起訂！</p>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-pencil"></i> 推薦新店家</h2>
+        <p class="text-sm text-sela-800/60 mb-4">發現好吃的店家？推薦給大家一起訂！</p>
         
         <form action="/recommend" method="POST" enctype="multipart/form-data" class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">店家名稱 <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">店家名稱 <span class="text-red-500">*</span></label>
                 <input type="text" name="store_name" required placeholder="例如：50嵐、麥當勞"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
+                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">店家類型 <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">店家類型 <span class="text-red-500">*</span></label>
                 <select name="category" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
+                        class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
                     <option value="">請選擇</option>
                     <option value="drink"><i class="ti ti-cup"></i> 飲料店</option>
                     <option value="meal"><i class="ti ti-bowl"></i> 餐廳</option>
@@ -41,26 +43,26 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">菜單連結（選填）</label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">菜單連結（選填）</label>
                 <input type="url" name="menu_url" placeholder="https://..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
-                <p class="text-xs text-gray-400 mt-1">可貼上官網、Uber Eats、foodpanda 等菜單連結</p>
+                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
+                <p class="text-xs text-sela-800/45 mt-1">可貼上官網、Uber Eats、foodpanda 等菜單連結</p>
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">菜單圖片（選填）</label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">菜單圖片（選填）</label>
                 <input type="file" name="menu_image" accept="image/*"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-sela-50 file:text-sela-600">
-                <p class="text-xs text-gray-400 mt-1">可拍照或上傳菜單圖片</p>
+                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-sela-50 file:text-sela-800">
+                <p class="text-xs text-sela-800/45 mt-1">可拍照或上傳菜單圖片</p>
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">備註（選填）</label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">備註（選填）</label>
                 <textarea name="note" rows="2" placeholder="例如：推薦他們的珍珠奶茶！"
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"></textarea>
+                          class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"></textarea>
             </div>
             
-            <button type="submit" class="w-full bg-sela-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-sela-600">
+            <button type="submit" class="w-full bg-sela-500 text-sela-800 px-4 py-3 rounded-lg font-medium hover:bg-sela-600">
                 <i class="ti ti-rocket"></i> 送出推薦
             </button>
         </form>
@@ -68,9 +70,9 @@
     
     <!-- 我的推薦紀錄 -->
     {% if recommendations %}
-    <div class="bg-white rounded-lg shadow-sm">
+    <div class="bg-white rounded-2xl shadow-sm">
         <div class="p-4 border-b">
-            <h2 class="font-medium text-gray-800"><i class="ti ti-clipboard-list"></i> 我的推薦紀錄</h2>
+            <h2 class="font-medium text-sela-800"><i class="ti ti-clipboard-list"></i> 我的推薦紀錄</h2>
         </div>
         <div class="divide-y">
             {% for rec in recommendations %}
@@ -78,20 +80,20 @@
                 <div class="flex items-start justify-between gap-3">
                     <div class="flex-1">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="font-medium text-gray-800">{{ rec.store_name }}</span>
+                            <span class="font-medium text-sela-800">{{ rec.store_name }}</span>
                             <span class="text-xs px-1.5 py-0.5 rounded
                                 {% if rec.category == 'drink' %}bg-amber-100 text-amber-600
                                 {% elif rec.category == 'meal' %}bg-green-100 text-green-600
-                                {% else %}bg-blue-100 text-blue-600{% endif %}">
+                                {% else %}bg-sela-100 text-sela-800{% endif %}">
                                 {% if rec.category == 'drink' %}<i class="ti ti-cup"></i> 飲料
                                 {% elif rec.category == 'meal' %}<i class="ti ti-bowl"></i> 餐廳
                                 {% else %}<i class="ti ti-shopping-cart"></i> 團購{% endif %}
                             </span>
                         </div>
                         {% if rec.note %}
-                        <div class="text-sm text-gray-500">{{ rec.note }}</div>
+                        <div class="text-sm text-sela-800/60">{{ rec.note }}</div>
                         {% endif %}
-                        <div class="text-xs text-gray-400 mt-1">
+                        <div class="text-xs text-sela-800/45 mt-1">
                             {{ rec.created_at.strftime('%Y/%m/%d %H:%M') }}
                         </div>
                     </div>
@@ -112,7 +114,7 @@
                 {% endif %}
                 {% if rec.status == 'approved' and rec.created_store_id %}
                 <div class="mt-2">
-                    <a href="/stores/{{ rec.created_store_id }}" class="text-xs text-sela-600 hover:underline">
+                    <a href="/stores/{{ rec.created_store_id }}" class="text-xs text-sela-800 hover:underline">
                         查看店家 →
                     </a>
                 </div>

@@ -2,18 +2,22 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>登入 - SELA 快點來點餐</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
+    <style>body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}</style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full mx-4 text-center">
-        <img src="/static/images/sela-logo.svg" alt="SELA" class="h-20 w-20 mx-auto mb-4">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">SELA 快點來點餐</h1>
-        <p class="text-gray-600 mb-6">團購訂餐好幫手</p>
-        <a href="/auth/login" 
-           class="block w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition">
-            使用 LINE 登入
+<body style="background:#FAF6EF;" class="min-h-screen flex items-center justify-center antialiased">
+    <div class="rounded-2xl shadow-sm p-8 max-w-sm w-full mx-4 text-center" style="background:#fff;border:1px solid #F3EBDD;">
+        <img src="/static/images/order-logo.png" alt="ORDER" class="h-24 w-24 mx-auto mb-5">
+        <h1 class="text-2xl font-bold mb-2" style="color:#5B4733;">SELA 快點來點餐</h1>
+        <p class="mb-7" style="color:#5B4733;opacity:.6;">團購訂餐好幫手</p>
+        <a href="/auth/login"
+           class="flex items-center justify-center gap-2 w-full text-white font-medium py-3.5 px-4 rounded-xl transition active:scale-95"
+           style="background:#06C755;">
+            <i class="ti ti-brand-line" style="font-size:22px;"></i> 使用 LINE 登入
         </a>
     </div>
 </body>

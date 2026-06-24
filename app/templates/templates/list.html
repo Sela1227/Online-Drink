@@ -1,28 +1,30 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}我的開團模板 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- Header -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-clipboard-list"></i> 我的開團模板</h1>
-                <p class="text-sm text-gray-500 mt-1">儲存常用設定，一鍵快速開團</p>
+                <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-clipboard-list"></i> 我的開團模板</h1>
+                <p class="text-sm text-sela-800/60 mt-1">儲存常用設定，一鍵快速開團</p>
             </div>
             <div class="flex items-center gap-3">
                 <a href="/templates/new" 
-                   class="bg-sela-500 hover:bg-sela-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                   class="bg-sela-500 hover:bg-sela-600 text-sela-800 px-3 py-1.5 rounded-lg text-sm font-medium">
                     + 新增
                 </a>
-                <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+                
             </div>
         </div>
     </div>
     
     <!-- 模板列表 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         {% if my_templates %}
         <div class="space-y-3">
             {% for tpl in my_templates %}
@@ -32,18 +34,18 @@
                         {% if tpl.store.logo_url %}
                         <img src="{{ tpl.store.logo_url }}" class="w-10 h-10 rounded object-contain">
                         {% else %}
-                        <div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xl">
+                        <div class="w-10 h-10 bg-sela-100 rounded flex items-center justify-center text-xl">
                             {% if tpl.store.category.value == 'drink' %}<i class="ti ti-cup"></i>
                             {% elif tpl.store.category.value == 'meal' %}<i class="ti ti-bowl"></i>
                             {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
                         </div>
                         {% endif %}
                         <div>
-                            <div class="font-medium text-gray-800">{{ tpl.name }}</div>
-                            <div class="text-sm text-gray-500">
+                            <div class="font-medium text-sela-800">{{ tpl.name }}</div>
+                            <div class="text-sm text-sela-800/60">
                                 {{ tpl.store.name }} · {{ tpl.group_name }}
                             </div>
-                            <div class="text-xs text-gray-400 mt-1">
+                            <div class="text-xs text-sela-800/45 mt-1">
                                 <i class="ti ti-stopwatch"></i> {{ tpl.default_duration_minutes }}分鐘
                                 {% if tpl.is_blind_mode %}· <i class="ti ti-eye-off"></i> 盲點{% endif %}
                                 {% if tpl.enable_lucky_draw %}· <i class="ti ti-confetti"></i> 抽獎{% endif %}
@@ -51,7 +53,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="text-xs text-gray-400">
+                    <div class="text-xs text-sela-800/45">
                         已用 {{ tpl.use_count }} 次
                     </div>
                 </div>
@@ -59,7 +61,7 @@
                 <div class="flex gap-2 mt-3">
                     <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-1">
                         <button type="submit" 
-                                class="w-full py-2 bg-sela-500 hover:bg-sela-600 text-white rounded-lg text-sm font-medium">
+                                class="w-full py-2 bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-lg text-sm font-medium">
                             <i class="ti ti-bolt"></i> 使用開團
                         </button>
                     </form>
@@ -75,11 +77,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center text-gray-500 py-8">
+        <div class="text-center text-sela-800/60 py-8">
             <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
             <p>還沒有儲存任何模板</p>
             <p class="text-sm mt-1">可從開團頁面新增，或從已開的團單儲存</p>
-            <a href="/templates/new" class="inline-block mt-4 text-sela-500 hover:text-sela-600">
+            <a href="/templates/new" class="inline-block mt-4 text-sela-800 hover:text-sela-800">
                 新增第一個模板 →
             </a>
         </div>

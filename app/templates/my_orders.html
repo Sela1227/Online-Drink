@@ -1,25 +1,27 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}我的訂單 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/profile', '個人資料') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-clipboard-list"></i> 我的訂單</h1>
-            <div class="text-sm text-gray-500">共 {{ total }} 筆</div>
+            <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-clipboard-list"></i> 我的訂單</h1>
+            <div class="text-sm text-sela-800/60">共 {{ total }} 筆</div>
         </div>
-        <a href="/profile" class="text-sm text-gray-500 hover:text-gray-700">返回個人頁面 →</a>
+        
     </div>
     
     {% if orders %}
     <div class="space-y-3">
         {% for order in orders %}
-        <a href="/groups/{{ order.group.id }}" class="block bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+        <a href="/groups/{{ order.group.id }}" class="block bg-white rounded-lg p-4 shadow-sm border border-sela-100">
             <div class="flex items-start gap-3">
                 <!-- Logo -->
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div class="w-12 h-12 bg-sela-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {% if order.group.store and order.group.store.logo_url %}
                     <img src="{{ order.group.store.logo_url }}" alt="{{ order.group.store_display_name }}" class="w-full h-full object-contain">
                     {% else %}
@@ -33,20 +35,20 @@
                 
                 <!-- 資訊 -->
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-800 truncate">{{ order.group.name }}</div>
-                    <div class="text-sm text-gray-500">{{ order.group.store_display_name }}</div>
-                    <div class="text-xs text-gray-400 mt-1">
+                    <div class="font-medium text-sela-800 truncate">{{ order.group.name }}</div>
+                    <div class="text-sm text-sela-800/60">{{ order.group.store_display_name }}</div>
+                    <div class="text-xs text-sela-800/45 mt-1">
                         {{ order.created_at.strftime('%Y/%m/%d %H:%M') }}
                     </div>
                     <!-- 訂單內容摘要 -->
-                    <div class="text-sm text-gray-600 mt-2">
+                    <div class="text-sm text-sela-800/70 mt-2">
                         {% for item in order.items[:3] %}
-                        <span class="inline-block bg-gray-100 px-2 py-0.5 rounded text-xs mr-1 mb-1">
+                        <span class="inline-block bg-sela-100 px-2 py-0.5 rounded text-xs mr-1 mb-1">
                             {{ item.item_name }}{% if item.quantity > 1 %} ×{{ item.quantity }}{% endif %}
                         </span>
                         {% endfor %}
                         {% if order.items|length > 3 %}
-                        <span class="text-xs text-gray-400">+{{ order.items|length - 3 }} 項</span>
+                        <span class="text-xs text-sela-800/45">+{{ order.items|length - 3 }} 項</span>
                         {% endif %}
                     </div>
                 </div>
@@ -58,9 +60,9 @@
                     {% elif order.status.value == 'draft' %}
                     <span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">草稿</span>
                     {% else %}
-                    <span class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">編輯中</span>
+                    <span class="text-xs bg-sela-100 text-sela-800 px-2 py-1 rounded">編輯中</span>
                     {% endif %}
-                    <div class="text-sm font-medium text-sela-500 mt-1">${{ order.total_amount|int }}</div>
+                    <div class="text-sm font-medium text-sela-800 mt-1">${{ order.total_amount|int }}</div>
                 </div>
             </div>
         </a>
@@ -71,21 +73,21 @@
     {% if total_pages > 1 %}
     <div class="flex justify-center gap-2 py-4">
         {% if page > 1 %}
-        <a href="/my-orders?page={{ page - 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">上一頁</a>
+        <a href="/my-orders?page={{ page - 1 }}" class="px-3 py-1 bg-sela-100 rounded text-sm active:bg-sela-200">上一頁</a>
         {% endif %}
         
-        <span class="px-3 py-1 text-sm text-gray-600">{{ page }} / {{ total_pages }}</span>
+        <span class="px-3 py-1 text-sm text-sela-800/70">{{ page }} / {{ total_pages }}</span>
         
         {% if page < total_pages %}
-        <a href="/my-orders?page={{ page + 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">下一頁</a>
+        <a href="/my-orders?page={{ page + 1 }}" class="px-3 py-1 bg-sela-100 rounded text-sm active:bg-sela-200">下一頁</a>
         {% endif %}
     </div>
     {% endif %}
     
     {% else %}
-    <div class="text-center py-12 text-gray-500">
+    <div class="text-center py-12 text-sela-800/60">
         <p>還沒有訂單記錄</p>
-        <a href="/home" class="text-sela-500 text-sm mt-2 inline-block">去看看有什麼團 →</a>
+        <a href="/home" class="text-sela-800 text-sm mt-2 inline-block">去看看有什麼團 →</a>
     </div>
     {% endif %}
 </div>

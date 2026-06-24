@@ -74,6 +74,8 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
         "group_id": group_id,
         "group": group,
         "is_open": is_open,
+        "is_owner": group.owner_id == user.id,
+        "is_admin": user.is_admin,
     })
 
 

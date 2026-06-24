@@ -1,18 +1,20 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}發起投票 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-lg shadow-sm p-4">
+{{ nav.back('/votes', '投票') }}
+<div class="bg-white rounded-2xl shadow-sm p-4">
     <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-checkbox"></i>️ 發起投票</h1>
-        <a href="/votes" class="text-sm text-gray-500 hover:text-gray-700">返回投票列表 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-checkbox"></i>️ 發起投票</h1>
+        
     </div>
     
     <form action="/votes" method="post" class="space-y-4" x-data="newVoteForm()">
         <!-- 投票標題 -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">投票標題</label>
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">投票標題</label>
             <input type="text" name="title" required
                    placeholder="例：今天午餐吃什麼？"
                    class="w-full border rounded-lg px-3 py-2">
@@ -20,25 +22,25 @@
         
         <!-- 說明 -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">說明（選填）</label>
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">說明（選填）</label>
             <textarea name="description" rows="2" placeholder="補充說明..."
                       class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
         </div>
         
         <!-- 截止時間 -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">投票截止時間</label>
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">投票截止時間</label>
             <div class="flex flex-wrap gap-2 mb-2">
                 <button type="button" @click="setDeadline('30m')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
                     30分鐘後
                 </button>
                 <button type="button" @click="setDeadline('1h')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
                     1小時後
                 </button>
                 <button type="button" @click="setDeadline('11:30')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
                     今天 11:30
                 </button>
             </div>
@@ -50,29 +52,29 @@
         <div>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="is_multiple" value="true">
-                <span class="text-sm text-gray-600">允許多選</span>
+                <span class="text-sm text-sela-800/70">允許多選</span>
             </label>
         </div>
         
         <!-- 可見性設定 -->
         <div x-data="{ isPublic: true }">
-            <label class="block text-sm font-medium text-gray-700 mb-2">可見範圍</label>
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">可見範圍</label>
             <div class="space-y-2">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="visibility" value="public" checked
                            @change="isPublic = true">
-                    <span class="text-sm text-gray-600"><i class="ti ti-world"></i> 全體可見</span>
+                    <span class="text-sm text-sela-800/70"><i class="ti ti-world"></i> 全體可見</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="visibility" value="department"
                            @change="isPublic = false">
-                    <span class="text-sm text-gray-600"><i class="ti ti-users"></i> 限定部門</span>
+                    <span class="text-sm text-sela-800/70"><i class="ti ti-users"></i> 限定部門</span>
                 </label>
             </div>
             
             <!-- 部門選擇 -->
-            <div x-show="!isPublic" x-cloak class="mt-3 p-3 bg-gray-50 rounded-lg">
-                <div class="text-xs text-gray-500 mb-2">選擇可見的部門（可多選）</div>
+            <div x-show="!isPublic" x-cloak class="mt-3 p-3 bg-sela-50 rounded-lg">
+                <div class="text-xs text-sela-800/60 mb-2">選擇可見的部門（可多選）</div>
                 <div class="space-y-1 max-h-32 overflow-y-auto">
                     {% for dept in departments %}
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -86,27 +88,27 @@
         
         <!-- 選擇店家 -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">選擇店家（至少2個）</label>
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇店家（至少2個）</label>
             
             <!-- 分類篩選 -->
             <div class="flex gap-2 mb-3">
                 <button type="button" @click="filterCategory = ''"
-                        :class="filterCategory === '' ? 'bg-sela-100 text-sela-700 border-sela-300' : 'bg-gray-50 border-gray-200'"
+                        :class="filterCategory === '' ? 'bg-sela-100 text-sela-800 border-sela-300' : 'bg-sela-50 border-sela-200'"
                         class="px-3 py-1 rounded border text-sm">
                     全部
                 </button>
                 <button type="button" @click="filterCategory = 'drink'"
-                        :class="filterCategory === 'drink' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-50 border-gray-200'"
+                        :class="filterCategory === 'drink' ? 'bg-sela-800 text-white border-sela-800' : 'bg-sela-50 border-sela-200'"
                         class="px-3 py-1 rounded border text-sm">
                     <i class="ti ti-cup"></i> 飲料
                 </button>
                 <button type="button" @click="filterCategory = 'meal'"
-                        :class="filterCategory === 'meal' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-50 border-gray-200'"
+                        :class="filterCategory === 'meal' ? 'bg-sela-800 text-white border-sela-800' : 'bg-sela-50 border-sela-200'"
                         class="px-3 py-1 rounded border text-sm">
                     <i class="ti ti-bowl"></i> 餐廳
                 </button>
                 <button type="button" @click="filterCategory = 'group_buy'"
-                        :class="filterCategory === 'group_buy' ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 border-gray-200'"
+                        :class="filterCategory === 'group_buy' ? 'bg-sela-800 text-white border-sela-800' : 'bg-sela-50 border-sela-200'"
                         class="px-3 py-1 rounded border text-sm">
                     <i class="ti ti-shopping-cart"></i> 團購
                 </button>
@@ -114,7 +116,7 @@
             
             <div class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-lg">
                 {% for store in stores %}
-                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-sela-50 cursor-pointer"
                        x-show="filterCategory === '' || filterCategory === '{{ store.category.value }}'">
                     <input type="checkbox" name="store_ids" value="{{ store.id }}"
                            @change="updateSelectedCount()">
@@ -127,20 +129,20 @@
                 </label>
                 {% endfor %}
             </div>
-            <div class="text-xs text-gray-500 mt-1">
+            <div class="text-xs text-sela-800/60 mt-1">
                 已選擇 <span x-text="selectedCount">0</span> 個店家
             </div>
         </div>
         
         <!-- 送出按鈕 -->
         <div class="flex gap-2 pt-4">
-            <a href="/votes" class="flex-1 py-3 text-center rounded-lg border hover:bg-gray-50">
+            <a href="/votes" class="flex-1 py-3 text-center rounded-lg border hover:bg-sela-50">
                 取消
             </a>
             <button type="submit" 
                     :disabled="selectedCount < 2"
-                    :class="selectedCount < 2 ? 'bg-gray-300 cursor-not-allowed' : 'bg-sela-500 hover:bg-sela-600'"
-                    class="flex-1 py-3 rounded-lg text-white font-medium">
+                    :class="selectedCount < 2 ? 'bg-sela-300 cursor-not-allowed' : 'bg-sela-500 hover:bg-sela-600'"
+                    class="flex-1 py-3 rounded-lg text-sela-800 font-medium">
                 發起投票
             </button>
         </div>

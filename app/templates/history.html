@@ -1,24 +1,26 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}歷史團單 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-scroll"></i> 歷史團單</h1>
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-scroll"></i> 歷史團單</h1>
+        
     </div>
     
-    <div class="text-sm text-gray-500">共 {{ total }} 筆</div>
+    <div class="text-sm text-sela-800/60">共 {{ total }} 筆</div>
     
     {% if groups %}
     <div class="space-y-3">
         {% for group in groups %}
-        <a href="/groups/{{ group.id }}" class="block bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+        <a href="/groups/{{ group.id }}" class="block bg-white rounded-lg p-4 shadow-sm border border-sela-100">
             <div class="flex items-start gap-3">
                 <!-- Logo -->
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div class="w-12 h-12 bg-sela-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {% if group.store and group.store.logo_url %}
                     <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-full h-full object-contain">
                     {% else %}
@@ -32,9 +34,9 @@
                 
                 <!-- 資訊 -->
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-800 truncate">{{ group.name }}</div>
-                    <div class="text-sm text-gray-500">{{ group.store_display_name }}</div>
-                    <div class="text-xs text-gray-400 mt-1">
+                    <div class="font-medium text-sela-800 truncate">{{ group.name }}</div>
+                    <div class="text-sm text-sela-800/60">{{ group.store_display_name }}</div>
+                    <div class="text-xs text-sela-800/45 mt-1">
                         {{ group.owner.show_name }} · 
                         {{ group.deadline.strftime('%m/%d %H:%M') }} 截止 ·
                         {{ group.orders|length }} 人參與
@@ -44,9 +46,9 @@
                 <!-- 狀態 -->
                 <div class="flex-shrink-0">
                     {% if group.is_closed %}
-                    <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">已關團</span>
+                    <span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-1 rounded">已關團</span>
                     {% else %}
-                    <span class="text-xs bg-sela-100 text-sela-600 px-2 py-1 rounded">已截止</span>
+                    <span class="text-xs bg-sela-100 text-sela-800 px-2 py-1 rounded">已截止</span>
                     {% endif %}
                 </div>
             </div>
@@ -58,19 +60,19 @@
     {% if total_pages > 1 %}
     <div class="flex justify-center gap-2 py-4">
         {% if page > 1 %}
-        <a href="/history?page={{ page - 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">上一頁</a>
+        <a href="/history?page={{ page - 1 }}" class="px-3 py-1 bg-sela-100 rounded text-sm active:bg-sela-200">上一頁</a>
         {% endif %}
         
-        <span class="px-3 py-1 text-sm text-gray-600">{{ page }} / {{ total_pages }}</span>
+        <span class="px-3 py-1 text-sm text-sela-800/70">{{ page }} / {{ total_pages }}</span>
         
         {% if page < total_pages %}
-        <a href="/history?page={{ page + 1 }}" class="px-3 py-1 bg-gray-200 rounded text-sm hover:bg-gray-300">下一頁</a>
+        <a href="/history?page={{ page + 1 }}" class="px-3 py-1 bg-sela-100 rounded text-sm active:bg-sela-200">下一頁</a>
         {% endif %}
     </div>
     {% endif %}
     
     {% else %}
-    <div class="text-center py-12 text-gray-500">
+    <div class="text-center py-12 text-sela-800/60">
         <p>還沒有歷史團單</p>
     </div>
     {% endif %}

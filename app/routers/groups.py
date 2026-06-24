@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 import qrcode
 import io
@@ -608,6 +609,49 @@ async def copy_last_order(group_id: int, request: Request, db: Session = Depends
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
 
 
+@router.post("/{group_id}/orders/{order_id}/discount")
+async def set_order_discount(
+    group_id: int,
+    order_id: int,
+    request: Request,
+    discount_amount: str = Form(""),
+    discount_note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """團主/管理員對某人訂單設定折扣（店家優惠，連動所有金額處）"""
+    user = await get_current_user(request, db)
+
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    # 權限：只有團主或管理員
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="只有團主可以調整折扣")
+
+    order = db.query(Order).filter(Order.id == order_id, Order.group_id == group_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="訂單不存在")
+
+    # 解析折扣金額（空字串或 0 = 取消折扣）
+    amt = Decimal("0")
+    if discount_amount and discount_amount.strip():
+        try:
+            amt = Decimal(discount_amount.strip())
+        except (InvalidOperation, ValueError):
+            raise HTTPException(status_code=400, detail="折扣金額必須是數字")
+    if amt < 0:
+        amt = Decimal("0")
+    # 折扣不可超過原價
+    if amt > order.items_subtotal:
+        amt = order.items_subtotal
+
+    order.discount_amount = amt
+    order.discount_note = (discount_note.strip()[:100] or None) if amt > 0 else None
+    db.commit()
+
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+
+
 @router.get("/{group_id}/copy")
 async def copy_group_page(group_id: int, request: Request, db: Session = Depends(get_db)):
     """複製開團頁面"""
@@ -856,73 +900,57 @@ async def export_receipt_png(request: Request, group_id: int, db: Session = Depe
     )
 
 
-# ============ 訪客模式 ============
+# ============ 訪客模式（已停用，本系統只用 LINE 登入）============
+# V1.19.2：訪客功能會建立空殼帳號污染用戶列表，且本系統只需 LINE 登入，故停用。
+# 路由保留但回傳停用訊息，避免舊訪客連結被點到時建立新帳號。
+GUEST_MODE_ENABLED = False
+
 
 @router.post("/{group_id}/guest-link")
 async def generate_guest_link(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """產生訪客連結"""
-    import secrets
+    """產生分享連結（點連結的人需用自己的 LINE 登入才能跟團）"""
     import hashlib
-    
     user = await get_current_user(request, db)
-    
+
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
-    
-    # 只有團主或管理員可以產生
     if group.owner_id != user.id and not user.is_admin:
-        raise HTTPException(status_code=403, detail="只有團主可以產生訪客連結")
-    
-    # 產生一個基於 group_id 和時間的 token（簡單版）
-    # 實際上可以存到資料庫，這裡用 hash 簡化
+        raise HTTPException(status_code=403, detail="只有團主可以產生分享連結")
+
     secret = settings.secret_key or "default-secret"
     raw = f"{group_id}-{secret}-guest"
     token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    
     base_url = str(request.base_url).rstrip("/")
     link = f"{base_url}/groups/{group_id}/guest?token={token}"
-    
     return {"link": link}
 
 
 @router.get("/{group_id}/guest")
 async def guest_access(group_id: int, token: str, request: Request, db: Session = Depends(get_db)):
-    """訪客存取團單"""
+    """分享連結存取：驗證 token 後，未登入導去 LINE 登入、登入後回團單"""
     import hashlib
-    from fastapi.responses import Response
-    
-    group = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner)
-    ).filter(Group.id == group_id).first()
-    
+
+    group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
-    
+
     # 驗證 token
     secret = settings.secret_key or "default-secret"
     raw = f"{group_id}-{secret}-guest"
     expected_token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    
     if token != expected_token:
-        raise HTTPException(status_code=403, detail="無效的訪客連結")
-    
-    # 檢查是否已登入
+        raise HTTPException(status_code=403, detail="無效的連結")
+
+    # 已登入 → 直接進團單
     from app.services.auth import get_current_user_optional
     user, _ = await get_current_user_optional(request, db)
-    
     if user:
-        # 已登入，直接導向團單頁面
         return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
-    
-    # 未登入，顯示訪客進入頁面
-    return templates.TemplateResponse("guest_entry.html", {
-        "request": request,
-        "group": group,
-        "store": group.store,
-        "token": token,
-    })
+
+    # 未登入 → 導去 LINE 登入，登入後回團單頁（要跟團一定要用自己的 LINE）
+    resp = RedirectResponse(url=f"/auth/login?next=/groups/{group_id}", status_code=302)
+    return resp
 
 
 @router.post("/{group_id}/guest")
@@ -933,7 +961,9 @@ async def guest_enter(
     request: Request = None,
     db: Session = Depends(get_db)
 ):
-    """訪客輸入名字進入團單"""
+    """訪客輸入名字進入團單（已停用）"""
+    if not GUEST_MODE_ENABLED:
+        raise HTTPException(status_code=410, detail="訪客功能已停用，請使用 LINE 登入")
     import hashlib
     import secrets
     from app.models.user import User

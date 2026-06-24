@@ -1,12 +1,12 @@
 {# 北歐風簡潔卡片 #}
-{% set accent = 'amber' if group.category.value == 'drink' else ('green' if group.category.value == 'meal' else 'blue') %}
+{% set accent = 'sela' %}
 
 <a href="/groups/{{ group.id }}" 
-   class="block bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100 hover:border-{{ accent }}-200 relative">
+   class="block bg-white rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-all duration-150 border border-sela-100 relative">
     
     <!-- 限定標籤 -->
     {% if not group.is_public %}
-    <div class="absolute top-2 right-2 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+    <div class="absolute top-2 right-2 text-[10px] bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded-full">
         <i class="ti ti-users"></i>
     </div>
     {% endif %}
@@ -14,11 +14,11 @@
     <!-- 頂部：Logo + 資訊 -->
     <div class="flex gap-3">
         <!-- Logo -->
-        <div class="w-18 h-18 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0" style="width: 72px; height: 72px;">
+        <div class="w-18 h-18 rounded-xl bg-sela-50 flex items-center justify-center overflow-hidden flex-shrink-0" style="width: 72px; height: 72px;">
             {% if group.store and group.store.logo_url %}
             <img src="{{ group.store.logo_url }}" alt="{{ group.store_display_name }}" class="w-full h-full object-contain p-1">
             {% else %}
-            <span class="text-3xl text-gray-400">
+            <span class="text-3xl text-sela-800/45">
                 {% if group.category.value == 'drink' %}<i class="ti ti-cup"></i>
                 {% elif group.category.value == 'meal' %}<i class="ti ti-bowl"></i>
                 {% else %}<i class="ti ti-shopping-cart"></i>{% endif %}
@@ -28,15 +28,15 @@
         
         <!-- 資訊 -->
         <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">{{ group.name }}</div>
-            <div class="text-xs text-gray-500 truncate mt-0.5">{{ group.store_display_name }}</div>
-            <div class="text-xs text-gray-400 mt-0.5">{{ group.owner.show_name }}</div>
+            <div class="text-sm font-semibold text-sela-800 leading-snug line-clamp-2">{{ group.name }}</div>
+            <div class="text-xs text-sela-800/60 truncate mt-0.5">{{ group.store_display_name }}</div>
+            <div class="text-xs text-sela-800/45 mt-0.5">{{ group.owner.show_name }}</div>
         </div>
     </div>
     
     <!-- 備註 -->
     {% if group.note %}
-    <div class="mt-2 text-xs text-gray-500 line-clamp-1 bg-gray-50 rounded-lg px-2 py-1">
+    <div class="mt-2 text-xs text-sela-800/60 line-clamp-1 bg-sela-50 rounded-lg px-2 py-1">
         <i class="ti ti-pencil"></i> {{ group.note }}
     </div>
     {% endif %}
@@ -49,20 +49,20 @@
             <span class="text-green-600 font-medium"><i class="ti ti-check"></i> {{ group.submitted_count }}</span>
             {% endif %}
             {% if group.pending_count > 0 %}
-            <span class="text-{{ accent }}-500"><i class="ti ti-shopping-cart"></i> {{ group.pending_count }}</span>
+            <span class="text-sela-800/55"><i class="ti ti-shopping-cart"></i> {{ group.pending_count }}</span>
             {% endif %}
             {% if group.submitted_count == 0 and group.pending_count == 0 %}
-            <span class="text-gray-300">尚無訂單</span>
+            <span class="text-sela-800/35">尚無訂單</span>
             {% endif %}
         </div>
         
         <!-- 截止時間 -->
         {% if group.is_open %}
-        <div class="text-xs font-medium text-{{ accent }}-600 bg-{{ accent }}-50 px-2 py-1 rounded-full"
+        <div class="text-xs font-medium text-sela-800 bg-sela-100 px-2 py-1 rounded-full"
              x-data="countdown('{{ group.deadline.isoformat() }}')" 
              x-text="display"></div>
         {% else %}
-        <span class="text-xs text-gray-400">已截止</span>
+        <span class="text-xs text-sela-800/45">已截止</span>
         {% endif %}
     </div>
 </a>

@@ -1,13 +1,15 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}問題回報 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-mailbox"></i> 問題回報</h1>
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-mailbox"></i> 問題回報</h1>
+        
     </div>
     
     {% if request.query_params.get('success') %}
@@ -17,20 +19,20 @@
     {% endif %}
     
     <!-- 回報表單 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <form action="/feedback" method="POST" class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
+                <label class="block text-sm font-medium text-sela-800/80 mb-2">
                     遇到什麼問題？
                 </label>
                 <textarea name="content" rows="5" required
-                          class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"
+                          class="w-full border border-sela-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"
                           placeholder="請描述您遇到的問題或建議..."></textarea>
-                <p class="text-xs text-gray-400 mt-1">最多 1000 字</p>
+                <p class="text-xs text-sela-800/45 mt-1">最多 1000 字</p>
             </div>
             
             <button type="submit" 
-                    class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
+                    class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
                 送出回報
             </button>
         </form>
@@ -39,14 +41,14 @@
     <!-- 歷史回報 -->
     {% if feedbacks %}
     <div class="space-y-3">
-        <h2 class="text-lg font-semibold text-gray-700">我的回報記錄</h2>
+        <h2 class="text-lg font-semibold text-sela-800/80">我的回報記錄</h2>
         
         {% for feedback in feedbacks %}
-        <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm p-4">
             <div class="flex items-start justify-between gap-2">
                 <div class="flex-1">
-                    <p class="text-sm text-gray-700 whitespace-pre-line">{{ feedback.content[:200] }}{% if feedback.content|length > 200 %}...{% endif %}</p>
-                    <p class="text-xs text-gray-400 mt-2">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</p>
+                    <p class="text-sm text-sela-800/80 whitespace-pre-line">{{ feedback.content[:200] }}{% if feedback.content|length > 200 %}...{% endif %}</p>
+                    <p class="text-xs text-sela-800/45 mt-2">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</p>
                 </div>
                 <div class="flex-shrink-0">
                     {% if feedback.status == 'resolved' %}

@@ -2,7 +2,7 @@
 {% if hot_items %}
 <div class="mb-6" x-data="{ open: false }">
     <button @click="open = !open" class="w-full text-left">
-        <h2 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+        <h2 class="text-lg font-semibold text-sela-800/80 mb-3 flex items-center">
             <span class="mr-2" :class="open ? 'rotate-90' : ''" style="transition: transform 0.2s">▶</span>
             <i class="ti ti-flame"></i> 超夯清單（最近 30 天）
         </h2>
@@ -12,21 +12,21 @@
             {% for item in hot_items %}
             <div class="flex items-center justify-between p-2 bg-gradient-to-r from-sela-50 to-white rounded-lg">
                 <div class="flex items-center gap-3">
-                    <span class="text-lg font-bold text-sela-500 w-6">#{{ loop.index }}</span>
+                    <span class="text-lg font-bold text-sela-800 w-6">#{{ loop.index }}</span>
                     {% if item.store.logo_url %}
                     <img src="{{ item.store.logo_url }}" class="w-8 h-8 rounded-full object-cover">
                     {% else %}
-                    <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-full bg-sela-100 flex items-center justify-center">
                         {{ item.store.name[0] }}
                     </div>
                     {% endif %}
                     <div>
                         <div class="font-medium">{{ item.menu_item.name }}</div>
-                        <div class="text-xs text-gray-500">{{ item.store.name }}</div>
+                        <div class="text-xs text-sela-800/60">{{ item.store.name }}</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm font-medium text-sela-600">{{ item.count }} 杯</div>
+                    <div class="text-sm font-medium text-sela-800">{{ item.count }} 杯</div>
                 </div>
             </div>
             {% endfor %}

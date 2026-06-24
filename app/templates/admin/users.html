@@ -1,15 +1,18 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}使用者管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin', '管理後台') }}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold text-gray-800">使用者管理</h1>
-            <div class="text-sm text-gray-500">共 {{ users|length }} 人 · <span class="text-green-600"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> {{ online_count }} 人在線</span></div>
+            <h1 class="text-xl font-bold text-sela-800">使用者管理</h1>
+            <div class="text-sm text-sela-800/60">共 {{ users|length }} 人 · <span class="text-green-600"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> {{ online_count }} 人在線</span></div>
+            <a href="/admin/users-duplicates" class="text-xs text-sela-800 hover:underline"><i class="ti ti-users-group"></i> 檢查重複用戶</a>
         </div>
-        <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+        
     </div>
     
     <!-- 一鍵登出按鈕 -->
@@ -33,14 +36,22 @@
         <i class="ti ti-check"></i> 已成功登出所有用戶，所有人需重新登入。
     </div>
     {% endif %}
-    
+
+    <!-- 排序 -->
+    <div class="flex gap-1 bg-sela-100 p-1 rounded-lg text-sm overflow-x-auto">
+        {% for val, label in [('created','建立時間'), ('last_login','最近登入'), ('last_active','最近活動'), ('name','名稱')] %}
+        <a href="/admin/users?sort={{ val }}"
+           class="flex-1 text-center whitespace-nowrap py-2 px-3 rounded-md font-medium transition {{ 'bg-white text-sela-800 shadow-sm' if sort == val else 'text-sela-800/60' }}">{{ label }}</a>
+        {% endfor %}
+    </div>
+
     {% if users %}
-    <div class="bg-white rounded-lg shadow-sm divide-y">
+    <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for u in users %}
-        <div class="p-4 flex items-center gap-3 hover:bg-gray-50 transition">
+        <div class="p-4 flex items-center gap-3 hover:bg-sela-50 transition">
             <!-- 頭像 + 在線狀態（可點擊） -->
             <a href="/admin/users/{{ u.id }}" class="relative w-10 h-10 flex-shrink-0">
-                <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                <div class="w-10 h-10 bg-sela-100 rounded-full flex items-center justify-center overflow-hidden">
                     {% if u.picture_url %}
                     <img src="{{ u.picture_url }}" alt="{{ u.display_name }}" class="w-full h-full object-cover">
                     {% else %}
@@ -55,10 +66,10 @@
             
             <!-- 資訊（可點擊） -->
             <a href="/admin/users/{{ u.id }}" class="flex-1 min-w-0">
-                <div class="font-medium text-gray-900 truncate">
+                <div class="font-medium text-sela-800 truncate">
                     {{ u.show_name }}
                     {% if u.nickname %}
-                    <span class="text-xs text-gray-400 font-normal">({{ u.display_name }})</span>
+                    <span class="text-xs text-sela-800/45 font-normal">({{ u.display_name }})</span>
                     {% endif %}
                     {% if u.is_admin %}
                     <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
@@ -67,7 +78,7 @@
                     <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-1">在線</span>
                     {% endif %}
                 </div>
-                <div class="text-xs text-gray-400 truncate">
+                <div class="text-xs text-sela-800/45 truncate">
                     {% if u.last_login_at %}
                     最後登入：{{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}
                     {% else %}
@@ -85,7 +96,7 @@
                       onsubmit="return confirm('確定要{{ '移除' if u.is_admin else '設為' }}管理員嗎？')">
                     <button type="submit" class="text-sm px-3 py-1.5 rounded transition
                         {% if u.is_admin %}
-                        bg-gray-100 text-gray-600 hover:bg-gray-200
+                        bg-sela-100 text-sela-800/70 active:bg-sela-100
                         {% else %}
                         bg-amber-50 text-amber-600 hover:bg-amber-100
                         {% endif %}
@@ -94,14 +105,14 @@
                     </button>
                 </form>
                 {% else %}
-                <span class="text-xs text-gray-400">（你自己）</span>
+                <span class="text-xs text-sela-800/45">（你自己）</span>
                 {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
+    <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
         <div class="text-4xl mb-2"><i class="ti ti-users"></i></div>
         <p>還沒有任何使用者</p>
     </div>

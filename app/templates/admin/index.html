@@ -1,66 +1,68 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}後台管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">後台管理</h1>
-        <a href="/home" class="text-sm text-gray-500 hover:text-gray-700">返回首頁 →</a>
+        <h1 class="text-xl font-bold text-sela-800">後台管理</h1>
+        
     </div>
     
     <!-- 統計方塊（可點擊） -->
     <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/stores" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-600">{{ store_count }}</div>
-            <div class="text-xs text-gray-500">店家</div>
+        <a href="/admin/stores" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+            <div class="text-2xl font-bold text-sela-800">{{ store_count }}</div>
+            <div class="text-xs text-sela-800/60">店家</div>
         </a>
-        <a href="/admin/groups" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-600">{{ group_count }}</div>
-            <div class="text-xs text-gray-500">團單</div>
+        <a href="/admin/groups" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+            <div class="text-2xl font-bold text-sela-800">{{ group_count }}</div>
+            <div class="text-xs text-sela-800/60">團單</div>
         </a>
-        <a href="/admin/users" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-600">{{ user_count }}</div>
-            <div class="text-xs text-gray-500">使用者</div>
+        <a href="/admin/users" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+            <div class="text-2xl font-bold text-sela-800">{{ user_count }}</div>
+            <div class="text-xs text-sela-800/60">使用者</div>
         </a>
-        <a href="/admin/departments" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-purple-600">{{ department_count }}</div>
-            <div class="text-xs text-gray-500"><i class="ti ti-users"></i> 部門</div>
+        <a href="/admin/departments" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+            <div class="text-2xl font-bold text-sela-800">{{ department_count }}</div>
+            <div class="text-xs text-sela-800/60"><i class="ti ti-users"></i> 部門</div>
         </a>
     </div>
     
     <!-- 第二排統計 -->
     <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/users" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+        <a href="/admin/users" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
             <div class="text-2xl font-bold text-green-600">{{ online_count }}</div>
-            <div class="text-xs text-gray-500"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線</div>
+            <div class="text-xs text-sela-800/60"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線</div>
         </a>
-        <a href="/admin/feedbacks" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
+        <a href="/admin/feedbacks" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
             <div class="text-2xl font-bold text-red-500">{{ feedback_count }}</div>
-            <div class="text-xs text-gray-500"><i class="ti ti-mailbox"></i> 回報</div>
+            <div class="text-xs text-sela-800/60"><i class="ti ti-mailbox"></i> 回報</div>
             {% if feedback_count > 0 %}
             <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             {% endif %}
         </a>
-        <a href="/admin/recommendations" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
+        <a href="/admin/recommendations" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
             <div class="text-2xl font-bold text-amber-600">{{ recommendation_count }}</div>
-            <div class="text-xs text-gray-500"><i class="ti ti-bulb"></i> 推薦</div>
+            <div class="text-xs text-sela-800/60"><i class="ti ti-bulb"></i> 推薦</div>
             {% if recommendation_count > 0 %}
             <span class="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             {% endif %}
         </a>
-        <a href="/admin/announcements" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+        <a href="/admin/announcements" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
             <div class="text-2xl font-bold text-blue-600">{{ announcement_count }}</div>
-            <div class="text-xs text-gray-500"><i class="ti ti-speakerphone"></i> 公告</div>
+            <div class="text-xs text-sela-800/60"><i class="ti ti-speakerphone"></i> 公告</div>
         </a>
     </div>
     
     <!-- 第三排功能 -->
     <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/import" class="bg-white rounded-lg shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
+        <a href="/admin/import" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
             <div class="text-xl"><i class="ti ti-inbox"></i></div>
-            <div class="text-xs text-gray-500 mt-1">匯入</div>
+            <div class="text-xs text-sela-800/60 mt-1">匯入</div>
         </a>
     </div>
 </div>

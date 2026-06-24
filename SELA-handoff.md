@@ -6,6 +6,23 @@
 
 ---
 
+## 增補：V1.16.0 對齊升級至 Kit V1.18.0（2026-05-30）
+
+> 本專案 V1.0.0 已對齊 Kit V1.9.0。此增補記錄「Kit 自身從 V1.9.0 演進到 V1.18.0」後的再對齊。原始首次對齊回流見下方原文，保留不動。
+
+**這次對齊做了什麼：**
+- 🔴 更新衝突仲裁區塊 Kit 版本 V1.9.0 → V1.18.0
+- 🔴 修正 CLAUDE.md 開頭「當前狀態」版本號 V1.13.3 → V1.16.0（V1.13.4~V1.16.0 期間用 GitHub clone 改版時只加版本歷程列、漏更新開頭，此次補回）
+- 🟡 優化體檢（Kit V1.17.0 新鐵律）：對照 optimizations.md 4 條 OPT，**本專案無中招值得改項**（OPT-1 threading.Timer 排程不適用 — 自動催單是前端提示+手動催單非後端排程；OPT-2/3/4 情境不符）。體檢通過。
+- 🟡 app logo（Kit V1.13.0 雙軌系統）：SELA 同意做「快點來點餐」專屬 app logo，依 §17 自動工作流產出 `SELA-logo-prompt.md`（範本 A 業務工具型往親和調整、背景色取 app 主題色 #653985、壁虎 not-a-natural-fit）。等 SELA 拿 prompt 生圖後再走 §10.2 優化轉檔。
+
+**給 Kit 的回流發現：**
+- **「用 GitHub clone 改既有專案」會漏更新 CLAUDE.md 開頭版本號** — 本專案 V1.13.4 起容器重置後改用 `git clone` 拉線上版來改，幾次只動「版本歷程表格列」忘了同步「§〇 當前狀態」的版本字串，累積 3 版才在對齊時發現。**建議 Kit 的升版 SOP 明列「version bump 要同時改 N 處」的檢查點**（base.html app_version、CLAUDE.md §〇 當前狀態、CLAUDE.md 版本歷程表 — 三處同步）。這對「不在原專案對話、而是 clone 重建來改」的情境特別容易漏。
+- **嵌入式中文字型是 reportlab→PNG 的硬需求** — 核對單功能（V1.14.0-1）用 reportlab 產 PDF、pypdfium2 render PNG。reportlab 內建 CID 中文字型「引用不嵌入」，render PNG 會中文全空白；必須打包 TrueType 字型嵌入。**建議進 Kit tech-stack-lessons「Python 產 PDF/圖含中文」條目**：CID 字型只夠「PDF 在有字型的機器上看」，要 render 成圖一定要嵌入 TTF。
+
+---
+
+
 ## 〇、專案速覽
 
 - **專案名稱：** SELA 快點來點餐（GitHub repo：Online-Drink；本機資料夾：線上訂餐）

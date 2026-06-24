@@ -118,7 +118,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     
     store_count = db.query(Store).count()
     group_count = db.query(Group).count()
-    user_count = db.query(User).count()
+    user_count = db.query(User).filter(User.is_guest == False).count()
     
     # 計算在線人數
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -403,6 +403,49 @@ async def group_list(request: Request, db: Session = Depends(get_db)):
     })
 
 
+def _delete_group_cascade(db: Session, group: Group):
+    """安全刪團（含 FK 連鎖：請客記錄 / 部門關聯 / 訂單 / 訂單項目的選項與加料）"""
+    from app.models.treat import TreatRecord
+    from app.models.department import GroupDepartment
+    from app.models.order import Order, OrderItemOption, OrderItemTopping
+    db.query(TreatRecord).filter(TreatRecord.group_id == group.id).delete()
+    db.query(GroupDepartment).filter(GroupDepartment.group_id == group.id).delete()
+    orders = db.query(Order).filter(Order.group_id == group.id).all()
+    for order in orders:
+        for item in order.items:
+            db.query(OrderItemOption).filter(OrderItemOption.order_item_id == item.id).delete()
+            db.query(OrderItemTopping).filter(OrderItemTopping.order_item_id == item.id).delete()
+            db.delete(item)
+        db.delete(order)
+    db.delete(group)
+
+
+@router.post("/groups/cleanup-test")
+async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
+    """清除測試團：沒有人下單、或只有團主自己下單的團"""
+    await get_admin_user(request, db)
+    groups = db.query(Group).all()
+    removed = 0
+    for g in groups:
+        # 沒有訂單，或全部訂單都是團主自己的 → 視為測試團
+        if all(o.user_id == g.owner_id for o in g.orders):
+            _delete_group_cascade(db, g)
+            removed += 1
+    db.commit()
+    return RedirectResponse(url=f"/admin/groups?cleaned={removed}", status_code=302)
+
+
+@router.post("/groups/{group_id}/delete")
+async def admin_delete_group(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """管理員刪除單一團單"""
+    await get_admin_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group:
+        _delete_group_cascade(db, group)
+        db.commit()
+    return RedirectResponse(url="/admin/groups", status_code=302)
+
+
 @router.post("/stores/{store_id}/toggle")
 async def toggle_store(store_id: int, request: Request, db: Session = Depends(get_db)):
     """啟用/停用店家"""
@@ -627,14 +670,23 @@ async def update_store(
 
 
 @router.get("/users")
-async def user_list(request: Request, db: Session = Depends(get_db)):
+async def user_list(request: Request, sort: str = "created", db: Session = Depends(get_db)):
     """使用者列表"""
     user = await get_admin_user(request, db)
     
     from app.models.user import User, SystemSetting
     from datetime import datetime, timedelta
+    from sqlalchemy import nullslast
     
-    users = db.query(User).order_by(User.created_at.desc()).all()
+    sort_map = {
+        "created": User.created_at.desc(),
+        "last_login": nullslast(User.last_login_at.desc()),
+        "last_active": nullslast(User.last_active_at.desc()),
+        "name": User.display_name.asc(),
+    }
+    if sort not in sort_map:
+        sort = "created"
+    users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort]).all()
     
     # 計算在線人數（30分鐘內有活動）
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -652,6 +704,7 @@ async def user_list(request: Request, db: Session = Depends(get_db)):
         "users": users,
         "online_count": online_count,
         "system_setting": system_setting,
+        "sort": sort,
     })
 
 
@@ -673,6 +726,109 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
     db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=302)
+
+
+@router.get("/users-duplicates")
+async def users_duplicates(request: Request, db: Session = Depends(get_db)):
+    """診斷：找出同名用戶（判斷是否真重複帳號）"""
+    admin = await get_admin_user(request, db)
+
+    from app.models.user import User
+    from app.models.order import Order
+    from collections import defaultdict
+
+    all_users = db.query(User).filter(User.is_guest == False).all()
+    # 依 show_name 分組（排除訪客帳號）
+    by_name = defaultdict(list)
+    for u in all_users:
+        by_name[u.show_name].append(u)
+
+    # 只保留有重複名稱的組
+    dup_groups = []
+    for name, users in by_name.items():
+        if len(users) > 1:
+            rows = []
+            for u in users:
+                order_count = db.query(Order).filter(Order.user_id == u.id).count()
+                rows.append({
+                    "id": u.id,
+                    "line_tail": u.line_user_id[-6:] if u.line_user_id else "（無）",
+                    "line_full": u.line_user_id or "",
+                    "display_name": u.display_name,
+                    "nickname": u.nickname,
+                    "created_at": u.created_at,
+                    "last_active_at": u.last_active_at,
+                    "order_count": order_count,
+                    "has_picture": bool(u.picture_url),
+                })
+            # 同組內若有「相同 line_user_id」才是真重複（理論上 unique 不該發生）
+            line_ids = [u.line_user_id for u in users]
+            true_dup = len(line_ids) != len(set(line_ids))
+            dup_groups.append({
+                "name": name,
+                "count": len(users),
+                "rows": sorted(rows, key=lambda r: r["order_count"], reverse=True),
+                "true_dup": true_dup,
+            })
+
+    dup_groups.sort(key=lambda g: g["count"], reverse=True)
+
+    return templates.TemplateResponse("admin/users_duplicates.html", {
+        "request": request,
+        "user": admin,
+        "dup_groups": dup_groups,
+        "total_users": len(all_users),
+        "guest_count": db.query(User).filter(User.is_guest == True).count(),
+    })
+
+
+@router.post("/users-cleanup-guests")
+async def cleanup_guest_users(request: Request, db: Session = Depends(get_db)):
+    """清理訪客空殼帳號（徹底刪除，含其訂單；使用者確認舊訪客訂單不重要）"""
+    admin = await get_admin_user(request, db)
+
+    from app.models.user import User
+    from app.models.group import Group
+    from sqlalchemy import text as _sql, bindparam
+
+    # 找出所有訪客帳號 id（排除有開團的，避免動到團單擁有權）
+    all_guest_ids = [g.id for g in db.query(User).filter(User.is_guest == True).all()]
+    owner_ids = {gid for (gid,) in db.query(Group.owner_id).filter(Group.owner_id.in_(all_guest_ids)).all()} if all_guest_ids else set()
+    guest_ids = [gid for gid in all_guest_ids if gid not in owner_ids]
+    if not guest_ids:
+        return RedirectResponse(url="/admin/users-duplicates?cleaned=0", status_code=302)
+
+    params = {"ids": tuple(guest_ids)}
+    def _exec(sql):
+        db.execute(_sql(sql).bindparams(bindparam("ids", expanding=True)), params)
+
+    # 依子→父順序斷鏈刪除（訪客的訂單樹）
+    _exec("""
+        DELETE FROM order_item_toppings WHERE order_item_id IN (
+            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
+            WHERE o.user_id IN :ids
+        )
+    """)
+    _exec("""
+        DELETE FROM order_item_options WHERE order_item_id IN (
+            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
+            WHERE o.user_id IN :ids
+        )
+    """)
+    _exec("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN :ids)")
+    _exec("DELETE FROM orders WHERE user_id IN :ids")
+    for tbl in ["user_departments", "user_favorites", "user_presets"]:
+        try:
+            _exec(f"DELETE FROM {tbl} WHERE user_id IN :ids")
+        except Exception:
+            pass
+    _exec("DELETE FROM users WHERE id IN :ids")
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/users-duplicates?cleaned={len(guest_ids)}",
+        status_code=302
+    )
 
 
 @router.get("/users/{user_id}")
@@ -1044,6 +1200,7 @@ async def department_detail(request: Request, dept_id: int, db: Session = Depend
     # 取得尚未加入此部門的用戶
     member_ids = [m.user_id for m in members]
     available_users = db.query(User).filter(
+        User.is_guest == False,
         ~User.id.in_(member_ids) if member_ids else True
     ).order_by(User.display_name).all()
     

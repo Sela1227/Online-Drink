@@ -1,39 +1,41 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}店家管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin', '管理後台') }}
 <div class="space-y-4" x-data="{ filter: 'all' }">
     <!-- Header -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">店家管理</h1>
+        <h1 class="text-xl font-bold text-sela-800">店家管理</h1>
         <div class="flex items-center gap-3">
-            <a href="/admin/import" class="bg-sela-500 hover:bg-sela-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+            <a href="/admin/import" class="bg-sela-500 hover:bg-sela-600 text-sela-800 px-3 py-1.5 rounded-lg text-sm font-medium">
                 + 匯入
             </a>
-            <a href="/admin" class="text-sm text-gray-500 hover:text-gray-700">返回管理後台 →</a>
+            
         </div>
     </div>
     
     <!-- 分類篩選 -->
     <div class="flex gap-2 overflow-x-auto pb-1">
         <button @click="filter = 'all'" 
-                :class="filter === 'all' ? 'bg-sela-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                :class="filter === 'all' ? 'bg-sela-500 text-sela-800' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
             全部 ({{ stores|length }})
         </button>
         <button @click="filter = 'drink'" 
-                :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
             <i class="ti ti-cup"></i> 飲料店
         </button>
         <button @click="filter = 'meal'" 
-                :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
             <i class="ti ti-bowl"></i> 餐廳
         </button>
         <button @click="filter = 'group_buy'" 
-                :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
                 class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
             <i class="ti ti-shopping-cart"></i> 團購
         </button>
@@ -48,7 +50,7 @@
            x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
             
             <!-- Logo 區域 -->
-            <div class="aspect-square bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center relative">
+            <div class="aspect-square bg-gradient-to-br from-sela-50 to-sela-100 flex items-center justify-center relative">
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" 
                      class="w-full h-full object-contain p-4 group-hover:scale-105 transition">
@@ -65,7 +67,7 @@
                     {% if store.is_active %}
                     <span class="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full shadow">啟用</span>
                     {% else %}
-                    <span class="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full shadow">停用</span>
+                    <span class="text-xs bg-sela-300 text-white px-2 py-0.5 rounded-full shadow">停用</span>
                     {% endif %}
                 </div>
                 
@@ -81,8 +83,8 @@
             
             <!-- 資訊區域 -->
             <div class="p-3">
-                <div class="font-semibold text-gray-800 truncate">{{ store.name }}</div>
-                <div class="text-xs text-gray-400 mt-0.5">
+                <div class="font-semibold text-sela-800 truncate">{{ store.name }}</div>
+                <div class="text-xs text-sela-800/45 mt-0.5">
                     {% if store.branches %}{{ store.branches|length }} 間分店{% else %}無分店{% endif %}
                 </div>
             </div>
@@ -92,8 +94,8 @@
     {% else %}
     <div class="text-center py-16 bg-white rounded-xl">
         <div class="text-5xl mb-3"><i class="ti ti-building-store"></i></div>
-        <p class="text-gray-500 mb-4">還沒有任何店家</p>
-        <a href="/admin/import" class="inline-block bg-sela-500 hover:bg-sela-600 text-white px-6 py-2 rounded-lg">
+        <p class="text-sela-800/60 mb-4">還沒有任何店家</p>
+        <a href="/admin/import" class="inline-block bg-sela-500 hover:bg-sela-600 text-sela-800 px-6 py-2 rounded-lg">
             匯入第一間店家
         </a>
     </div>

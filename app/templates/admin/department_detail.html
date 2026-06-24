@@ -1,35 +1,37 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}{{ department.name }} - 部門管理{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin/departments', '部門管理') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-start justify-between">
         <div>
-            <h1 class="text-xl font-bold text-gray-800">{{ department.name }}</h1>
+            <h1 class="text-xl font-bold text-sela-800">{{ department.name }}</h1>
             {% if department.description %}
-            <p class="text-sm text-gray-500 mt-1">{{ department.description }}</p>
+            <p class="text-sm text-sela-800/60 mt-1">{{ department.description }}</p>
             {% endif %}
         </div>
-        <a href="/admin/departments" class="text-sm text-gray-500 hover:text-gray-700">返回部門管理 →</a>
+        
     </div>
     
     <!-- 新增成員 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-medium text-gray-800 mb-3"><i class="ti ti-plus"></i> 新增成員</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 新增成員</h2>
         <form action="/admin/departments/{{ department.id }}/members" method="POST" class="flex flex-wrap gap-2">
-            <select name="user_id" required class="flex-1 min-w-[140px] border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <select name="user_id" required class="flex-1 min-w-[140px] border border-sela-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">選擇用戶</option>
                 {% for user in available_users %}
                 <option value="{{ user.id }}">{{ user.show_name }}</option>
                 {% endfor %}
             </select>
-            <select name="role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <select name="role" class="border border-sela-300 rounded-lg px-3 py-2 text-sm">
                 <option value="member">成員</option>
                 <option value="leader">小組長</option>
             </select>
-            <button type="submit" class="bg-sela-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
+            <button type="submit" class="bg-sela-500 text-sela-800 px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
                 新增
             </button>
         </form>
@@ -37,20 +39,20 @@
     
     <!-- 成員列表 -->
     {% if members %}
-    <div class="bg-white rounded-lg shadow-sm divide-y">
+    <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for m in members %}
         <div class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 {% if m.user.picture_url %}
                 <img src="{{ m.user.picture_url }}" class="w-10 h-10 rounded-full">
                 {% else %}
-                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center"><i class="ti ti-user"></i></div>
+                <div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center"><i class="ti ti-user"></i></div>
                 {% endif %}
                 <div>
-                    <div class="font-medium text-gray-800">{{ m.user.show_name }}</div>
-                    <div class="text-xs text-gray-400">
+                    <div class="font-medium text-sela-800">{{ m.user.show_name }}</div>
+                    <div class="text-xs text-sela-800/45">
                         {% if m.role.value == 'leader' %}
-                        <span class="text-sela-500"><i class="ti ti-star"></i> 小組長</span>
+                        <span class="text-sela-800"><i class="ti ti-star"></i> 小組長</span>
                         {% else %}
                         成員
                         {% endif %}
@@ -77,31 +79,31 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 text-gray-500">
+    <div class="text-center py-12 text-sela-800/60">
         <p>還沒有成員</p>
     </div>
     {% endif %}
     
     <!-- 部門設定 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-medium text-gray-800 mb-3"><i class="ti ti-settings"></i>️ 部門設定</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-settings"></i>️ 部門設定</h2>
         <form action="/admin/departments/{{ department.id }}/update" method="POST" class="space-y-3">
             <div>
-                <label class="block text-sm text-gray-600 mb-1">部門名稱</label>
+                <label class="block text-sm text-sela-800/70 mb-1">部門名稱</label>
                 <input type="text" name="name" value="{{ department.name }}" required
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">說明</label>
+                <label class="block text-sm text-sela-800/70 mb-1">說明</label>
                 <input type="text" name="description" value="{{ department.description or '' }}"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <div class="flex items-center gap-2">
                 <input type="checkbox" name="is_public" id="is_public" value="1"
                        {% if department.is_public %}checked{% endif %}>
-                <label for="is_public" class="text-sm text-gray-600">公開部門（所有人都可加入）</label>
+                <label for="is_public" class="text-sm text-sela-800/70">公開部門（所有人都可加入）</label>
             </div>
-            <button type="submit" class="bg-sela-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sela-600">
+            <button type="submit" class="bg-sela-500 text-sela-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-sela-600">
                 儲存
             </button>
         </form>

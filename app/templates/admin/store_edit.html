@@ -1,22 +1,24 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}編輯 {{ store.name }} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/admin/stores/' ~ store.id, '店家詳情') }}
 <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800">編輯店家</h1>
-        <a href="/admin/stores/{{ store.id }}" class="text-sm text-gray-500 hover:text-gray-700">返回店家詳情 →</a>
+        <h1 class="text-xl font-bold text-sela-800">編輯店家</h1>
+        
     </div>
     
     <!-- 基本資訊表單 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-pencil"></i> 基本資訊</h2>
+        <h2 class="font-semibold text-sela-800 mb-4"><i class="ti ti-pencil"></i> 基本資訊</h2>
         <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
             <!-- Logo -->
             <div class="flex items-center gap-4">
-                <div class="w-20 h-20 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+                <div class="w-20 h-20 bg-gradient-to-br from-sela-50 to-sela-100 rounded-xl flex items-center justify-center overflow-hidden">
                     {% if store.logo_url %}
                     <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-2">
                     {% else %}
@@ -28,38 +30,38 @@
                     {% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">更換 Logo</label>
+                    <label class="block text-sm font-medium text-sela-800/80 mb-1">更換 Logo</label>
                     <input type="file" name="logo_file" accept="image/*" class="text-sm">
                 </div>
             </div>
             
             <!-- 名稱 -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">店家名稱 <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-1">店家名稱 <span class="text-red-500">*</span></label>
                 <input type="text" name="name" value="{{ store.name }}" required
                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-sela-500 focus:border-sela-500">
             </div>
             
             <!-- 類型 -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">類型</label>
+                <label class="block text-sm font-medium text-sela-800/80 mb-2">類型</label>
                 <div class="flex gap-3">
-                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-gray-50 has-[:checked]:bg-amber-50 has-[:checked]:border-amber-400">
+                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-sela-50 has-[:checked]:bg-amber-50 has-[:checked]:border-amber-400">
                         <input type="radio" name="category" value="drink" 
                                {% if store.category and store.category.value == 'drink' %}checked{% endif %}
-                               class="text-sela-500">
+                               class="text-sela-800">
                         <span><i class="ti ti-cup"></i> 飲料店</span>
                     </label>
-                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-gray-50 has-[:checked]:bg-green-50 has-[:checked]:border-green-400">
+                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-sela-50 has-[:checked]:bg-green-50 has-[:checked]:border-green-400">
                         <input type="radio" name="category" value="meal" 
                                {% if store.category and store.category.value == 'meal' %}checked{% endif %}
-                               class="text-sela-500">
+                               class="text-sela-800">
                         <span><i class="ti ti-bowl"></i> 餐廳</span>
                     </label>
-                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-gray-50 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400">
+                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:bg-sela-50 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400">
                         <input type="radio" name="category" value="group_buy" 
                                {% if store.category and store.category.value == 'group_buy' %}checked{% endif %}
-                               class="text-sela-500">
+                               class="text-sela-800">
                         <span><i class="ti ti-shopping-cart"></i> 團購</span>
                     </label>
                 </div>
@@ -68,12 +70,12 @@
             <!-- 聯絡資訊 -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-phone"></i> 電話</label>
+                    <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-phone"></i> 電話</label>
                     <input type="text" name="phone" value="{{ store.phone or '' }}" placeholder="02-1234-5678"
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-map-pin"></i> 地址</label>
+                    <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-map-pin"></i> 地址</label>
                     <input type="text" name="address" value="{{ store.address or '' }}" placeholder="台北市..."
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
@@ -82,23 +84,23 @@
             <!-- 連結 -->
             <div class="space-y-3 pt-2">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-world"></i> 官網</label>
+                    <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-world"></i> 官網</label>
                     <input type="url" name="website_url" value="{{ store.website_url or '' }}" placeholder="https://..."
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-map"></i>️ Google Maps</label>
+                    <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-map"></i>️ Google Maps</label>
                     <input type="url" name="google_maps_url" value="{{ store.google_maps_url or '' }}" placeholder="https://maps.google.com/..."
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> Uber Eats</label>
+                        <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> Uber Eats</label>
                         <input type="url" name="ubereats_url" value="{{ store.ubereats_url or '' }}" placeholder="https://..."
                                class="w-full border rounded-lg px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1"><i class="ti ti-heart"></i> foodpanda</label>
+                        <label class="block text-sm font-medium text-sela-800/80 mb-1"><i class="ti ti-heart"></i> foodpanda</label>
                         <input type="url" name="foodpanda_url" value="{{ store.foodpanda_url or '' }}" placeholder="https://..."
                                class="w-full border rounded-lg px-3 py-2 text-sm">
                     </div>
@@ -107,10 +109,10 @@
             
             <!-- 儲存按鈕 -->
             <div class="flex gap-2 pt-4 border-t">
-                <a href="/admin/stores/{{ store.id }}" class="flex-1 py-2.5 text-center rounded-lg border hover:bg-gray-50 font-medium">
+                <a href="/admin/stores/{{ store.id }}" class="flex-1 py-2.5 text-center rounded-lg border hover:bg-sela-50 font-medium">
                     取消
                 </a>
-                <button type="submit" class="flex-1 py-2.5 rounded-lg bg-sela-500 hover:bg-sela-600 text-white font-medium">
+                <button type="submit" class="flex-1 py-2.5 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
                     <i class="ti ti-device-floppy"></i> 儲存變更
                 </button>
             </div>
@@ -120,22 +122,22 @@
     <!-- 加料管理 -->
     {% if store.category and store.category.value in ['drink', 'meal'] %}
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-cup"></i> 加料管理</h2>
+        <h2 class="font-semibold text-sela-800 mb-4"><i class="ti ti-cup"></i> 加料管理</h2>
         
         {% if store.toppings %}
         <div class="space-y-2 mb-4">
             {% for topping in store.toppings|sort(attribute='sort_order') %}
-            <div class="flex items-center justify-between p-3 rounded-lg {% if topping.is_active %}bg-sela-50{% else %}bg-gray-100{% endif %}">
+            <div class="flex items-center justify-between p-3 rounded-lg {% if topping.is_active %}bg-sela-50{% else %}bg-sela-100{% endif %}">
                 <div class="flex items-center gap-3">
-                    <span class="font-medium {% if not topping.is_active %}text-gray-400{% endif %}">{{ topping.name }}</span>
-                    <span class="text-sela-600 {% if not topping.is_active %}text-gray-400{% endif %}">+${{ topping.price|int }}</span>
+                    <span class="font-medium {% if not topping.is_active %}text-sela-800/45{% endif %}">{{ topping.name }}</span>
+                    <span class="text-sela-800 {% if not topping.is_active %}text-sela-800/45{% endif %}">+${{ topping.price|int }}</span>
                     {% if not topping.is_active %}
-                    <span class="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded">停用中</span>
+                    <span class="text-xs bg-sela-100 text-sela-800/60 px-2 py-0.5 rounded">停用中</span>
                     {% endif %}
                 </div>
                 <div class="flex items-center gap-1">
                     <form action="/admin/stores/{{ store.id }}/toppings/{{ topping.id }}/toggle" method="post" class="inline">
-                        <button type="submit" class="px-3 py-1 text-sm rounded {% if topping.is_active %}text-gray-600 hover:bg-gray-200{% else %}text-green-600 hover:bg-green-100{% endif %}">
+                        <button type="submit" class="px-3 py-1 text-sm rounded {% if topping.is_active %}text-sela-800/70 active:bg-sela-100{% else %}text-green-600 hover:bg-green-100{% endif %}">
                             {% if topping.is_active %}停用{% else %}啟用{% endif %}
                         </button>
                     </form>
@@ -148,7 +150,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-sm text-gray-500 mb-4">尚未新增加料選項</p>
+        <p class="text-sm text-sela-800/60 mb-4">尚未新增加料選項</p>
         {% endif %}
         
         <!-- 新增加料 -->
@@ -156,11 +158,11 @@
             <input type="text" name="topping_name" placeholder="加料名稱" required
                    class="flex-1 min-w-[120px] border rounded-lg px-3 py-2 text-sm">
             <div class="flex items-center gap-1 border rounded-lg px-2">
-                <span class="text-gray-500 text-sm">+$</span>
+                <span class="text-sela-800/60 text-sm">+$</span>
                 <input type="number" name="topping_price" value="10" min="0" step="5"
                        class="w-14 py-2 text-sm text-center border-0 focus:ring-0">
             </div>
-            <button type="submit" class="px-3 py-2 bg-sela-500 hover:bg-sela-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">
+            <button type="submit" class="px-3 py-2 bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-lg text-sm font-medium whitespace-nowrap">
                 新增
             </button>
         </form>
@@ -169,16 +171,16 @@
     
     <!-- 分店管理 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="font-semibold text-gray-800 mb-4"><i class="ti ti-building-store"></i> 分店管理</h2>
+        <h2 class="font-semibold text-sela-800 mb-4"><i class="ti ti-building-store"></i> 分店管理</h2>
         
         {% if store.branches %}
         <div class="space-y-2 mb-4">
             {% for branch in store.branches %}
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center justify-between p-3 bg-sela-50 rounded-lg">
                 <div>
-                    <div class="font-medium text-gray-800">{{ branch.name }}</div>
+                    <div class="font-medium text-sela-800">{{ branch.name }}</div>
                     {% if branch.phone %}
-                    <div class="text-sm text-gray-500"><i class="ti ti-phone"></i> {{ branch.phone }}</div>
+                    <div class="text-sm text-sela-800/60"><i class="ti ti-phone"></i> {{ branch.phone }}</div>
                     {% endif %}
                 </div>
                 <form action="/admin/stores/{{ store.id }}/branches/{{ branch.id }}/delete" method="post" class="inline"
@@ -189,7 +191,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-sm text-gray-500 mb-4">尚未新增分店</p>
+        <p class="text-sm text-sela-800/60 mb-4">尚未新增分店</p>
         {% endif %}
         
         <!-- 新增分店 -->
@@ -198,7 +200,7 @@
                    class="flex-1 border rounded-lg px-3 py-2 text-sm">
             <input type="text" name="branch_phone" placeholder="電話"
                    class="w-32 border rounded-lg px-3 py-2 text-sm">
-            <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">
+            <button type="submit" class="px-4 py-2 bg-sela-100 active:bg-sela-100 rounded-lg text-sm font-medium">
                 新增
             </button>
         </form>

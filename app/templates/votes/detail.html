@@ -1,26 +1,28 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}{{ vote.title }} - 投票{% endblock %}
 
 {% block content %}
+{{ nav.back('/votes', '投票') }}
 <div class="space-y-4">
     <!-- Header -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex items-start justify-between">
             <div>
-                <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-checkbox"></i>️ {{ vote.title }}</h1>
+                <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-checkbox"></i>️ {{ vote.title }}</h1>
                 {% if vote.description %}
-                <p class="text-gray-600 text-sm mt-1">{{ vote.description }}</p>
+                <p class="text-sela-800/70 text-sm mt-1">{{ vote.description }}</p>
                 {% endif %}
             </div>
-            <a href="/votes" class="text-sm text-gray-500 hover:text-gray-700">返回投票列表 →</a>
+            
         </div>
         
-        <div class="flex items-center gap-4 mt-3 text-sm text-gray-500">
+        <div class="flex items-center gap-4 mt-3 text-sm text-sela-800/60">
             <span>{{ vote.creator.show_name }} 發起</span>
             <span>{{ vote.total_votes }} 票</span>
             {% if vote.is_multiple %}
-            <span class="text-purple-600">可多選</span>
+            <span class="text-sela-800">可多選</span>
             {% endif %}
         </div>
         
@@ -31,10 +33,10 @@
             <span x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display" class="font-medium"></span>
         </div>
         {% else %}
-        <div class="mt-3 p-3 bg-gray-100 rounded-lg text-sm text-gray-600">
+        <div class="mt-3 p-3 bg-sela-100 rounded-lg text-sm text-sela-800/70">
             <i class="ti ti-check"></i> 投票已結束
             {% if vote.winner_store_id %}
-            <span class="font-medium text-green-600 ml-2">
+            <span class="font-medium text-sela-800/70 ml-2">
                 <i class="ti ti-trophy"></i> 勝出：
                 {% for opt in sorted_options if opt.store_id == vote.winner_store_id %}
                 {{ opt.store.name }}
@@ -50,18 +52,18 @@
             {% if vote.is_open %}
             <form action="/votes/{{ vote.id }}/close" method="post" class="inline"
                   onsubmit="return confirm('確定要結束投票嗎？')">
-                <button type="submit" class="text-sela-600 hover:text-sela-700">結束投票</button>
+                <button type="submit" class="text-sela-800 hover:text-sela-800">結束投票</button>
             </form>
             {% endif %}
             {% if not vote.is_open and vote.winner_store_id and not vote.created_group_id %}
             <form action="/votes/{{ vote.id }}/create-group" method="post" class="inline">
-                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded">
+                <button type="submit" class="bg-sela-800 hover:bg-sela-900 text-white px-3 py-1 rounded">
                     <i class="ti ti-confetti"></i> 開團！
                 </button>
             </form>
             {% endif %}
             {% if vote.created_group_id %}
-            <a href="/groups/{{ vote.created_group_id }}" class="text-green-600 hover:text-green-700">
+            <a href="/groups/{{ vote.created_group_id }}" class="text-sela-800/70 hover:text-sela-800">
                 → 查看團單
             </a>
             {% endif %}
@@ -74,8 +76,8 @@
     </div>
     
     <!-- 投票選項 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">投票選項</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3">投票選項</h2>
         
         {% if vote.is_open %}
         <!-- 可投票 -->
@@ -111,14 +113,14 @@
                                 {% endif %}
                                 <span class="font-medium">{{ opt.store.name }}</span>
                             </div>
-                            <div class="text-xs text-gray-400 mt-0.5">
+                            <div class="text-xs text-sela-800/45 mt-0.5">
                                 {{ opt.added_by.show_name }} 提議
                             </div>
                         </div>
                         
                         <div class="text-right">
-                            <div class="font-bold text-sela-600">{{ opt.vote_count }}</div>
-                            <div class="text-xs text-gray-400">票</div>
+                            <div class="font-bold text-sela-800">{{ opt.vote_count }}</div>
+                            <div class="text-xs text-sela-800/45">票</div>
                         </div>
                     </div>
                 </label>
@@ -126,7 +128,7 @@
             </div>
             
             <button type="submit" 
-                    class="w-full mt-4 py-3 bg-sela-500 hover:bg-sela-600 text-white rounded-lg font-medium">
+                    class="w-full mt-4 py-3 bg-sela-500 hover:bg-sela-600 text-sela-800 rounded-lg font-medium">
                 投票
             </button>
         </form>
@@ -135,7 +137,7 @@
         {% if available_stores %}
         <div class="mt-4 pt-4 border-t" x-data="{ showAdd: false }">
             <button @click="showAdd = !showAdd" 
-                    class="text-sm text-gray-500 hover:text-gray-700">
+                    class="text-sm text-sela-800/60 hover:text-sela-800/80">
                 + 提議其他店家
             </button>
             
@@ -153,7 +155,7 @@
                         {% endfor %}
                     </select>
                     <button type="submit" 
-                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                            class="px-4 py-2 bg-sela-100 active:bg-sela-100 rounded-lg text-sm">
                         提議
                     </button>
                 </form>
@@ -167,9 +169,9 @@
             {% for opt in sorted_options %}
             {% set percentage = (opt.vote_count / vote.total_votes * 100) if vote.total_votes > 0 else 0 %}
             <div class="p-3 border rounded-lg relative overflow-hidden
-                        {% if opt.store_id == vote.winner_store_id %}border-green-400 bg-green-50{% endif %}">
+                        {% if opt.store_id == vote.winner_store_id %}border-sela-300 bg-sela-50{% endif %}">
                 <!-- 投票進度條 -->
-                <div class="absolute inset-0 bg-gray-100" 
+                <div class="absolute inset-0 bg-sela-100" 
                      style="width: {{ percentage }}%;"></div>
                 
                 <div class="relative flex items-center gap-3">
@@ -192,10 +194,10 @@
                     </div>
                     
                     <div class="text-right">
-                        <div class="font-bold {% if opt.store_id == vote.winner_store_id %}text-green-600{% else %}text-gray-600{% endif %}">
+                        <div class="font-bold {% if opt.store_id == vote.winner_store_id %}text-sela-800/70{% else %}text-sela-800/70{% endif %}">
                             {{ opt.vote_count }}
                         </div>
-                        <div class="text-xs text-gray-400">{{ percentage|round(0)|int }}%</div>
+                        <div class="text-xs text-sela-800/45">{{ percentage|round(0)|int }}%</div>
                     </div>
                 </div>
                 

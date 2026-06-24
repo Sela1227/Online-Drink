@@ -2,7 +2,10 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#E8D9C0">
     <title>{% block title %}SELA 快點來點餐{% endblock %}</title>
     <!-- Favicon 套組（對齊 Kit V1.9.0 標準資產）-->
     <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
@@ -16,16 +19,16 @@
                 extend: {
                     colors: {
                         sela: {
-                            50: '#F4EEFC',
-                            100: '#E9DDF8',
-                            200: '#D3BAF1',
-                            300: '#B78FE9',
-                            400: '#965CDE',
-                            500: '#7528D4',
-                            600: '#6222B2',
-                            700: '#4D1A8C',
-                            800: '#3A146A',
-                            900: '#280E48',
+                            50: '#FAF6EF',
+                            100: '#F3EBDD',
+                            200: '#E8D9C0',
+                            300: '#DCC8A6',
+                            400: '#D0B98C',
+                            500: '#C9A977',
+                            600: '#BE9F69',
+                            700: '#8A6A38',
+                            800: '#5B4733',
+                            900: '#41331F',
                         }
                     }
                 }
@@ -42,17 +45,75 @@
         /* 北歐風滾動條 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #B78FE9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #DCC8A6; border-radius: 4px; }
         
         /* 平滑過渡 */
         * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
         
         /* 安全區域 */
         body { padding-bottom: env(safe-area-inset-bottom); }
+
+        /* ===== 手機優化（V1.24.0）===== */
+        /* 移除點擊灰閃 */
+        * { -webkit-tap-highlight-color: transparent; }
+        /* 輸入框 ≥16px：避免 iOS 聚焦時整頁自動放大 */
+        input:not([type=checkbox]):not([type=radio]):not([type=range]),
+        select, textarea { font-size: 16px; }
+        /* 安全區底部留白（底部導航 home indicator）*/
+        .safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
+        /* 捲動回彈：不把橡皮筋傳到外層 */
+        body { overscroll-behavior-y: none; -webkit-overflow-scrolling: touch; }
+
+        /* ===== 元件層（V1.21.0 設計地基・奶茶統一）===== */
+        /* 按鈕：主鈕高對比實心、次鈕淡、危險、幽靈 */
+        .btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
+               font-weight:600; border-radius:14px; min-height:44px; padding:.7rem 1.1rem;
+               line-height:1; border:1px solid transparent; cursor:pointer;
+               transition:transform .1s, background-color .15s, border-color .15s; -webkit-tap-highlight-color:transparent; }
+        .btn:active { transform:scale(.97); }
+        .btn-primary   { background:#5B4733; color:#fff; }
+        .btn-primary:active { background:#41331F; }
+        .btn-secondary { background:#F3EBDD; color:#5B4733; }
+        .btn-secondary:active { background:#E8D9C0; }
+        .btn-danger    { background:#fff; color:#C0392B; border-color:#E8C4BE; }
+        .btn-danger:active { background:#FBEFED; }
+        .btn-ghost     { background:transparent; color:#5B4733; }
+        .btn-ghost:active { background:#F3EBDD; }
+        .btn[disabled] { opacity:.5; pointer-events:none; }
+
+        /* 卡片：統一圓角 18px + 暖邊 */
+        .card { background:#fff; border-radius:18px; box-shadow:0 1px 2px rgba(65,51,31,.05); border:1px solid #F3EBDD; }
+
+        /* 選項晶片：清楚的選中態（實心深咖啡）+ 可點高度 */
+        .chip { display:inline-flex; align-items:center; justify-content:center; gap:.3rem;
+                min-height:40px; padding:.45rem .95rem; border-radius:999px;
+                border:1px solid #DCC8A6; color:#5B4733; background:#fff; font-size:.9rem;
+                transition:transform .1s, background-color .15s; -webkit-tap-highlight-color:transparent; }
+        .chip:active { transform:scale(.97); }
+        .chip-selected { background:#5B4733; color:#fff; border-color:#5B4733; }
+
+        /* 統一返回鍵：左上角、44pt 可點、chevron + 目的地 */
+        .back-link { display:inline-flex; align-items:center; gap:1px; color:#5B4733; opacity:.7;
+                     font-size:.92rem; min-height:40px; padding:.4rem .6rem .4rem 0; margin:0 0 .15rem -.15rem;
+                     -webkit-tap-highlight-color:transparent; }
+        .back-link:active { opacity:1; }
+        .back-link i { font-size:21px; line-height:1; }
+
+        /* 圓形步進鈕（數量±）：44pt 可點 */
+        .stepper { width:44px; height:44px; border-radius:999px; background:#F3EBDD; color:#5B4733;
+                   font-size:1.25rem; display:inline-flex; align-items:center; justify-content:center;
+                   transition:transform .1s, background-color .15s; -webkit-tap-highlight-color:transparent; }
+        .stepper:active { transform:scale(.92); background:#E8D9C0; }
+
+        /* 購物車結帳列：只在購物車 sheet 內釘底（頁面版顯示不受影響）*/
+        #cart-content .order-actions { position:sticky; bottom:0; z-index:5;
+                background:#fff; border-top:1px solid #F3EBDD;
+                margin:0 -1rem -1rem; padding:.85rem 1rem calc(.85rem + env(safe-area-inset-bottom));
+                box-shadow:0 -4px 12px rgba(65,51,31,.06); }
     </style>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V1.14.1' %}
+{% set app_version = 'V1.26.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
@@ -63,13 +124,15 @@
     </script>
     
     <!-- Header - 簡潔北歐風 -->
-    <header class="bg-sela-600 sticky top-0 z-40 shadow-sm">
+    <header class="bg-sela-200 sticky top-0 z-40 shadow-sm border-b border-sela-300" style="padding-top: env(safe-area-inset-top);">
         <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
             <!-- Logo -->
             <a href="/home" class="flex items-center gap-2">
                 <img src="/static/images/sela-logo.jpg" alt="SELA" class="h-9 w-9 rounded-lg">
-                <span class="font-bold text-white text-lg tracking-tight">快點來點餐</span>
-                <span class="text-[10px] text-white/50 font-mono leading-none">{{ app_version }}</span>
+                <span class="flex flex-col leading-none">
+                    <span class="font-bold text-sela-800 text-lg tracking-tight">快點來點餐</span>
+                    <span class="text-[10px] text-sela-800/40 font-mono mt-0.5">{{ app_version }}</span>
+                </span>
             </a>
             
             <!-- 右側操作 -->
@@ -77,23 +140,17 @@
                 {% if user %}
                 <!-- 管理（管理員限定） -->
                 {% if user.is_admin %}
-                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/15 transition-colors">
+                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full text-sela-700 hover:bg-sela-900/10 transition-colors">
                     <i class="ti ti-settings" style="font-size: 20px;" aria-hidden="true"></i>
                 </a>
                 {% endif %}
                 
-                <!-- 開團按鈕 -->
-                <a href="/groups/new" 
-                   class="h-9 px-4 bg-white hover:bg-sela-50 text-sela-600 text-sm font-medium rounded-full flex items-center gap-1 transition-colors shadow-sm">
-                    <span class="text-base">+</span> 開團
-                </a>
-                
                 <!-- 個人頭像 -->
-                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-white/60 hover:border-white transition-colors">
+                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-sela-400/60 hover:border-sela-500 transition-colors">
                     {% if user.picture_url %}
                     <img src="{{ user.picture_url }}" class="w-full h-full object-cover">
                     {% else %}
-                    <div class="w-full h-full bg-white flex items-center justify-center text-sela-600 text-sm font-bold">
+                    <div class="w-full h-full bg-white flex items-center justify-center text-sela-800 text-sm font-bold">
                         {{ user.show_name[:1] }}
                     </div>
                     {% endif %}
@@ -117,40 +174,56 @@
     {% set nav_profile = path.startswith('/profile') %}
     <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-sela-100 z-40 safe-area-pb">
         <div class="max-w-lg mx-auto px-6 h-14 flex items-center justify-around">
-            <a href="/home" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_home else 'text-gray-400 hover:text-sela-500' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_home else '' }} rounded-xl flex items-center justify-center">
+            <a href="/home" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_home else 'text-sela-400' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_home else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-home" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
                 <span class="text-[10px] {{ 'font-medium' if nav_home else '' }}">首頁</span>
             </a>
-            <a href="/votes" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_votes else 'text-gray-400 hover:text-sela-500' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_votes else '' }} rounded-xl flex items-center justify-center">
+            <a href="/votes" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_votes else 'text-sela-400' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_votes else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-checkbox" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
                 <span class="text-[10px] {{ 'font-medium' if nav_votes else '' }}">投票</span>
             </a>
             <a href="/groups/new" class="flex flex-col items-center">
-                <div class="w-12 h-12 -mt-6 bg-sela-500 rounded-full flex items-center justify-center shadow-lg">
+                <div class="w-12 h-12 -mt-6 bg-sela-700 rounded-full flex items-center justify-center shadow-lg">
                     <i class="ti ti-plus text-white" style="font-size: 24px;" aria-hidden="true"></i>
                 </div>
             </a>
-            <a href="/feedback" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_feedback else 'text-gray-400 hover:text-sela-500' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_feedback else '' }} rounded-xl flex items-center justify-center">
+            <a href="/feedback" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_feedback else 'text-sela-400' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_feedback else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-mailbox" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
                 <span class="text-[10px] {{ 'font-medium' if nav_feedback else '' }}">回報</span>
             </a>
-            <a href="/profile" class="flex flex-col items-center gap-1 {{ 'text-sela-600' if nav_profile else 'text-gray-400 hover:text-sela-500' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-50' if nav_profile else '' }} rounded-xl flex items-center justify-center">
+            <a href="/profile" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_profile else 'text-sela-400' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_profile else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti ti-user" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
                 <span class="text-[10px] {{ 'font-medium' if nav_profile else '' }}">我的</span>
             </a>
         </div>
     </nav>
-    <div class="h-16"></div> <!-- 底部導航佔位 -->
+    <div style="height: calc(3.5rem + env(safe-area-inset-bottom));"></div> <!-- 底部導航佔位 -->
     {% endif %}
-    
+
+    <!-- 全域 Toast 提示 -->
+    <div x-data="{ msg:'', show:false }"
+         @apptoast.window="msg = $event.detail; show = true; clearTimeout(window._toastT); window._toastT = setTimeout(() => show = false, 1800)"
+         x-show="show" x-cloak
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         class="fixed left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
+         style="bottom: calc(5rem + env(safe-area-inset-bottom));">
+        <div class="bg-sela-800 text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium flex items-center gap-2">
+            <i class="ti ti-check" style="font-size:18px;"></i><span x-text="msg"></span>
+        </div>
+    </div>
+    <script>
+        window.toast = function(m){ window.dispatchEvent(new CustomEvent('apptoast', { detail: m })); };
+    </script>
+
     {% if user %}
     <!-- 閒置偵測 -->
     <script>

@@ -1,0 +1,4 @@
+{# 統一返回鍵：永遠左上角、chevron + 目的地名稱、相同樣式 #}
+{% macro back(href, label='返回') -%}
+<a href="{{ href }}" class="back-link" aria-label="{{ label }}"><i class="ti ti-chevron-left"></i><span>{{ label }}</span></a>
+{%- endmacro %}

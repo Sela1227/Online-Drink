@@ -1,36 +1,38 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}消費統計 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/profile', '個人資料') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800"><i class="ti ti-chart-bar"></i> 我的消費統計</h1>
-        <a href="/profile" class="text-sm text-gray-500 hover:text-gray-700">返回個人資料 →</a>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-chart-bar"></i> 我的消費統計</h1>
+        
     </div>
     
     <!-- 時間篩選 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex flex-wrap gap-2 mb-3">
             <a href="/stats?period=month" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'month' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'month' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 這個月
             </a>
             <a href="/stats?period=last_month" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'last_month' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'last_month' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 過去30天
             </a>
             <a href="/stats?period=3months" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == '3months' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == '3months' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 過去3個月
             </a>
             <a href="/stats?period=year" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'year' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'year' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 今年
             </a>
             <a href="/stats?period=all" 
-               class="px-3 py-1.5 rounded-full text-sm {% if period == 'all' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+               class="px-3 py-1.5 rounded-full text-sm {% if period == 'all' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 全部
             </a>
         </div>
@@ -38,27 +40,27 @@
         <!-- 自訂區間 -->
         <form action="/stats" method="get" class="flex flex-wrap items-center gap-2" x-data="{ showCustom: {{ 'true' if period == 'custom' else 'false' }} }">
             <button type="button" @click="showCustom = !showCustom" 
-                    class="px-3 py-1.5 rounded-full text-sm {% if period == 'custom' %}bg-sela-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                    class="px-3 py-1.5 rounded-full text-sm {% if period == 'custom' %}bg-sela-500 text-sela-800{% else %}bg-sela-100 text-sela-800/70 active:bg-sela-100{% endif %}">
                 <i class="ti ti-calendar"></i> 自訂區間
             </button>
             <div x-show="showCustom" x-cloak class="flex items-center gap-2 flex-wrap">
                 <input type="hidden" name="period" value="custom">
                 <input type="date" name="start_date" value="{{ start_date }}" 
                        class="border rounded px-2 py-1 text-sm">
-                <span class="text-gray-400">~</span>
+                <span class="text-sela-800/45">~</span>
                 <input type="date" name="end_date" value="{{ end_date }}" 
                        class="border rounded px-2 py-1 text-sm">
-                <button type="submit" class="px-3 py-1 bg-sela-500 text-white rounded text-sm">查詢</button>
+                <button type="submit" class="px-3 py-1 bg-sela-500 text-sela-800 rounded text-sm">查詢</button>
             </div>
         </form>
         
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-sela-800/45 mt-2">
             統計期間：{{ date_start.strftime('%Y/%m/%d') }} ~ {{ date_end.strftime('%Y/%m/%d') }}
         </div>
     </div>
     
     <!-- 總覽 -->
-    <div class="bg-gradient-to-br from-sela-500 to-amber-500 rounded-xl shadow-lg p-5 text-white">
+    <div class="bg-gradient-to-br from-sela-700 to-sela-800 rounded-xl shadow-lg p-5 text-white">
         <div class="text-sm opacity-80 mb-1">總消費金額</div>
         <div class="text-4xl font-bold mb-3">${{ "{:,.0f}".format(total_amount) }}</div>
         <div class="grid grid-cols-2 gap-4 text-sm">
@@ -76,31 +78,31 @@
     <!-- 分類統計 -->
     <div class="grid grid-cols-3 gap-3">
         <!-- 飲料 -->
-        <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
+        <div class="bg-sela-50 rounded-lg p-3 border border-sela-200">
             <div class="text-2xl mb-1"><i class="ti ti-cup"></i></div>
-            <div class="text-xs text-amber-600 mb-1">飲料</div>
-            <div class="text-lg font-bold text-amber-700">${{ "{:,.0f}".format(category_stats.drink.amount) }}</div>
-            <div class="text-xs text-amber-500">{{ category_stats.drink.orders }} 筆</div>
+            <div class="text-xs text-sela-800/70 mb-1">飲料</div>
+            <div class="text-lg font-bold text-sela-800">${{ "{:,.0f}".format(category_stats.drink.amount) }}</div>
+            <div class="text-xs text-sela-800/60">{{ category_stats.drink.orders }} 筆</div>
         </div>
         <!-- 餐點 -->
-        <div class="bg-green-50 rounded-lg p-3 border border-green-200">
+        <div class="bg-sela-50 rounded-lg p-3 border border-sela-200">
             <div class="text-2xl mb-1"><i class="ti ti-bowl"></i></div>
-            <div class="text-xs text-green-600 mb-1">餐點</div>
-            <div class="text-lg font-bold text-green-700">${{ "{:,.0f}".format(category_stats.meal.amount) }}</div>
-            <div class="text-xs text-green-500">{{ category_stats.meal.orders }} 筆</div>
+            <div class="text-xs text-sela-800/70 mb-1">餐點</div>
+            <div class="text-lg font-bold text-sela-800">${{ "{:,.0f}".format(category_stats.meal.amount) }}</div>
+            <div class="text-xs text-sela-800/60">{{ category_stats.meal.orders }} 筆</div>
         </div>
         <!-- 團購 -->
-        <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+        <div class="bg-sela-50 rounded-lg p-3 border border-sela-200">
             <div class="text-2xl mb-1"><i class="ti ti-shopping-cart"></i></div>
-            <div class="text-xs text-blue-600 mb-1">團購</div>
-            <div class="text-lg font-bold text-blue-700">${{ "{:,.0f}".format(category_stats.group_buy.amount) }}</div>
-            <div class="text-xs text-blue-500">{{ category_stats.group_buy.orders }} 筆</div>
+            <div class="text-xs text-sela-800/70 mb-1">團購</div>
+            <div class="text-lg font-bold text-sela-800">${{ "{:,.0f}".format(category_stats.group_buy.amount) }}</div>
+            <div class="text-xs text-sela-800/60">{{ category_stats.group_buy.orders }} 筆</div>
         </div>
     </div>
     
     <!-- 月度趨勢 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-chart-line"></i> 近6個月趨勢</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-chart-line"></i> 近6個月趨勢</h2>
         <div class="flex items-end justify-between gap-2 h-32">
             {% set max_amount = monthly_trend | map(attribute='amount') | max or 1 %}
             {% for month in monthly_trend %}
@@ -108,72 +110,72 @@
                 <div class="w-full bg-sela-100 rounded-t relative" 
                      style="height: {{ (month.amount / max_amount * 100) | int }}%">
                     {% if month.amount > 0 %}
-                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-sela-600 whitespace-nowrap">
+                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-sela-800 whitespace-nowrap">
                         {{ "{:,.0f}".format(month.amount) }}
                     </div>
                     {% endif %}
                 </div>
-                <div class="text-xs text-gray-500 mt-1">{{ month.month }}</div>
+                <div class="text-xs text-sela-800/60 mt-1">{{ month.month }}</div>
             </div>
             {% endfor %}
         </div>
     </div>
     
     <!-- 趣味統計 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-dice"></i> 趣味統計</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-dice"></i> 趣味統計</h2>
         <div class="grid grid-cols-2 gap-3">
-            <div class="bg-purple-50 rounded-lg p-3 text-center">
+            <div class="bg-sela-50 rounded-lg p-3 text-center">
                 <div class="text-2xl"><i class="ti ti-crown"></i></div>
-                <div class="text-xl font-bold text-purple-700">{{ groups_created }}</div>
-                <div class="text-xs text-purple-600">開團次數</div>
+                <div class="text-xl font-bold text-sela-800">{{ groups_created }}</div>
+                <div class="text-xs text-sela-800">開團次數</div>
             </div>
             <div class="bg-yellow-50 rounded-lg p-3 text-center">
                 <div class="text-2xl"><i class="ti ti-confetti"></i></div>
                 <div class="text-xl font-bold text-yellow-700">{{ lucky_wins }}</div>
                 <div class="text-xs text-yellow-600">中獎次數</div>
             </div>
-            <div class="bg-pink-50 rounded-lg p-3 text-center">
+            <div class="bg-sela-50 rounded-lg p-3 text-center">
                 <div class="text-2xl"><i class="ti ti-confetti"></i></div>
-                <div class="text-xl font-bold text-pink-700">{{ treated_count }}</div>
-                <div class="text-xs text-pink-600">被請客次數</div>
+                <div class="text-xl font-bold text-sela-800">{{ treated_count }}</div>
+                <div class="text-xs text-sela-800/70">被請客次數</div>
             </div>
-            <div class="bg-red-50 rounded-lg p-3 text-center">
+            <div class="bg-sela-50 rounded-lg p-3 text-center">
                 <div class="text-2xl"><i class="ti ti-heart"></i></div>
-                <div class="text-xl font-bold text-red-700">{{ treat_count }}</div>
-                <div class="text-xs text-red-600">請客次數</div>
+                <div class="text-xl font-bold text-sela-800">{{ treat_count }}</div>
+                <div class="text-xs text-sela-800/70">請客次數</div>
             </div>
         </div>
     </div>
     
     <!-- 下單習慣 -->
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-alarm"></i> 下單習慣</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-alarm"></i> 下單習慣</h2>
         <div class="grid grid-cols-2 gap-4">
             <div class="text-center">
-                <div class="text-3xl font-bold text-sela-600">{{ peak_hour }}:00</div>
-                <div class="text-sm text-gray-500">最常下單時間</div>
+                <div class="text-3xl font-bold text-sela-800">{{ peak_hour }}:00</div>
+                <div class="text-sm text-sela-800/60">最常下單時間</div>
             </div>
             <div class="text-center">
-                <div class="text-3xl font-bold text-sela-600">週{{ peak_weekday }}</div>
-                <div class="text-sm text-gray-500">最常下單日</div>
+                <div class="text-3xl font-bold text-sela-800">週{{ peak_weekday }}</div>
+                <div class="text-sm text-sela-800/60">最常下單日</div>
             </div>
         </div>
     </div>
     
     <!-- 飲料偏好 -->
     {% if sugar_stats or ice_stats %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-cup"></i> 飲料偏好</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-cup"></i> 飲料偏好</h2>
         <div class="grid grid-cols-2 gap-4">
             {% if sugar_stats %}
             <div>
-                <div class="text-sm text-gray-500 mb-2">甜度</div>
+                <div class="text-sm text-sela-800/60 mb-2">甜度</div>
                 <div class="space-y-1">
                     {% for s in sugar_stats %}
                     <div class="flex items-center justify-between text-sm">
-                        <span class="text-amber-700">{{ s.sugar }}</span>
-                        <span class="text-gray-400">{{ s.count }}次</span>
+                        <span class="text-sela-800">{{ s.sugar }}</span>
+                        <span class="text-sela-800/45">{{ s.count }}次</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -181,12 +183,12 @@
             {% endif %}
             {% if ice_stats %}
             <div>
-                <div class="text-sm text-gray-500 mb-2">冰塊</div>
+                <div class="text-sm text-sela-800/60 mb-2">冰塊</div>
                 <div class="space-y-1">
                     {% for i in ice_stats %}
                     <div class="flex items-center justify-between text-sm">
-                        <span class="text-blue-700">{{ i.ice }}</span>
-                        <span class="text-gray-400">{{ i.count }}次</span>
+                        <span class="text-sela-800">{{ i.ice }}</span>
+                        <span class="text-sela-800/45">{{ i.count }}次</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -196,10 +198,10 @@
         
         {% if topping_stats %}
         <div class="mt-4 pt-4 border-t">
-            <div class="text-sm text-gray-500 mb-2">最愛加料</div>
+            <div class="text-sm text-sela-800/60 mb-2">最愛加料</div>
             <div class="flex flex-wrap gap-2">
                 {% for t in topping_stats %}
-                <span class="px-2 py-1 bg-sela-100 text-sela-700 rounded text-sm">
+                <span class="px-2 py-1 bg-sela-100 text-sela-800 rounded text-sm">
                     {{ t.topping_name }} ({{ t.count }})
                 </span>
                 {% endfor %}
@@ -211,16 +213,16 @@
     
     <!-- 最愛店家 TOP 5 -->
     {% if favorite_stores %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-heart"></i>️ 最愛店家 TOP 5</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-heart"></i>️ 最愛店家 TOP 5</h2>
         <div class="space-y-3">
             {% for store in favorite_stores %}
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 flex items-center justify-center font-bold 
                     {% if loop.index == 1 %}text-yellow-500 text-lg
-                    {% elif loop.index == 2 %}text-gray-400
-                    {% elif loop.index == 3 %}text-amber-600
-                    {% else %}text-gray-300{% endif %}">
+                    {% elif loop.index == 2 %}text-sela-800/45
+                    {% elif loop.index == 3 %}text-sela-800/70
+                    {% else %}text-sela-800/35{% endif %}">
                     {% if loop.index <= 3 %}
                     <i class="ti ti-medal"></i>
                     {% else %}
@@ -228,13 +230,13 @@
                     {% endif %}
                 </div>
                 {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" class="w-10 h-10 rounded-lg object-contain bg-gray-50">
+                <img src="{{ store.logo_url }}" class="w-10 h-10 rounded-lg object-contain bg-sela-50">
                 {% else %}
-                <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xl"><i class="ti ti-building-store"></i></div>
+                <div class="w-10 h-10 rounded-lg bg-sela-100 flex items-center justify-center text-xl"><i class="ti ti-building-store"></i></div>
                 {% endif %}
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-800 truncate">{{ store.name }}</div>
-                    <div class="text-xs text-gray-500">{{ store.order_count }} 次 · ${{ "{:,.0f}".format(store.total_spent or 0) }}</div>
+                    <div class="font-medium text-sela-800 truncate">{{ store.name }}</div>
+                    <div class="text-xs text-sela-800/60">{{ store.order_count }} 次 · ${{ "{:,.0f}".format(store.total_spent or 0) }}</div>
                 </div>
             </div>
             {% endfor %}
@@ -244,20 +246,20 @@
     
     <!-- 最常點的品項 TOP 10 -->
     {% if favorite_items %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-flame"></i> 最常點的品項 TOP 10</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-flame"></i> 最常點的品項 TOP 10</h2>
         <div class="space-y-2">
             {% for item in favorite_items %}
-            <div class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-100{% endif %}">
+            <div class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-sela-100{% endif %}">
                 <div class="flex items-center gap-2">
                     <span class="w-6 h-6 flex items-center justify-center text-sm 
-                        {% if loop.index <= 3 %}bg-sela-100 text-sela-600{% else %}bg-gray-100 text-gray-500{% endif %} 
+                        {% if loop.index <= 3 %}bg-sela-100 text-sela-800{% else %}bg-sela-100 text-sela-800/60{% endif %} 
                         rounded-full font-medium">{{ loop.index }}</span>
-                    <span class="text-gray-800">{{ item.item_name }}</span>
+                    <span class="text-sela-800">{{ item.item_name }}</span>
                 </div>
                 <div class="text-sm">
-                    <span class="text-sela-600 font-medium">{{ item.total_qty|int }} 份</span>
-                    <span class="text-gray-400 ml-2">${{ "{:,.0f}".format(item.total_spent or 0) }}</span>
+                    <span class="text-sela-800 font-medium">{{ item.total_qty|int }} 份</span>
+                    <span class="text-sela-800/45 ml-2">${{ "{:,.0f}".format(item.total_spent or 0) }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -267,19 +269,19 @@
     
     <!-- 最常跟團的團主 -->
     {% if favorite_owners %}
-    <div class="bg-white rounded-lg shadow-sm p-4">
-        <h2 class="font-semibold text-gray-800 mb-3"><i class="ti ti-users"></i> 最常跟團的團主</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-users"></i> 最常跟團的團主</h2>
         <div class="space-y-3">
             {% for owner in favorite_owners %}
             <div class="flex items-center gap-3">
                 {% if owner.picture_url %}
                 <img src="{{ owner.picture_url }}" class="w-10 h-10 rounded-full">
                 {% else %}
-                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl"><i class="ti ti-user"></i></div>
+                <div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center text-xl"><i class="ti ti-user"></i></div>
                 {% endif %}
                 <div class="flex-1">
-                    <div class="font-medium text-gray-800">{{ owner.nickname or owner.display_name }}</div>
-                    <div class="text-xs text-gray-500">跟了 {{ owner.follow_count }} 團</div>
+                    <div class="font-medium text-sela-800">{{ owner.nickname or owner.display_name }}</div>
+                    <div class="text-xs text-sela-800/60">跟了 {{ owner.follow_count }} 團</div>
                 </div>
             </div>
             {% endfor %}
@@ -289,7 +291,7 @@
     
     <!-- 沒有資料 -->
     {% if total_orders == 0 %}
-    <div class="text-center py-12 text-gray-500 bg-white rounded-lg">
+    <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
         <div class="text-4xl mb-2"><i class="ti ti-mailbox"></i></div>
         <p>這段期間沒有訂單記錄</p>
         <p class="text-sm mt-1">快去參加一個團吧！</p>

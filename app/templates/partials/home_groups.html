@@ -8,8 +8,8 @@
                 <span class="text-lg"><i class="ti ti-speakerphone"></i></span>
             </div>
             <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-sela-700 mb-1">公告</div>
-                <div class="text-sm text-gray-600 whitespace-pre-line">{{ announcement }}</div>
+                <div class="text-sm font-medium text-sela-800 mb-1">公告</div>
+                <div class="text-sm text-sela-800/70 whitespace-pre-line">{{ announcement }}</div>
             </div>
         </div>
     </div>
@@ -19,20 +19,20 @@
     {% if active_votes %}
     <section>
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-base font-semibold text-gray-800">投票中</h2>
-            <a href="/votes" class="text-sm text-sela-500 hover:text-sela-600">全部 →</a>
+            <h2 class="text-base font-semibold text-sela-800">投票中</h2>
+            <a href="/votes" class="text-sm text-sela-800/70">全部 →</a>
         </div>
         <div class="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {% for vote in active_votes[:4] %}
             <a href="/votes/{{ vote.id }}" 
-               class="flex-shrink-0 w-32 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-sela-200 transition-colors snap-start">
-                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-2">
+               class="flex-shrink-0 w-32 bg-white rounded-2xl p-3 shadow-sm border border-sela-100 hover:border-sela-200 transition-colors snap-start">
+                <div class="w-10 h-10 rounded-full bg-sela-50 flex items-center justify-center mx-auto mb-2">
                     <span class="text-lg"><i class="ti ti-checkbox"></i>️</span>
                 </div>
-                <div class="text-sm font-medium text-gray-800 truncate text-center">{{ vote.title }}</div>
+                <div class="text-sm font-medium text-sela-800 truncate text-center">{{ vote.title }}</div>
                 <div class="flex justify-between items-center mt-2 text-xs">
-                    <span class="text-purple-500">{{ vote.total_votes }}票</span>
-                    <span class="text-sela-500" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
+                    <span class="text-sela-800">{{ vote.total_votes }}票</span>
+                    <span class="text-sela-800" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
                 </div>
             </a>
             {% endfor %}
@@ -44,27 +44,27 @@
     {% if stores %}
     <section x-data="{ open: false, filter: 'all' }">
         <button @click="open = !open" class="w-full flex items-center justify-between py-2">
-            <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <h2 class="text-base font-semibold text-sela-800 flex items-center gap-2">
                 <span><i class="ti ti-building-store"></i></span> 店家
-                <span class="text-sm font-normal text-gray-400">({{ stores|length }})</span>
+                <span class="text-sm font-normal text-sela-800/45">({{ stores|length }})</span>
             </h2>
-            <span class="text-gray-400 text-sm" x-text="open ? '收起' : '展開'"></span>
+            <span class="text-sela-800/45 text-sm" x-text="open ? '收起' : '展開'"></span>
         </button>
         
         <div x-show="open" x-collapse class="mt-2">
             <!-- 分類篩選 -->
             <div class="flex gap-2 mb-3">
                 <button @click="filter = 'all'" 
-                        :class="filter === 'all' ? 'bg-sela-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="filter === 'all' ? 'bg-sela-800 text-white' : 'bg-white text-sela-800/70 border border-sela-200'"
                         class="px-3 py-1.5 rounded-full text-xs font-medium">全部</button>
                 <button @click="filter = 'drink'" 
-                        :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="filter === 'drink' ? 'bg-sela-800 text-white' : 'bg-white text-sela-800/70 border border-sela-200'"
                         class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-cup"></i> 飲料</button>
                 <button @click="filter = 'meal'" 
-                        :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="filter === 'meal' ? 'bg-sela-800 text-white' : 'bg-white text-sela-800/70 border border-sela-200'"
                         class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-bowl"></i> 餐廳</button>
                 <button @click="filter = 'group_buy'" 
-                        :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="filter === 'group_buy' ? 'bg-sela-800 text-white' : 'bg-white text-sela-800/70 border border-sela-200'"
                         class="px-3 py-1.5 rounded-full text-xs font-medium"><i class="ti ti-shopping-cart"></i> 團購</button>
             </div>
             
@@ -74,7 +74,7 @@
                 <a href="/stores/{{ store.id }}"
                    class="bg-white rounded-xl p-2 text-center hover:shadow-md transition-shadow"
                    x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
-                    <div class="w-12 h-12 mx-auto bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden mb-1">
+                    <div class="w-12 h-12 mx-auto bg-sela-50 rounded-xl flex items-center justify-center overflow-hidden mb-1">
                         {% if store.logo_url %}
                         <img src="{{ store.logo_url }}" class="w-10 h-10 object-contain">
                         {% else %}
@@ -85,13 +85,13 @@
                         </span>
                         {% endif %}
                     </div>
-                    <div class="text-xs font-medium text-gray-700 truncate">{{ store.name }}</div>
+                    <div class="text-xs font-medium text-sela-800/80 truncate">{{ store.name }}</div>
                 </a>
                 {% endfor %}
             </div>
             
             <!-- 推薦店家 -->
-            <a href="/recommend" class="mt-3 flex items-center justify-center gap-1 text-sm text-sela-500 hover:text-sela-600 py-2">
+            <a href="/recommend" class="mt-3 flex items-center justify-center gap-1 text-sm text-sela-800 hover:text-sela-800 py-2">
                 <span><i class="ti ti-bulb"></i></span> 我想推薦店家
             </a>
         </div>
@@ -104,9 +104,9 @@
     <!-- 飲料團 -->
     {% if drink_groups %}
     <section>
-        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 class="text-base font-semibold text-sela-800 mb-3 flex items-center gap-2">
             <span><i class="ti ti-cup"></i></span> 飲料
-            <span class="text-sm font-normal text-gray-400">({{ drink_groups|length }})</span>
+            <span class="text-sm font-normal text-sela-800/45">({{ drink_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
             {% for group in drink_groups %}
@@ -119,9 +119,9 @@
     <!-- 餐廳團 -->
     {% if meal_groups %}
     <section>
-        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 class="text-base font-semibold text-sela-800 mb-3 flex items-center gap-2">
             <span><i class="ti ti-bowl"></i></span> 餐廳
-            <span class="text-sm font-normal text-gray-400">({{ meal_groups|length }})</span>
+            <span class="text-sm font-normal text-sela-800/45">({{ meal_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
             {% for group in meal_groups %}
@@ -134,9 +134,9 @@
     <!-- 團購 -->
     {% if groupbuy_groups %}
     <section>
-        <h2 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 class="text-base font-semibold text-sela-800 mb-3 flex items-center gap-2">
             <span><i class="ti ti-shopping-cart"></i></span> 團購
-            <span class="text-sm font-normal text-gray-400">({{ groupbuy_groups|length }})</span>
+            <span class="text-sm font-normal text-sela-800/45">({{ groupbuy_groups|length }})</span>
         </h2>
         <div class="grid grid-cols-2 gap-3">
             {% for group in groupbuy_groups %}
@@ -150,17 +150,17 @@
     <!-- 無開放中的團 -->
     <div class="text-center py-16">
         <div class="w-20 h-20 mx-auto rounded-full bg-sela-50 flex items-center justify-center mb-4">
-            <i class="ti ti-cup text-sela-400" style="font-size: 38px;" aria-hidden="true"></i>
+            <i class="ti ti-cup text-sela-800" style="font-size: 38px;" aria-hidden="true"></i>
         </div>
-        <p class="text-gray-500 mb-1">目前沒有開放中的團</p>
-        <p class="text-sm text-gray-400">點擊「開團」開始揪人！</p>
+        <p class="text-sela-800/60 mb-1">目前沒有開放中的團</p>
+        <p class="text-sm text-sela-800/45">點擊「開團」開始揪人！</p>
     </div>
     {% endif %}
 
     <!-- 已截止（可收合） -->
     {% if closed_groups %}
     <section x-data="{ open: false }">
-        <button @click="open = !open" class="w-full flex items-center justify-between py-2 text-gray-400">
+        <button @click="open = !open" class="w-full flex items-center justify-between py-2 text-sela-800/45">
             <span class="text-sm">已截止 ({{ closed_groups|length }})</span>
             <span class="text-xs" x-text="open ? '收起' : '展開'"></span>
         </button>
@@ -168,7 +168,7 @@
         <div x-show="open" x-collapse>
             <div class="grid grid-cols-2 gap-3 mt-2 opacity-50">
                 {% for group in closed_groups %}
-                <a href="/groups/{{ group.id }}" class="bg-gray-100 rounded-2xl p-3 text-center">
+                <a href="/groups/{{ group.id }}" class="bg-sela-100 rounded-2xl p-3 text-center">
                     <div class="w-14 h-14 mx-auto bg-white rounded-xl flex items-center justify-center overflow-hidden mb-2">
                         {% if group.store and group.store.logo_url %}
                         <img src="{{ group.store.logo_url }}" class="w-12 h-12 object-contain grayscale">
@@ -180,12 +180,12 @@
                         </span>
                         {% endif %}
                     </div>
-                    <div class="text-sm font-medium text-gray-500 truncate">{{ group.name }}</div>
-                    <div class="text-xs text-gray-400 truncate">{{ group.store_display_name }}</div>
+                    <div class="text-sm font-medium text-sela-800/60 truncate">{{ group.name }}</div>
+                    <div class="text-xs text-sela-800/45 truncate">{{ group.store_display_name }}</div>
                 </a>
                 {% endfor %}
             </div>
-            <a href="/history" class="block text-center text-sm text-gray-400 mt-3 py-2 hover:text-sela-500">
+            <a href="/history" class="block text-center text-sm text-sela-800/45 mt-3 py-2 hover:text-sela-800">
                 查看全部歷史 →
             </a>
         </div>
