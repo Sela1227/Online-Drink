@@ -1,15 +1,17 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}{{ title }} - {{ group.name }}{% endblock %}
 
 {% block content %}
+{{ nav.back('/groups/' ~ group.id, '團單') }}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800">{{ title }}</h1>
-        <a href="/groups/{{ group.id }}" class="text-sela-800 hover:text-sela-800">返回團單 →</a>
+        
     </div>
     
-    <div class="bg-white rounded-lg shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex justify-end mb-3">
             <button onclick="copyText()" 
                     class="text-sm bg-sela-600 hover:bg-sela-700 text-sela-800 px-4 py-2 rounded-lg">

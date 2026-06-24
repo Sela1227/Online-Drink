@@ -1,19 +1,21 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}收藏店家 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/profile', '個人資料') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-star"></i> 收藏店家</h1>
-        <a href="/profile" class="text-sm text-sela-800/60 hover:text-sela-800/80">返回個人頁面 →</a>
+        
     </div>
     
     {% if favorites %}
     <div class="space-y-3">
         {% for fav in favorites %}
-        <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm p-4">
             <div class="flex items-center gap-3">
                 <!-- Logo -->
                 <div class="w-12 h-12 bg-sela-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">

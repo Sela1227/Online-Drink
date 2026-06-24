@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}我的訂單 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/profile', '個人資料') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
@@ -10,7 +12,7 @@
             <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-clipboard-list"></i> 我的訂單</h1>
             <div class="text-sm text-sela-800/60">共 {{ total }} 筆</div>
         </div>
-        <a href="/profile" class="text-sm text-sela-800/60 hover:text-sela-800/80">返回個人頁面 →</a>
+        
     </div>
     
     {% if orders %}

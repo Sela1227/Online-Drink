@@ -1,13 +1,15 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}{{ store.name }} - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800">{{ store.name }}</h1>
-        <a href="/home" class="text-sm text-sela-800/60 active:text-sela-800 flex items-center gap-0.5"><i class="ti ti-chevron-left"></i> 首頁</a>
+        
     </div>
     
     <!-- 店家資訊卡片 -->

@@ -78,6 +78,13 @@
         .chip:active { transform:scale(.97); }
         .chip-selected { background:#5B4733; color:#fff; border-color:#5B4733; }
 
+        /* 統一返回鍵：左上角、44pt 可點、chevron + 目的地 */
+        .back-link { display:inline-flex; align-items:center; gap:1px; color:#5B4733; opacity:.7;
+                     font-size:.92rem; min-height:40px; padding:.4rem .6rem .4rem 0; margin:0 0 .15rem -.15rem;
+                     -webkit-tap-highlight-color:transparent; }
+        .back-link:active { opacity:1; }
+        .back-link i { font-size:21px; line-height:1; }
+
         /* 圓形步進鈕（數量±）：44pt 可點 */
         .stepper { width:44px; height:44px; border-radius:999px; background:#F3EBDD; color:#5B4733;
                    font-size:1.25rem; display:inline-flex; align-items:center; justify-content:center;
@@ -92,7 +99,7 @@
     </style>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V1.22.0' %}
+{% set app_version = 'V1.23.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     document.body.addEventListener('htmx:responseError', function(evt) {
