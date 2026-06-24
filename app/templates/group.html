@@ -687,7 +687,7 @@
         
         <!-- 分類快速導覽（固定在頂部） -->
         {% if menu.categories|length > 1 %}
-        <div class="sticky top-14 bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
+        <div class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
             <div class="flex gap-2 min-w-max">
                 {% for category in menu.categories %}
                 <button @click="scrollToCategory('category-{{ category.id }}')"
