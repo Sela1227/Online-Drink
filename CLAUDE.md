@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V1.24.0（手機優化：輸入框防放大、安全區、移除重複開團鈕）
+- **版本：** V1.25.0（加入回饋 toast + 拿掉結帳重載 + 再來一杯 + 匯入頁重設計）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -274,6 +274,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V1.25.0 | **使用者體驗強化（toast + 無重載結帳 + 再來一杯）+ 匯入頁重設計**。(1) **加入購物車即時回饋**：base.html 加全域 toast 元件（`@apptoast.window` 監聽、底部置中、1.8s 自動消失）＋ `window.toast(msg)` helper；`afterAddItem()` 觸發「已加入購物車」。(2) **拿掉結帳整頁重載**：`my_order.html` 四顆鈕（送出/取消/修改/刪除）原 `$dispatch('orderUpdated'); location.reload()` → 改成只更新 Alpine `orderStatus`（送出→submitted＋關購物車、修改→editing、取消→submitted、刪除→none＋cartCount=0），畫面切換靠既有 x-show、內容靠既有 orderUpdated 監聽刷新，不再白閃/跳頂/失去位置；送出與刪除附 toast。(3) **再來一杯（記住上次糖/冰/尺寸）**：`orderPage()` 加 `saveLastPref()`（加入時把勾選的 sugar/ice + selectedSize 存 `localStorage['selapref_<storeId>']`）與 `applyLastPref()`（openAddItem 後 `$nextTick` 套用；找不到對應選項就回到團預設，graceful）。(4) **匯入店家/菜單頁重設計**：原本一牆並列盒子（AI prompt 藍盒＋Logo 盒＋分頁＋表單＋格式說明）看不出先做什麼；改成**編號步驟流程**（①複製 prompt 給 AI → ②貼 JSON 並預覽匯入），選用的 **Logo 生成摺疊移到最下方**（與菜單匯入無關、不再打斷主線），藍/琥珀彩虹收品牌 sela，主鈕升 `.btn btn-primary`，store_id 選擇從厚重 amber alert 簡化成一般欄位。**block scripts 的 5 段 prompt 字串原封不動**。教訓：`location.reload` 之所以能安全移除，是因為畫面切換本就綁在 Alpine `orderStatus` 的 x-show、內容刷新本就綁在 `orderUpdated` 監聽——reload 只是把這兩件事一起暴力重來；分清楚「狀態切換」與「內容刷新」兩條路徑後就能局部更新。**實機需驗**：送出/修改/刪除的平滑切換、加入 toast、再來一杯預填。 |
 | V1.24.0 | **手機優化 + 移除重複開團鈕**。(1) **去重**：移除 header 右上的「開團」鈕，與底部中央 FAB 重複（每位使用者其實多半是加入點餐、非開團，開團入口留一個即可）。header 右側精簡為 管理（限管理員）+ 頭像。(2) **手機優化**：viewport 改 `viewport-fit=cover` 並放開縮放限制（無障礙）；**輸入框強制 ≥16px**（避免 iOS 聚焦時整頁自動放大，超常見痛點）；header 加 `padding-top: env(safe-area-inset-top)`（瀏海不擋內容）；底部導航 `.safe-area-pb` 補定義＋佔位高度納入安全區（home indicator 不擋）；移除點擊灰閃 `-webkit-tap-highlight-color`；`overscroll-behavior-y` 防橡皮筋外溢；加 `apple-mobile-web-app` / `theme-color #E8D9C0` meta。group.html sticky 分類列 `top` 改 `calc(3.5rem+env(safe-area-inset-top))` 配合 header 安全區。 |
 | V1.23.1 | **後台管理介面返回鍵統一 + 灰字暖化**。使用者回報後台返回鍵位置仍亂。Phase 3 為控風險未掃 admin，本版補上：17 個後台頁全部套用 `nav.back()` macro（左上角、chevron + 目的地、統一樣式），移除原本散落 header 右側的 `返回XXX →`（灰、往前箭頭）；`import.html` 的條件式雙返回（有/無選定店家）改成條件式 `nav.back`。後台 18 檔灰字暖化（coffee 墨色階）、卡片圓角統一 `rounded-2xl`，後台 gray 歸零。後台的狀態色（啟用/停用/角色/審核狀態）屬語意色，保留。全模板 Jinja 解析通過。至此**前台＋後台返回鍵與文字色系全站一致**。 |
 | V1.23.0 | **UI 優化 Phase 3：返回鍵全站統一 + 次要頁收尾**。使用者回報「按鍵位置跳來跳去、尤其返回鍵」。盤點發現返回鍵根本各做各的：位置有左有右、圖示 `←`／`‹`／往前的 `→` 混用、文案「返回首頁／個人頁面／店家／投票列表…」不一、顏色 gray/sela 混。**統一方案（iOS 風）**：新增 `partials/nav.html` 的 `nav.back(href, label)` macro + base.html `.back-link` 樣式（左上、chevron + 目的地、44pt 可點）；16 個頁面一律在 `{% block content %}` 後第一個元素放 `{{ nav.back(...) }}`（永遠左上角），移除原本散落的返回連結；group.html 自身返回鍵也對齊同款。**次要頁彩虹收尾**：stats（資料頁全收品牌）、votes/*（投票選擇器→深咖啡實心、進度條→sela）、feedback 列表（blue→sela，保留 green=已解決/red=緊急）、guest_entry、templates/* 的灰字暖化＋彩虹收斂。卡片圓角統一 `rounded-2xl`。至此**消費端 gray 與非語意彩虹全部歸零**（green/amber/red 僅留語意）。全模板 Jinja 解析通過。教訓：返回鍵這種全站重複元件，應一開始就做成 macro+共用 class，不要每頁各寫一份——否則位置/圖示/文案必然漂移。 |

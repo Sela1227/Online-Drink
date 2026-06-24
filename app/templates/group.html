@@ -1013,13 +1013,33 @@ function orderPage() {
             this.quantity = 1;
             this.extraToppings = 0;
             this.showAddItem = true;
+            this.$nextTick(() => this.applyLastPref());
         },
         
         afterAddItem() {
+            this.saveLastPref();
             this.showAddItem = false;
             this.updateCartCount();
             this.orderStatus = 'draft';
             document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+            window.toast('已加入購物車');
+        },
+
+        applyLastPref() {
+            try {
+                const pref = JSON.parse(localStorage.getItem('selapref_{{ store.id if store else 0 }}') || '{}');
+                if (pref.size) this.selectedSize = pref.size;
+                if (pref.sugar) { const r = document.querySelector(`input[name=sugar][value="${pref.sugar}"]`); if (r) r.checked = true; }
+                if (pref.ice)   { const r = document.querySelector(`input[name=ice][value="${pref.ice}"]`);   if (r) r.checked = true; }
+            } catch (e) {}
+        },
+
+        saveLastPref() {
+            try {
+                const sugar = document.querySelector('input[name=sugar]:checked')?.value;
+                const ice   = document.querySelector('input[name=ice]:checked')?.value;
+                localStorage.setItem('selapref_{{ store.id if store else 0 }}', JSON.stringify({ size: this.selectedSize, sugar, ice }));
+            } catch (e) {}
         },
         
         itemSubtotal() {

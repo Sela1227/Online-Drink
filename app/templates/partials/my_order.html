@@ -58,18 +58,18 @@
         <div class="flex gap-2">
             {% if order.status.value == 'draft' or order.status.value == 'editing' %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="$dispatch('orderUpdated'); location.reload();"
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
                     class="btn btn-primary flex-1">確定結單</button>
             {% if order.status.value == 'editing' %}
             <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="$dispatch('orderUpdated'); location.reload();" class="btn btn-secondary">取消</button>
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'" class="btn btn-secondary">取消</button>
             {% endif %}
             {% else %}
             <button hx-post="/groups/{{ group.id }}/orders/edit" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="$dispatch('orderUpdated'); location.reload();" class="btn btn-secondary flex-1">修改訂單</button>
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='editing'" class="btn btn-secondary flex-1">修改訂單</button>
             {% endif %}
             <button hx-delete="/groups/{{ group.id }}/orders" hx-target="#cart-content" hx-swap="innerHTML" hx-confirm="確定要刪除整張訂單嗎？"
-                    @htmx:after-request="$dispatch('orderUpdated'); location.reload();" class="btn btn-danger" aria-label="刪除整張訂單"><i class="ti ti-trash"></i></button>
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='none'; cartCount=0; showCart=false; window.toast('已刪除訂單')" class="btn btn-danger" aria-label="刪除整張訂單"><i class="ti ti-trash"></i></button>
         </div>
         {% endif %}
     </div>
