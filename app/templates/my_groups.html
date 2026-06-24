@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}我的團單 - 團購系統{% endblock %}
 
 {% block content %}
+{{ nav.back('/profile', '個人資料') }}
 <div class="space-y-4">
     <h1 class="text-xl font-bold text-sela-800">我的團單</h1>
     

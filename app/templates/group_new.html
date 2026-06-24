@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
 
 {% block title %}開新團 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{{ nav.back('/home', '首頁') }}
 <div class="space-y-4">
     <!-- 快速開團模板 -->
     {% if my_templates %}
