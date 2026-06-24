@@ -306,6 +306,24 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     
     # 取得菜單品項（含分類）
     menu = group.menu
+
+    # 個人常點（此使用者在此店家點過最多的品項，對應到目前菜單中可點的）
+    my_freq_rows = db.query(
+        OrderItem.menu_item_id,
+        func.sum(OrderItem.quantity).label('cnt')
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Group.store_id == group.store_id,
+        OrderItem.menu_item_id.isnot(None)
+    ).group_by(OrderItem.menu_item_id).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(8).all()
+    _freq_ids = [r[0] for r in my_freq_rows]
+    _menu_items_by_id = {}
+    for _cat in menu.categories:
+        for _it in _cat.items:
+            _menu_items_by_id[_it.id] = _it
+    my_frequent = [_menu_items_by_id[i] for i in _freq_ids if i in _menu_items_by_id][:4]
     
     # 取得所有用戶（用於轉移團主）
     all_users = []
@@ -339,6 +357,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "last_order_items": last_order_items,
         "favorite_items": favorite_items,
         "hot_items": hot_items,
+        "my_frequent": my_frequent,
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,

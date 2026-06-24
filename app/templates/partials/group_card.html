@@ -58,9 +58,11 @@
         
         <!-- 截止時間 -->
         {% if group.is_open %}
-        <div class="text-xs font-medium text-sela-800 bg-sela-100 px-2 py-1 rounded-full"
-             x-data="countdown('{{ group.deadline.isoformat() }}')" 
-             x-text="display"></div>
+        <div x-data="countdown('{{ group.deadline.isoformat() }}')"
+             class="text-xs font-medium px-2 py-1 rounded-full inline-flex items-center gap-1 transition-colors"
+             :class="urgent ? 'bg-red-100 text-red-700 animate-pulse' : 'text-sela-800 bg-sela-100'">
+            <i class="ti ti-clock" x-show="!urgent"></i><i class="ti ti-flame" x-show="urgent" x-cloak></i><span x-text="display"></span>
+        </div>
         {% else %}
         <span class="text-xs text-sela-800/45">已截止</span>
         {% endif %}

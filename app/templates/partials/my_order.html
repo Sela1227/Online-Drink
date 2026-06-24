@@ -76,10 +76,17 @@
 
     {% else %}
     <!-- 空訂單 -->
-    <div class="text-center py-10 text-sela-700/50">
-        <div class="w-14 h-14 mx-auto rounded-full bg-sela-50 flex items-center justify-center mb-3"><i class="ti ti-shopping-cart" style="font-size:26px;"></i></div>
-        <p class="text-sela-800/70">購物車是空的</p>
-        <p class="text-sm">從菜單選擇品項加入</p>
+    <div class="text-center py-10">
+        <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3">
+            <ellipse cx="44" cy="78" rx="22" ry="4" fill="#E8D9C0" opacity="0.6"/>
+            <rect x="42" y="14" width="6" height="26" rx="3" transform="rotate(14 45 27)" fill="#8A6A38"/>
+            <path d="M25 31 H63 L58.5 71 Q58 75.5 53.5 75.5 H34.5 Q30 75.5 29.5 71 Z" fill="#F3EBDD" stroke="#C9A977" stroke-width="2.5"/>
+            <path d="M27.5 50 H60.5 L58.5 71 Q58 75.5 53.5 75.5 H34.5 Q30 75.5 29.5 71 Z" fill="#DCC8A6"/>
+            <circle cx="37" cy="69" r="3" fill="#5B4733"/><circle cx="45" cy="70" r="3" fill="#5B4733"/><circle cx="52" cy="68" r="3" fill="#5B4733"/>
+            <rect x="22" y="26" width="44" height="8" rx="4" fill="#C9A977"/>
+        </svg>
+        <p class="text-sela-800/70 font-medium">購物車是空的</p>
+        <p class="text-sm text-sela-800/45">從下方菜單選擇品項加入</p>
     </div>
     {% endif %}
 </div>

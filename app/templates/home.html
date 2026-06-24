@@ -3,6 +3,36 @@
 {% block title %}首頁 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
+{% if my_active %}
+<div class="mb-4">
+    <h2 class="text-sm font-semibold text-sela-800/70 mb-2 px-1 flex items-center gap-1.5"><i class="ti ti-progress-check"></i> 我的進行中</h2>
+    <div class="space-y-2">
+        {% for a in my_active %}
+        <a href="/groups/{{ a.group.id }}" class="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-sela-100 p-3 active:bg-sela-50 transition">
+            <div class="w-10 h-10 bg-sela-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                {% if a.group.store and a.group.store.logo_url %}
+                <img src="{{ a.group.store.logo_url }}" alt="" class="w-8 h-8 object-contain">
+                {% else %}
+                <span class="text-xl text-sela-800">{% if a.group.category.value == 'drink' %}<i class="ti ti-cup"></i>{% elif a.group.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>{% else %}<i class="ti ti-bowl"></i>{% endif %}</span>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sela-800 truncate">{{ a.group.name }}</div>
+                <div class="text-xs text-sela-800/55 truncate">{{ a.group.store_display_name }}</div>
+            </div>
+            {% if a.status == 'submitted' %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap"><i class="ti ti-check"></i> 已結單</span>
+            {% elif a.status == 'owner' %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full whitespace-nowrap">待點餐</span>
+            {% else %}
+            <span class="text-xs bg-sela-200 text-sela-800 px-2 py-1 rounded-full whitespace-nowrap">未送出</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div id="group-list" 
      hx-get="/home/groups" 
      hx-trigger="refreshGroups from:body"
@@ -16,6 +46,7 @@ let refreshScheduled = false;
 function countdown(deadline) {
     return {
         display: '',
+        urgent: false,
         init() {
             this.update();
             setInterval(() => this.update(), 60000);
@@ -24,6 +55,7 @@ function countdown(deadline) {
             const now = new Date();
             const end = new Date(deadline);
             const diff = end - now;
+            this.urgent = diff > 0 && diff < 15 * 60 * 1000;
             
             if (diff <= 0) {
                 this.display = '已截止';

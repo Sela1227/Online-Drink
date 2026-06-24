@@ -149,11 +149,22 @@
     {% else %}
     <!-- 無開放中的團 -->
     <div class="text-center py-16">
-        <div class="w-20 h-20 mx-auto rounded-full bg-sela-50 flex items-center justify-center mb-4">
-            <i class="ti ti-cup text-sela-800" style="font-size: 38px;" aria-hidden="true"></i>
-        </div>
+        <svg width="120" height="96" viewBox="0 0 120 96" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4">
+            <ellipse cx="60" cy="84" rx="42" ry="5" fill="#E8D9C0" opacity="0.5"/>
+            <line x1="16" y1="78" x2="104" y2="78" stroke="#DCC8A6" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- 飲料杯 -->
+            <rect x="34" y="24" width="5" height="18" rx="2.5" transform="rotate(13 36 33)" fill="#8A6A38"/>
+            <path d="M26 40 H50 L47 72 Q46.5 75.5 42.5 75.5 H33.5 Q29.5 75.5 29 72 Z" fill="#F3EBDD" stroke="#C9A977" stroke-width="2.5"/>
+            <path d="M27.5 56 H48.5 L47 72 Q46.5 75.5 42.5 75.5 H33.5 Q29.5 75.5 29 72 Z" fill="#DCC8A6"/>
+            <rect x="24" y="35" width="28" height="7" rx="3.5" fill="#C9A977"/>
+            <!-- 餐碗 -->
+            <path d="M62 58 Q62 75.5 80 75.5 Q98 75.5 98 58 Z" fill="#DCC8A6" stroke="#C9A977" stroke-width="2.5"/>
+            <ellipse cx="80" cy="58" rx="18" ry="4.5" fill="#F3EBDD" stroke="#C9A977" stroke-width="2.5"/>
+            <path d="M75 50 q-3.5 -5 0 -11" stroke="#C9A977" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.65"/>
+            <path d="M85 50 q-3.5 -5 0 -11" stroke="#C9A977" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.65"/>
+        </svg>
         <p class="text-sela-800/60 mb-1">目前沒有開放中的團</p>
-        <p class="text-sm text-sela-800/45">點擊「開團」開始揪人！</p>
+        <p class="text-sm text-sela-800/45">點下方「＋」開團，開始揪人！</p>
     </div>
     {% endif %}
 

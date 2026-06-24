@@ -11,9 +11,10 @@
             <a href="/home" class="back-link"><i class="ti ti-chevron-left"></i><span>首頁</span></a>
             <div class="text-right">
                 {% if is_open %}
-                <div class="text-sela-800 font-medium flex items-center gap-1"
-                     x-data="countdown('{{ group.deadline.isoformat() }}')">
-                    <i class="ti ti-alarm" x-show="!isClosed"></i>
+                <div class="font-medium flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
+                     x-data="countdown('{{ group.deadline.isoformat() }}')"
+                     :class="urgent ? 'bg-red-100 text-red-700 animate-pulse' : 'text-sela-800'">
+                    <i class="ti ti-flame" x-show="urgent" x-cloak></i><i class="ti ti-alarm" x-show="!isClosed && !urgent"></i>
                     <span x-text="display"></span>
                 </div>
                 {% else %}
@@ -466,7 +467,21 @@
     {% if is_open %}
     <div class="bg-white rounded-2xl shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
         <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-bolt"></i> {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
-        
+
+        {% if my_frequent %}
+        <div class="mb-3">
+            <div class="text-xs text-sela-800/55 mb-1.5 flex items-center gap-1"><i class="ti ti-rotate-clockwise"></i> 你的常點</div>
+            <div class="flex flex-wrap gap-2">
+                {% for item in my_frequent %}
+                <button @click="openAddItem({ id: {{ item.id }}, name: '{{ item.name }}', price: {{ item.price }}, price_l: {{ item.price_l if item.price_l else 'null' }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })"
+                        class="flex items-center gap-1.5 px-3 py-2 bg-sela-800 text-white rounded-lg text-sm active:bg-sela-900 transition">
+                    <i class="ti ti-plus"></i> {{ item.name }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="flex flex-wrap gap-2 mb-3">
             <!-- 複製上次訂單 -->
             {% if last_order and last_order_items %}
@@ -1079,6 +1094,7 @@ function countdown(deadline) {
     return {
         display: '',
         isClosed: false,
+        urgent: false,
         init() {
             this.update();
             setInterval(() => this.update(), 1000);
@@ -1087,10 +1103,12 @@ function countdown(deadline) {
             const now = new Date();
             const end = new Date(deadline);
             const diff = end - now;
+            this.urgent = diff > 0 && diff < 15 * 60 * 1000;
             
             if (diff <= 0) {
                 this.display = '已截止';
                 this.isClosed = true;
+                this.urgent = false;
                 return;
             }
             

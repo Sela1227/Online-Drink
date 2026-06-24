@@ -131,6 +131,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
         db.rollback()
         groupbuy_groups = []
     
+    # 我的進行中（開放團中，我是團主或已下單）
+    my_active = []
+    for g in (drink_groups + meal_groups + groupbuy_groups):
+        mo = next((o for o in g.orders if o.user_id == user.id), None)
+        if mo:
+            my_active.append({"group": g, "status": mo.status.value})
+        elif g.owner_id == user.id:
+            my_active.append({"group": g, "status": "owner"})
+    my_active.sort(key=lambda x: x["group"].deadline)
+
     # 已截止的團（最近 10 個）
     closed_groups_raw = db.query(Group).options(
         joinedload(Group.store),
@@ -196,6 +206,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "announcement": announcement,
         "active_votes": active_votes,
         "stores": stores,
+        "my_active": my_active,
         "now": now,
     })
 
