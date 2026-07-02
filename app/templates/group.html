@@ -181,6 +181,17 @@
         {% endif %}
         
         <!-- 外送費顯示 -->
+        {% if group.order_limit %}
+        <div class="mt-2 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
+            <div>
+                <i class="ti ti-coin"></i> 每單上限：${{ group.order_limit|int }}
+            </div>
+            <div class="text-sela-800/70 text-xs">
+                {% if group.allow_over_limit %}可超過，超過自行貼補{% else %}不可超過{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         {% if group.delivery_fee %}
         <div class="mt-2 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
             <div>
@@ -313,6 +324,20 @@
                                        placeholder="0"
                                        class="w-24 border rounded px-3 py-2 text-sm">
                                 <span class="text-xs text-sela-800/45">自動分攤</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-sela-800/70 mb-1">每單上限</label>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sela-800/60">$</span>
+                                <input type="number" name="order_limit" min="0" step="1"
+                                       value="{{ group.order_limit|int if group.order_limit else '' }}"
+                                       placeholder="不限"
+                                       class="w-24 border rounded px-3 py-2 text-sm">
+                                <label class="flex items-center gap-1 text-xs text-sela-800/70 cursor-pointer">
+                                    <input type="checkbox" name="allow_over_limit" value="true" class="rounded border-sela-300"
+                                           {% if group.allow_over_limit %}checked{% endif %}> 允許超過（自行貼補）
+                                </label>
                             </div>
                         </div>
                         <div>

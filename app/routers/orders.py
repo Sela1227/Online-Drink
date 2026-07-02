@@ -332,6 +332,10 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
     if not order or not order.items:
         raise HTTPException(status_code=400, detail="請先加入品項")
     
+    # 每單上限檢查（不允許超過時擋下）
+    if group.order_limit and not group.allow_over_limit and order.total_amount > group.order_limit:
+        raise HTTPException(status_code=400, detail=f"超過每單上限 ${int(group.order_limit)}，請調整品項")
+    
     order.status = OrderStatus.SUBMITTED
     order.snapshot = None  # 清除快照
     db.commit()

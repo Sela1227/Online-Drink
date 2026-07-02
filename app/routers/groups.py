@@ -99,6 +99,8 @@ async def create_group(
     note: str = Form(None),
     branch_id: int = Form(None),
     delivery_fee: float = Form(None),
+    order_limit: float = Form(None),
+    allow_over_limit: bool = Form(False),
     visibility: str = Form("public"),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
@@ -156,6 +158,8 @@ async def create_group(
         deadline=deadline_dt,
         is_public=is_public,
         delivery_fee=Decimal(str(delivery_fee)) if delivery_fee and delivery_fee > 0 else None,
+        order_limit=Decimal(str(order_limit)) if order_limit and order_limit > 0 else None,
+        allow_over_limit=allow_over_limit,
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
         lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
@@ -752,6 +756,8 @@ async def edit_group(
     note: str = Form(None),
     deadline: str = Form(None),
     delivery_fee: float = Form(None),
+    order_limit: float = Form(None),
+    allow_over_limit: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """編輯團單"""
@@ -774,6 +780,10 @@ async def edit_group(
     # 更新外送費
     if delivery_fee is not None:
         group.delivery_fee = Decimal(str(delivery_fee)) if delivery_fee > 0 else None
+    
+    # 更新每單上限
+    group.order_limit = Decimal(str(order_limit)) if order_limit and order_limit > 0 else None
+    group.allow_over_limit = allow_over_limit
     
     # 更新截止時間
     if deadline:

@@ -128,6 +128,24 @@
                 <span class="text-sm text-sela-800/60">會自動平均分攤給所有人</span>
             </div>
         </div>
+
+        <!-- 每單金額上限 -->
+        <div x-show="storeId" x-cloak x-data="{ hasLimit: {% if copy_from and copy_from.order_limit %}true{% else %}false{% endif %} }">
+            <label class="block text-sm font-medium text-sela-800/80 mb-2">每單金額上限（選填）</label>
+            <div class="flex items-center gap-2">
+                <span class="text-sela-800/60">$</span>
+                <input type="number" name="order_limit" min="0" step="1" placeholder="不限"
+                       class="w-32 border rounded-lg px-3 py-2"
+                       @input="hasLimit = $event.target.value > 0"
+                       value="{% if copy_from and copy_from.order_limit %}{{ copy_from.order_limit|int }}{% endif %}">
+                <span class="text-sm text-sela-800/60">例：公司補助每人 $100</span>
+            </div>
+            <label x-show="hasLimit" x-cloak class="flex items-start gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="allow_over_limit" value="true" class="mt-0.5 rounded border-sela-300"
+                       {% if copy_from and copy_from.allow_over_limit %}checked{% endif %}>
+                <span class="text-sm text-sela-800/70">允許超過上限<span class="block text-xs text-sela-800/50">勾選＝可以點超過，超過的部分自行貼補；不勾＝不能結單超過上限的訂單</span></span>
+            </label>
+        </div>
         
         <!-- 可見範圍 -->
         <div x-show="storeId" x-cloak x-data="{ isPublic: true }">

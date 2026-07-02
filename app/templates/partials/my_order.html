@@ -50,16 +50,32 @@
 
     <!-- 結帳列（購物車內自動釘底）-->
     <div class="order-actions">
+        {% set over = (order.total_amount - group.order_limit) if group.order_limit and order.total_amount > group.order_limit else 0 %}
+        {% if over > 0 %}
+        {% if group.allow_over_limit %}
+        <div class="mb-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            <i class="ti ti-alert-triangle"></i> 超過每單上限 ${{ group.order_limit|int }}，<span class="font-bold">需自行貼補 ${{ over|int }}</span>
+        </div>
+        {% else %}
+        <div class="mb-2.5 p-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <i class="ti ti-alert-circle"></i> 超過每單上限 ${{ group.order_limit|int }}（多 ${{ over|int }}），此團不可超過，請調整品項
+        </div>
+        {% endif %}
+        {% endif %}
         <div class="flex items-center justify-between mb-2.5">
             <span class="text-sela-700/70">合計</span>
-            <span class="text-xl font-bold text-sela-800">${{ order.total_amount }}</span>
+            <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.total_amount }}</span>
         </div>
         {% if is_open %}
         <div class="flex gap-2">
             {% if order.status.value == 'draft' or order.status.value == 'editing' %}
+            {% if over > 0 and not group.allow_over_limit %}
+            <button type="button" disabled class="btn btn-primary flex-1">超過上限，請調整</button>
+            {% else %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
                     class="btn btn-primary flex-1">確定結單</button>
+            {% endif %}
             {% if order.status.value == 'editing' %}
             <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'" class="btn btn-secondary">取消</button>

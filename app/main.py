@@ -110,6 +110,10 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "auto_remind_minutes", "INTEGER")
     add_column_if_not_exists("groups", "last_remind_at", "TIMESTAMP")
     
+    # V2.1.0 每單金額上限
+    add_column_if_not_exists("groups", "order_limit", "NUMERIC(10,2)")
+    add_column_if_not_exists("groups", "allow_over_limit", "BOOLEAN DEFAULT FALSE")
+    
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
     

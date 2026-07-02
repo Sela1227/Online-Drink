@@ -25,6 +25,10 @@ class Group(Base):
     # 外送費
     delivery_fee: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     
+    # 每單金額上限（V2.1.0）
+    order_limit: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # 每單上限，NULL=不限
+    allow_over_limit: Mapped[bool] = mapped_column(Boolean, default=False)  # 可否超過（超過部分自行貼補）
+    
     # 飲料團設定
     default_sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     default_ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
