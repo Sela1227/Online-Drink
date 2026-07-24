@@ -108,7 +108,7 @@
             <span><i class="ti ti-cup"></i></span> 飲料
             <span class="text-sm font-normal text-sela-800/45">({{ drink_groups|length }})</span>
         </h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-2">
             {% for group in drink_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -123,7 +123,7 @@
             <span><i class="ti ti-bowl"></i></span> 餐廳
             <span class="text-sm font-normal text-sela-800/45">({{ meal_groups|length }})</span>
         </h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-2">
             {% for group in meal_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -138,7 +138,7 @@
             <span><i class="ti ti-shopping-cart"></i></span> 團購
             <span class="text-sm font-normal text-sela-800/45">({{ groupbuy_groups|length }})</span>
         </h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-2">
             {% for group in groupbuy_groups %}
             {% include "partials/group_card.html" with context %}
             {% endfor %}
@@ -177,7 +177,7 @@
         </button>
         
         <div x-show="open" x-collapse>
-            <div class="grid grid-cols-2 gap-3 mt-2 opacity-50">
+            <div class="space-y-2 mt-2 opacity-60">
                 {% for group in closed_groups %}
                 <a href="/groups/{{ group.id }}" class="bg-sela-100 rounded-2xl p-3 text-center">
                     <div class="w-14 h-14 mx-auto bg-white rounded-xl flex items-center justify-center overflow-hidden mb-2">
