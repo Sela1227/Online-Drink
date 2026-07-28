@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum, JSON, Text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import enum
 
 
@@ -41,6 +41,27 @@ class Order(Base):
         total = self.items_subtotal - (self.discount_amount or Decimal("0"))
         return total if total > 0 else Decimal("0")
     
+    @property
+    def final_amount(self) -> Decimal:
+        """套用整單折扣後的應付金額（四捨五入到元）"""
+        t = self.total_amount
+        d = self.group.discount_percent if self.group else None
+        if d and Decimal("0") < d < Decimal("100"):
+            t = (t * d / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        return t
+
+    @property
+    def company_pay(self) -> Decimal:
+        """公司補助額（有每單上限時 = min(折後, 上限)；沒設上限 = 0）"""
+        if self.group and self.group.order_limit:
+            return min(self.final_amount, self.group.order_limit)
+        return Decimal("0")
+
+    @property
+    def self_pay(self) -> Decimal:
+        """個人應自付 = 折後 − 公司補助（沒用到上限不退錢）"""
+        return self.final_amount - self.company_pay
+
     @property
     def total_quantity(self) -> int:
         return sum(item.quantity for item in self.items)

@@ -625,6 +625,8 @@ async def update_store(
     google_maps_url: str = Form(None),
     ubereats_url: str = Form(None),
     foodpanda_url: str = Form(None),
+    provides_invoice: bool = Form(False),
+    provides_receipt: bool = Form(False),
     logo_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -644,6 +646,8 @@ async def update_store(
     store.google_maps_url = google_maps_url.strip() if google_maps_url else None
     store.ubereats_url = ubereats_url.strip() if ubereats_url else None
     store.foodpanda_url = foodpanda_url.strip() if foodpanda_url else None
+    store.provides_invoice = provides_invoice
+    store.provides_receipt = provides_receipt
     
     # 分類修改 - 使用 raw SQL 直接用大寫值
     category_map = {

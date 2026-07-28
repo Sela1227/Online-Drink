@@ -143,6 +143,23 @@
                 <span class="ml-auto text-xs text-sela-800/45">{% if group.submitted_count > 0 %}每人 ${{ group.delivery_fee_per_person|int }}（{{ group.submitted_count }} 人）{% else %}結單後分攤{% endif %}</span>
             </div>
             {% endif %}
+            <!-- 整單折扣 -->
+            {% if group.discount_percent and group.discount_percent < 100 %}
+            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
+                <i class="ti ti-discount text-sela-800/50"></i>
+                <span class="text-sela-800/50 w-14 flex-shrink-0">折扣</span>
+                <span class="font-medium text-sela-800">全單 {{ group.discount_percent|int }} 折</span>
+                <span class="ml-auto text-xs text-sela-800/45">結帳金額自動重算</span>
+            </div>
+            {% endif %}
+            <!-- 單據 -->
+            {% if store.provides_invoice or store.provides_receipt %}
+            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
+                <i class="ti ti-receipt text-sela-800/50"></i>
+                <span class="text-sela-800/50 w-14 flex-shrink-0">單據</span>
+                <span class="text-sela-800">可開{% if store.provides_invoice %}發票{% endif %}{% if store.provides_invoice and store.provides_receipt %}、{% endif %}{% if store.provides_receipt %}收據{% endif %}</span>
+            </div>
+            {% endif %}
             <!-- 湊團 -->
             {% if group.min_members %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
@@ -292,6 +309,16 @@
                                     <input type="checkbox" name="allow_over_limit" value="true" class="rounded border-sela-300"
                                            {% if group.allow_over_limit %}checked{% endif %}> 允許超過（自行貼補）
                                 </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-sela-800/70 mb-1">整單折扣</label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" name="discount_percent" min="1" max="99" step="1"
+                                       value="{{ group.discount_percent|int if group.discount_percent else '' }}"
+                                       placeholder="無"
+                                       class="w-20 border rounded px-3 py-2 text-sm">
+                                <span class="text-sm text-sela-800/60">折（例：95 = 全單 95 折，留空 = 無）</span>
                             </div>
                         </div>
                         <div>

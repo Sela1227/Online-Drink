@@ -102,58 +102,68 @@ def generate_order_text(db: Session, group: Group) -> str:
 
 
 def generate_payment_text(db: Session, group: Group) -> str:
-    """產生收款文字（個人點餐明細）"""
+    """產生收款文字（個人結帳明細：自動計算折扣、公司補助、個人自付）"""
     from decimal import Decimal
-    
+
     lines = []
-    
-    # 取得所有訂單
+
     orders = db.query(Order).filter(Order.group_id == group.id).all()
-    
-    subtotal = Decimal("0")
+
+    subtotal = Decimal("0")        # 原價小計
+    final_total = Decimal("0")     # 折後小計
+    company_total = Decimal("0")   # 公司補助合計
+    self_total = Decimal("0")      # 個人自付合計
     submitted_orders = []
     pending_users = []
-    
+
     for order in orders:
         if order.status == OrderStatus.SUBMITTED:
             submitted_orders.append(order)
             subtotal += order.total_amount
+            final_total += order.final_amount
+            company_total += order.company_pay
+            self_total += order.self_pay
         else:
             pending_users.append(order.user.show_name)
-    
-    # 外送費分攤計算
+
+    # 外送費分攤
     delivery_fee = group.delivery_fee or Decimal("0")
     delivery_per_person = Decimal("0")
     if delivery_fee > 0 and len(submitted_orders) > 0:
         delivery_per_person = (delivery_fee / len(submitted_orders)).quantize(Decimal("1"))
-    
-    total_amount = subtotal + delivery_fee
-    
-    # 標題和總金額（先顯示）
+
+    has_discount = bool(group.discount_percent and Decimal("0") < group.discount_percent < Decimal("100"))
+    has_limit = bool(group.order_limit)
+
+    # ── 標題與總覽 ──
     lines.append(f"【{group.name}】收款明細")
     lines.append(f"店家：{group.store.name}")
+    docs = []
+    if group.store.provides_invoice: docs.append("發票")
+    if group.store.provides_receipt: docs.append("收據")
+    if docs:
+        lines.append(f"單據：可開{('、'.join(docs))}")
     lines.append("")
-    lines.append(f"💰 餐點小計：${subtotal}")
+    lines.append(f"餐點小計：${subtotal}")
+    if has_discount:
+        lines.append(f"整單折扣：{group.discount_percent.normalize()} 折 → 折後 ${final_total}")
+    if has_limit:
+        lines.append(f"公司補助：每單上限 ${int(group.order_limit)}，合計 ${company_total}")
     if delivery_fee > 0:
-        lines.append(f"🚗 外送費：${delivery_fee}（每人 ${delivery_per_person}）")
-        lines.append(f"💰 總金額：${total_amount}")
-    lines.append(f"👥 {len(submitted_orders)} 人已結單")
+        lines.append(f"外送費：${delivery_fee}（每人 ${delivery_per_person}）")
+    lines.append(f"應向個人收：${self_total + delivery_fee}")
+    lines.append(f"{len(submitted_orders)} 人已結單")
     lines.append("")
     lines.append("=" * 30)
     lines.append("")
-    
-    # 每個人的細項
+
+    # ── 每人明細 ──
     for order in sorted(submitted_orders, key=lambda x: x.user.show_name):
         user_name = order.user.show_name
-        order_amount = order.total_amount
-        total_with_delivery = order_amount + delivery_per_person
-        
-        if delivery_fee > 0:
-            lines.append(f"☐ {user_name}：${total_with_delivery}（餐 ${order_amount} + 運 ${delivery_per_person}）")
-        else:
-            lines.append(f"☐ {user_name}：${order_amount}")
-        
-        # 顯示點餐細項
+        pay = order.self_pay + delivery_per_person
+
+        lines.append(f"☐ {user_name}：${pay}")
+
         for item in order.items:
             item_desc = item.item_name
             if item.size:
@@ -163,16 +173,23 @@ def generate_payment_text(db: Session, group: Group) -> str:
             if item.quantity > 1:
                 item_desc += f" x{item.quantity}"
             lines.append(f"   - {item_desc} ${item.subtotal}")
-        # 折扣行（有折扣才顯示）
         if order.discount_amount and order.discount_amount > 0:
             note = f"（{order.discount_note}）" if order.discount_note else ""
             lines.append(f"   - 折扣{note} -${order.discount_amount}")
+        # 結算行（有折扣或補助才逐項顯示計算過程）
+        if has_discount:
+            lines.append(f"   原價 ${order.total_amount} → 折後 ${order.final_amount}")
+        if has_limit:
+            if order.company_pay > 0:
+                lines.append(f"   公司補助 -${order.company_pay}")
+            lines.append(f"   應自付 ${order.self_pay}" + (f" + 運 ${delivery_per_person}" if delivery_per_person > 0 else ""))
+        elif delivery_per_person > 0:
+            lines.append(f"   餐 ${order.final_amount} + 運 ${delivery_per_person}")
         lines.append("")
-    
-    # 未結單
+
     if pending_users:
         lines.append("【尚未結單】")
         for user_name in sorted(pending_users):
-            lines.append(f"⚠️ {user_name}")
-    
+            lines.append(f"- {user_name}")
+
     return "\n".join(lines)

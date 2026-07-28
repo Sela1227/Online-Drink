@@ -9,6 +9,12 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800">{{ store.name }}</h1>
+                {% if store.provides_invoice or store.provides_receipt %}
+                <div class="flex gap-1.5 mt-1">
+                    {% if store.provides_invoice %}<span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded-full"><i class="ti ti-receipt"></i> 可開發票</span>{% endif %}
+                    {% if store.provides_receipt %}<span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded-full"><i class="ti ti-file-text"></i> 可開收據</span>{% endif %}
+                </div>
+                {% endif %}
         
     </div>
     

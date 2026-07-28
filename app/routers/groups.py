@@ -758,6 +758,7 @@ async def edit_group(
     delivery_fee: float = Form(None),
     order_limit: float = Form(None),
     allow_over_limit: bool = Form(False),
+    discount_percent: float = Form(None),
     db: Session = Depends(get_db),
 ):
     """編輯團單"""
@@ -784,6 +785,9 @@ async def edit_group(
     # 更新每單上限
     group.order_limit = Decimal(str(order_limit)) if order_limit and order_limit > 0 else None
     group.allow_over_limit = allow_over_limit
+    
+    # 整單折扣（1-99 有效，其餘=無折扣）
+    group.discount_percent = Decimal(str(int(discount_percent))) if discount_percent and 0 < discount_percent < 100 else None
     
     # 更新截止時間
     if deadline:

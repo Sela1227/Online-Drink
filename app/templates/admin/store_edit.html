@@ -79,6 +79,22 @@
                     <input type="text" name="address" value="{{ store.address or '' }}" placeholder="台北市..."
                            class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-sela-800 mb-2">可開立單據</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="provides_invoice" value="true" class="rounded border-sela-300"
+                                   {% if store.provides_invoice %}checked{% endif %}>
+                            <span class="text-sm text-sela-800">發票</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="provides_receipt" value="true" class="rounded border-sela-300"
+                                   {% if store.provides_receipt %}checked{% endif %}>
+                            <span class="text-sm text-sela-800">收據</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-sela-800/50 mt-1">會顯示在團單資訊與收款明細，方便報帳</p>
+                </div>
             </div>
             
             <!-- 連結 -->

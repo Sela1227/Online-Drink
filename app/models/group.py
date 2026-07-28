@@ -29,6 +29,9 @@ class Group(Base):
     order_limit: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # 每單上限，NULL=不限
     allow_over_limit: Mapped[bool] = mapped_column(Boolean, default=False)  # 可否超過（超過部分自行貼補）
     
+    # 整單折扣（V2.3.0）例：95 = 全單 95 折，NULL/100 = 無折扣
+    discount_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    
     # 飲料團設定
     default_sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     default_ice: Mapped[str | None] = mapped_column(String(50), nullable=True)

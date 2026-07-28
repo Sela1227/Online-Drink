@@ -50,7 +50,8 @@
 
     <!-- 結帳列（購物車內自動釘底）-->
     <div class="order-actions">
-        {% set over = (order.total_amount - group.order_limit) if group.order_limit and order.total_amount > group.order_limit else 0 %}
+        {% set has_discount = group.discount_percent and group.discount_percent < 100 %}
+        {% set over = order.self_pay if group.order_limit and order.self_pay > 0 else 0 %}
         {% if over > 0 %}
         {% if group.allow_over_limit %}
         <div class="mb-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
@@ -63,8 +64,11 @@
         {% endif %}
         {% endif %}
         <div class="flex items-center justify-between mb-2.5">
-            <span class="text-sela-700/70">合計</span>
-            <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.total_amount }}</span>
+            <span class="text-sela-700/70">合計{% if has_discount %}<span class="text-xs">（{{ group.discount_percent|int }} 折後）</span>{% endif %}</span>
+            <span class="text-right">
+                {% if has_discount %}<span class="text-sm text-sela-800/40 line-through mr-1.5">${{ order.total_amount }}</span>{% endif %}
+                <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount }}</span>
+            </span>
         </div>
         {% if is_open %}
         <div class="flex gap-2">

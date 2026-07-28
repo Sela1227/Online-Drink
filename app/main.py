@@ -114,6 +114,11 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "order_limit", "NUMERIC(10,2)")
     add_column_if_not_exists("groups", "allow_over_limit", "BOOLEAN DEFAULT FALSE")
     
+    # V2.3.0 整單折扣 + 店家單據
+    add_column_if_not_exists("groups", "discount_percent", "NUMERIC(5,2)")
+    add_column_if_not_exists("stores", "provides_invoice", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("stores", "provides_receipt", "BOOLEAN DEFAULT FALSE")
+    
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
     
