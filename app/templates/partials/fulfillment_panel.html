@@ -1,0 +1,72 @@
+{# 缺貨處理面板（團主/管理員・htmx 自刷新）#}
+{% if not item_groups %}
+<div class="text-center py-8 text-sela-800/45 text-sm">尚無已結單品項</div>
+{% else %}
+<p class="text-xs text-sela-800/55 mb-3">店家說什麼缺貨，就展開那個品項，逐人選用候補或標記缺貨不出。補退金額已含折扣與補助效果。</p>
+<div class="space-y-2">
+    {% for g in item_groups %}
+    {% set changed = g.entries | selectattr('item.fulfillment') | list | length %}
+    <details class="border border-sela-100 rounded-xl" {% if changed > 0 %}open{% endif %}>
+        <summary class="px-3 py-2.5 cursor-pointer text-sm font-medium text-sela-800 flex items-center gap-2">
+            {{ g.label }}
+            <span class="text-xs text-sela-800/45 font-normal">{{ g.entries | length }} 人</span>
+            {% if changed > 0 %}<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full ml-auto">{{ changed }} 筆已處理</span>{% endif %}
+        </summary>
+        <div class="px-3 pb-2 divide-y divide-sela-100">
+            {% for e in g.entries %}
+            {% set item = e.item %}{% set order = e.order %}
+            <div class="py-2.5">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="font-medium text-sela-800">{{ order.user.show_name }}</span>
+                    <span class="text-sela-800/50 text-xs">x{{ item.quantity }}・${{ item.subtotal|int }}</span>
+                    {% if item.sugar or item.ice %}<span class="text-sela-800/45 text-xs">{{ item.sugar or '' }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice or '' }}</span>{% endif %}
+                </div>
+
+                {% if not item.fulfillment %}
+                <div class="flex flex-wrap gap-1.5 mt-1.5">
+                    {% for b in item.backups %}
+                    {% set bdiff = (b.unit_price - (item.subtotal / item.quantity)) * item.quantity %}
+                    <button hx-post="/groups/{{ group.id }}/fulfillment/{{ item.id }}"
+                            hx-vals='{"action": "backup", "backup_id": {{ b.id }}}'
+                            hx-target="#fulfillment-content" hx-swap="innerHTML"
+                            class="text-xs bg-sela-50 border border-sela-200 text-sela-800 rounded-full px-2.5 py-1.5 active:bg-sela-100">
+                        換候補{{ b.priority }} {{ b.item_name }}
+                        {% if bdiff > 0 %}<span class="text-amber-600">+${{ bdiff|int }}</span>{% elif bdiff < 0 %}<span class="text-green-600">-${{ (0 - bdiff)|int }}</span>{% endif %}
+                    </button>
+                    {% endfor %}
+                    {% if not item.backups %}<span class="text-xs text-sela-800/40 py-1.5">（未填候補）</span>{% endif %}
+                    <button hx-post="/groups/{{ group.id }}/fulfillment/{{ item.id }}"
+                            hx-vals='{"action": "unavailable"}' hx-confirm="標記「缺貨不出」？此品項將不收費。"
+                            hx-target="#fulfillment-content" hx-swap="innerHTML"
+                            class="text-xs text-red-600 border border-red-200 rounded-full px-2.5 py-1.5 active:bg-red-50">缺貨不出</button>
+                </div>
+                {% else %}
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    {% if item.fulfillment == 'substituted' and item.fulfilled_backup %}
+                    <span class="text-xs bg-green-100 text-green-700 rounded-full px-2.5 py-1"><i class="ti ti-replace"></i> 已換候補{{ item.fulfilled_backup.priority }}：{{ item.fulfilled_backup.item_name }}</span>
+                    {% else %}
+                    <span class="text-xs bg-sela-100 text-sela-800/70 rounded-full px-2.5 py-1"><i class="ti ti-x"></i> 缺貨不出</span>
+                    {% endif %}
+                    {% set d = order.settle_diff %}
+                    {% if d > 0 %}<span class="text-xs text-amber-700 font-medium">此人需補 ${{ d|int }}</span>
+                    {% elif d < 0 %}<span class="text-xs text-green-700 font-medium">此人需退 ${{ (0 - d)|int }}</span>
+                    {% else %}<span class="text-xs text-sela-800/45">補退 $0</span>{% endif %}
+                    <button hx-post="/groups/{{ group.id }}/fulfillment/{{ item.id }}"
+                            hx-vals='{"action": "toggle_settled"}'
+                            hx-target="#fulfillment-content" hx-swap="innerHTML"
+                            class="text-xs rounded-full px-2.5 py-1.5 border {% if item.diff_settled %}bg-green-50 border-green-300 text-green-700{% else %}border-sela-300 text-sela-800/60 active:bg-sela-50{% endif %}">
+                        {% if item.diff_settled %}<i class="ti ti-check"></i> 已結清{% else %}未結清{% endif %}
+                    </button>
+                    <button hx-post="/groups/{{ group.id }}/fulfillment/{{ item.id }}"
+                            hx-vals='{"action": "reset"}'
+                            hx-target="#fulfillment-content" hx-swap="innerHTML"
+                            class="text-xs text-sela-800/45 underline px-1.5 py-1.5 ml-auto">還原</button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% endif %}

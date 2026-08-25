@@ -375,6 +375,92 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     })
 
 
+@router.get("/{group_id}/fulfillment")
+async def fulfillment_panel(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """缺貨處理面板（團主/管理員）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    
+    from app.models.order import OrderItem as OI
+    orders = db.query(Order).filter(
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).options(
+        joinedload(Order.items).joinedload(OI.backups),
+        joinedload(Order.user),
+    ).all()
+    
+    # 依「品項名(尺寸)」分組，店家說什麼缺貨就找那一組
+    groups_map = {}
+    for o in orders:
+        for it in o.items:
+            label = it.item_name + (f"（{it.size}）" if it.size else "")
+            groups_map.setdefault(label, []).append({"order": o, "item": it})
+    item_groups = [{"label": k, "entries": v} for k, v in sorted(groups_map.items())]
+    
+    return templates.TemplateResponse("partials/fulfillment_panel.html", {
+        "request": request,
+        "group": group,
+        "item_groups": item_groups,
+    })
+
+
+@router.post("/{group_id}/fulfillment/{item_id}")
+async def fulfillment_action(
+    group_id: int,
+    item_id: int,
+    request: Request,
+    action: str = Form(...),
+    backup_id: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    """缺貨處理動作：backup=換候補 / unavailable=缺貨不出 / reset=還原 / toggle_settled=補退結清切換"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    
+    from app.models.order import OrderItem as OI
+    item = db.query(OI).join(Order).filter(
+        OI.id == item_id,
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在或未結單")
+    
+    if action == "backup":
+        backup = next((b for b in item.backups if b.id == backup_id), None)
+        if not backup:
+            raise HTTPException(status_code=400, detail="候補不存在或不屬於此品項")
+        item.fulfillment = "substituted"
+        item.fulfilled_backup_id = backup.id
+        item.diff_settled = False
+    elif action == "unavailable":
+        item.fulfillment = "unavailable"
+        item.fulfilled_backup_id = None
+        item.diff_settled = False
+    elif action == "reset":
+        item.fulfillment = None
+        item.fulfilled_backup_id = None
+        item.diff_settled = False
+    elif action == "toggle_settled":
+        if not item.fulfillment:
+            raise HTTPException(status_code=400, detail="此品項無換貨紀錄")
+        item.diff_settled = not item.diff_settled
+    else:
+        raise HTTPException(status_code=400, detail="未知動作")
+    
+    db.commit()
+    return await fulfillment_panel(group_id, request, db)
+
+
 @router.post("/{group_id}/close")
 async def close_group(group_id: int, request: Request, db: Session = Depends(get_db)):
     """提前截止團單"""

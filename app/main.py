@@ -123,6 +123,11 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "enable_backup", "BOOLEAN DEFAULT FALSE")
     add_column_if_not_exists("groups", "backup_count", "INTEGER DEFAULT 2")
     
+    # V2.5.0 缺貨處理
+    add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
+    add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")
+    add_column_if_not_exists("order_items", "diff_settled", "BOOLEAN DEFAULT FALSE")
+    
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
     

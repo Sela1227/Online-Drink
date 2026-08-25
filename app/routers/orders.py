@@ -130,10 +130,13 @@ async def add_item(
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     
-    # 取得菜單品項
-    menu_item = db.query(MenuItem).filter(MenuItem.id == menu_item_id).first()
+    # 取得菜單品項（必須屬於本團菜單，防跨店/舊菜單注入）
+    menu_item = db.query(MenuItem).filter(
+        MenuItem.id == menu_item_id,
+        MenuItem.menu_id == group.menu_id,
+    ).first()
     if not menu_item:
-        raise HTTPException(status_code=404, detail="品項不存在")
+        raise HTTPException(status_code=404, detail="品項不存在或不屬於本團菜單")
     
     # 決定單價（根據尺寸）
     if size == 'L' and menu_item.price_l:
@@ -143,12 +146,20 @@ async def add_item(
         if not menu_item.price_l:
             size = None  # 沒有 L 價格就不記錄尺寸
     
+    # 數量驗證（後端防異常值）
+    if not backup_for and not (1 <= quantity <= 99):
+        raise HTTPException(status_code=400, detail="數量需為 1-99")
+    
     # ── 缺貨候補分支（V2.4.0 資訊型）──
     if backup_for:
         from app.models.order import OrderItemBackup
         from app.models.store import StoreTopping
+        try:
+            backup_for_id = int(backup_for)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="候補目標格式錯誤")
         target = db.query(OrderItem).join(Order).filter(
-            OrderItem.id == int(backup_for),
+            OrderItem.id == backup_for_id,
             Order.user_id == user.id,
             Order.group_id == group_id,
         ).first()
@@ -165,15 +176,23 @@ async def add_item(
         full_unit = Decimal(str(unit_price))
         extras = []
         for option_id in options:
-            option = db.query(ItemOption).filter(ItemOption.id == option_id).first()
-            if option:
-                full_unit += option.price_diff
-                extras.append(option.name)
+            option = db.query(ItemOption).filter(
+                ItemOption.id == option_id,
+                ItemOption.menu_item_id == menu_item.id,
+            ).first()
+            if not option:
+                raise HTTPException(status_code=400, detail="加購選項不存在或不屬於此品項")
+            full_unit += option.price_diff
+            extras.append(option.name)
         for topping_id in toppings:
-            topping = db.query(StoreTopping).filter(StoreTopping.id == topping_id).first()
-            if topping:
-                full_unit += topping.price
-                extras.append("+" + topping.name)
+            topping = db.query(StoreTopping).filter(
+                StoreTopping.id == topping_id,
+                StoreTopping.store_id == group.store_id,
+            ).first()
+            if not topping:
+                raise HTTPException(status_code=400, detail="加料不存在或不屬於此店家")
+            full_unit += topping.price
+            extras.append("+" + topping.name)
         
         db.add(OrderItemBackup(
             order_item_id=target.id,
@@ -246,30 +265,38 @@ async def add_item(
         db.add(order_item)
         db.flush()
         
-        # 加入選項
+        # 加入選項（驗證歸屬，不合法即拒絕）
         for option_id in options:
-            option = db.query(ItemOption).filter(ItemOption.id == option_id).first()
-            if option:
-                order_item_option = OrderItemOption(
-                    order_item_id=order_item.id,
-                    item_option_id=option_id,
-                    option_name=option.name,
-                    price_diff=option.price_diff,
-                )
-                db.add(order_item_option)
+            option = db.query(ItemOption).filter(
+                ItemOption.id == option_id,
+                ItemOption.menu_item_id == menu_item.id,
+            ).first()
+            if not option:
+                raise HTTPException(status_code=400, detail="加購選項不存在或不屬於此品項")
+            order_item_option = OrderItemOption(
+                order_item_id=order_item.id,
+                item_option_id=option_id,
+                option_name=option.name,
+                price_diff=option.price_diff,
+            )
+            db.add(order_item_option)
         
-        # 加入加料
+        # 加入加料（驗證歸屬，不合法即拒絕）
         from app.models.store import StoreTopping
         for topping_id in toppings:
-            topping = db.query(StoreTopping).filter(StoreTopping.id == topping_id).first()
-            if topping:
-                order_item_topping = OrderItemTopping(
-                    order_item_id=order_item.id,
-                    store_topping_id=topping_id,
-                    topping_name=topping.name,
-                    price=topping.price,
-                )
-                db.add(order_item_topping)
+            topping = db.query(StoreTopping).filter(
+                StoreTopping.id == topping_id,
+                StoreTopping.store_id == group.store_id,
+            ).first()
+            if not topping:
+                raise HTTPException(status_code=400, detail="加料不存在或不屬於此店家")
+            order_item_topping = OrderItemTopping(
+                order_item_id=order_item.id,
+                store_topping_id=topping_id,
+                topping_name=topping.name,
+                price=topping.price,
+            )
+            db.add(order_item_topping)
     
     db.commit()
     
@@ -496,6 +523,27 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
                     }
                     for opt in item.selected_options
                 ],
+                "toppings": [
+                    {
+                        "store_topping_id": t.store_topping_id,
+                        "topping_name": t.topping_name,
+                        "price": str(t.price),
+                    }
+                    for t in item.selected_toppings
+                ],
+                "backups": [
+                    {
+                        "priority": b.priority,
+                        "menu_item_id": b.menu_item_id,
+                        "item_name": b.item_name,
+                        "size": b.size,
+                        "sugar": b.sugar,
+                        "ice": b.ice,
+                        "extras_text": b.extras_text,
+                        "unit_price": str(b.unit_price),
+                    }
+                    for b in item.backups
+                ],
             }
             for item in order.items
         ]
@@ -567,6 +615,30 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
                 price_diff=Decimal(opt_data["price_diff"]),
             )
             db.add(order_item_option)
+        
+        # 還原加料（V2.4.1 修：舊版快照漏存導致取消修改後加料遺失）
+        for t_data in item_data.get("toppings", []):
+            db.add(OrderItemTopping(
+                order_item_id=order_item.id,
+                store_topping_id=t_data["store_topping_id"],
+                topping_name=t_data["topping_name"],
+                price=Decimal(t_data["price"]),
+            ))
+        
+        # 還原候補（V2.4.1 修）
+        from app.models.order import OrderItemBackup
+        for b_data in item_data.get("backups", []):
+            db.add(OrderItemBackup(
+                order_item_id=order_item.id,
+                priority=b_data["priority"],
+                menu_item_id=b_data.get("menu_item_id"),
+                item_name=b_data["item_name"],
+                size=b_data.get("size"),
+                sugar=b_data.get("sugar"),
+                ice=b_data.get("ice"),
+                extras_text=b_data.get("extras_text"),
+                unit_price=Decimal(b_data["unit_price"]),
+            ))
     
     order.status = OrderStatus.SUBMITTED
     order.snapshot = None
@@ -626,17 +698,21 @@ async def follow_item(
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     
-    # 取得要跟的品項
-    source_item = db.query(OrderItem).filter(OrderItem.id == item_id).first()
+    # 取得要跟的品項（V2.4.1 修：限本團、已結單的品項，防跨團複製）
+    source_item = db.query(OrderItem).join(Order).filter(
+        OrderItem.id == item_id,
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).first()
     if not source_item:
-        raise HTTPException(status_code=404, detail="品項不存在")
+        raise HTTPException(status_code=404, detail="品項不存在或不屬於本團")
     
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
     
-    # 如果已結單，自動進入編輯模式
+    # V2.4.1 修：已結單不再靜默改狀態（原本偷偷進 EDITING 且無快照，取消修改會壞）
     if order.status == OrderStatus.SUBMITTED:
-        order.status = OrderStatus.EDITING
+        raise HTTPException(status_code=400, detail="請先在「我的訂單」按修改訂單，再跟點")
     
     # 複製品項
     order_item = OrderItem(
@@ -691,8 +767,8 @@ async def follow_item(
 
 
 @router.post("/groups/{group_id}/orders/copy-last")
-async def copy_last_order(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """複製上次訂單到購物車"""
+async def copy_last_order(group_id: int, request: Request, mode: str = Form("replace"), db: Session = Depends(get_db)):
+    """複製上次訂單到購物車（mode: replace=取代現有 / append=加入保留現有）"""
     from fastapi.responses import RedirectResponse
     from app.models.store import Store, StoreTopping
     
@@ -724,13 +800,18 @@ async def copy_last_order(group_id: int, request: Request, db: Session = Depends
     # 取得或建立當前訂單
     order = get_or_create_order(db, group_id, user.id)
     
-    # 清空現有品項
-    for item in order.items:
-        for opt in item.selected_options:
-            db.delete(opt)
-        for topping in item.selected_toppings:
-            db.delete(topping)
-        db.delete(item)
+    # V2.6.0 修：已送出的訂單不可被複製覆蓋（原本會靜默清空已送出內容）
+    if order.status == OrderStatus.SUBMITTED:
+        raise HTTPException(status_code=400, detail="訂單已送出，請先按「修改訂單」再複製")
+    
+    # 取代模式才清空現有品項；加入模式保留
+    if mode != "append":
+        for item in order.items:
+            for opt in item.selected_options:
+                db.delete(opt)
+            for topping in item.selected_toppings:
+                db.delete(topping)
+            db.delete(item)
     
     # 複製上次訂單的品項
     for old_item in previous_order.items:

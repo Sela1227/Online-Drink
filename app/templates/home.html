@@ -19,9 +19,21 @@
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-sela-800 truncate">{{ a.group.name }}</div>
                 <div class="text-xs text-sela-800/55 truncate">{{ a.group.store_display_name }}</div>
+                {% if a.group.owner_id == user.id and a.group.is_open %}
+                <div class="flex items-center gap-2 mt-1 text-xs">
+                    <span class="text-green-600 font-medium">已送出 {{ a.group.submitted_count }}</span>
+                    {% if a.group.pending_count > 0 %}<span class="text-amber-600">{{ a.group.pending_count }} 未送出</span>{% endif %}
+                    {% if a.group.submitted_count > 0 %}<span class="text-sela-800/45">${{ a.group.total_amount|int }}</span>{% endif %}
+                    <button type="button"
+                            class="ml-auto text-sela-800 bg-sela-100 px-2 py-0.5 rounded-full active:bg-sela-200"
+                            onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard.writeText('【{{ a.group.name }}】{{ a.group.deadline.strftime('%m/%d %H:%M') }} 結單，還沒點的快來點餐：' + window.location.origin + '/groups/{{ a.group.id }}{% if a.group.pending_count > 0 %}' + '（還有 {{ a.group.pending_count }} 位點了還沒送出）{% endif %}').then(function(){ window.toast('催單文字已複製，貼到 LINE 群組吧') })">
+                        <i class="ti ti-speakerphone"></i> 催單
+                    </button>
+                </div>
+                {% endif %}
             </div>
             {% if a.status == 'submitted' %}
-            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap"><i class="ti ti-check"></i> 已結單</span>
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap"><i class="ti ti-check"></i> 已送出</span>
             {% elif a.status == 'owner' %}
             <span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full whitespace-nowrap">待點餐</span>
             {% else %}

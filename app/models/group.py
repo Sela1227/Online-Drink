@@ -104,17 +104,17 @@ class Group(Base):
     
     @property
     def delivery_fee_per_person(self) -> Decimal:
-        """每人分攤的外送費"""
+        """每人分攤的外送費（約略值，收款明細採餘數精確分配）"""
         if not self.delivery_fee or self.submitted_count == 0:
             return Decimal("0")
         return (self.delivery_fee / self.submitted_count).quantize(Decimal("1"))  # 四捨五入到整數
     
     @property
     def total_amount(self) -> Decimal:
-        """團單總金額（含外送費）"""
+        """團單總金額（含外送費）。V2.4.1 修：改用折後金額，與收款明細/請客紀錄一致"""
         from app.models.order import OrderStatus
         subtotal = sum(
-            o.total_amount for o in self.orders 
+            o.final_amount for o in self.orders 
             if o.status == OrderStatus.SUBMITTED
         )
         return subtotal + (self.delivery_fee or Decimal("0"))

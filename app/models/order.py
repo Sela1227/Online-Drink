@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum, JSON, Text, Numeric
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum, JSON, Text, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from decimal import Decimal, ROUND_HALF_UP
@@ -63,6 +63,38 @@ class Order(Base):
         return self.final_amount - self.company_pay
 
     @property
+    def has_fulfillment_changes(self) -> bool:
+        """是否有缺貨處理紀錄（換候補或缺貨未出）"""
+        return any(item.fulfillment for item in self.items)
+
+    @property
+    def actual_total_amount(self) -> Decimal:
+        """實際出貨應付（品項實際小計 − 團主折扣）"""
+        total = sum((item.actual_subtotal for item in self.items), Decimal("0")) - (self.discount_amount or Decimal("0"))
+        return total if total > 0 else Decimal("0")
+
+    @property
+    def actual_final_amount(self) -> Decimal:
+        """實際出貨套整單折扣後"""
+        t = self.actual_total_amount
+        d = self.group.discount_percent if self.group else None
+        if d and Decimal("0") < d < Decimal("100"):
+            t = (t * d / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        return t
+
+    @property
+    def actual_self_pay(self) -> Decimal:
+        """實際出貨的個人自付（同一條補助規則）"""
+        if self.group and self.group.order_limit:
+            return self.actual_final_amount - min(self.actual_final_amount, self.group.order_limit)
+        return self.actual_final_amount
+
+    @property
+    def settle_diff(self) -> Decimal:
+        """換貨後補退金額：>0 需向該員補收、<0 需退還（含折扣與補助效果）"""
+        return self.actual_self_pay - self.self_pay
+
+    @property
     def total_quantity(self) -> int:
         return sum(item.quantity for item in self.items)
 
@@ -81,6 +113,11 @@ class OrderItem(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # 缺貨處理（V2.5.0）：原訂單保留，出貨結果另記
+    fulfillment: Mapped[str | None] = mapped_column(String(20), nullable=True)  # NULL=正常 / substituted=已換候補 / unavailable=缺貨未出
+    fulfilled_backup_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 實際使用的候補 id
+    diff_settled: Mapped[bool] = mapped_column(Boolean, default=False)  # 價差補退已完成
     
     # Relationships
     order: Mapped["Order"] = relationship(back_populates="items")
@@ -102,6 +139,26 @@ class OrderItem(Base):
     @property
     def subtotal(self) -> Decimal:
         return (self.unit_price + self.options_total + self.toppings_total) * self.quantity
+    
+    @property
+    def fulfilled_backup(self):
+        """實際使用的候補（找不到回 None）"""
+        if self.fulfilled_backup_id:
+            for b in self.backups:
+                if b.id == self.fulfilled_backup_id:
+                    return b
+        return None
+    
+    @property
+    def actual_subtotal(self) -> Decimal:
+        """實際出貨小計：正常=原小計／已換候補=候補單價×數量／缺貨未出=0"""
+        if self.fulfillment == "unavailable":
+            return Decimal("0")
+        if self.fulfillment == "substituted":
+            b = self.fulfilled_backup
+            if b:
+                return b.unit_price * self.quantity
+        return self.subtotal
 
 
 class OrderItemOption(Base):

@@ -2,7 +2,7 @@
 <div class="bg-white rounded-lg shadow-sm p-4" x-data="{ expanded: false }">
     <h2 class="font-semibold text-sela-800 mb-3 flex items-center gap-2 cursor-pointer" @click="expanded = !expanded">
         <span x-text="expanded ? '▼' : '▶'" class="text-sela-800/45 text-xs"></span>
-        已結單
+        已送出
         <span class="text-sm font-normal text-sela-800/60">({{ submitted_orders|length }} 人)</span>
         <span class="text-sm font-normal text-sela-800">${{ submitted_orders|sum(attribute='total_amount') }}</span>
         {% if group.is_blind_mode and is_open %}

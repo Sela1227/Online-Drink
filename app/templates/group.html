@@ -147,7 +147,7 @@
                 <i class="ti ti-car text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">外送費</span>
                 <span class="font-medium text-sela-800">${{ group.delivery_fee|int }}</span>
-                <span class="ml-auto text-xs text-sela-800/45">{% if group.submitted_count > 0 %}每人 ${{ group.delivery_fee_per_person|int }}（{{ group.submitted_count }} 人）{% else %}結單後分攤{% endif %}</span>
+                <span class="ml-auto text-xs text-sela-800/45">{% if group.submitted_count > 0 %}每人約 ${{ group.delivery_fee_per_person|int }}（{{ group.submitted_count }} 人）{% else %}結單後分攤{% endif %}</span>
             </div>
             {% endif %}
             <!-- 整單折扣 -->
@@ -155,7 +155,7 @@
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-discount text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">折扣</span>
-                <span class="font-medium text-sela-800">全單 {{ group.discount_percent|int }} 折</span>
+                <span class="font-medium text-sela-800">全單 {{ group.discount_percent|int }}%</span>
                 <span class="ml-auto text-xs text-sela-800/45">結帳金額自動重算</span>
             </div>
             {% endif %}
@@ -199,7 +199,7 @@
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-users text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">狀況</span>
-                <span class="text-sela-800">{{ pending_count }} 人尚未送出</span>
+                <span class="text-sela-800">{{ pending_count }} 人未送出</span>
                 <button @click="showReminder = true" class="ml-auto text-xs font-medium text-sela-800 bg-sela-100 px-2.5 py-1 rounded-full active:bg-sela-200">查看名單</button>
             </div>
             {% endif %}
@@ -237,6 +237,9 @@
                     <button @click="showSettings = true" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
                         <i class="ti ti-settings text-lg"></i><span class="text-xs">修改設定</span>
                     </button>
+                    <button @click="showFulfillment = true; toolsOpen = false" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
+                        <i class="ti ti-replace text-lg"></i><span class="text-xs">缺貨處理</span>
+                    </button>
                     {% if is_open %}
                     <form action="/groups/{{ group.id }}/close" method="post"
                           onsubmit="return confirm('確定要提早結單嗎？結單後將無法再{% if group.category.value == 'group_buy' %}下單{% else %}點餐{% endif %}。')">
@@ -247,28 +250,35 @@
                     {% endif %}
                 </div>
 
-                <!-- 匯出單據（展開）-->
-                <div x-show="showExport" x-transition class="mt-2 p-3 bg-sela-50 rounded-xl">
-                    <div class="text-xs text-sela-800/60 mb-2">給店家核對：</div>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                        <a href="/groups/{{ group.id }}/export/receipt.pdf" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                            <i class="ti ti-file-text"></i> 核對單 PDF
-                        </a>
-                        <a href="/groups/{{ group.id }}/export/receipt.png" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                            <i class="ti ti-photo"></i> 核對單圖片
+                <!-- 匯出單據（依用途分組）-->
+                <div x-show="showExport" x-transition class="mt-2 p-3 bg-sela-50 rounded-xl space-y-3">
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-send"></i> 傳給店家（下單用）</div>
+                        <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
+                            <i class="ti ti-building-store"></i> 點餐彙總（含候補對照）
                         </a>
                     </div>
-                    <div class="text-xs text-sela-800/60 mb-2">其他格式：</div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-xs active:bg-sela-100">
-                            <i class="ti ti-building-store"></i> 店家明細
-                        </a>
-                        <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-xs active:bg-sela-100">
-                            <i class="ti ti-user"></i> 個人明細
-                        </a>
-                        <a href="/groups/{{ group.id }}/export/excel" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-xs active:bg-sela-100">
-                            <i class="ti ti-table"></i> Excel
-                        </a>
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-checklist"></i> 現場核對（取餐時比對）</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/groups/{{ group.id }}/export/receipt.pdf" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
+                                <i class="ti ti-file-text"></i> 核對單 PDF
+                            </a>
+                            <a href="/groups/{{ group.id }}/export/receipt.png" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
+                                <i class="ti ti-photo"></i> 核對單圖片
+                            </a>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-coin"></i> 收款與留存</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
+                                <i class="ti ti-coin"></i> 收款明細（向大家收錢）
+                            </a>
+                            <a href="/groups/{{ group.id }}/export/excel" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-sm active:bg-sela-100">
+                                <i class="ti ti-table"></i> Excel（存檔）
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -328,13 +338,13 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm text-sela-800/70 mb-1">整單折扣</label>
+                            <label class="block text-sm text-sela-800/70 mb-1">整單折扣（折後百分比）</label>
                             <div class="flex items-center gap-2">
                                 <input type="number" name="discount_percent" min="1" max="99" step="1"
                                        value="{{ group.discount_percent|int if group.discount_percent else '' }}"
                                        placeholder="無"
                                        class="w-20 border rounded px-3 py-2 text-sm">
-                                <span class="text-sm text-sela-800/60">折（例：95 = 全單 95 折，留空 = 無）</span>
+                                <span class="text-sm text-sela-800/60">%（例：95 = 九五折，付原價的 95%；留空 = 無）</span>
                             </div>
                         </div>
                         <div>
@@ -687,12 +697,26 @@
                         class="flex-1 py-2 rounded-lg border hover:bg-sela-100 text-sm">
                     取消
                 </button>
-                <form action="/groups/{{ group.id }}/orders/copy-last" method="post" class="flex-1">
+                <div x-data="{ askCopy: false }" class="flex-1 relative">
+                <form x-ref="copyForm" action="/groups/{{ group.id }}/orders/copy-last" method="post" class="w-full"
+                      @submit="if (cartCount > 0 && !askCopy) { $event.preventDefault(); askCopy = true }">
+                    <input type="hidden" name="mode" x-ref="copyMode" value="replace">
                     <button type="submit"
                             class="w-full py-2 rounded-lg bg-sela-800 active:bg-sela-900 text-white text-sm">
                         複製到購物車
                     </button>
                 </form>
+                <div x-show="askCopy" x-cloak @click.outside="askCopy = false"
+                     class="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-sela-200 rounded-xl shadow-lg p-2 space-y-1.5">
+                    <p class="text-xs text-sela-800/60 px-1">購物車已有品項，要怎麼複製？</p>
+                    <button type="button" @click="$refs.copyMode.value='replace'; askCopy=false; $refs.copyForm.submit()"
+                            class="w-full text-left text-sm px-3 py-2 rounded-lg bg-sela-50 text-sela-800 active:bg-sela-100">取代目前購物車</button>
+                    <button type="button" @click="$refs.copyMode.value='append'; askCopy=false; $refs.copyForm.submit()"
+                            class="w-full text-left text-sm px-3 py-2 rounded-lg bg-sela-50 text-sela-800 active:bg-sela-100">加入（保留現有品項）</button>
+                    <button type="button" @click="askCopy = false"
+                            class="w-full text-left text-sm px-3 py-2 rounded-lg text-sela-800/55 active:bg-sela-50">取消</button>
+                </div>
+                </div>
             </div>
         </div>
     </div>
@@ -791,6 +815,27 @@
         </button>
     </div>
     
+    {% if is_owner or is_admin %}
+    <!-- 缺貨處理視窗（團主/管理員）-->
+    <div x-show="showFulfillment" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" @click="showFulfillment = false"></div>
+        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[88vh]"
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
+            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
+            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-replace"></i> 缺貨處理</h3>
+                <button @click="showFulfillment = false" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
+                    <i class="ti ti-x" style="font-size:20px;"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" id="fulfillment-content"
+                 hx-get="/groups/{{ group.id }}/fulfillment" hx-trigger="load, orderUpdated from:body" hx-swap="innerHTML">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 購物車（底部 sheet・只有未結單時使用）-->
     <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
         <div class="absolute inset-0 bg-black/40" @click="showCart = false"
@@ -1029,6 +1074,7 @@ function orderPage() {
         quantity: 1,
         extraToppings: 0,
         backupMode: null,
+        showFulfillment: false,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
         orderStatus: '{{ my_order.status.value if my_order else "none" }}',
         showRandom: false,
@@ -1054,7 +1100,7 @@ function orderPage() {
         async openAddItem(item) {
             // 如果已結單，先問是否要加點
             if (this.orderStatus === 'submitted') {
-                if (!confirm('您已結單，是否要加點？\n\n選「確定」將修改訂單並加點\n選「取消」則不加點')) {
+                if (!confirm('您已送出訂單，是否要加點？\n\n選「確定」將修改訂單並加點\n選「取消」則不加點')) {
                     return;
                 }
                 // 先調用修改訂單 API

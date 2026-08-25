@@ -3,9 +3,9 @@
         我的訂單
         {% if order %}
         {% if order.status.value == 'submitted' %}
-        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已結單</span>
+        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已送出</span>
         {% elif order.status.value == 'editing' %}
-        <span class="text-xs bg-sela-200 text-sela-800 px-2 py-0.5 rounded-full">修改中</span>
+        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
         {% endif %}
         {% endif %}
     </h2>
@@ -17,7 +17,13 @@
         <div class="py-2.5 border-b border-sela-100 last:border-b-0" data-item-id="{{ item.id }}">
             <div class="flex items-start gap-2">
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-sela-800">{{ item.item_name }}{% if item.size %}（{{ item.size }}）{% endif %}</div>
+                    <div class="font-medium text-sela-800 {% if item.fulfillment == 'unavailable' %}line-through text-sela-800/40{% endif %}">{{ item.item_name }}{% if item.size %}（{{ item.size }}）{% endif %}
+                        {% if item.fulfillment == 'substituted' and item.fulfilled_backup %}
+                        <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-normal"><i class="ti ti-replace"></i> 已換：{{ item.fulfilled_backup.item_name }}</span>
+                        {% elif item.fulfillment == 'unavailable' %}
+                        <span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal no-underline" style="text-decoration:none;display:inline-block;">缺貨未出</span>
+                        {% endif %}
+                    </div>
                     <div class="text-sm text-sela-700/60 mt-0.5">
                         {% if item.sugar or item.ice %}{{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }}{% endif %}
                         {% for opt in item.selected_options %}<span class="text-xs bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded ml-1">{{ opt.option_name }}</span>{% endfor %}
@@ -102,19 +108,30 @@
         {% endif %}
         {% endif %}
         <div class="flex items-center justify-between mb-2.5">
-            <span class="text-sela-700/70">合計{% if has_discount %}<span class="text-xs">（{{ group.discount_percent|int }} 折後）</span>{% endif %}</span>
+            <span class="text-sela-700/70">合計{% if has_discount %}<span class="text-xs">（全單 {{ group.discount_percent|int }}%）</span>{% endif %}</span>
             <span class="text-right">
                 {% if has_discount %}<span class="text-sm text-sela-800/40 line-through mr-1.5">${{ order.total_amount }}</span>{% endif %}
                 <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount }}</span>
             </span>
         </div>
+        {% if order.has_fulfillment_changes %}
+        {% set sd = order.settle_diff %}
+        <div class="mb-2.5 p-2.5 bg-sela-50 border border-sela-100 rounded-xl text-sm text-sela-800">
+            <i class="ti ti-replace"></i> 換貨後實際金額 ${{ order.actual_final_amount }}
+            {% if sd > 0 %}・<span class="font-bold text-amber-700">需補 ${{ sd|int }}</span>
+            {% elif sd < 0 %}・<span class="font-bold text-green-700">需退 ${{ (0 - sd)|int }}</span>
+            {% else %}・補退 $0{% endif %}
+        </div>
+        {% endif %}
         {% if is_open %}
         <div class="flex gap-2">
             {% if order.status.value == 'draft' or order.status.value == 'editing' %}
             {% if over > 0 and not group.allow_over_limit %}
             <button type="button" disabled class="btn btn-primary flex-1">超過上限，請調整</button>
             {% else %}
+            {% set bkn = order.items | selectattr('backups') | list | length %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
+                    hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
                     class="btn btn-primary flex-1">確定結單</button>
             {% endif %}

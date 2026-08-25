@@ -53,7 +53,7 @@
                         </div>
                         <div class="text-xs text-sela-800/45">
                             {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
-                            ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已結單
+                            ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已送出
                         </div>
                     </div>
                 </a>
