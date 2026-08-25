@@ -113,9 +113,10 @@ async def add_item(
     note: str = Form(None),
     options: list[int] = Form(default=[]),
     toppings: list[int] = Form(default=[]),
+    backup_for: str = Form(None),
     db: Session = Depends(get_db),
 ):
-    """加入品項"""
+    """加入品項（backup_for 有值時＝為該訂單品項新增缺貨候補）"""
     import logging
     logger = logging.getLogger("orders")
     
@@ -141,6 +142,62 @@ async def add_item(
         unit_price = menu_item.price
         if not menu_item.price_l:
             size = None  # 沒有 L 價格就不記錄尺寸
+    
+    # ── 缺貨候補分支（V2.4.0 資訊型）──
+    if backup_for:
+        from app.models.order import OrderItemBackup
+        from app.models.store import StoreTopping
+        target = db.query(OrderItem).join(Order).filter(
+            OrderItem.id == int(backup_for),
+            Order.user_id == user.id,
+            Order.group_id == group_id,
+        ).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="找不到要加候補的品項")
+        if target.order.status == OrderStatus.SUBMITTED:
+            raise HTTPException(status_code=400, detail="請先進入修改模式")
+        if not group.enable_backup:
+            raise HTTPException(status_code=400, detail="此團未開啟候補")
+        if len(target.backups) >= (group.backup_count or 1):
+            raise HTTPException(status_code=400, detail="候補已達上限")
+        
+        # 每份總價 = 尺寸單價 + 加購 + 加料（快照）
+        full_unit = Decimal(str(unit_price))
+        extras = []
+        for option_id in options:
+            option = db.query(ItemOption).filter(ItemOption.id == option_id).first()
+            if option:
+                full_unit += option.price_diff
+                extras.append(option.name)
+        for topping_id in toppings:
+            topping = db.query(StoreTopping).filter(StoreTopping.id == topping_id).first()
+            if topping:
+                full_unit += topping.price
+                extras.append("+" + topping.name)
+        
+        db.add(OrderItemBackup(
+            order_item_id=target.id,
+            priority=len(target.backups) + 1,
+            menu_item_id=menu_item_id,
+            item_name=menu_item.name,
+            size=size,
+            sugar=sugar,
+            ice=ice,
+            extras_text=" ".join(extras) if extras else None,
+            unit_price=full_unit,
+        ))
+        db.commit()
+        
+        order = db.query(Order).filter(Order.id == target.order_id).options(
+            joinedload(Order.items).joinedload(OrderItem.selected_options),
+            joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+        ).first()
+        return templates.TemplateResponse("partials/my_order.html", {
+            "request": request,
+            "order": order,
+            "group": group,
+            "is_open": group.is_open,
+        })
     
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
@@ -223,6 +280,51 @@ async def add_item(
     ).first()
     
     # 回傳更新後的訂單
+    return templates.TemplateResponse("partials/my_order.html", {
+        "request": request,
+        "order": order,
+        "group": group,
+        "is_open": group.is_open,
+    })
+
+
+@router.delete("/orders/backups/{backup_id}")
+async def delete_backup(
+    backup_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """刪除缺貨候補（並重排順位）"""
+    from app.models.order import OrderItemBackup
+    user = await get_current_user(request, db)
+    
+    backup = db.query(OrderItemBackup).join(OrderItem).join(Order).filter(
+        OrderItemBackup.id == backup_id,
+        Order.user_id == user.id,
+    ).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="候補不存在")
+    
+    target_item = backup.order_item
+    order_id = target_item.order_id
+    if target_item.order.status == OrderStatus.SUBMITTED:
+        raise HTTPException(status_code=400, detail="請先進入修改模式")
+    group = target_item.order.group
+    
+    db.delete(backup)
+    db.flush()
+    # 重排順位 1..n
+    remaining = db.query(OrderItemBackup).filter(
+        OrderItemBackup.order_item_id == target_item.id
+    ).order_by(OrderItemBackup.priority).all()
+    for i, b in enumerate(remaining, start=1):
+        b.priority = i
+    db.commit()
+    
+    order = db.query(Order).filter(Order.id == order_id).options(
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings)
+    ).first()
     return templates.TemplateResponse("partials/my_order.html", {
         "request": request,
         "order": order,

@@ -32,6 +32,10 @@ class Group(Base):
     # 整單折扣（V2.3.0）例：95 = 全單 95 折，NULL/100 = 無折扣
     discount_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     
+    # 缺貨候補（V2.4.0）
+    enable_backup: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否開啟候補
+    backup_count: Mapped[int] = mapped_column(Integer, default=2)  # 每品項候補上限 1-3
+    
     # 飲料團設定
     default_sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     default_ice: Mapped[str | None] = mapped_column(String(50), nullable=True)

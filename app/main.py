@@ -119,6 +119,10 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("stores", "provides_invoice", "BOOLEAN DEFAULT FALSE")
     add_column_if_not_exists("stores", "provides_receipt", "BOOLEAN DEFAULT FALSE")
     
+    # V2.4.0 缺貨候補（order_item_backups 新表由 create_all 自動建立）
+    add_column_if_not_exists("groups", "enable_backup", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("groups", "backup_count", "INTEGER DEFAULT 2")
+    
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
     

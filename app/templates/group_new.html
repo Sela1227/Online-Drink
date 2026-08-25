@@ -147,6 +147,35 @@
             </label>
         </div>
         
+        <!-- 缺貨候補 -->
+        <div x-show="storeId" x-cloak x-data="{ bkOn: {% if copy_from and copy_from.enable_backup %}true{% else %}false{% endif %} }">
+            <div class="flex items-center justify-between mb-1">
+                <div>
+                    <label class="block text-sm font-medium text-sela-800/80">缺貨候補</label>
+                    <p class="text-xs text-sela-800/50">讓大家為品項填候補，臨時沒貨照候補買</p>
+                </div>
+                <label class="cursor-pointer">
+                    <input type="checkbox" name="enable_backup" value="true" class="peer hidden" @change="bkOn = $event.target.checked"
+                           {% if copy_from and copy_from.enable_backup %}checked{% endif %}>
+                    <span class="block w-11 h-6 rounded-full bg-sela-200 peer-checked:bg-sela-800 relative transition-colors
+                                 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5"></span>
+                </label>
+            </div>
+            <div x-show="bkOn" x-cloak class="flex items-center gap-2 mt-2">
+                <span class="text-sm text-sela-800/60">每個品項最多可填</span>
+                {% set bc = copy_from.backup_count if copy_from and copy_from.backup_count else 2 %}
+                <div class="flex gap-1 bg-sela-100 p-1 rounded-lg">
+                    {% for n in [1, 2, 3] %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="backup_count" value="{{ n }}" class="peer hidden" {% if bc == n %}checked{% endif %}>
+                        <span class="block px-3.5 py-1 rounded-md text-sm font-medium text-sela-800/55 peer-checked:bg-sela-800 peer-checked:text-white transition">{{ n }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <span class="text-sm text-sela-800/60">個候補</span>
+            </div>
+        </div>
+        
         <!-- 可見範圍 -->
         <div x-show="storeId" x-cloak x-data="{ isPublic: true }">
             <label class="block text-sm font-medium text-sela-800/80 mb-2">可見範圍</label>

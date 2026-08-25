@@ -83,6 +83,27 @@ def generate_order_text(db: Session, group: Group) -> str:
         total_quantity += qty
         total_amount += subtotal
     
+    # 缺貨候補對照（誰的哪個品項 → 候補什麼）
+    backup_lines = []
+    for order in orders:
+        for item in order.items:
+            if item.backups:
+                specs = []
+                for b in item.backups:
+                    spec = b.item_name
+                    if b.size:
+                        spec += f"({b.size})"
+                    if b.sugar or b.ice:
+                        spec += f" {b.sugar or ''}/{b.ice or ''}"
+                    if b.extras_text:
+                        spec += f" {b.extras_text}"
+                    specs.append(f"候補{b.priority} {spec} ${int(b.unit_price)}")
+                backup_lines.append(f"- {order.user.show_name} {item.item_name}{f'({item.size})' if item.size else ''} x{item.quantity}：{'、'.join(specs)}")
+    if backup_lines:
+        lines.append("【缺貨候補對照】沒貨時依順位改買，數量同主品項")
+        lines.extend(backup_lines)
+        lines.append("")
+    
     lines.append("=" * 30)
     lines.append(f"總杯數：{total_quantity}")
     # 店家優惠（所有人折扣加總）
@@ -173,6 +194,24 @@ def generate_payment_text(db: Session, group: Group) -> str:
             if item.quantity > 1:
                 item_desc += f" x{item.quantity}"
             lines.append(f"   - {item_desc} ${item.subtotal}")
+            # 缺貨候補（含價差提醒）
+            for b in item.backups:
+                unit_total = item.subtotal / item.quantity
+                diff = b.unit_price - unit_total
+                spec = b.item_name
+                if b.size:
+                    spec += f"({b.size})"
+                if b.sugar or b.ice:
+                    spec += f" {b.sugar or ''}/{b.ice or ''}"
+                if b.extras_text:
+                    spec += f" {b.extras_text}"
+                if diff > 0:
+                    diff_txt = f"（價差 +${int(diff)}/份 需補）"
+                elif diff < 0:
+                    diff_txt = f"（價差 -${int(-diff)}/份 需退）"
+                else:
+                    diff_txt = "（同價）"
+                lines.append(f"     候補{b.priority}: {spec} ${int(b.unit_price)}/份 {diff_txt}")
         if order.discount_amount and order.discount_amount > 0:
             note = f"（{order.discount_note}）" if order.discount_note else ""
             lines.append(f"   - 折扣{note} -${order.discount_amount}")
@@ -185,6 +224,11 @@ def generate_payment_text(db: Session, group: Group) -> str:
             lines.append(f"   應自付 ${order.self_pay}" + (f" + 運 ${delivery_per_person}" if delivery_per_person > 0 else ""))
         elif delivery_per_person > 0:
             lines.append(f"   餐 ${order.final_amount} + 運 ${delivery_per_person}")
+        lines.append("")
+
+    has_any_backup = any(b for o in submitted_orders for it in o.items for b in it.backups)
+    if has_any_backup:
+        lines.append("※ 若以候補出貨，請依價差向該員補收/退還")
         lines.append("")
 
     if pending_users:

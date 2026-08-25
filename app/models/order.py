@@ -87,6 +87,7 @@ class OrderItem(Base):
     menu_item: Mapped["MenuItem"] = relationship(back_populates="order_items")
     selected_options: Mapped[list["OrderItemOption"]] = relationship(back_populates="order_item", cascade="all, delete-orphan")
     selected_toppings: Mapped[list["OrderItemTopping"]] = relationship(back_populates="order_item", cascade="all, delete-orphan")
+    backups: Mapped[list["OrderItemBackup"]] = relationship(back_populates="order_item", cascade="all, delete-orphan", order_by="OrderItemBackup.priority")
     
     @property
     def options_total(self) -> Decimal:
@@ -134,3 +135,22 @@ class OrderItemTopping(Base):
 from app.models.group import Group
 from app.models.user import User
 from app.models.menu import MenuItem
+
+
+class OrderItemBackup(Base):
+    """缺貨候補（V2.4.0 資訊型：給團主在店裡照著換，價差人工補退）"""
+    __tablename__ = "order_item_backups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.id"))
+    priority: Mapped[int] = mapped_column(Integer, default=1)  # 順位 1-3
+    menu_item_id: Mapped[int | None] = mapped_column(ForeignKey("menu_items.id"), nullable=True)
+    item_name: Mapped[str] = mapped_column(String(100))  # 快照
+    size: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    extras_text: Mapped[str | None] = mapped_column(String(300), nullable=True)  # 加料/加購摘要
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 每份含加料總價（快照）
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    order_item: Mapped["OrderItem"] = relationship(back_populates="backups")

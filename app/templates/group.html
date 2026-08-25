@@ -6,6 +6,13 @@
 <div class="space-y-4" x-data="orderPage()">
     <!-- Header -->
     <div class="bg-white rounded-2xl shadow-sm p-4">
+        <!-- 候補模式提示條 -->
+        <div x-show="backupMode" x-cloak x-transition
+             class="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-30 mb-3 bg-sela-800 text-white rounded-xl px-3.5 py-2.5 text-sm flex items-center gap-2 shadow-lg">
+            <i class="ti ti-replace"></i>
+            <span>正在為「<span class="font-bold" x-text="backupMode?.itemName"></span>」選<span class="font-bold" x-text="'候補 ' + (backupMode?.priority || '')"></span>・點選下方菜單品項</span>
+            <button @click="cancelBackup()" class="ml-auto underline text-white/90 active:text-white flex-shrink-0">取消</button>
+        </div>
         <a href="/home" class="back-link"><i class="ti ti-chevron-left"></i><span>首頁</span></a>
 
         <!-- 店家資訊：大縮圖 + 分行文字 -->
@@ -158,6 +165,15 @@
                 <i class="ti ti-receipt text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">單據</span>
                 <span class="text-sela-800">可開{% if store.provides_invoice %}發票{% endif %}{% if store.provides_invoice and store.provides_receipt %}、{% endif %}{% if store.provides_receipt %}收據{% endif %}</span>
+            </div>
+            {% endif %}
+            <!-- 缺貨候補 -->
+            {% if group.enable_backup %}
+            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
+                <i class="ti ti-replace text-sela-800/50"></i>
+                <span class="text-sela-800/50 w-14 flex-shrink-0">候補</span>
+                <span class="text-sela-800">每品項可填 {{ group.backup_count }} 個</span>
+                <span class="ml-auto text-xs text-sela-800/45">臨時缺貨照候補買</span>
             </div>
             {% endif %}
             <!-- 湊團 -->
@@ -319,6 +335,20 @@
                                        placeholder="無"
                                        class="w-20 border rounded px-3 py-2 text-sm">
                                 <span class="text-sm text-sela-800/60">折（例：95 = 全單 95 折，留空 = 無）</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-sela-800/70 mb-1">缺貨候補</label>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="checkbox" name="enable_backup" value="true" class="rounded border-sela-300"
+                                           {% if group.enable_backup %}checked{% endif %}> 開啟
+                                </label>
+                                <select name="backup_count" class="border rounded px-2 py-1.5 text-sm">
+                                    {% for n in [1, 2, 3] %}
+                                    <option value="{{ n }}" {% if (group.backup_count or 2) == n %}selected{% endif %}>最多 {{ n }} 個</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         <div>
@@ -834,6 +864,11 @@
          class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
          @click.self="showAddItem = false">
         <div class="bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div x-show="backupMode" x-cloak class="mb-2">
+                <span class="inline-block text-xs text-sela-700 bg-sela-50 border border-dashed border-sela-300 rounded-lg px-2.5 py-1.5">
+                    候補 <span x-text="backupMode?.priority"></span>・「<span x-text="backupMode?.itemName"></span>」缺貨時改買
+                </span>
+            </div>
             <h3 class="font-semibold text-lg mb-4" x-text="selectedItem?.name"></h3>
             
             <form hx-post="/groups/{{ group.id }}/orders/items" 
@@ -933,12 +968,14 @@
                 <!-- 數量 -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-sela-800 mb-2">數量</label>
-                    <div class="flex items-center gap-3">
+                    <input type="hidden" name="backup_for" :value="backupMode ? backupMode.itemId : ''">
+                    <div class="flex items-center gap-3" x-show="!backupMode">
                         <button type="button" @click="quantity = Math.max(1, quantity - 1)" class="stepper" aria-label="減少數量">−</button>
                         <input type="number" name="quantity" x-model="quantity" min="1"
                                class="w-16 text-center border border-sela-300 rounded-xl py-2.5 text-sela-800 font-medium">
                         <button type="button" @click="quantity++" class="stepper" aria-label="增加數量">+</button>
                     </div>
+                    <p x-show="backupMode" x-cloak class="text-xs text-sela-800/50 mt-1">候補數量會跟隨主品項</p>
                 </div>
                 
                 <!-- 備註 -->
@@ -956,7 +993,7 @@
                 <!-- 按鈕 -->
                 <div class="flex gap-2">
                     <button type="button" @click="showAddItem = false" class="btn btn-secondary flex-1">取消</button>
-                    <button type="submit" class="btn btn-primary flex-1">加入購物車</button>
+                    <button type="submit" class="btn btn-primary flex-1"><span x-text="backupMode ? ('設為候補 ' + backupMode.priority) : '加入購物車'"></span></button>
                 </div>
             </form>
         </div>
@@ -991,6 +1028,7 @@ function orderPage() {
         selectedSize: 'M',
         quantity: 1,
         extraToppings: 0,
+        backupMode: null,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
         orderStatus: '{{ my_order.status.value if my_order else "none" }}',
         showRandom: false,
@@ -1033,7 +1071,26 @@ function orderPage() {
             this.$nextTick(() => this.applyLastPref());
         },
         
+        startBackup(itemId, itemName, nextPriority) {
+            this.backupMode = { itemId: itemId, itemName: itemName, priority: nextPriority };
+            this.showCart = false;
+            window.toast('點選菜單品項作為候補');
+        },
+        
+        cancelBackup() {
+            this.backupMode = null;
+        },
+        
         afterAddItem() {
+            if (this.backupMode) {
+                const p = this.backupMode.priority;
+                this.backupMode = null;
+                this.showAddItem = false;
+                document.body.dispatchEvent(new CustomEvent('orderUpdated'));
+                this.showCart = true;
+                window.toast('已設定候補 ' + p);
+                return;
+            }
             this.saveLastPref();
             this.showAddItem = false;
             this.updateCartCount();

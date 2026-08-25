@@ -41,8 +41,46 @@
                         @htmx:after-request="$dispatch('orderUpdated')"
                         class="ml-auto w-9 h-9 rounded-full text-red-400 active:bg-red-50 transition flex items-center justify-center" aria-label="刪除品項"><i class="ti ti-trash"></i></button>
             </div>
+            {% if group.enable_backup %}
+            {% set unit_total = (item.subtotal / item.quantity) %}
+            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                {% for b in item.backups %}
+                {% set diff = b.unit_price - unit_total %}
+                <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/80 rounded-full pl-2 pr-1 py-1">
+                    <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
+                    {% if b.sugar or b.ice %}<span class="text-sela-800/50">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600 font-medium">+${{ diff|int }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600 font-medium">-${{ (0 - diff)|int }}</span>{% endif %}
+                    <button hx-delete="/orders/backups/{{ b.id }}" hx-target="#cart-content" hx-swap="innerHTML"
+                            @htmx:after-request="$dispatch('orderUpdated')"
+                            class="w-5 h-5 rounded-full flex items-center justify-center text-sela-800/45 active:bg-sela-100" aria-label="刪除候補"><i class="ti ti-x" style="font-size:11px;"></i></button>
+                </span>
+                {% endfor %}
+                {% if item.backups|length < group.backup_count %}
+                <button type="button"
+                        @click="startBackup({{ item.id }}, '{{ item.item_name }}', {{ item.backups|length + 1 }})"
+                        class="inline-flex items-center gap-1 text-xs text-sela-700 border border-dashed border-sela-300 rounded-full px-2.5 py-1 active:bg-sela-50">
+                    <i class="ti ti-plus" style="font-size:11px;"></i> 缺貨候補（{{ item.backups|length }}/{{ group.backup_count }}）
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
             {% else %}
             <div class="text-sm text-sela-700/60 mt-1">x{{ item.quantity }}</div>
+            {% if group.enable_backup and item.backups %}
+            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {% set unit_total = (item.subtotal / item.quantity) %}
+                {% for b in item.backups %}
+                {% set diff = b.unit_price - unit_total %}
+                <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/70 rounded-full px-2 py-1">
+                    <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
+                    {% if b.sugar or b.ice %}<span class="text-sela-800/45">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600">+${{ diff|int }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600">-${{ (0 - diff)|int }}</span>{% endif %}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
         </div>
         {% endfor %}

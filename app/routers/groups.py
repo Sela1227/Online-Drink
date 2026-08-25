@@ -101,6 +101,8 @@ async def create_group(
     delivery_fee: float = Form(None),
     order_limit: float = Form(None),
     allow_over_limit: bool = Form(False),
+    enable_backup: bool = Form(False),
+    backup_count: int = Form(2),
     visibility: str = Form("public"),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
@@ -160,6 +162,8 @@ async def create_group(
         delivery_fee=Decimal(str(delivery_fee)) if delivery_fee and delivery_fee > 0 else None,
         order_limit=Decimal(str(order_limit)) if order_limit and order_limit > 0 else None,
         allow_over_limit=allow_over_limit,
+        enable_backup=enable_backup,
+        backup_count=max(1, min(3, backup_count)),
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
         lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
@@ -759,6 +763,8 @@ async def edit_group(
     order_limit: float = Form(None),
     allow_over_limit: bool = Form(False),
     discount_percent: float = Form(None),
+    enable_backup: bool = Form(False),
+    backup_count: int = Form(2),
     db: Session = Depends(get_db),
 ):
     """編輯團單"""
@@ -788,6 +794,10 @@ async def edit_group(
     
     # 整單折扣（1-99 有效，其餘=無折扣）
     group.discount_percent = Decimal(str(int(discount_percent))) if discount_percent and 0 < discount_percent < 100 else None
+    
+    # 缺貨候補
+    group.enable_backup = enable_backup
+    group.backup_count = max(1, min(3, backup_count))
     
     # 更新截止時間
     if deadline:
