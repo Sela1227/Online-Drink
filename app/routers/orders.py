@@ -102,16 +102,36 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
     })
 
 
-def _stock_remaining(db: Session, group_id: int, menu_item) -> int | None:
-    """品項剩餘量（None=不限）。佔用=已送出訂單（V2.7.0 代購庫存）"""
+def _stock_remaining(db: Session, group_id: int, menu_item, exclude_order_id: int | None = None) -> int | None:
+    """品項剩餘量（None=不限）。
+    V2.8.0：佔用=已送出＋修改中（審稿方案 A——修改期間保留原庫存，不會因進修改被搶走；
+    減量/刪除仍即時釋放）。exclude_order_id 用於送出/還原時排除自身避免重複計算。"""
     if menu_item is None or menu_item.stock_limit is None:
         return None
-    used = db.query(func.coalesce(func.sum(OrderItem.quantity), 0)).join(Order).filter(
+    q = db.query(func.coalesce(func.sum(OrderItem.quantity), 0)).join(Order).filter(
         OrderItem.menu_item_id == menu_item.id,
         Order.group_id == group_id,
-        Order.status == OrderStatus.SUBMITTED,
-    ).scalar()
+        Order.status.in_((OrderStatus.SUBMITTED, OrderStatus.EDITING)),
+    )
+    if exclude_order_id is not None:
+        q = q.filter(Order.id != exclude_order_id)
+    used = q.scalar()
     return max(0, menu_item.stock_limit - int(used or 0))
+
+
+def _lock_menu_items(db: Session, menu_item_ids):
+    """交易內鎖定品項列（PostgreSQL SELECT FOR UPDATE，固定依 ID 排序防死鎖；SQLite 無效但無害）"""
+    from app.models.menu import MenuItem as _MI
+    ids = sorted(set(i for i in menu_item_ids if i))
+    if not ids:
+        return
+    db.query(_MI).filter(_MI.id.in_(ids)).order_by(_MI.id).with_for_update().all()
+
+
+def _ensure_visible(group, user, db):
+    """限定部門/私人團可見性（審稿 #10：不能只靠畫面隱藏）"""
+    if not group.is_visible_to(user, db):
+        raise HTTPException(status_code=403, detail="您無權查看此團單")
 
 
 @router.post("/groups/{group_id}/orders/items")
@@ -142,6 +162,7 @@ async def add_item(
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
+    _ensure_visible(group, user, db)
     
     # 取得菜單品項（必須屬於本團菜單，防跨店/舊菜單注入）
     menu_item = db.query(MenuItem).filter(
@@ -475,6 +496,7 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
+    _ensure_visible(group, user, db)
     
     order = db.query(Order).filter(
         Order.group_id == group_id,
@@ -484,12 +506,19 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
     if not order or not order.items:
         raise HTTPException(status_code=400, detail="請先加入品項")
     
-    # 庫存權威檢查（V2.7.0：送出那一刻才佔用，先送先贏）
+    # 庫存權威檢查（V2.8.0：同品項多列彙總＋交易內鎖定，資料庫層保證先送先贏）
+    _requested = {}
+    _mi_map = {}
     for _it in order.items:
         if _it.menu_item is not None and _it.menu_item.stock_limit is not None:
-            _rem = _stock_remaining(db, group_id, _it.menu_item)
-            if _rem is not None and _it.quantity > _rem:
-                raise HTTPException(status_code=400, detail=f"「{_it.item_name}」只剩 {_rem} 份，請調整數量後再送出")
+            _requested[_it.menu_item_id] = _requested.get(_it.menu_item_id, 0) + _it.quantity
+            _mi_map[_it.menu_item_id] = _it.menu_item
+    if _requested:
+        _lock_menu_items(db, _requested.keys())
+        for _mid, _qty in _requested.items():
+            _rem = _stock_remaining(db, group_id, _mi_map[_mid], exclude_order_id=order.id)
+            if _rem is not None and _qty > _rem:
+                raise HTTPException(status_code=400, detail=f"「{_mi_map[_mid].name}」只剩 {_rem} 份（你共點了 {_qty} 份），請調整數量後再送出")
     
     # 每單上限檢查（不允許超過時擋下）
     if group.order_limit and not group.allow_over_limit and order.final_amount > group.order_limit:
@@ -521,6 +550,7 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
+    _ensure_visible(group, user, db)
     
     order = db.query(Order).filter(
         Order.group_id == group_id,
@@ -561,6 +591,9 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
                     }
                     for t in item.selected_toppings
                 ],
+                "fulfillment": item.fulfillment,
+                "fulfilled_backup_priority": (item.fulfilled_backup.priority if item.fulfilled_backup else None),
+                "diff_settled": item.diff_settled,
                 "backups": [
                     {
                         "priority": b.priority,
@@ -603,6 +636,8 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
+    if group:
+        _ensure_visible(group, user, db)
     order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user.id,
@@ -616,6 +651,23 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
     
     if not order.snapshot:
         raise HTTPException(status_code=400, detail="無法還原訂單")
+    
+    # V2.8.0：還原前重驗庫存（修改期間若把限量品項刪除，名額可能已被他人取走）
+    _snap_req = {}
+    for _idata in order.snapshot["items"]:
+        _mid = _idata.get("menu_item_id")
+        if _mid:
+            _snap_req[_mid] = _snap_req.get(_mid, 0) + int(_idata.get("quantity", 1))
+    if _snap_req:
+        from app.models.menu import MenuItem as _MI
+        _lock_menu_items(db, _snap_req.keys())
+        for _mid, _qty in _snap_req.items():
+            _mi = db.query(_MI).filter(_MI.id == _mid).first()
+            if _mi is None or _mi.stock_limit is None:
+                continue
+            _rem = _stock_remaining(db, group_id, _mi, exclude_order_id=order.id)
+            if _rem is not None and _qty > _rem:
+                raise HTTPException(status_code=400, detail=f"原訂單中的「{_mi.name}」目前僅剩 {_rem} 份，無法完整還原，請調整後重新送出")
     
     # 刪除目前的品項
     for item in order.items:
@@ -655,10 +707,11 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
                 price=Decimal(t_data["price"]),
             ))
         
-        # 還原候補（V2.4.1 修）
+        # 還原候補（V2.4.1 修；V2.8.0 加回填出貨狀態）
         from app.models.order import OrderItemBackup
+        _new_backups = {}
         for b_data in item_data.get("backups", []):
-            db.add(OrderItemBackup(
+            _nb = OrderItemBackup(
                 order_item_id=order_item.id,
                 priority=b_data["priority"],
                 menu_item_id=b_data.get("menu_item_id"),
@@ -668,7 +721,17 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
                 ice=b_data.get("ice"),
                 extras_text=b_data.get("extras_text"),
                 unit_price=Decimal(b_data["unit_price"]),
-            ))
+            )
+            db.add(_nb)
+            _new_backups[b_data["priority"]] = _nb
+        # 出貨狀態還原（缺貨處理結果不因取消修改消失；fulfilled_backup_id 依順位重連新候補）
+        if item_data.get("fulfillment"):
+            order_item.fulfillment = item_data["fulfillment"]
+            order_item.diff_settled = bool(item_data.get("diff_settled"))
+            _fp = item_data.get("fulfilled_backup_priority")
+            if _fp is not None and _fp in _new_backups:
+                db.flush()
+                order_item.fulfilled_backup_id = _new_backups[_fp].id
     
     order.status = OrderStatus.SUBMITTED
     order.snapshot = None
@@ -691,6 +754,7 @@ async def delete_order(group_id: int, request: Request, db: Session = Depends(ge
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
+    _ensure_visible(group, user, db)
     
     order = db.query(Order).filter(
         Order.group_id == group_id,
@@ -727,6 +791,7 @@ async def follow_item(
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
+    _ensure_visible(group, user, db)
     
     # 取得要跟的品項（V2.4.1 修：限本團、已結單的品項，防跨團複製）
     source_item = db.query(OrderItem).join(Order).filter(

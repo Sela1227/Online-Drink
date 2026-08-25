@@ -337,6 +337,10 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         func.sum(OrderItem.quantity).desc()
     ).limit(5).all()
     
+    # 限定部門/私人團可見性（V2.8.0 審稿：後端真正阻擋）
+    if not group.is_visible_to(user, db):
+        raise HTTPException(status_code=403, detail="您無權查看此團單")
+    
     # 取得菜單品項（含分類）
     menu = group.menu
 
@@ -367,7 +371,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         ).join(Order).filter(
             OrderItem.menu_item_id.in_(_limited_ids),
             Order.group_id == group.id,
-            Order.status == OrderStatus.SUBMITTED,
+            Order.status.in_((OrderStatus.SUBMITTED, OrderStatus.EDITING)),
         ).group_by(OrderItem.menu_item_id).all()
         stock_used = {r[0]: int(r[1]) for r in rows}
     
@@ -438,7 +442,7 @@ async def proxy_item_create(
     group_id: int,
     request: Request,
     item_name: str = Form(...),
-    price: float = Form(...),
+    price: str = Form(...),
     description: str = Form(None),
     stock_limit: int = Form(None),
     image_file: UploadFile = File(None),
@@ -451,10 +455,19 @@ async def proxy_item_create(
         raise HTTPException(status_code=404, detail="非代購團")
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="僅團主可管理品項")
-    if not item_name.strip():
-        raise HTTPException(status_code=400, detail="請填品名")
-    if price is None or price <= 0:
-        raise HTTPException(status_code=400, detail="價格需大於 0")
+    item_name = (item_name or "").strip()
+    if not (1 <= len(item_name) <= 100):
+        raise HTTPException(status_code=400, detail="品名需 1-100 字")
+    if description and len(description.strip()) > 200:
+        raise HTTPException(status_code=400, detail="說明最多 200 字")
+    try:
+        price_dec = Decimal(str(price).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="價格格式錯誤")
+    if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+        raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
+        raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
     cat = group.menu.categories[0] if group.menu and group.menu.categories else None
     if cat is None:
@@ -471,7 +484,7 @@ async def proxy_item_create(
         menu_id=group.menu_id,
         category_id=cat.id,
         name=item_name.strip(),
-        price=Decimal(str(price)),
+        price=price_dec,
         description=description.strip() if description else None,
         image_url=image_url,
         stock_limit=stock_limit if stock_limit and stock_limit > 0 else None,
@@ -486,7 +499,7 @@ async def proxy_item_update(
     item_id: int,
     request: Request,
     item_name: str = Form(...),
-    price: float = Form(...),
+    price: str = Form(...),
     description: str = Form(None),
     stock_limit: int = Form(None),
     image_file: UploadFile = File(None),
@@ -502,13 +515,31 @@ async def proxy_item_update(
     item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="品項不存在")
-    if not item_name.strip():
-        raise HTTPException(status_code=400, detail="請填品名")
-    if price is None or price <= 0:
-        raise HTTPException(status_code=400, detail="價格需大於 0")
+    item_name = (item_name or "").strip()
+    if not (1 <= len(item_name) <= 100):
+        raise HTTPException(status_code=400, detail="品名需 1-100 字")
+    if description and len(description.strip()) > 200:
+        raise HTTPException(status_code=400, detail="說明最多 200 字")
+    try:
+        price_dec = Decimal(str(price).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="價格格式錯誤")
+    if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+        raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
+        raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
+    if stock_limit and stock_limit > 0:
+        from app.models.order import OrderItem as _OI, Order as _O, OrderStatus as _OS
+        _used = db.query(func.coalesce(func.sum(_OI.quantity), 0)).join(_O).filter(
+            _OI.menu_item_id == item.id,
+            _O.group_id == group.id,
+            _O.status.in_((_OS.SUBMITTED, _OS.EDITING)),
+        ).scalar() or 0
+        if stock_limit < int(_used):
+            raise HTTPException(status_code=400, detail=f"已有 {int(_used)} 份被訂走，上限不可低於 {int(_used)}")
     item.name = item_name.strip()
-    item.price = Decimal(str(price))
+    item.price = price_dec
     item.description = description.strip() if description else None
     item.stock_limit = stock_limit if stock_limit and stock_limit > 0 else None
     if image_file and image_file.filename:
@@ -609,6 +640,8 @@ async def fulfillment_action(
         raise HTTPException(status_code=404, detail="團單不存在")
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="僅團主可操作")
+    if group.is_open:
+        raise HTTPException(status_code=400, detail="請先截止團單，再進行缺貨與換貨處理")
     
     from app.models.order import OrderItem as OI
     item = db.query(OI).join(Order).filter(

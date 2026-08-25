@@ -134,6 +134,7 @@ def generate_payment_text(db: Session, group: Group) -> str:
     final_total = Decimal("0")     # 折後小計
     company_total = Decimal("0")   # 公司補助合計
     self_total = Decimal("0")      # 個人自付合計
+    actual_self_total = Decimal("0")  # 換貨後個人自付合計（無換貨=同 self_total）
     submitted_orders = []
     pending_users = []
 
@@ -144,6 +145,7 @@ def generate_payment_text(db: Session, group: Group) -> str:
             final_total += order.final_amount
             company_total += order.company_pay
             self_total += order.self_pay
+            actual_self_total += order.actual_self_pay
         else:
             pending_users.append(order.user.show_name)
 
@@ -179,7 +181,14 @@ def generate_payment_text(db: Session, group: Group) -> str:
         _shares = sorted(set(int(v) for v in delivery_share.values()))
         _share_txt = f"${_shares[0]}" if len(_shares) == 1 else f"${_shares[0]}~{_shares[-1]}"
         lines.append(f"外送費：${delivery_fee}（每人 {_share_txt}，依名單分攤、總和不差）")
-    lines.append(f"應向個人收：${self_total + delivery_fee}")
+    if actual_self_total != self_total:
+        _collect = sum((o.settle_diff for o in submitted_orders if o.settle_diff > 0), Decimal("0"))
+        _refund = sum((-o.settle_diff for o in submitted_orders if o.settle_diff < 0), Decimal("0"))
+        lines.append(f"原訂應收：${self_total + delivery_fee}")
+        lines.append(f"換貨補收 +${int(_collect)}／退還 -${int(_refund)}")
+        lines.append(f"最終應收：${actual_self_total + delivery_fee}")
+    else:
+        lines.append(f"應向個人收：${self_total + delivery_fee}")
     lines.append(f"{len(submitted_orders)} 人已送出")
     lines.append("")
     lines.append("=" * 30)
@@ -190,8 +199,12 @@ def generate_payment_text(db: Session, group: Group) -> str:
         user_name = order.user.show_name
         _dp = delivery_share.get(order.id, Decimal("0"))
         pay = order.self_pay + _dp
+        final_pay = order.actual_self_pay + _dp
 
-        lines.append(f"☐ {user_name}：${pay}")
+        if order.has_fulfillment_changes:
+            lines.append(f"☐ {user_name}：${final_pay}（原 ${pay}，含換貨）")
+        else:
+            lines.append(f"☐ {user_name}：${pay}")
 
         for item in order.items:
             item_desc = item.item_name
@@ -243,9 +256,9 @@ def generate_payment_text(db: Session, group: Group) -> str:
             settled = all(it.diff_settled for it in order.items if it.fulfillment)
             mark = "（已結清）" if settled else "（未結清）"
             if sd > 0:
-                lines.append(f"   換貨後應付 ${order.actual_self_pay + _dp}，需向本人補收 ${int(sd)} {mark}")
+                lines.append(f"   已收 ${pay} 者需向本人補收 ${int(sd)} {mark}")
             elif sd < 0:
-                lines.append(f"   換貨後應付 ${order.actual_self_pay + _dp}，需退還本人 ${int(-sd)} {mark}")
+                lines.append(f"   已收 ${pay} 者需退還本人 ${int(-sd)} {mark}")
             else:
                 lines.append(f"   換貨後應付不變（補退 $0）")
         lines.append("")

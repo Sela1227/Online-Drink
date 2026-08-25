@@ -28,7 +28,7 @@
           class="p-3 bg-sela-50 rounded-xl space-y-2">
         <div class="text-sm font-medium text-sela-800">新增品項</div>
         <div class="flex gap-2">
-            <input type="text" name="item_name" placeholder="品名（例：草莓大福）" required
+            <input type="text" name="item_name" maxlength="100" placeholder="品名（例：草莓大福）" required
                    class="flex-1 min-w-0 border border-sela-300 rounded-lg px-3 py-2 text-sm">
             <div class="flex items-center gap-1 flex-shrink-0">
                 <span class="text-sela-800/50 text-sm">$</span>
@@ -36,7 +36,7 @@
                        class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
             </div>
         </div>
-        <input type="text" name="description" placeholder="說明（選填，例：6 入一盒）"
+        <input type="text" name="description" maxlength="200" placeholder="說明（選填，例：6 入一盒）"
                class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
         <div class="flex items-center gap-2">
             <div class="flex items-center gap-1.5 text-sm text-sela-800/60">
@@ -79,7 +79,7 @@
                 <form hx-post="/groups/{{ group.id }}/items/{{ item.id }}/update" hx-encoding="multipart/form-data"
                       hx-target="#proxy-items-content" hx-swap="innerHTML" class="space-y-2">
                     <div class="flex gap-2">
-                        <input type="text" name="item_name" value="{{ item.name }}" required
+                        <input type="text" name="item_name" maxlength="100" value="{{ item.name }}" required
                                class="flex-1 min-w-0 border border-sela-300 rounded-lg px-3 py-2 text-sm">
                         <div class="flex items-center gap-1 flex-shrink-0">
                             <span class="text-sela-800/50 text-sm">$</span>
@@ -87,7 +87,7 @@
                                    class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
                         </div>
                     </div>
-                    <input type="text" name="description" value="{{ item.description or '' }}" placeholder="說明（選填）"
+                    <input type="text" name="description" maxlength="200" value="{{ item.description or '' }}" placeholder="說明（選填）"
                            class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
                     <div class="flex items-center gap-2">
                         <div class="flex items-center gap-1.5 text-sm text-sela-800/60">

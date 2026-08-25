@@ -1,5 +1,10 @@
 {# 缺貨處理面板（團主/管理員・htmx 自刷新）#}
-{% if not item_groups %}
+{% if group.is_open %}
+<div class="text-center py-8 text-sm text-sela-800/60">
+    <i class="ti ti-lock"></i> 請先截止團單，再進行缺貨與換貨處理<br>
+    <span class="text-xs text-sela-800/45">（開放中處理會與團員改單互相覆蓋）</span>
+</div>
+{% elif not item_groups %}
 <div class="text-center py-8 text-sela-800/45 text-sm">尚無已結單品項</div>
 {% else %}
 <p class="text-xs text-sela-800/55 mb-3">店家說什麼缺貨，就展開那個品項，逐人選用候補或標記缺貨不出。補退金額已含折扣與補助效果。</p>
