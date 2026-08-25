@@ -169,7 +169,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
     
     # 店家列表（啟用中，根據部門過濾）
     from app.models.department import StoreDepartment
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
     
@@ -289,7 +289,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     ).all()]
     
     # 店家列表（根據部門過濾）
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
     

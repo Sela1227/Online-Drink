@@ -124,6 +124,14 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("groups", "backup_count", "INTEGER DEFAULT 2")
     
     # V2.5.0 缺貨處理
+    # V2.7.0 代購
+    add_column_if_not_exists("stores", "is_personal", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("stores", "owner_user_id", "INTEGER")
+    add_column_if_not_exists("menu_items", "description", "VARCHAR(200)")
+    add_column_if_not_exists("menu_items", "image_url", "VARCHAR(500)")
+    add_column_if_not_exists("menu_items", "stock_limit", "INTEGER")
+    add_column_if_not_exists("menu_items", "is_available", "BOOLEAN DEFAULT TRUE")
+    
     add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
     add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")
     add_column_if_not_exists("order_items", "diff_settled", "BOOLEAN DEFAULT FALSE")

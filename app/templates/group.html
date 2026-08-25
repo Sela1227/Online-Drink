@@ -213,6 +213,16 @@
             {% endif %}
         </div>
         
+        {% if store.is_personal and is_open and (is_owner or is_admin) %}
+        {% set _item_count = namespace(n=0) %}
+        {% for c in menu.categories %}{% set _item_count.n = _item_count.n + (c.items|length) %}{% endfor %}
+        {% if _item_count.n == 0 %}
+        <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            <i class="ti ti-alert-triangle"></i> 還沒有品項——先到「團主工具 → 管理品項」新增，加好再分享連結
+        </div>
+        {% endif %}
+        {% endif %}
+
         {% if is_owner or is_admin %}
         <!-- 團主工具（收合・團員不顯示）-->
         <div class="mt-3 pt-3 border-t border-sela-100" x-data="{ toolsOpen: false, showExport: false }">
@@ -222,6 +232,11 @@
             </button>
             <div x-show="toolsOpen" x-transition x-cloak class="mt-2">
                 <div class="grid grid-cols-3 gap-2">
+                    {% if store.is_personal %}
+                    <button @click="showItemsPanel = true; toolsOpen = false" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-800 text-white active:bg-sela-900">
+                        <i class="ti ti-list-details text-lg"></i><span class="text-xs">管理品項</span>
+                    </button>
+                    {% endif %}
                     <button @click="copyLink()" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
                         <i class="ti ti-link text-lg"></i><span class="text-xs">複製連結</span>
                     </button>
@@ -815,6 +830,27 @@
         </button>
     </div>
     
+    {% if (is_owner or is_admin) and store.is_personal %}
+    <!-- 代購品項管理視窗 -->
+    <div x-show="showItemsPanel" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" @click="showItemsPanel = false"></div>
+        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90vh]"
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
+            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
+            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-list-details"></i> 管理品項</h3>
+                <button @click="showItemsPanel = false; location.reload()" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
+                    <i class="ti ti-x" style="font-size:20px;"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" id="proxy-items-content"
+                 hx-get="/groups/{{ group.id }}/items-panel" hx-trigger="load" hx-swap="innerHTML">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if is_owner or is_admin %}
     <!-- 缺貨處理視窗（團主/管理員）-->
     <div x-show="showFulfillment" x-cloak class="fixed inset-0 z-50">
@@ -1018,7 +1054,7 @@
                         <button type="button" @click="quantity = Math.max(1, quantity - 1)" class="stepper" aria-label="減少數量">−</button>
                         <input type="number" name="quantity" x-model="quantity" min="1"
                                class="w-16 text-center border border-sela-300 rounded-xl py-2.5 text-sela-800 font-medium">
-                        <button type="button" @click="quantity++" class="stepper" aria-label="增加數量">+</button>
+                        <button type="button" @click="quantity = (selectedItem && selectedItem.remaining != null) ? Math.min(selectedItem.remaining, quantity + 1) : quantity + 1" class="stepper" aria-label="增加數量">+</button>
                     </div>
                     <p x-show="backupMode" x-cloak class="text-xs text-sela-800/50 mt-1">候補數量會跟隨主品項</p>
                 </div>
@@ -1075,6 +1111,7 @@ function orderPage() {
         extraToppings: 0,
         backupMode: null,
         showFulfillment: false,
+        showItemsPanel: false,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
         orderStatus: '{{ my_order.status.value if my_order else "none" }}',
         showRandom: false,

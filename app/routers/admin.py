@@ -116,7 +116,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     from app.models.user import User, Announcement
     from datetime import datetime, timedelta
     
-    store_count = db.query(Store).count()
+    store_count = db.query(Store).filter(Store.is_personal != True).count()
     group_count = db.query(Group).count()
     user_count = db.query(User).filter(User.is_guest == False).count()
     
@@ -170,7 +170,7 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
     """店家列表"""
     user = await get_admin_user(request, db)
     
-    stores = db.query(Store).options(
+    stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).order_by(Store.created_at.desc()).all()
     

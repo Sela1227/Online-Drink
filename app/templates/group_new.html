@@ -49,7 +49,7 @@
         <!-- 分類選擇 -->
         <div>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇類型</label>
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-4 gap-2">
                 <button type="button" @click="selectCategory('drink')"
                         :class="selectedCategory === 'drink' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
                         class="p-3 rounded-lg border-2 text-center transition">
@@ -68,13 +68,25 @@
                     <div class="text-2xl mb-1"><i class="ti ti-shopping-cart"></i></div>
                     <div class="text-sm font-medium">團購</div>
                 </button>
+                <button type="button" @click="selectCategory('proxy')"
+                        :class="selectedCategory === 'proxy' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
+                        class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-2xl mb-1"><i class="ti ti-basket"></i></div>
+                    <div class="text-sm font-medium">代購</div>
+                </button>
             </div>
+            <input type="hidden" name="is_proxy" :value="selectedCategory === 'proxy' ? 'true' : ''">
         </div>
         
         <!-- 店家選擇 -->
-        <div x-show="selectedCategory" x-cloak>
+        <!-- 代購提示 -->
+        <div x-show="selectedCategory === 'proxy'" x-cloak class="p-3 bg-sela-100 rounded-xl text-sm text-sela-800/75">
+            <i class="ti ti-info-circle"></i> 代購由你自訂品項與價格——開團後進團按「團主工具 → 管理品項」新增，加好再分享連結
+        </div>
+
+        <div x-show="selectedCategory && selectedCategory !== 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇店家</label>
-            <select name="store_id" x-model="storeId" @change="onStoreChange()" required
+            <select name="store_id" x-model="storeId" @change="onStoreChange()" :required="selectedCategory !== 'proxy'"
                     class="w-full border rounded-lg px-3 py-2">
                 <option value="">請選擇...</option>
                 <template x-for="store in filteredStores" :key="store.id">
@@ -103,7 +115,7 @@
         </div>
         
         <!-- 團名 -->
-        <div x-show="storeId" x-cloak>
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">團名</label>
             <input type="text" name="name" required placeholder="例：下午茶團"
                    class="w-full border rounded-lg px-3 py-2"
@@ -111,14 +123,14 @@
         </div>
         
         <!-- 備註 -->
-        <div x-show="storeId" x-cloak>
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">備註（選填）</label>
             <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間"
                       class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
         </div>
         
         <!-- 外送費 -->
-        <div x-show="storeId" x-cloak>
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">外送費（選填）</label>
             <div class="flex items-center gap-2">
                 <span class="text-sela-800/60">$</span>
@@ -130,7 +142,7 @@
         </div>
 
         <!-- 每單金額上限 -->
-        <div x-show="storeId" x-cloak x-data="{ hasLimit: {% if copy_from and copy_from.order_limit %}true{% else %}false{% endif %} }">
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ hasLimit: {% if copy_from and copy_from.order_limit %}true{% else %}false{% endif %} }">
             <label class="block text-sm font-medium text-sela-800/80 mb-2">每單金額上限（選填）</label>
             <div class="flex items-center gap-2">
                 <span class="text-sela-800/60">$</span>
@@ -148,7 +160,7 @@
         </div>
         
         <!-- 缺貨候補 -->
-        <div x-show="storeId" x-cloak x-data="{ bkOn: {% if copy_from and copy_from.enable_backup %}true{% else %}false{% endif %} }">
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ bkOn: {% if copy_from and copy_from.enable_backup %}true{% else %}false{% endif %} }">
             <div class="flex items-center justify-between mb-1">
                 <div>
                     <label class="block text-sm font-medium text-sela-800/80">缺貨候補</label>
@@ -177,7 +189,7 @@
         </div>
         
         <!-- 可見範圍 -->
-        <div x-show="storeId" x-cloak x-data="{ isPublic: true }">
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ isPublic: true }">
             <label class="block text-sm font-medium text-sela-800/80 mb-2">可見範圍</label>
             <div class="space-y-2">
                 <label class="flex items-center gap-2">
@@ -211,7 +223,7 @@
         </div>
         
         <!-- 截止時間 -->
-        <div x-show="storeId" x-cloak>
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">截止時間</label>
             <div class="flex flex-wrap gap-2 mb-2">
                 <button type="button" @click="setDeadline('30m')"
@@ -279,7 +291,7 @@
         </div>
         
         <!-- 趣味功能設定 -->
-        <div x-show="storeId" x-cloak class="p-4 bg-sela-50 rounded-lg" x-data="{ showFunOptions: false }">
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak class="p-4 bg-sela-50 rounded-lg" x-data="{ showFunOptions: false }">
             <button type="button" @click="showFunOptions = !showFunOptions"
                     class="flex items-center justify-between w-full text-left">
                 <h3 class="font-medium text-sela-800"><i class="ti ti-confetti"></i> 趣味功能（選用）</h3>
@@ -373,7 +385,7 @@
         </div>
         
         <!-- 送出按鈕 -->
-        <div class="flex gap-2 pt-4" x-show="storeId" x-cloak>
+        <div class="flex gap-2 pt-4" x-show="storeId || selectedCategory === 'proxy'" x-cloak>
             <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-sela-50">
                 取消
             </a>

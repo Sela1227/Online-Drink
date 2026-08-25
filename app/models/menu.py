@@ -44,6 +44,10 @@ class MenuItem(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     price_l: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # L 尺寸價格
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)  # 說明（V2.7.0 代購）
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 品項圖（V2.7.0，Cloudinary）
+    stock_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 數量上限（NULL=不限，已送出佔用）
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True)  # 上/下架
     
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="items")

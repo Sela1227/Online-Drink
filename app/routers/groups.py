@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.group import Group
 from app.models.store import Store, StoreBranch, CategoryType
-from app.models.menu import Menu, MenuItem
+from app.models.menu import Menu, MenuItem, MenuCategory
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User
 from app.services.auth import get_current_user, get_current_user_optional
@@ -52,7 +52,7 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     ).all()]
     
     # 取得啟用中的店家（含分店）
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).all()
     
@@ -93,7 +93,8 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
 @router.post("")
 async def create_group(
     request: Request,
-    store_id: int = Form(...),
+    store_id: int = Form(None),
+    is_proxy: bool = Form(False),
     name: str = Form(...),
     deadline: str = Form(...),
     note: str = Form(None),
@@ -126,18 +127,42 @@ async def create_group(
     form_data = await request.form()
     department_ids = form_data.getlist("department_ids")
     
-    # 取得店家
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 取得啟用中的菜單
-    menu = db.query(Menu).filter(
-        Menu.store_id == store_id,
-        Menu.is_active == True
-    ).first()
-    if not menu:
-        raise HTTPException(status_code=400, detail="該店家尚無啟用的菜單")
+    if is_proxy:
+        # 代購（V2.7.0）：取得/建立個人店家 + 每團一份自訂菜單
+        store = db.query(Store).filter(
+            Store.is_personal == True,
+            Store.owner_user_id == user.id,
+        ).first()
+        if not store:
+            store = Store(
+                name=f"{user.show_name} 的代購",
+                category=CategoryType.GROUP_BUY,
+                is_personal=True,
+                owner_user_id=user.id,
+            )
+            db.add(store)
+            db.flush()
+        menu = Menu(store_id=store.id, is_active=False)  # 不啟用，避免干擾一般選單邏輯
+        db.add(menu)
+        db.flush()
+        db.add(MenuCategory(menu_id=menu.id, name="代購品項", sort_order=0))
+        db.flush()
+        store_id = store.id
+    else:
+        if not store_id:
+            raise HTTPException(status_code=400, detail="請選擇店家")
+        # 取得店家
+        store = db.query(Store).filter(Store.id == store_id).first()
+        if not store:
+            raise HTTPException(status_code=404, detail="店家不存在")
+        
+        # 取得啟用中的菜單
+        menu = db.query(Menu).filter(
+            Menu.store_id == store_id,
+            Menu.is_active == True
+        ).first()
+        if not menu:
+            raise HTTPException(status_code=400, detail="該店家尚無啟用的菜單")
     
     # 解析截止時間
     try:
@@ -333,6 +358,19 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
             _menu_items_by_id[_it.id] = _it
     my_frequent = [_menu_items_by_id[i] for i in _freq_ids if i in _menu_items_by_id][:4]
     
+    # 庫存已用量（V2.7.0：已送出佔用；有設上限的品項才需要）
+    stock_used = {}
+    _limited_ids = [i for i, m in _menu_items_by_id.items() if m.stock_limit is not None]
+    if _limited_ids:
+        rows = db.query(
+            OrderItem.menu_item_id, func.coalesce(func.sum(OrderItem.quantity), 0)
+        ).join(Order).filter(
+            OrderItem.menu_item_id.in_(_limited_ids),
+            Order.group_id == group.id,
+            Order.status == OrderStatus.SUBMITTED,
+        ).group_by(OrderItem.menu_item_id).all()
+        stock_used = {r[0]: int(r[1]) for r in rows}
+    
     # 取得所有用戶（用於轉移團主）
     all_users = []
     if group.owner_id == user.id or user.is_admin:
@@ -366,6 +404,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "favorite_items": favorite_items,
         "hot_items": hot_items,
         "my_frequent": my_frequent,
+        "stock_used": stock_used,
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,
@@ -373,6 +412,151 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "is_favorited": is_favorited,
         "treat_user": treat_user,
     })
+
+
+@router.get("/{group_id}/items-panel")
+async def proxy_items_panel(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """代購品項管理面板（團主/管理員，僅代購團）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    items = []
+    if group.menu:
+        for cat in group.menu.categories:
+            items.extend(cat.items)
+    items.sort(key=lambda x: (x.sort_order, x.id))
+    return templates.TemplateResponse("partials/proxy_items_panel.html", {
+        "request": request, "group": group, "items": items,
+    })
+
+
+@router.post("/{group_id}/items")
+async def proxy_item_create(
+    group_id: int,
+    request: Request,
+    item_name: str = Form(...),
+    price: float = Form(...),
+    description: str = Form(None),
+    stock_limit: int = Form(None),
+    image_file: UploadFile = File(None),
+    db: Session = Depends(get_db),
+):
+    """代購新增品項"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    if not item_name.strip():
+        raise HTTPException(status_code=400, detail="請填品名")
+    if price is None or price <= 0:
+        raise HTTPException(status_code=400, detail="價格需大於 0")
+    
+    cat = group.menu.categories[0] if group.menu and group.menu.categories else None
+    if cat is None:
+        cat = MenuCategory(menu_id=group.menu_id, name="代購品項", sort_order=0)
+        db.add(cat)
+        db.flush()
+    
+    image_url = None
+    if image_file and image_file.filename:
+        from app.services.upload_service import upload_image
+        image_url = await upload_image(image_file, folder="sela/items")
+    
+    db.add(MenuItem(
+        menu_id=group.menu_id,
+        category_id=cat.id,
+        name=item_name.strip(),
+        price=Decimal(str(price)),
+        description=description.strip() if description else None,
+        image_url=image_url,
+        stock_limit=stock_limit if stock_limit and stock_limit > 0 else None,
+    ))
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/items/{item_id}/update")
+async def proxy_item_update(
+    group_id: int,
+    item_id: int,
+    request: Request,
+    item_name: str = Form(...),
+    price: float = Form(...),
+    description: str = Form(None),
+    stock_limit: int = Form(None),
+    image_file: UploadFile = File(None),
+    db: Session = Depends(get_db),
+):
+    """代購修改品項（不影響已送出訂單的快照）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在")
+    if not item_name.strip():
+        raise HTTPException(status_code=400, detail="請填品名")
+    if price is None or price <= 0:
+        raise HTTPException(status_code=400, detail="價格需大於 0")
+    
+    item.name = item_name.strip()
+    item.price = Decimal(str(price))
+    item.description = description.strip() if description else None
+    item.stock_limit = stock_limit if stock_limit and stock_limit > 0 else None
+    if image_file and image_file.filename:
+        from app.services.upload_service import upload_image
+        new_url = await upload_image(image_file, folder="sela/items")
+        if new_url:
+            item.image_url = new_url
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/items/{item_id}/toggle")
+async def proxy_item_toggle(group_id: int, item_id: int, request: Request, db: Session = Depends(get_db)):
+    """代購品項上/下架"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在")
+    item.is_available = not (item.is_available if item.is_available is not None else True)
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/store-icon")
+async def proxy_store_icon(
+    group_id: int,
+    request: Request,
+    icon_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """代購團 icon 上傳（個人店家 logo）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    from app.services.upload_service import upload_image
+    url = await upload_image(icon_file, folder="sela/proxy")
+    if url:
+        group.store.logo_url = url
+        db.commit()
+    return await proxy_items_panel(group_id, request, db)
 
 
 @router.get("/{group_id}/fulfillment")
@@ -775,7 +959,7 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
         raise HTTPException(status_code=404, detail="團單不存在")
     
     # 取得店家選項
-    stores = db.query(Store).filter(Store.is_active == True).all()
+    stores = db.query(Store).filter(Store.is_active == True, Store.is_personal != True).all()
     
     # 取得啟用中的部門
     from app.models.department import Department

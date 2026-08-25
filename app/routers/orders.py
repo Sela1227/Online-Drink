@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 
@@ -101,6 +102,18 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
     })
 
 
+def _stock_remaining(db: Session, group_id: int, menu_item) -> int | None:
+    """品項剩餘量（None=不限）。佔用=已送出訂單（V2.7.0 代購庫存）"""
+    if menu_item is None or menu_item.stock_limit is None:
+        return None
+    used = db.query(func.coalesce(func.sum(OrderItem.quantity), 0)).join(Order).filter(
+        OrderItem.menu_item_id == menu_item.id,
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).scalar()
+    return max(0, menu_item.stock_limit - int(used or 0))
+
+
 @router.post("/groups/{group_id}/orders/items")
 async def add_item(
     group_id: int,
@@ -137,6 +150,12 @@ async def add_item(
     ).first()
     if not menu_item:
         raise HTTPException(status_code=404, detail="品項不存在或不屬於本團菜單")
+    if menu_item.is_available is False:
+        raise HTTPException(status_code=400, detail="此品項已下架")
+    if not backup_for:
+        _rem = _stock_remaining(db, group_id, menu_item)
+        if _rem is not None and quantity > _rem:
+            raise HTTPException(status_code=400, detail=f"「{menu_item.name}」只剩 {_rem} 份" if _rem > 0 else f"「{menu_item.name}」已售完")
     
     # 決定單價（根據尺寸）
     if size == 'L' and menu_item.price_l:
@@ -388,6 +407,10 @@ async def update_item(
     if quantity <= 0:
         db.delete(order_item)
     else:
+        if order_item.menu_item is not None and quantity > order_item.quantity:
+            _rem = _stock_remaining(db, order.group_id, order_item.menu_item)
+            if _rem is not None and (quantity - order_item.quantity) > _rem:
+                raise HTTPException(status_code=400, detail=f"「{order_item.item_name}」僅剩 {_rem} 份可再增加")
         order_item.quantity = quantity
     
     db.commit()
@@ -460,6 +483,13 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
     
     if not order or not order.items:
         raise HTTPException(status_code=400, detail="請先加入品項")
+    
+    # 庫存權威檢查（V2.7.0：送出那一刻才佔用，先送先贏）
+    for _it in order.items:
+        if _it.menu_item is not None and _it.menu_item.stock_limit is not None:
+            _rem = _stock_remaining(db, group_id, _it.menu_item)
+            if _rem is not None and _it.quantity > _rem:
+                raise HTTPException(status_code=400, detail=f"「{_it.item_name}」只剩 {_rem} 份，請調整數量後再送出")
     
     # 每單上限檢查（不允許超過時擋下）
     if group.order_limit and not group.allow_over_limit and order.final_amount > group.order_limit:
@@ -714,6 +744,14 @@ async def follow_item(
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="請先在「我的訂單」按修改訂單，再跟點")
     
+    # V2.7.0：跟點也吃庫存/上下架
+    if source_item.menu_item is not None:
+        if source_item.menu_item.is_available is False:
+            raise HTTPException(status_code=400, detail="此品項已下架")
+        _rem = _stock_remaining(db, group_id, source_item.menu_item)
+        if _rem is not None and _rem < 1:
+            raise HTTPException(status_code=400, detail=f"「{source_item.item_name}」已售完")
+    
     # 複製品項
     order_item = OrderItem(
         order_id=order.id,
@@ -813,8 +851,21 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
                 db.delete(topping)
             db.delete(item)
     
-    # 複製上次訂單的品項
+    # 複製上次訂單的品項（V2.7.0：過濾非本團菜單/已下架，數量封頂到剩餘庫存）
+    _menu_item_ids = {mi.id for cat in group.menu.categories for mi in cat.items} if group.menu else set()
     for old_item in previous_order.items:
+        if old_item.menu_item_id and _menu_item_ids and old_item.menu_item_id not in _menu_item_ids:
+            continue
+        _mi = old_item.menu_item
+        if _mi is not None and _mi.is_available is False:
+            continue
+        _copy_qty = old_item.quantity
+        if _mi is not None:
+            _rem = _stock_remaining(db, group_id, _mi)
+            if _rem is not None:
+                if _rem < 1:
+                    continue
+                _copy_qty = min(_copy_qty, _rem)
         new_item = OrderItem(
             order_id=order.id,
             menu_item_id=old_item.menu_item_id,
@@ -822,7 +873,7 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
             size=old_item.size,
             sugar=old_item.sugar,
             ice=old_item.ice,
-            quantity=old_item.quantity,
+            quantity=_copy_qty,
             unit_price=old_item.unit_price,
             note=old_item.note,
         )
