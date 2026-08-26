@@ -1057,6 +1057,7 @@
                         <button type="button" @click="quantity = (selectedItem && selectedItem.remaining != null) ? Math.min(selectedItem.remaining, quantity + 1) : quantity + 1" class="stepper" aria-label="增加數量">+</button>
                     </div>
                     <p x-show="backupMode" x-cloak class="text-xs text-sela-800/50 mt-1">候補數量會跟隨主品項</p>
+                    <p x-show="selectedItem?.tbd" x-cloak class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 mt-1"><i class="ti ti-info-circle"></i> 此品項價格未訂，團主定價後金額會自動補上</p>
                 </div>
                 
                 <!-- 備註 -->

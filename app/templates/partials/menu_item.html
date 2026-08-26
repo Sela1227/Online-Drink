@@ -6,6 +6,7 @@
             id: {{ item.id }},
             name: '{{ item.name }}',
             price: {{ item.price }},
+            tbd: {{ 'true' if item.price_tbd else 'false' }},
             price_l: {{ item.price_l if item.price_l else 'null' }},
             remaining: {{ rem if rem is not none else 'null' }},
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
@@ -35,7 +36,9 @@
         </div>
     </div>
     <div class="text-sela-800 font-medium flex-shrink-0">
-        {% if item.price_l %}
+        {% if item.price_tbd %}
+        <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">價格未訂</span>
+        {% elif item.price_l %}
         ${{ item.price }}/${{ item.price_l }}
         {% else %}
         ${{ item.price }}

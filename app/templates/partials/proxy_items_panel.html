@@ -34,6 +34,10 @@
                 <span class="text-sela-800/50 text-sm">$</span>
                 <input type="number" name="price" min="1" step="1" placeholder="價格" required
                        class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+                <label class="flex items-center gap-1 text-xs text-sela-800/70 cursor-pointer whitespace-nowrap ml-1">
+                    <input type="checkbox" name="price_tbd" value="true" class="rounded border-sela-300"
+                           onchange="var p=this.closest('form').querySelector('[name=price]'); p.disabled=this.checked; p.required=!this.checked; if(this.checked) p.value='';"> 未訂
+                </label>
             </div>
         </div>
         <input type="text" name="description" maxlength="200" placeholder="說明（選填，例：6 入一盒）"
@@ -71,7 +75,7 @@
                     {% if item.is_available is false %}<span class="text-xs bg-sela-100 text-sela-800/55 px-1.5 py-0.5 rounded-full">已下架</span>{% endif %}
                     {% if item.description %}<div class="text-xs text-sela-800/50 truncate">{{ item.description }}</div>{% endif %}
                 </div>
-                <b class="text-sela-800">${{ item.price|int }}</b>
+                <b class="text-sela-800">{% if item.price_tbd %}<span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal">未訂</span>{% else %}${{ item.price|int }}{% endif %}</b>
                 {% if item.stock_limit %}<span class="text-xs text-sela-800/45">限 {{ item.stock_limit }}</span>{% endif %}
                 <i class="ti ti-chevron-down text-sela-300"></i>
             </summary>
@@ -83,8 +87,14 @@
                                class="flex-1 min-w-0 border border-sela-300 rounded-lg px-3 py-2 text-sm">
                         <div class="flex items-center gap-1 flex-shrink-0">
                             <span class="text-sela-800/50 text-sm">$</span>
-                            <input type="number" name="price" value="{{ item.price|int }}" min="1" step="1" required
+                            <input type="number" name="price" value="{% if not item.price_tbd %}{{ item.price|int }}{% endif %}" min="1" step="1"
+                                   {% if item.price_tbd %}disabled{% else %}required{% endif %}
                                    class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+                            <label class="flex items-center gap-1 text-xs text-sela-800/70 cursor-pointer whitespace-nowrap ml-1">
+                                <input type="checkbox" name="price_tbd" value="true" class="rounded border-sela-300"
+                                       {% if item.price_tbd %}checked{% endif %}
+                                       onchange="var p=this.closest('form').querySelector('[name=price]'); p.disabled=this.checked; p.required=!this.checked; if(this.checked) p.value='';"> 未訂
+                            </label>
                         </div>
                     </div>
                     <input type="text" name="description" maxlength="200" value="{{ item.description or '' }}" placeholder="說明（選填）"

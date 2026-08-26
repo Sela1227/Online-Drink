@@ -48,6 +48,7 @@ class MenuItem(Base):
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 品項圖（V2.7.0，Cloudinary）
     stock_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 數量上限（NULL=不限，已送出佔用）
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)  # 上/下架
+    price_tbd: Mapped[bool] = mapped_column(Boolean, default=False)  # 價格未訂（V2.9.0 代購：定價後回寫訂單）
     
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="items")

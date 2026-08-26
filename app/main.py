@@ -131,6 +131,7 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("menu_items", "image_url", "VARCHAR(500)")
     add_column_if_not_exists("menu_items", "stock_limit", "INTEGER")
     add_column_if_not_exists("menu_items", "is_available", "BOOLEAN DEFAULT TRUE")
+    add_column_if_not_exists("menu_items", "price_tbd", "BOOLEAN DEFAULT FALSE")
     
     add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
     add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")

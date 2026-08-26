@@ -189,6 +189,9 @@ def generate_payment_text(db: Session, group: Group) -> str:
         lines.append(f"最終應收：${actual_self_total + delivery_fee}")
     else:
         lines.append(f"應向個人收：${self_total + delivery_fee}")
+    _has_tbd = any(it.menu_item is not None and it.menu_item.price_tbd and it.unit_price == 0 for o in submitted_orders for it in o.items)
+    if _has_tbd:
+        lines.append("※ 含價格未訂品項，團主定價後金額會自動更新，請以更新後為準")
     lines.append(f"{len(submitted_orders)} 人已送出")
     lines.append("")
     lines.append("=" * 30)
@@ -214,7 +217,10 @@ def generate_payment_text(db: Session, group: Group) -> str:
                 item_desc += f" {item.sugar or ''}/{item.ice or ''}"
             if item.quantity > 1:
                 item_desc += f" x{item.quantity}"
-            lines.append(f"   - {item_desc} ${item.subtotal}")
+            if item.menu_item is not None and item.menu_item.price_tbd and item.unit_price == 0:
+                lines.append(f"   - {item_desc}（價格未訂）")
+            else:
+                lines.append(f"   - {item_desc} ${item.subtotal}")
             # 缺貨候補（含價差提醒）
             for b in item.backups:
                 unit_total = item.subtotal / item.quantity

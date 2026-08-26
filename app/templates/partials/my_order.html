@@ -31,7 +31,7 @@
                     </div>
                     {% if item.note %}<div class="text-xs text-sela-700/70 mt-0.5"><i class="ti ti-pencil"></i> {{ item.note }}</div>{% endif %}
                 </div>
-                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">${{ item.subtotal }}</div>
+                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">{% if item.menu_item and item.menu_item.price_tbd and item.unit_price == 0 %}<span class="text-xs text-sela-800/50">未訂</span>{% else %}${{ item.subtotal }}{% endif %}</div>
             </div>
 
             {% if is_open and order.status.value != 'submitted' %}

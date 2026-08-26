@@ -442,7 +442,8 @@ async def proxy_item_create(
     group_id: int,
     request: Request,
     item_name: str = Form(...),
-    price: str = Form(...),
+    price: str = Form(None),
+    price_tbd: bool = Form(False),
     description: str = Form(None),
     stock_limit: int = Form(None),
     image_file: UploadFile = File(None),
@@ -460,12 +461,15 @@ async def proxy_item_create(
         raise HTTPException(status_code=400, detail="品名需 1-100 字")
     if description and len(description.strip()) > 200:
         raise HTTPException(status_code=400, detail="說明最多 200 字")
-    try:
-        price_dec = Decimal(str(price).strip())
-    except Exception:
-        raise HTTPException(status_code=400, detail="價格格式錯誤")
-    if not (Decimal("1") <= price_dec <= Decimal("1000000")):
-        raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if price_tbd:
+        price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
+    else:
+        try:
+            price_dec = Decimal(str(price).strip())
+        except Exception:
+            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
+        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
     if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
         raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
@@ -488,6 +492,7 @@ async def proxy_item_create(
         description=description.strip() if description else None,
         image_url=image_url,
         stock_limit=stock_limit if stock_limit and stock_limit > 0 else None,
+        price_tbd=price_tbd,
     ))
     db.commit()
     return await proxy_items_panel(group_id, request, db)
@@ -499,7 +504,8 @@ async def proxy_item_update(
     item_id: int,
     request: Request,
     item_name: str = Form(...),
-    price: str = Form(...),
+    price: str = Form(None),
+    price_tbd: bool = Form(False),
     description: str = Form(None),
     stock_limit: int = Form(None),
     image_file: UploadFile = File(None),
@@ -520,12 +526,15 @@ async def proxy_item_update(
         raise HTTPException(status_code=400, detail="品名需 1-100 字")
     if description and len(description.strip()) > 200:
         raise HTTPException(status_code=400, detail="說明最多 200 字")
-    try:
-        price_dec = Decimal(str(price).strip())
-    except Exception:
-        raise HTTPException(status_code=400, detail="價格格式錯誤")
-    if not (Decimal("1") <= price_dec <= Decimal("1000000")):
-        raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if price_tbd:
+        price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
+    else:
+        try:
+            price_dec = Decimal(str(price).strip())
+        except Exception:
+            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
+        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
     if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
         raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
@@ -538,6 +547,14 @@ async def proxy_item_update(
         ).scalar() or 0
         if stock_limit < int(_used):
             raise HTTPException(status_code=400, detail=f"已有 {int(_used)} 份被訂走，上限不可低於 {int(_used)}")
+    # 未訂 → 定價：回寫此團所有引用此品項且仍為 0 元的訂單（未訂快照本為暫定，唯一允許回寫的情境）
+    if item.price_tbd and not price_tbd and price_dec > 0:
+        db.query(OrderItem).filter(
+            OrderItem.menu_item_id == item.id,
+            OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
+            OrderItem.unit_price == 0,
+        ).update({OrderItem.unit_price: price_dec}, synchronize_session=False)
+    item.price_tbd = price_tbd
     item.name = item_name.strip()
     item.price = price_dec
     item.description = description.strip() if description else None
