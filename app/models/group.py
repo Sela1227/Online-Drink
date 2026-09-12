@@ -21,6 +21,25 @@ def taipei_now():
     return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
 
 
+def taipei_to_utc(dt):
+    """台北牆上時間的 naive datetime → UTC 的 naive datetime。
+
+    V2.10.2：用於「使用者心智模型是台北日曆邊界，但要比對 UTC 欄位」的場合，
+    例如統計頁的「本月」＝台北 9/1 00:00，換算後要拿 UTC 8/31 16:00 去比對
+    `Group.created_at`。
+
+    注意這**不是**把所有台北計算都改成 `utcnow()` 就好 —— 日曆邊界仍然要用
+    台北算（那才是使用者要的月份），算完再用這個函式轉。至於滾動窗（近 30 天）
+    則直接從 `utcnow()` 起算即可，不需要經過這裡。
+    """
+    if dt is None:
+        return None
+    from datetime import timezone, timedelta
+    return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(
+        timezone.utc
+    ).replace(tzinfo=None)
+
+
 class Group(Base):
     __tablename__ = "groups"
     

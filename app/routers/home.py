@@ -884,12 +884,20 @@ async def stats_page(
         date_start = datetime(today.year, today.month, 1)
         date_end = now
     
+    # V2.10.2：date_start/date_end 是台北牆上時間（日曆邊界才符合使用者心智模型，
+    # 且模板的「統計期間」直接顯示它們）；但 Order/Group.created_at 存的是 UTC，
+    # 所以查詢另用一組轉換後的值。原本直接拿台北值去比，「本月」會漏掉每月前
+    # 8 小時的資料（台北 9/1 00:00-08:00 開的團不算進本月）。坑 #25 的反向案例。
+    from app.models.group import taipei_to_utc
+    query_start = taipei_to_utc(date_start)
+    query_end = taipei_to_utc(date_end)
+    
     # 基礎過濾條件
     base_filters = [
         Order.user_id == user.id,
         Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        Order.created_at >= query_start,
+        Order.created_at <= query_end
     ]
     
     # ===== 基本統計 =====
@@ -976,16 +984,16 @@ async def stats_page(
     # ===== 開團統計 =====
     groups_created = db.query(Group).filter(
         Group.owner_id == user.id,
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # ===== 抽獎統計 =====
     # 中獎次數
     lucky_wins = db.query(Group).filter(
         Group.lucky_winner_ids.contains(str(user.id)),
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # 被請客次數（在有 treat_user_id 的團中有訂單）
@@ -1000,8 +1008,8 @@ async def stats_page(
     # 請客次數
     treat_count = db.query(Group).filter(
         Group.treat_user_id == user.id,
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # ===== 月度趨勢（最近6個月）=====

@@ -11,7 +11,7 @@ from app.database import get_db
 from app.config import get_settings
 from app.models.store import Store, StoreOption, CategoryType, OptionType
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
-from app.models.group import Group, taipei_now
+from app.models.group import Group, taipei_now, taipei_to_utc
 from app.schemas.menu import MenuImport, FullImport, MenuContent
 from app.services.auth import get_admin_user
 from app.services.import_service import import_store_and_menu, import_menu
@@ -1615,9 +1615,8 @@ def _parse_taipei_to_utc(value: str):
         local_dt = datetime.fromisoformat(value)
     except (ValueError, TypeError):
         return None
-    if local_dt.tzinfo is None:
-        local_dt = local_dt.replace(tzinfo=timezone(timedelta(hours=8)))
-    return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+    # V2.10.2：轉換邏輯收斂到 taipei_to_utc()，這裡只負責解析字串
+    return taipei_to_utc(local_dt)
 
 
 # ============== 店家推薦審核 ==============

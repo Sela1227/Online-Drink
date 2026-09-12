@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.10.1（修 V2.10.0 增補審稿抓到的兩處 deadline 時區錯誤＋煙霧測試進版控）
+- **版本：** V2.10.2（落實坑 #25 的反向規則：三處拿台北時間比對 UTC 欄位＋煙霧測試安全防護）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -248,9 +248,19 @@
     - 根因：`groups.deadline` 存的是**台北牆上時間的 naive datetime**（見 `Group.is_expired` 的原始寫法），但 `announcements.expires_at`、`orders.created_at` 等欄位存的是 **UTC**。同一個 codebase 兩套慣例並存，寫新查詢時選錯只是機率問題——V2.10.0 就是在修完公告時區問題的**同一批程式碼裡**又犯了一次
     - 做法：`app/models/group.py` 新增模組級 `taipei_now()`，`Group.is_expired` 也改用它成為單一來源。**凡是比對 `deadline` 一律用 `taipei_now()`，永遠不要用 `utcnow()`**；反過來，比對 `expires_at` / `created_at` 這類 UTC 欄位時要用 `utcnow()`，不要用 `taipei_now()`
     - 自我檢查：改完 grep 一次 `deadline` 與 `utcnow` 同行的殘留
+    - **鏡像案例（V2.10.2 清掉）**：反過來拿台北時間去比對 UTC 欄位也一樣錯。
+      (a) `groups.py` 店家熱門品項的 30 天窗從台北時間起算，比對 UTC 的 `Order.created_at`，窗口實際變成 29 天 16 小時（`home.py::get_hot_items` 做同一件事卻是對的，兩支幾乎相同的函式一對一錯）。
+      (b) 統計頁 `home.py` 的 `date_start/date_end` 全從台北推算，卻比對 UTC 的 `Order/Group.created_at`，「本月」會漏掉每月前 8 小時（台北 9/1 00:00-08:00 開的團不算進本月），「今年」同理漏 1/1 前 8 小時。
+    - **修法有陷阱**：增補審稿建議「兩處都改用 `utcnow()`」，這對**滾動窗**（近 30/90 天）是對的，但對**日曆邊界**（本月/今年）是錯的——改成 `datetime(utcnow.year, utcnow.month, 1)` 會變成「UTC 的九月」＝台北 9/1 08:00 起，只是換個方向漏同樣 8 小時。日曆邊界仍要用台北算（那才是使用者要的月份），算完用 `taipei_to_utc()` 轉；而且統計頁的 `date_start/date_end` 還要顯示在模板的「統計期間」，所以**顯示用台北值、查詢用轉換值，必須拆成兩組**。這正是 `taipei_now()` docstring 那句反向規則想防的矯枉過正
     - 根治：這只是緩解。兩套慣例並存是結構問題，V2.11「時間單一真相」處理。增補審稿的判斷值得記下——**時間處理是目前唯一一個「已證實會持續產生新缺陷」的結構問題**，所以它在 V2.11 裡排第一，優先於授權 dependency 與 Alembic（那兩項解決的是潛在風險與維護成本，還沒造成實際錯誤）
 
 
+
+26. **測試腳本用 `os.environ.setdefault("DATABASE_URL", ...)` 等於沒有防護**（V2.10.2 修正，外部審稿抓到）
+    - 症狀：`scripts/smoke_test.py` 開頭會 `db.query(model).delete()` 清四張表。若執行時 shell 裡已匯出過正式的 `DATABASE_URL`（剛操作完 Railway、或在 Railway console 裡跑），`setdefault` **不會覆寫**它，四道 DELETE 直接打到正式資料庫
+    - 為什麼「沒出事」不算安全：外鍵約束**可能**在刪 `Group` 時中斷並回滾，但 `announcements` 沒有被任何東西參照，順序剛好就會真的被清掉。這是靠運氣不是靠設計
+    - 做法：偵測到非 SQLite 的 `DATABASE_URL` 直接 `SystemExit` 中止，並用**指派**而非 `setdefault` 覆寫；`SECRET_KEY` 同理。錯誤訊息只印 scheme，不印完整連線字串
+    - 通用原則：**任何會寫入或刪除的腳本，都要主動拒絕非預期的目標，而不是預設一個安全值就當作防住了。** `setdefault` 表達的是「偏好」，不是「限制」
 
 ---
 
@@ -290,6 +300,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.10.2 | **落實坑 #25 的反向規則＋煙霧測試安全防護**（V2.10.1 增補審稿）。(1) **`smoke_test.py` 誤刪正式資料的風險**：`os.environ.setdefault("DATABASE_URL", ...)` 在 shell 已匯出正式連線時不會覆寫，而腳本開頭會 DELETE 四張表 → 改為偵測非 SQLite 就中止，並用指派覆寫（坑 #26）。(2) **`groups.py` 熱門品項 30 天窗**：從台北時間起算卻比對 UTC 的 `Order.created_at`，窗口實際是 29 天 16 小時 → 改從 `utcnow()` 起算，與 `home.py::get_hot_items` 一致。(3) **統計頁日期區間**：`date_start/date_end` 從台北推算卻比對 UTC 的 `created_at`，「本月」漏掉每月前 8 小時 → 新增 `taipei_to_utc()`，**顯示仍用台北值（模板的「統計期間」要看）、查詢改用 `query_start/query_end`**，四組比對全改。**※ 審稿建議的「兩處都改 utcnow()」只對一半**——滾動窗對、日曆邊界錯（會變成 UTC 的月份，換個方向漏同樣 8 小時），見坑 #25 的修法陷阱。(4) `admin.py::_parse_taipei_to_utc` 改為呼叫 `taipei_to_utc()`，轉換邏輯收斂單一來源。(5) 煙霧測試 15 → **19 項**（加台北日曆邊界、跨年、None、與 `_parse_taipei_to_utc` 一致性）。**※ 審稿 2.3「ZIP 內含 6 個 `__pycache__`」不成立**：V2.10.1 的 ZIP 實際為 161 檔、`__pycache__` 計數 0。那 6 個目錄是審稿自己執行 `check_routes.py` 與 `smoke_test.py` 後產生的。不過其 SOP 排序建議正確，已寫進 handoff（跑測試 → 清理 → 改名 → 打包）。 |
 | V2.10.1 | **修 V2.10.0 增補審稿抓到的兩處時區錯誤**。(1) `cleanup_test_groups` 與店家編輯頁的 `active_group_count` 都用 `datetime.utcnow()` 比對 `Group.deadline`，但 deadline 存的是台北牆上時間，差 8 小時 → 新增 `app/models/group.py::taipei_now()`，兩處改用它，`Group.is_expired` 也改用它成為單一來源（坑 #25）。前者影響方向是安全的（不會誤刪進行中的團）但已截止的團要 8 小時後才清得掉；後者只影響提示文字會高估團數。(2) **煙霧測試進版控** `scripts/smoke_test.py`（15 項，含坑 #25 的回歸測試，且刻意 assert「舊寫法仍會錯」以確保測試有鑑別力）—— 增補審稿建議保留成檔案而非一次性腳本，採納。(3) 審稿 3.5 指 ZIP 檔名不合規範**不成立**：實際產出是 `Online-Drink V2.10.0.zip`（空格與點），底線版是平台傳檔時的字元置換。**其餘不動**：3.3 儀表板重複卡片、3.4 分類改變後飲料選項殘留，都留在 V2.11 的批次裡。 |
 | V2.10.0 | **管理後台流程第一包（審稿七提案的接線與導向 + 提案 3）**。(1) **公告二合一**：首頁改直接查 `announcements` 表（`home.py` 新增 `get_active_announcements()`，篩啟用中＋未到期、置頂優先、最多 2 則），標題獨立顯示、置頂左粗邊＋圖釘、有到期日顯示「X/X 前顯示」；移除 `_sync_announcement_from_active()` 與其 5 個呼叫點、移除孤兒路由 `POST /admin/announcement`（全站無表單指向它，且會覆寫同步結果造成脫鉤，另與 1486 行函式同名 `update_announcement`）；`SystemSetting.announcement` 欄位保留不動（不碰 schema，僅不再讀寫）；儀表板數字由「公告總數」改「公告顯示中」。**※ 審稿原判斷有誤**：它說 `Announcement` 從未被前台查詢、公告完全不會顯示——實際有同步 helper 接著，真正的問題是只能顯示一則、標題被塞進內文、且 `expires_at` 從未被比對。(2) **公告到期時間時區修正**：`datetime-local` 表單值是台北牆上時間，原本 `fromisoformat` 直接存＝當成 UTC 存，差 8 小時。過去 `expires_at` 沒被用過所以沒人發現，現在首頁要依它過濾，必須正確 → 新增 `_parse_taipei_to_utc()`，列表與編輯頁顯示補 `|taipei`。(3) **核准推薦接匯入頁**（提案 1）：`approve_recommendation` 改導向 `/admin/import?store_id={新ID}`；匯入頁若該店家有對應 `StoreRecommendation`（以 `created_store_id` 反查），顯示推薦人／菜單照片（可開新分頁放大）／菜單網址／備註，右上給「稍後再匯入」出口。**與 Sela 議定不加勾選框**——預設勾起的勾選框實務上沒人取消，多一個要測的分支換不到彈性，出口放匯入頁即可。(4) **匯入完成接菜單頁**（提案 7）：`do_import` 由導回 `/admin` 改為 `/admin/stores/{id}/menus?imported=1&cats=&items=`，兩個分支都取得得到 store_id（完整匯入回 Store、菜單更新回 Menu.store_id）；新增 `_count_import()` 算分類／品項數；菜單頁顯示綠色成功提示，舊菜單有保留時加註第 N 版，附「回店家列表」「繼續匯入其他店家」。(5) **清除測試團排除進行中團單**（審稿 4.1）：`all()` 對零訂單恆為真，且原查詢 `db.query(Group).all()` 不篩狀態 → 早上開、還沒人點的團會被 `_delete_group_cascade` 實體刪除且不可復原。加 `or_(is_closed == True, deadline <= now)`。**兩段式預覽刻意不做**，留 V2.11 與刪店家輸入店名確認、全體登出影響說明一起包成「危險操作」，讓本版維持在「只改導向與查詢條件」的低風險層級（本版與未實測的 V2.9.1 同批部署，排查範圍是兩版總和）。(6) **店家編輯頁補飲料選項**（提案 3）：原本甜度冰塊只有完整 JSON 匯入才建得出來，從推薦核准來的飲料店永遠沒有、後台無處可補。新增 `POST /admin/stores/{id}/options`，甜度／冰塊各一個逗號分隔輸入框＋兩顆常用組合按鈕，有進行中團單時顯示提示。**採整批取代**（刪舊的再依填寫順序重建）而非比照加料逐筆增刪——甜冰有顯示順序，逐筆要另做排序 UI，而它本來就是一次設定好的東西；`OrderItem.sugar/.ice` 是字串快照不吃 `store_options.id`，重建不影響任何歷史訂單。`_parse_option_values()` 容忍全形逗號、去重保序、單值截 50（欄位上限）、上限 20 個。教訓見坑 #24（批次刪行的錨點縮排陷阱）。本版額外寫了 SQLite 煙霧測試驗公告過濾排序／選項解析／時區轉換／匯入計數；`check_routes.py` 這次真的跑起來（裝 requirements 後），135 條路由無重複。 |
 | V2.9.1 | **上線前審核修正（六項阻斷級＋低風險四項）**。(1) **刪除 groups.py 重複的 copy_last_order**——與 orders.py 同路徑，groups router 先註冊者勝，導致 **V2.6 的已送出防護/mode 與 V2.7 的庫存封頂從未生效**、且舊版引用不存在欄位。已建 `scripts/check_routes.py` 重複路由檢查納入發版流程。(2) 收藏按鈕路徑 `/favorites/{id}/add|remove` → `/favorites/{id}`，非 HTMX 請求改回傳 redirect（原本使用者看到裸 JSON）。(3) `delete_store` 補三條外鍵斷鏈：`order_item_backups.menu_item_id` 設 NULL（V2.4 新表未涵蓋會擋刪除）、`user_favorites`、`group_templates`。(4) `export_service` 改用 `group.store_display_name`＋None 防護（店家已刪的歷史團單匯出原本 500）；空購物車不再列入「未送出」。(5) `SECRET_KEY`/LINE 憑證未設定時拒絕啟動（不再用公開預設金鑰簽 JWT；⚠️ 部署前先在 Railway 確認 SECRET_KEY，換金鑰全員需重新登入）。(6) `create_engine` 加 `pool_pre_ping/pool_recycle(1800)/pool_size(5)/max_overflow(10)`——解「早上第一個人打開會錯、重整就好」。(7) 訂單牆截止判斷改 `group.is_open`（原 utcnow 比對有時區/提早結單漏洞）。(8) 正式環境關閉 /docs 與 openapi。(9) 刪死碼 dev/auth_extra/feedback/orders_extra 及 dev include。(10) start.sh 改 3 workers＋proxy-headers。**教訓：每次新增資料表都要回頭檢查刪除流程；每次新增路由都要跑重複路由檢查；橫向一致性（時區、可見性、None 防護）不能只在當下需要的地方套用。** |

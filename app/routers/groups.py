@@ -324,7 +324,9 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     
     # 取得該店家熱門品項（全站統計，最近 30 天）
     from datetime import timedelta
-    thirty_days_ago = datetime.now(TAIPEI_TZ).replace(tzinfo=None) - timedelta(days=30)
+    # V2.10.2：Order.created_at 是 UTC，門檻若從台北時間算，窗口會變成 29 天 16 小時
+    # （坑 #25 的反向案例）。滾動窗直接從 utcnow() 起算，寫法同 home.py::get_hot_items
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     hot_items = db.query(
         OrderItem.item_name,
         OrderItem.menu_item_id,

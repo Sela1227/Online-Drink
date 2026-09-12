@@ -5,12 +5,13 @@
     SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py
 跑完記得 `rm -f _smoke.db`，打包前不要把它一起裝進去。
 
-涵蓋範圍（V2.10.1）：
+涵蓋範圍（V2.10.2）：
   1. 首頁公告的過濾與排序（啟用/停用、到期、置頂、則數上限）
   2. deadline 的時區比對（清除測試團、進行中團數）— 坑 #25 的回歸測試
   3. 飲料選項字串解析（全形逗號、去重、長度上限）
   4. 公告到期時間的台北→UTC 轉換
-  5. 匯入分類／品項計數
+  5. 台北日曆邊界轉 UTC（統計頁「本月」的邊界）
+  6. 匯入分類／品項計數
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -18,8 +19,17 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./_smoke.db")
-os.environ.setdefault("SECRET_KEY", "smoke_test_only")
+# V2.10.2 安全防護：setdefault 的語意是「沒設才用預設值」，若 shell 裡已經
+# 匯出過正式的 DATABASE_URL（例如剛操作完 Railway），下面的 delete() 會直接
+# 打到正式資料庫。這裡改成偵測到非 SQLite 就中止，並強制覆寫而非 setdefault。
+_existing = os.environ.get("DATABASE_URL", "")
+if _existing and not _existing.startswith("sqlite"):
+    raise SystemExit(
+        "smoke_test 只能跑在 SQLite。偵測到 DATABASE_URL 指向非 SQLite "
+        f"（{_existing.split('://')[0]}://...），已中止以免刪到正式資料。"
+    )
+os.environ["DATABASE_URL"] = "sqlite:///./_smoke.db"
+os.environ["SECRET_KEY"] = "smoke_test_only"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import or_
@@ -27,7 +37,7 @@ from sqlalchemy import or_
 from app.database import Base, engine, SessionLocal
 from app.models.user import Announcement, User
 from app.models.store import Store, CategoryType
-from app.models.group import Group, taipei_now
+from app.models.group import Group, taipei_now, taipei_to_utc
 from app.routers.home import get_active_announcements
 from app.routers.admin import _parse_option_values, _parse_taipei_to_utc, _count_import
 from app.schemas.menu import MenuContent
@@ -136,8 +146,19 @@ def main():
     assert _parse_taipei_to_utc("") is None and _parse_taipei_to_utc("亂打") is None
     check("空值與格式錯誤回 None")
 
-    # ---------- 5. 匯入計數 ----------
-    print("\n[5] 匯入計數")
+    # ---------- 5. 台北日曆邊界轉 UTC ----------
+    print("\n[5] 台北日曆邊界轉 UTC")
+    assert taipei_to_utc(datetime(2026, 9, 1, 0, 0)) == datetime(2026, 8, 31, 16, 0)
+    check("台北 9/1 00:00 = UTC 8/31 16:00（統計「本月」不會漏掉每月前 8 小時）")
+    assert taipei_to_utc(datetime(2026, 1, 1, 0, 0)) == datetime(2025, 12, 31, 16, 0)
+    check("跨年邊界")
+    assert taipei_to_utc(None) is None
+    check("None 直通")
+    assert _parse_taipei_to_utc("2026-09-20T12:00") == taipei_to_utc(datetime(2026, 9, 20, 12, 0))
+    check("_parse_taipei_to_utc 與 taipei_to_utc 結果一致（同一套轉換）")
+
+    # ---------- 6. 匯入計數 ----------
+    print("\n[6] 匯入計數")
     content = MenuContent(
         categories=[{"name": "甜點", "items": [{"name": "a", "price": 1}, {"name": "b", "price": 2}]}],
         items=[{"name": "c", "price": 3}],
