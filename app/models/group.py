@@ -35,6 +35,10 @@ def taipei_to_utc(dt):
     if dt is None:
         return None
     from datetime import timezone, timedelta
+    if dt.tzinfo is not None:
+        # V2.10.3：帶時區的輸入直接換算，不要 replace（那是覆寫不是轉換）。
+        # V2.10.1 的 _parse_taipei_to_utc 原本有這個判斷，收斂時漏掉了。
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(
         timezone.utc
     ).replace(tzinfo=None)

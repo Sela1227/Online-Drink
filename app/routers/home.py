@@ -29,6 +29,35 @@ def to_taipei_time(dt):
 templates.env.filters['taipei'] = to_taipei_time
 
 
+def month_buckets(today, count: int = 6):
+    """往回推 count 個月，回傳 [(年, 月), ...]，最舊在前、當月在最後。
+
+    V2.10.3：原本用 `today.replace(day=1) - timedelta(days=i*30)` 推算，但月份
+    長度是 28-31 天，累積誤差會讓某些月份重複、某些月份消失（2026 年 3-5 月都
+    會漏掉二月）。月份要用月份運算，不要用天數近似。
+    """
+    out, year, month = [], today.year, today.month
+    for _ in range(count):
+        out.append((year, month))
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+    return list(reversed(out))
+
+
+def taipei_slot(utc_dow: int, utc_hour: int) -> tuple[int, int]:
+    """(UTC 星期, UTC 小時) → (台北星期, 台北小時)。
+
+    V2.10.3：`Order.created_at` 是 UTC，`extract` 出來的小時與星期也是 UTC。
+    午餐團多在台北 09:00-12:00＝UTC 01:00-04:00，未位移時「最常下單時段」會
+    顯示 2:00 或 3:00。位移跨過 24 點時星期要進一天，所以兩者必須一起算。
+    dow 慣例 0=週日，PostgreSQL 與 SQLite 一致。
+    """
+    taipei_hour = (utc_hour + 8) % 24
+    taipei_dow = (utc_dow + 1) % 7 if utc_hour + 8 >= 24 else utc_dow
+    return taipei_dow, taipei_hour
+
+
 def get_active_announcements(db: Session, limit: int = 2):
     """首頁公告（V2.10.0）：啟用中且未到期，置頂優先、其次建立時間新到舊。
 
@@ -1013,14 +1042,14 @@ async def stats_page(
     ).count()
     
     # ===== 月度趨勢（最近6個月）=====
+    # V2.10.3：月份桶邏輯見 month_buckets()（舊寫法會重複/跳月）
     monthly_trend = []
-    for i in range(5, -1, -1):
-        month_date = today.replace(day=1) - timedelta(days=i*30)
-        month_start = datetime(month_date.year, month_date.month, 1)
-        if month_date.month == 12:
-            month_end = datetime(month_date.year + 1, 1, 1) - timedelta(seconds=1)
+    for bucket_year, bucket_month in month_buckets(today):
+        month_start = datetime(bucket_year, bucket_month, 1)
+        if bucket_month == 12:
+            month_end = datetime(bucket_year + 1, 1, 1) - timedelta(seconds=1)
         else:
-            month_end = datetime(month_date.year, month_date.month + 1, 1) - timedelta(seconds=1)
+            month_end = datetime(bucket_year, bucket_month + 1, 1) - timedelta(seconds=1)
         
         month_amount = db.query(
             func.sum(OrderItem.unit_price * OrderItem.quantity)
@@ -1029,8 +1058,9 @@ async def stats_page(
         ).filter(
             Order.user_id == user.id,
             Order.status == OrderStatus.SUBMITTED,
-            Order.created_at >= month_start,
-            Order.created_at <= month_end
+            # 月份邊界是台北日曆，created_at 是 UTC（坑 #25），要轉
+            Order.created_at >= taipei_to_utc(month_start),
+            Order.created_at <= taipei_to_utc(month_end)
         ).scalar() or Decimal("0")
         
         monthly_trend.append({
@@ -1038,28 +1068,38 @@ async def stats_page(
             "amount": int(month_amount)
         })
     
-    # ===== 時段分析 =====
-    # 取得所有訂單的小時分布
-    hour_stats = db.query(
+    # ===== 時段與星期分析 =====
+    # V2.10.3：created_at 是 UTC，extract 出來的小時與星期也是 UTC。午餐團多在
+    # 台北 09:00-12:00＝UTC 01:00-04:00，原本「最常下單時段」會顯示 2:00 或 3:00。
+    # 一次撈出 (UTC 星期, UTC 小時) 的分布，再於 Python 位移 +8 小時；跨過 24 點
+    # 時星期要進一天，所以兩者必須一起算，不能各自 group by。
+    # 在 Python 位移而非用 SQL 的 interval，是為了不綁資料庫方言，煙霧測試才能在
+    # SQLite 上跑（坑 #25 的同一族問題）。
+    slot_stats = db.query(
+        extract('dow', Order.created_at).label('dow'),
         extract('hour', Order.created_at).label('hour'),
         func.count(Order.id).label('count')
     ).filter(
         *base_filters
-    ).group_by(extract('hour', Order.created_at)).all()
+    ).group_by(
+        extract('dow', Order.created_at),
+        extract('hour', Order.created_at)
+    ).all()
     
-    # 找出最常下單時段
-    peak_hour = max(hour_stats, key=lambda x: x.count).hour if hour_stats else 12
+    hour_counts = {}
+    weekday_counts = {}
+    for row in slot_stats:
+        utc_hour = int(row.hour)
+        utc_dow = int(row.dow)
+        count = int(row.count)
+        taipei_dow, taipei_hour = taipei_slot(utc_dow, utc_hour)
+        hour_counts[taipei_hour] = hour_counts.get(taipei_hour, 0) + count
+        weekday_counts[taipei_dow] = weekday_counts.get(taipei_dow, 0) + count
     
-    # ===== 星期分析 =====
-    weekday_stats = db.query(
-        extract('dow', Order.created_at).label('dow'),
-        func.count(Order.id).label('count')
-    ).filter(
-        *base_filters
-    ).group_by(extract('dow', Order.created_at)).all()
+    peak_hour = max(hour_counts, key=hour_counts.get) if hour_counts else 12
     
     weekday_names = ['日', '一', '二', '三', '四', '五', '六']
-    peak_weekday = max(weekday_stats, key=lambda x: x.count).dow if weekday_stats else 1
+    peak_weekday = max(weekday_counts, key=weekday_counts.get) if weekday_counts else 1
     
     # ===== 甜度冰塊偏好（飲料）=====
     sugar_stats = db.query(

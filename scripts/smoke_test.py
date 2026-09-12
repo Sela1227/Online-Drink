@@ -5,13 +5,14 @@
     SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py
 跑完記得 `rm -f _smoke.db`，打包前不要把它一起裝進去。
 
-涵蓋範圍（V2.10.2）：
+涵蓋範圍（V2.10.3）：
   1. 首頁公告的過濾與排序（啟用/停用、到期、置頂、則數上限）
   2. deadline 的時區比對（清除測試團、進行中團數）— 坑 #25 的回歸測試
   3. 飲料選項字串解析（全形逗號、去重、長度上限）
   4. 公告到期時間的台北→UTC 轉換
   5. 台北日曆邊界轉 UTC（統計頁「本月」的邊界）
-  6. 匯入分類／品項計數
+  6. 統計頁的月份桶連續性與 UTC→台北時段位移
+  7. 匯入分類／品項計數
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -38,7 +39,7 @@ from app.database import Base, engine, SessionLocal
 from app.models.user import Announcement, User
 from app.models.store import Store, CategoryType
 from app.models.group import Group, taipei_now, taipei_to_utc
-from app.routers.home import get_active_announcements
+from app.routers.home import get_active_announcements, month_buckets, taipei_slot
 from app.routers.admin import _parse_option_values, _parse_taipei_to_utc, _count_import
 from app.schemas.menu import MenuContent
 
@@ -157,8 +158,29 @@ def main():
     assert _parse_taipei_to_utc("2026-09-20T12:00") == taipei_to_utc(datetime(2026, 9, 20, 12, 0))
     check("_parse_taipei_to_utc 與 taipei_to_utc 結果一致（同一套轉換）")
 
-    # ---------- 6. 匯入計數 ----------
-    print("\n[6] 匯入計數")
+    # ---------- 6. 統計頁：月份桶與時段位移 ----------
+    print("\n[6] 統計頁計算")
+
+    from datetime import date
+    for probe in (date(2026, 3, 1), date(2026, 3, 15), date(2026, 4, 10),
+                  date(2026, 5, 20), date(2026, 9, 12), date(2027, 1, 5)):
+        got = month_buckets(probe)
+        assert len(set(got)) == 6, f"{probe} 推出重複月份：{got}"
+        assert got[-1] == (probe.year, probe.month), f"{probe} 最後一桶應是當月"
+        for a, b in zip(got, got[1:]):
+            gap = (b[0] - a[0]) * 12 + (b[1] - a[1])
+            assert gap == 1, f"{probe} 月份不連續：{a} → {b}"
+    check("六個月份桶連續、不重複、不跳月（2026/3-5 是舊寫法必錯的月份）")
+
+    assert taipei_slot(3, 3) == (3, 11), "UTC 週三 03:00 = 台北週三 11:00"
+    check("午餐時段：UTC 03:00 → 台北 11:00（不再顯示 2:00/3:00）")
+    assert taipei_slot(3, 17) == (4, 1), "UTC 週三 17:00 = 台北週四 01:00"
+    check("跨 24 點時星期進一天")
+    assert taipei_slot(6, 16) == (0, 0), "UTC 週六 16:00 = 台北週日 00:00"
+    check("週六跨到週日（dow 迴繞）")
+
+    # ---------- 7. 匯入計數 ----------
+    print("\n[7] 匯入計數")
     content = MenuContent(
         categories=[{"name": "甜點", "items": [{"name": "a", "price": 1}, {"name": "b", "price": 2}]}],
         items=[{"name": "c", "price": 3}],
