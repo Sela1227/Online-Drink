@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.10.0（管理後台流程第一包：公告二合一＋接線導向＋飲料選項）
+- **版本：** V2.10.1（修 V2.10.0 增補審稿抓到的兩處 deadline 時區錯誤＋煙霧測試進版控）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -242,6 +242,15 @@
     - 做法：**縮排敏感的整行刪除，錨點一律連同前一行（或後一行）一起寫**，例如 `"        ann.is_active = not ann.is_active\n        _sync...(db)\n"`。只靠單行內容當錨點時，若該行可能出現在不同縮排層級，assert 完全不保護。收尾一定要 `py_compile`，光看 assert 全過不代表沒事
     - 延伸：這是 V2.8「多行替換注意 try 縮排」的同一族問題，但更陰險——那次是縮排沒補上，這次是 assert 說謊
 
+25. **`deadline` 是台北牆上時間，不是 UTC — 拿 `utcnow()` 比會差 8 小時**（V2.10.1 修正，外部增補審稿抓到）
+    - 症狀一：「清除測試團」對當天剛截止的團完全沒反應，要等 8 小時後才清得掉，管理員會以為功能壞了
+    - 症狀二：飲料選項的「有 N 個進行中的團」警告高估，已截止 8 小時內的團仍被算成進行中
+    - 根因：`groups.deadline` 存的是**台北牆上時間的 naive datetime**（見 `Group.is_expired` 的原始寫法），但 `announcements.expires_at`、`orders.created_at` 等欄位存的是 **UTC**。同一個 codebase 兩套慣例並存，寫新查詢時選錯只是機率問題——V2.10.0 就是在修完公告時區問題的**同一批程式碼裡**又犯了一次
+    - 做法：`app/models/group.py` 新增模組級 `taipei_now()`，`Group.is_expired` 也改用它成為單一來源。**凡是比對 `deadline` 一律用 `taipei_now()`，永遠不要用 `utcnow()`**；反過來，比對 `expires_at` / `created_at` 這類 UTC 欄位時要用 `utcnow()`，不要用 `taipei_now()`
+    - 自我檢查：改完 grep 一次 `deadline` 與 `utcnow` 同行的殘留
+    - 根治：這只是緩解。兩套慣例並存是結構問題，V2.11「時間單一真相」處理。增補審稿的判斷值得記下——**時間處理是目前唯一一個「已證實會持續產生新缺陷」的結構問題**，所以它在 V2.11 裡排第一，優先於授權 dependency 與 Alembic（那兩項解決的是潛在風險與維護成本，還沒造成實際錯誤）
+
+
 
 ---
 
@@ -281,6 +290,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.10.1 | **修 V2.10.0 增補審稿抓到的兩處時區錯誤**。(1) `cleanup_test_groups` 與店家編輯頁的 `active_group_count` 都用 `datetime.utcnow()` 比對 `Group.deadline`，但 deadline 存的是台北牆上時間，差 8 小時 → 新增 `app/models/group.py::taipei_now()`，兩處改用它，`Group.is_expired` 也改用它成為單一來源（坑 #25）。前者影響方向是安全的（不會誤刪進行中的團）但已截止的團要 8 小時後才清得掉；後者只影響提示文字會高估團數。(2) **煙霧測試進版控** `scripts/smoke_test.py`（15 項，含坑 #25 的回歸測試，且刻意 assert「舊寫法仍會錯」以確保測試有鑑別力）—— 增補審稿建議保留成檔案而非一次性腳本，採納。(3) 審稿 3.5 指 ZIP 檔名不合規範**不成立**：實際產出是 `Online-Drink V2.10.0.zip`（空格與點），底線版是平台傳檔時的字元置換。**其餘不動**：3.3 儀表板重複卡片、3.4 分類改變後飲料選項殘留，都留在 V2.11 的批次裡。 |
 | V2.10.0 | **管理後台流程第一包（審稿七提案的接線與導向 + 提案 3）**。(1) **公告二合一**：首頁改直接查 `announcements` 表（`home.py` 新增 `get_active_announcements()`，篩啟用中＋未到期、置頂優先、最多 2 則），標題獨立顯示、置頂左粗邊＋圖釘、有到期日顯示「X/X 前顯示」；移除 `_sync_announcement_from_active()` 與其 5 個呼叫點、移除孤兒路由 `POST /admin/announcement`（全站無表單指向它，且會覆寫同步結果造成脫鉤，另與 1486 行函式同名 `update_announcement`）；`SystemSetting.announcement` 欄位保留不動（不碰 schema，僅不再讀寫）；儀表板數字由「公告總數」改「公告顯示中」。**※ 審稿原判斷有誤**：它說 `Announcement` 從未被前台查詢、公告完全不會顯示——實際有同步 helper 接著，真正的問題是只能顯示一則、標題被塞進內文、且 `expires_at` 從未被比對。(2) **公告到期時間時區修正**：`datetime-local` 表單值是台北牆上時間，原本 `fromisoformat` 直接存＝當成 UTC 存，差 8 小時。過去 `expires_at` 沒被用過所以沒人發現，現在首頁要依它過濾，必須正確 → 新增 `_parse_taipei_to_utc()`，列表與編輯頁顯示補 `|taipei`。(3) **核准推薦接匯入頁**（提案 1）：`approve_recommendation` 改導向 `/admin/import?store_id={新ID}`；匯入頁若該店家有對應 `StoreRecommendation`（以 `created_store_id` 反查），顯示推薦人／菜單照片（可開新分頁放大）／菜單網址／備註，右上給「稍後再匯入」出口。**與 Sela 議定不加勾選框**——預設勾起的勾選框實務上沒人取消，多一個要測的分支換不到彈性，出口放匯入頁即可。(4) **匯入完成接菜單頁**（提案 7）：`do_import` 由導回 `/admin` 改為 `/admin/stores/{id}/menus?imported=1&cats=&items=`，兩個分支都取得得到 store_id（完整匯入回 Store、菜單更新回 Menu.store_id）；新增 `_count_import()` 算分類／品項數；菜單頁顯示綠色成功提示，舊菜單有保留時加註第 N 版，附「回店家列表」「繼續匯入其他店家」。(5) **清除測試團排除進行中團單**（審稿 4.1）：`all()` 對零訂單恆為真，且原查詢 `db.query(Group).all()` 不篩狀態 → 早上開、還沒人點的團會被 `_delete_group_cascade` 實體刪除且不可復原。加 `or_(is_closed == True, deadline <= now)`。**兩段式預覽刻意不做**，留 V2.11 與刪店家輸入店名確認、全體登出影響說明一起包成「危險操作」，讓本版維持在「只改導向與查詢條件」的低風險層級（本版與未實測的 V2.9.1 同批部署，排查範圍是兩版總和）。(6) **店家編輯頁補飲料選項**（提案 3）：原本甜度冰塊只有完整 JSON 匯入才建得出來，從推薦核准來的飲料店永遠沒有、後台無處可補。新增 `POST /admin/stores/{id}/options`，甜度／冰塊各一個逗號分隔輸入框＋兩顆常用組合按鈕，有進行中團單時顯示提示。**採整批取代**（刪舊的再依填寫順序重建）而非比照加料逐筆增刪——甜冰有顯示順序，逐筆要另做排序 UI，而它本來就是一次設定好的東西；`OrderItem.sugar/.ice` 是字串快照不吃 `store_options.id`，重建不影響任何歷史訂單。`_parse_option_values()` 容忍全形逗號、去重保序、單值截 50（欄位上限）、上限 20 個。教訓見坑 #24（批次刪行的錨點縮排陷阱）。本版額外寫了 SQLite 煙霧測試驗公告過濾排序／選項解析／時區轉換／匯入計數；`check_routes.py` 這次真的跑起來（裝 requirements 後），135 條路由無重複。 |
 | V2.9.1 | **上線前審核修正（六項阻斷級＋低風險四項）**。(1) **刪除 groups.py 重複的 copy_last_order**——與 orders.py 同路徑，groups router 先註冊者勝，導致 **V2.6 的已送出防護/mode 與 V2.7 的庫存封頂從未生效**、且舊版引用不存在欄位。已建 `scripts/check_routes.py` 重複路由檢查納入發版流程。(2) 收藏按鈕路徑 `/favorites/{id}/add|remove` → `/favorites/{id}`，非 HTMX 請求改回傳 redirect（原本使用者看到裸 JSON）。(3) `delete_store` 補三條外鍵斷鏈：`order_item_backups.menu_item_id` 設 NULL（V2.4 新表未涵蓋會擋刪除）、`user_favorites`、`group_templates`。(4) `export_service` 改用 `group.store_display_name`＋None 防護（店家已刪的歷史團單匯出原本 500）；空購物車不再列入「未送出」。(5) `SECRET_KEY`/LINE 憑證未設定時拒絕啟動（不再用公開預設金鑰簽 JWT；⚠️ 部署前先在 Railway 確認 SECRET_KEY，換金鑰全員需重新登入）。(6) `create_engine` 加 `pool_pre_ping/pool_recycle(1800)/pool_size(5)/max_overflow(10)`——解「早上第一個人打開會錯、重整就好」。(7) 訂單牆截止判斷改 `group.is_open`（原 utcnow 比對有時區/提早結單漏洞）。(8) 正式環境關閉 /docs 與 openapi。(9) 刪死碼 dev/auth_extra/feedback/orders_extra 及 dev include。(10) start.sh 改 3 workers＋proxy-headers。**教訓：每次新增資料表都要回頭檢查刪除流程；每次新增路由都要跑重複路由檢查；橫向一致性（時區、可見性、None 防護）不能只在當下需要的地方套用。** |
 | V2.9.0 | **代購：價格「未訂」**。品項價格可勾「未訂」（不用填價、先開賣），MenuItem 加 `price_tbd`（未訂時 price=0 佔位）。**核心規則：未訂→定價那一刻，自動回寫此團所有引用該品項且仍為 0 元的訂單 unit_price**（含已送出——未訂快照本為暫定，這是唯一允許回寫快照的情境），總額/補助/收款全自動重算。UI：面板新增/修改表單「未訂」勾選（勾了價格欄 disable＋免填、JS 同步 required）、團主列表「未訂」標籤；團員菜單「價格未訂」pill、下單視窗琥珀提示「定價後金額自動補上」、購物車該品項顯示「未訂」；收款明細該品項標（價格未訂）＋總覽 ※ 提醒。注意：未訂品項在每單上限/折扣計算中以 0 計，定價後才反映。 |
@@ -387,6 +397,9 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
   2. 改 `CLAUDE.md` 第〇章「當前狀態」的版本字串
   3. `CLAUDE.md` 第六章「版本歷程」加新一列
   4. 打包 zip 命名 `Online-Drink VX.Y.Z.zip`
+  5. **跑 `scripts/smoke_test.py`**（V2.10.1 起）：`pip install -q --break-system-packages -r requirements.txt` 後
+     `SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py`，
+     跑完 `rm -f _smoke.db` 並清 `__pycache__` 再打包。改到公告／飲料選項／匯入／deadline 邏輯時要一併更新這支測試
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作

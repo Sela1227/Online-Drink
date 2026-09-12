@@ -6,6 +6,21 @@ from app.database import Base
 from app.models.store import CategoryType
 
 
+def taipei_now():
+    """現在的台北牆上時間（naive），用來跟 `Group.deadline` 比對。
+
+    V2.10.1：`groups.deadline` 存的是台北牆上時間的 naive datetime，不是 UTC。
+    拿 `datetime.utcnow()` 去比會差 8 小時 —— V2.10.0 的清除測試團與飲料選項
+    團數統計就是這樣錯的（坑 #25）。**凡是比對 deadline 一律用這個函式。**
+
+    注意：`announcements.expires_at`、`orders.created_at` 等欄位存的是 UTC，
+    那些場合要用 `datetime.utcnow()`，不要用這個。兩套慣例並存是已知的結構
+    問題，V2.11 的「時間單一真相」會處理。
+    """
+    from datetime import timezone, timedelta
+    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
+
+
 class Group(Base):
     __tablename__ = "groups"
     
@@ -67,10 +82,7 @@ class Group(Base):
     
     @property
     def is_expired(self) -> bool:
-        from datetime import timezone, timedelta
-        taipei_tz = timezone(timedelta(hours=8))
-        now = datetime.now(taipei_tz).replace(tzinfo=None)
-        return now > self.deadline
+        return taipei_now() > self.deadline
     
     @property
     def is_open(self) -> bool:

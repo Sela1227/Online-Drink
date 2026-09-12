@@ -1,22 +1,23 @@
 # SELA-handoff — 快點來點餐 Online-Drink
 
-**交班時間:** 2026-09-12 **目前版本:V2.10.0(已打包,待部署實測)**
-**⚠ V2.9.1 與 V2.10.0 皆未上線,這次是兩版一起部署 — 出問題時排查範圍是兩版總和**
+**交班時間:** 2026-09-12 **目前版本:V2.10.1(已打包,待部署實測)**
+**⚠ V2.9.1、V2.10.0、V2.10.1 皆未上線,這次是三版一起部署 — 出問題時排查範圍是三版總和**
 
 ## 一、專案概況
 - LINE 登入的團體訂餐 web app(約 30 人團隊用),FastAPI + SQLAlchemy + PostgreSQL(Railway)+ Jinja2 + Tailwind CDN + Alpine + htmx,圖床 Cloudinary(`app/services/upload_service.py::upload_image(file, folder)`)
 - 無 Alembic:既有表加欄走 `app/main.py` 的 `add_column_if_not_exists` 啟動遷移;**新表**由 create_all 自動建;**絕不動 PostgreSQL enum**(新類別用旗標判斷,如代購=GROUP_BUY+`store.is_personal`)
 
 ## 二、新對話啟動方式
-1. 附上 `Online-Drink V2.10.0.zip` + 本檔 +(要做哪包就附哪份審稿 md)
-2. 還原:`mkdir -p /home/claude/sela && cd /home/claude/sela && unzip "/mnt/user-data/uploads/Online-Drink_V2_10_0.zip"`(outputs 掛載偶有延遲,失敗先 ls 再試)
+1. 附上 `Online-Drink V2.10.1.zip` + 本檔 +(要做哪包就附哪份審稿 md)
+2. 還原:`mkdir -p /home/claude/sela && cd /home/claude/sela && unzip "/mnt/user-data/uploads/Online-Drink_V2_10_1.zip"`(outputs 掛載偶有延遲,失敗先 ls 再試)
 3. 完整版本歷程/教訓在包內 `CLAUDE.md`,**動工前先讀**
 
 ## 三、版本升級 SOP(四處,每版必做)
 ① `app/templates/base.html` `{% set app_version %}` ② CLAUDE.md 狀態行 ③ CLAUDE.md 歷程表新列(含成因與教訓) ④ 資料夾改名+ZIP `Online-Drink VX.Y.Z.zip`(空格與點)。打包前清 `__pycache__` 與 `*.db`。
 驗證三件套:`py_compile` 全 .py、Jinja `Environment().parse()` 全模板、`python scripts/check_routes.py`。
 **V2.10.0 起:check_routes 可以真的跑** — `pip install -q --break-system-packages -r requirements.txt`(約 1 分鐘)後 `SECRET_KEY=dummy DATABASE_URL="sqlite:///./_check.db" PYTHONPATH=. python scripts/check_routes.py`。裝完記得清 `__pycache__` 和 `_check.db` 再打包。
-無法跑 live app,每版列「部署後實測點」給 Sela。核心邏輯建議另寫 SQLite 煙霧測試(V2.10.0 有做,驗到排序與時區)。
+**V2.10.1 起煙霧測試已進版控**:`scripts/smoke_test.py`(15 項,含 deadline 時區回歸)。跑完 `rm -f _smoke.db`、清 `__pycache__` 再打包。改到公告/飲料選項/匯入/deadline 邏輯時要一併更新它。
+無法跑 live app,每版列「部署後實測點」給 Sela。
 
 ## 四、協作習慣
 - 全程繁體中文;絕不用 emoji(Tabler webfont / inline SVG)
@@ -26,22 +27,22 @@
 - 審稿 md 的判斷不一定對,實作前先驗證(V2.10.0 就發現公告那段診斷有誤)
 
 ## 五、V2.x 主要功能地圖(細節見 CLAUDE.md)
-V2.1 每單上限/補助 → V2.2 去 geek 化+團主工具收合 → V2.3 結帳自動化(final_amount 單一真相/整單折扣%) → V2.4 缺貨候補(order_item_backups) → V2.5 缺貨處理(fulfillment 三欄+actual 金額鏈+settle_diff) → V2.6 UX 收尾(狀態統一 未送出/修改中/已送出、催單、匯出分組) → V2.7 代購(個人店家+每團菜單+品項圖/庫存 stock_limit) → V2.8 審稿二修(庫存彙總+FOR UPDATE 鎖、佔用=SUBMITTED+EDITING、_ensure_visible×8) → V2.9 價格未訂(price_tbd,定價回寫) → V2.9.1 六阻斷級(重複路由/收藏/刪店家 FK/匯出 None/SECRET_KEY 拒啟動/連線池) → **V2.10.0 管理後台流程第一包(公告二合一+接線導向+飲料選項)**
+V2.1 每單上限/補助 → V2.2 去 geek 化+團主工具收合 → V2.3 結帳自動化(final_amount 單一真相/整單折扣%) → V2.4 缺貨候補(order_item_backups) → V2.5 缺貨處理(fulfillment 三欄+actual 金額鏈+settle_diff) → V2.6 UX 收尾(狀態統一 未送出/修改中/已送出、催單、匯出分組) → V2.7 代購(個人店家+每團菜單+品項圖/庫存 stock_limit) → V2.8 審稿二修(庫存彙總+FOR UPDATE 鎖、佔用=SUBMITTED+EDITING、_ensure_visible×8) → V2.9 價格未訂(price_tbd,定價回寫) → V2.9.1 六阻斷級(重複路由/收藏/刪店家 FK/匯出 None/SECRET_KEY 拒啟動/連線池) → **V2.10.0 管理後台流程第一包(公告二合一+接線導向+飲料選項)** → **V2.10.1 兩處 deadline 時區修正+煙霧測試進版控**
 
 ## 六、待辦(依序做)
 **V2.11 管理後台流程第二包＋危險操作**(附「管理後台流程優化建議」md):提案 2 手動新增店家表單、提案 4 部門成員批次加入、提案 5 使用者列表顯部門+指派入口、提案 6 店家列表快捷操作與搜尋、儀表板重整(修 `/admin/users` 重複連結、分兩區)、危險操作三項(清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響)、下架兩處訪客清理工具
-**V2.12 防再犯基礎設施**(附「程式碼優化與維護建議」md 的 H/A/G/J 節):Alembic 評估(注意坑 #1 本專案刻意不用)、授權 dependency、**時間單一真相**(坑 #24 那類時區問題的根治)、表單輸入 schema
+**V2.12 防再犯基礎設施**(附「程式碼優化與維護建議」md 的 H/A/G/J 節):**時間單一真相排第一**(增補審稿:這是唯一已證實會持續產生新缺陷的結構問題,坑 #25)、統一 Jinja2 環境(坑 #6;`home_groups.html` 已用 `|taipei`,哪天別的 router 重用這個 partial 就會 500)、授權 dependency、Alembic 評估(注意坑 #1 本專案刻意不用)、表單輸入 schema
 **獨立長工 大重構**:`admin.py` 已 1700+ 行要拆、group.html 1359 行拆 JS、Jinja 環境統一(坑 #6)、函式內 import 清理 → 功能穩定期再動,需全站回歸
 **零星**:核對單 PDF/Excel 改用 actual 出貨鏈(兩輪審稿點名,現以「原始品項」標示過渡);候補列進核對單 PDF(分頁高度計算是已知重疊坑,坑 #23)
 
-## 七、部署注意(V2.9.1 + V2.10.0 一起上,都未實測)
+## 七、部署注意(V2.9.1 + V2.10.0 + V2.10.1 一起上,都未實測)
 - ⚠️ **先在 Railway 設 `SECRET_KEY`**(`python -c "import secrets; print(secrets.token_urlsafe(48))"`)否則拒絕啟動(刻意);換金鑰全員重登,選非用餐時段
 - ⚠️ **公告改版後,舊的 `SystemSetting.announcement` 內容會從首頁消失**。部署前先去後台「公告管理」確認 `announcements` 表裡有沒有現在掛在首頁的那則(多半有,它就是同步來源),沒有的話部署後重發一次
 - ⚠️ **公告到期時間的時區修正只影響「之後新設的」**。V2.10.0 之前設過 expires_at 的舊公告,資料庫裡存的是台北時間被當 UTC,會比預期晚 8 小時過期。舊公告不多的話,進後台編輯頁重存一次即可校正
 - **V2.9.1 待實測**:V2.6 複製上次三選一(重複路由修掉後才真正生效)、V2.7 代購全流程+庫存先送先贏、V2.8 部門限定團 403、V2.9 未訂定價回寫、刪測試店家、舊團匯出
 - **V2.10.0 待實測**:見下節
 
-## 八、V2.10.0 部署後實測點
+## 八、V2.10.x 部署後實測點
 1. **公告顯示**:後台新增兩則啟用公告(其中一則置頂)→ 首頁應看到兩則、置頂在最上且有左粗邊+圖釘、標題與內文分開
 2. **公告則數上限**:新增第三則 → 首頁仍只顯示兩則
 3. **公告到期**:新增一則、到期時間設「現在往後 5 分鐘」(台北時間)→ 5 分鐘後重整首頁應消失,後台列表仍看得到。**這項是驗時區修正的關鍵**
@@ -53,8 +54,11 @@ V2.1 每單上限/補助 → V2.2 去 geek 化+團主工具收合 → V2.3 結�
 9. **飲料選項**:找一家沒有甜冰的飲料店 → 編輯頁應看到「飲料選項」區塊 → 按「套用標準五段/四段」→ 儲存 → 開團點餐應看得到甜度冰塊
 10. **飲料選項不影響歷史**:對有進行中團單的飲料店改選項(應看到琥珀色提示)→ 已送出的訂單甜冰不變
 11. **非飲料店**:餐廳/團購店家的編輯頁不應出現飲料選項區塊
+12. **清除測試團的時區(V2.10.1 修正)**:開一個今天稍早已截止的空團 → 當天按「清除測試團」應**立刻**清掉。V2.10.0 這裡會沒反應要等 8 小時,已修
+13. **飲料選項的進行中團數**:對一家只有「已截止團」的飲料店開編輯頁,不應顯示琥珀色「有 N 個進行中的團」提示
 
 ## 九、關鍵教訓(血淚精選,全文在 CLAUDE.md)
+- **`deadline` 是台北牆上時間,`expires_at`/`created_at` 是 UTC — 兩套慣例並存**(坑 #25)。比對 deadline 一律用 `app/models/group.py::taipei_now()`,永遠不要用 `utcnow()`;反之亦然。V2.10.0 在修完公告時區問題的同一批程式碼裡又犯了一次,證明這是結構問題不是粗心
 - **批次刪行的錨點若是縮排較深那行的子字串,assert 會假性通過**(坑 #24,V2.10.0 踩到)— 縮排敏感的刪除要連前一行一起當錨點,收尾一定 `py_compile`
 - 每加新表要回頭檢查**刪除流程**;每加路由跑**重複路由檢查**(V2.6/2.7 的 copy_last 修正曾被舊路由蓋住兩版沒生效)
 - 橫向一致性(時區/可見性/None 防護)不能只套當下需要處 — 公告 `expires_at` 就是因為「沒人用它」而時區錯了一年

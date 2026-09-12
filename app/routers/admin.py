@@ -11,7 +11,7 @@ from app.database import get_db
 from app.config import get_settings
 from app.models.store import Store, StoreOption, CategoryType, OptionType
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
-from app.models.group import Group
+from app.models.group import Group, taipei_now
 from app.schemas.menu import MenuImport, FullImport, MenuContent
 from app.services.auth import get_admin_user
 from app.services.import_service import import_store_and_menu, import_menu
@@ -465,7 +465,9 @@ async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
     會被當成測試團實體刪除且不可復原。
     """
     await get_admin_user(request, db)
-    now = datetime.utcnow()
+    # V2.10.1：deadline 是台北牆上時間，用 utcnow() 比會差 8 小時，
+    # 害當天剛截止的測試團要等到晚上才清得掉（坑 #25）
+    now = taipei_now()
     groups = db.query(Group).filter(
         or_(Group.is_closed == True, Group.deadline <= now)
     ).all()
@@ -671,10 +673,12 @@ async def edit_store_page(store_id: int, request: Request, db: Session = Depends
         return ",".join(o.option_value for o in vals)
     
     # 改選項時提醒管理員：已送出的訂單是快照不受影響，但還在點餐的人會看到新選項
+    # 不能用 Group.is_open（Python property 進不了 SQL），只能手寫條件，
+    # 所以更要注意 deadline 的時區（V2.10.1，坑 #25）
     active_group_count = db.query(Group).filter(
         Group.store_id == store_id,
         Group.is_closed == False,
-        Group.deadline > datetime.utcnow(),
+        Group.deadline > taipei_now(),
     ).count()
     
     return templates.TemplateResponse("admin/store_edit.html", {
