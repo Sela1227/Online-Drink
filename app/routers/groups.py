@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.group import Group
 from app.models.store import Store, StoreBranch, CategoryType
-from app.models.menu import Menu, MenuItem
+from app.models.menu import Menu, MenuItem, MenuCategory
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User
 from app.services.auth import get_current_user, get_current_user_optional
@@ -52,7 +52,7 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     ).all()]
     
     # 取得啟用中的店家（含分店）
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).all()
     
@@ -93,12 +93,17 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
 @router.post("")
 async def create_group(
     request: Request,
-    store_id: int = Form(...),
+    store_id: int = Form(None),
+    is_proxy: bool = Form(False),
     name: str = Form(...),
     deadline: str = Form(...),
     note: str = Form(None),
     branch_id: int = Form(None),
     delivery_fee: float = Form(None),
+    order_limit: float = Form(None),
+    allow_over_limit: bool = Form(False),
+    enable_backup: bool = Form(False),
+    backup_count: int = Form(2),
     visibility: str = Form("public"),
     default_sugar: str = Form(None),
     default_ice: str = Form(None),
@@ -122,18 +127,42 @@ async def create_group(
     form_data = await request.form()
     department_ids = form_data.getlist("department_ids")
     
-    # 取得店家
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 取得啟用中的菜單
-    menu = db.query(Menu).filter(
-        Menu.store_id == store_id,
-        Menu.is_active == True
-    ).first()
-    if not menu:
-        raise HTTPException(status_code=400, detail="該店家尚無啟用的菜單")
+    if is_proxy:
+        # 代購（V2.7.0）：取得/建立個人店家 + 每團一份自訂菜單
+        store = db.query(Store).filter(
+            Store.is_personal == True,
+            Store.owner_user_id == user.id,
+        ).first()
+        if not store:
+            store = Store(
+                name=f"{user.show_name} 的代購",
+                category=CategoryType.GROUP_BUY,
+                is_personal=True,
+                owner_user_id=user.id,
+            )
+            db.add(store)
+            db.flush()
+        menu = Menu(store_id=store.id, is_active=False)  # 不啟用，避免干擾一般選單邏輯
+        db.add(menu)
+        db.flush()
+        db.add(MenuCategory(menu_id=menu.id, name="代購品項", sort_order=0))
+        db.flush()
+        store_id = store.id
+    else:
+        if not store_id:
+            raise HTTPException(status_code=400, detail="請選擇店家")
+        # 取得店家
+        store = db.query(Store).filter(Store.id == store_id).first()
+        if not store:
+            raise HTTPException(status_code=404, detail="店家不存在")
+        
+        # 取得啟用中的菜單
+        menu = db.query(Menu).filter(
+            Menu.store_id == store_id,
+            Menu.is_active == True
+        ).first()
+        if not menu:
+            raise HTTPException(status_code=400, detail="該店家尚無啟用的菜單")
     
     # 解析截止時間
     try:
@@ -156,6 +185,10 @@ async def create_group(
         deadline=deadline_dt,
         is_public=is_public,
         delivery_fee=Decimal(str(delivery_fee)) if delivery_fee and delivery_fee > 0 else None,
+        order_limit=Decimal(str(order_limit)) if order_limit and order_limit > 0 else None,
+        allow_over_limit=allow_over_limit,
+        enable_backup=enable_backup,
+        backup_count=max(1, min(3, backup_count)),
         default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
         default_ice=default_ice if store.category == CategoryType.DRINK else None,
         lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
@@ -304,8 +337,43 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         func.sum(OrderItem.quantity).desc()
     ).limit(5).all()
     
+    # 限定部門/私人團可見性（V2.8.0 審稿：後端真正阻擋）
+    if not group.is_visible_to(user, db):
+        raise HTTPException(status_code=403, detail="您無權查看此團單")
+    
     # 取得菜單品項（含分類）
     menu = group.menu
+
+    # 個人常點（此使用者在此店家點過最多的品項，對應到目前菜單中可點的）
+    my_freq_rows = db.query(
+        OrderItem.menu_item_id,
+        func.sum(OrderItem.quantity).label('cnt')
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Group.store_id == group.store_id,
+        OrderItem.menu_item_id.isnot(None)
+    ).group_by(OrderItem.menu_item_id).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(8).all()
+    _freq_ids = [r[0] for r in my_freq_rows]
+    _menu_items_by_id = {}
+    for _cat in menu.categories:
+        for _it in _cat.items:
+            _menu_items_by_id[_it.id] = _it
+    my_frequent = [_menu_items_by_id[i] for i in _freq_ids if i in _menu_items_by_id][:4]
+    
+    # 庫存已用量（V2.7.0：已送出佔用；有設上限的品項才需要）
+    stock_used = {}
+    _limited_ids = [i for i, m in _menu_items_by_id.items() if m.stock_limit is not None]
+    if _limited_ids:
+        rows = db.query(
+            OrderItem.menu_item_id, func.coalesce(func.sum(OrderItem.quantity), 0)
+        ).join(Order).filter(
+            OrderItem.menu_item_id.in_(_limited_ids),
+            Order.group_id == group.id,
+            Order.status.in_((OrderStatus.SUBMITTED, OrderStatus.EDITING)),
+        ).group_by(OrderItem.menu_item_id).all()
+        stock_used = {r[0]: int(r[1]) for r in rows}
     
     # 取得所有用戶（用於轉移團主）
     all_users = []
@@ -339,6 +407,8 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "last_order_items": last_order_items,
         "favorite_items": favorite_items,
         "hot_items": hot_items,
+        "my_frequent": my_frequent,
+        "stock_used": stock_used,
         "is_owner": group.owner_id == user.id,
         "is_admin": user.is_admin,
         "is_open": group.is_open,
@@ -346,6 +416,283 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "is_favorited": is_favorited,
         "treat_user": treat_user,
     })
+
+
+@router.get("/{group_id}/items-panel")
+async def proxy_items_panel(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """代購品項管理面板（團主/管理員，僅代購團）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    items = []
+    if group.menu:
+        for cat in group.menu.categories:
+            items.extend(cat.items)
+    items.sort(key=lambda x: (x.sort_order, x.id))
+    return templates.TemplateResponse("partials/proxy_items_panel.html", {
+        "request": request, "group": group, "items": items,
+    })
+
+
+@router.post("/{group_id}/items")
+async def proxy_item_create(
+    group_id: int,
+    request: Request,
+    item_name: str = Form(...),
+    price: str = Form(None),
+    price_tbd: bool = Form(False),
+    description: str = Form(None),
+    stock_limit: int = Form(None),
+    image_file: UploadFile = File(None),
+    db: Session = Depends(get_db),
+):
+    """代購新增品項"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    item_name = (item_name or "").strip()
+    if not (1 <= len(item_name) <= 100):
+        raise HTTPException(status_code=400, detail="品名需 1-100 字")
+    if description and len(description.strip()) > 200:
+        raise HTTPException(status_code=400, detail="說明最多 200 字")
+    if price_tbd:
+        price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
+    else:
+        try:
+            price_dec = Decimal(str(price).strip())
+        except Exception:
+            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
+        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
+        raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
+    
+    cat = group.menu.categories[0] if group.menu and group.menu.categories else None
+    if cat is None:
+        cat = MenuCategory(menu_id=group.menu_id, name="代購品項", sort_order=0)
+        db.add(cat)
+        db.flush()
+    
+    image_url = None
+    if image_file and image_file.filename:
+        from app.services.upload_service import upload_image
+        image_url = await upload_image(image_file, folder="sela/items")
+    
+    db.add(MenuItem(
+        menu_id=group.menu_id,
+        category_id=cat.id,
+        name=item_name.strip(),
+        price=price_dec,
+        description=description.strip() if description else None,
+        image_url=image_url,
+        stock_limit=stock_limit if stock_limit and stock_limit > 0 else None,
+        price_tbd=price_tbd,
+    ))
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/items/{item_id}/update")
+async def proxy_item_update(
+    group_id: int,
+    item_id: int,
+    request: Request,
+    item_name: str = Form(...),
+    price: str = Form(None),
+    price_tbd: bool = Form(False),
+    description: str = Form(None),
+    stock_limit: int = Form(None),
+    image_file: UploadFile = File(None),
+    db: Session = Depends(get_db),
+):
+    """代購修改品項（不影響已送出訂單的快照）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在")
+    item_name = (item_name or "").strip()
+    if not (1 <= len(item_name) <= 100):
+        raise HTTPException(status_code=400, detail="品名需 1-100 字")
+    if description and len(description.strip()) > 200:
+        raise HTTPException(status_code=400, detail="說明最多 200 字")
+    if price_tbd:
+        price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
+    else:
+        try:
+            price_dec = Decimal(str(price).strip())
+        except Exception:
+            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
+        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
+            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+    if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
+        raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
+    
+    if stock_limit and stock_limit > 0:
+        from app.models.order import OrderItem as _OI, Order as _O, OrderStatus as _OS
+        _used = db.query(func.coalesce(func.sum(_OI.quantity), 0)).join(_O).filter(
+            _OI.menu_item_id == item.id,
+            _O.group_id == group.id,
+            _O.status.in_((_OS.SUBMITTED, _OS.EDITING)),
+        ).scalar() or 0
+        if stock_limit < int(_used):
+            raise HTTPException(status_code=400, detail=f"已有 {int(_used)} 份被訂走，上限不可低於 {int(_used)}")
+    # 未訂 → 定價：回寫此團所有引用此品項且仍為 0 元的訂單（未訂快照本為暫定，唯一允許回寫的情境）
+    if item.price_tbd and not price_tbd and price_dec > 0:
+        db.query(OrderItem).filter(
+            OrderItem.menu_item_id == item.id,
+            OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
+            OrderItem.unit_price == 0,
+        ).update({OrderItem.unit_price: price_dec}, synchronize_session=False)
+    item.price_tbd = price_tbd
+    item.name = item_name.strip()
+    item.price = price_dec
+    item.description = description.strip() if description else None
+    item.stock_limit = stock_limit if stock_limit and stock_limit > 0 else None
+    if image_file and image_file.filename:
+        from app.services.upload_service import upload_image
+        new_url = await upload_image(image_file, folder="sela/items")
+        if new_url:
+            item.image_url = new_url
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/items/{item_id}/toggle")
+async def proxy_item_toggle(group_id: int, item_id: int, request: Request, db: Session = Depends(get_db)):
+    """代購品項上/下架"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可管理品項")
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在")
+    item.is_available = not (item.is_available if item.is_available is not None else True)
+    db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.post("/{group_id}/store-icon")
+async def proxy_store_icon(
+    group_id: int,
+    request: Request,
+    icon_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """代購團 icon 上傳（個人店家 logo）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group or not group.store or not group.store.is_personal:
+        raise HTTPException(status_code=404, detail="非代購團")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    from app.services.upload_service import upload_image
+    url = await upload_image(icon_file, folder="sela/proxy")
+    if url:
+        group.store.logo_url = url
+        db.commit()
+    return await proxy_items_panel(group_id, request, db)
+
+
+@router.get("/{group_id}/fulfillment")
+async def fulfillment_panel(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """缺貨處理面板（團主/管理員）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    
+    from app.models.order import OrderItem as OI
+    orders = db.query(Order).filter(
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).options(
+        joinedload(Order.items).joinedload(OI.backups),
+        joinedload(Order.user),
+    ).all()
+    
+    # 依「品項名(尺寸)」分組，店家說什麼缺貨就找那一組
+    groups_map = {}
+    for o in orders:
+        for it in o.items:
+            label = it.item_name + (f"（{it.size}）" if it.size else "")
+            groups_map.setdefault(label, []).append({"order": o, "item": it})
+    item_groups = [{"label": k, "entries": v} for k, v in sorted(groups_map.items())]
+    
+    return templates.TemplateResponse("partials/fulfillment_panel.html", {
+        "request": request,
+        "group": group,
+        "item_groups": item_groups,
+    })
+
+
+@router.post("/{group_id}/fulfillment/{item_id}")
+async def fulfillment_action(
+    group_id: int,
+    item_id: int,
+    request: Request,
+    action: str = Form(...),
+    backup_id: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    """缺貨處理動作：backup=換候補 / unavailable=缺貨不出 / reset=還原 / toggle_settled=補退結清切換"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可操作")
+    if group.is_open:
+        raise HTTPException(status_code=400, detail="請先截止團單，再進行缺貨與換貨處理")
+    
+    from app.models.order import OrderItem as OI
+    item = db.query(OI).join(Order).filter(
+        OI.id == item_id,
+        Order.group_id == group_id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="品項不存在或未結單")
+    
+    if action == "backup":
+        backup = next((b for b in item.backups if b.id == backup_id), None)
+        if not backup:
+            raise HTTPException(status_code=400, detail="候補不存在或不屬於此品項")
+        item.fulfillment = "substituted"
+        item.fulfilled_backup_id = backup.id
+        item.diff_settled = False
+    elif action == "unavailable":
+        item.fulfillment = "unavailable"
+        item.fulfilled_backup_id = None
+        item.diff_settled = False
+    elif action == "reset":
+        item.fulfillment = None
+        item.fulfilled_backup_id = None
+        item.diff_settled = False
+    elif action == "toggle_settled":
+        if not item.fulfillment:
+            raise HTTPException(status_code=400, detail="此品項無換貨紀錄")
+        item.diff_settled = not item.diff_settled
+    else:
+        raise HTTPException(status_code=400, detail="未知動作")
+    
+    db.commit()
+    return await fulfillment_panel(group_id, request, db)
 
 
 @router.post("/{group_id}/close")
@@ -541,74 +888,6 @@ async def group_qrcode(group_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/{group_id}/orders/copy-last")
-async def copy_last_order(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """複製上次訂單到購物車"""
-    user = await get_current_user(request, db)
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    if not group.is_open:
-        raise HTTPException(status_code=400, detail="團單已截止")
-    
-    # 找到上次在同店家的訂單
-    previous_order = db.query(Order).join(Group).filter(
-        Group.store_id == group.store_id,
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.group_id != group_id
-    ).order_by(Order.created_at.desc()).first()
-    
-    if not previous_order:
-        raise HTTPException(status_code=404, detail="找不到上次訂單")
-    
-    # 取得或建立當前訂單
-    my_order = db.query(Order).filter(
-        Order.group_id == group_id,
-        Order.user_id == user.id
-    ).first()
-    
-    if not my_order:
-        my_order = Order(
-            group_id=group_id,
-            user_id=user.id,
-            status=OrderStatus.DRAFT,
-        )
-        db.add(my_order)
-        db.flush()
-    elif my_order.status == OrderStatus.SUBMITTED:
-        # 已結單，先改為編輯狀態
-        my_order.status = OrderStatus.EDITING
-    
-    # 複製品項
-    for old_item in previous_order.items:
-        # 檢查品項是否還在菜單上
-        menu_item = db.query(MenuItem).filter(
-            MenuItem.id == old_item.menu_item_id,
-            MenuItem.menu_id == group.menu_id
-        ).first()
-        
-        if menu_item:  # 品項還存在才複製
-            new_item = OrderItem(
-                order_id=my_order.id,
-                menu_item_id=old_item.menu_item_id,
-                item_name=old_item.item_name,
-                size=old_item.size,
-                price=old_item.price,
-                sugar=old_item.sugar,
-                ice=old_item.ice,
-                quantity=old_item.quantity,
-                note=old_item.note,
-            )
-            db.add(new_item)
-    
-    db.commit()
-    
-    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
-
-
 @router.post("/{group_id}/orders/{order_id}/discount")
 async def set_order_discount(
     group_id: int,
@@ -662,7 +941,7 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
         raise HTTPException(status_code=404, detail="團單不存在")
     
     # 取得店家選項
-    stores = db.query(Store).filter(Store.is_active == True).all()
+    stores = db.query(Store).filter(Store.is_active == True, Store.is_personal != True).all()
     
     # 取得啟用中的部門
     from app.models.department import Department
@@ -733,6 +1012,11 @@ async def edit_group(
     note: str = Form(None),
     deadline: str = Form(None),
     delivery_fee: float = Form(None),
+    order_limit: float = Form(None),
+    allow_over_limit: bool = Form(False),
+    discount_percent: float = Form(None),
+    enable_backup: bool = Form(False),
+    backup_count: int = Form(2),
     db: Session = Depends(get_db),
 ):
     """編輯團單"""
@@ -755,6 +1039,17 @@ async def edit_group(
     # 更新外送費
     if delivery_fee is not None:
         group.delivery_fee = Decimal(str(delivery_fee)) if delivery_fee > 0 else None
+    
+    # 更新每單上限
+    group.order_limit = Decimal(str(order_limit)) if order_limit and order_limit > 0 else None
+    group.allow_over_limit = allow_over_limit
+    
+    # 整單折扣（1-99 有效，其餘=無折扣）
+    group.discount_percent = Decimal(str(int(discount_percent))) if discount_percent and 0 < discount_percent < 100 else None
+    
+    # 缺貨候補
+    group.enable_backup = enable_backup
+    group.backup_count = max(1, min(3, backup_count))
     
     # 更新截止時間
     if deadline:

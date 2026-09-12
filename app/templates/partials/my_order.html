@@ -3,9 +3,9 @@
         我的訂單
         {% if order %}
         {% if order.status.value == 'submitted' %}
-        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已結單</span>
+        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已送出</span>
         {% elif order.status.value == 'editing' %}
-        <span class="text-xs bg-sela-200 text-sela-800 px-2 py-0.5 rounded-full">修改中</span>
+        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
         {% endif %}
         {% endif %}
     </h2>
@@ -17,7 +17,13 @@
         <div class="py-2.5 border-b border-sela-100 last:border-b-0" data-item-id="{{ item.id }}">
             <div class="flex items-start gap-2">
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-sela-800">{{ item.item_name }}{% if item.size %}（{{ item.size }}）{% endif %}</div>
+                    <div class="font-medium text-sela-800 {% if item.fulfillment == 'unavailable' %}line-through text-sela-800/40{% endif %}">{{ item.item_name }}{% if item.size %}（{{ item.size }}）{% endif %}
+                        {% if item.fulfillment == 'substituted' and item.fulfilled_backup %}
+                        <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-normal"><i class="ti ti-replace"></i> 已換：{{ item.fulfilled_backup.item_name }}</span>
+                        {% elif item.fulfillment == 'unavailable' %}
+                        <span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal no-underline" style="text-decoration:none;display:inline-block;">缺貨未出</span>
+                        {% endif %}
+                    </div>
                     <div class="text-sm text-sela-700/60 mt-0.5">
                         {% if item.sugar or item.ice %}{{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }}{% endif %}
                         {% for opt in item.selected_options %}<span class="text-xs bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded ml-1">{{ opt.option_name }}</span>{% endfor %}
@@ -25,7 +31,7 @@
                     </div>
                     {% if item.note %}<div class="text-xs text-sela-700/70 mt-0.5"><i class="ti ti-pencil"></i> {{ item.note }}</div>{% endif %}
                 </div>
-                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">${{ item.subtotal }}</div>
+                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">{% if item.menu_item and item.menu_item.price_tbd and item.unit_price == 0 %}<span class="text-xs text-sela-800/50">未訂</span>{% else %}${{ item.subtotal }}{% endif %}</div>
             </div>
 
             {% if is_open and order.status.value != 'submitted' %}
@@ -41,8 +47,46 @@
                         @htmx:after-request="$dispatch('orderUpdated')"
                         class="ml-auto w-9 h-9 rounded-full text-red-400 active:bg-red-50 transition flex items-center justify-center" aria-label="刪除品項"><i class="ti ti-trash"></i></button>
             </div>
+            {% if group.enable_backup %}
+            {% set unit_total = (item.subtotal / item.quantity) %}
+            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                {% for b in item.backups %}
+                {% set diff = b.unit_price - unit_total %}
+                <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/80 rounded-full pl-2 pr-1 py-1">
+                    <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
+                    {% if b.sugar or b.ice %}<span class="text-sela-800/50">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600 font-medium">+${{ diff|int }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600 font-medium">-${{ (0 - diff)|int }}</span>{% endif %}
+                    <button hx-delete="/orders/backups/{{ b.id }}" hx-target="#cart-content" hx-swap="innerHTML"
+                            @htmx:after-request="$dispatch('orderUpdated')"
+                            class="w-5 h-5 rounded-full flex items-center justify-center text-sela-800/45 active:bg-sela-100" aria-label="刪除候補"><i class="ti ti-x" style="font-size:11px;"></i></button>
+                </span>
+                {% endfor %}
+                {% if item.backups|length < group.backup_count %}
+                <button type="button"
+                        @click="startBackup({{ item.id }}, '{{ item.item_name }}', {{ item.backups|length + 1 }})"
+                        class="inline-flex items-center gap-1 text-xs text-sela-700 border border-dashed border-sela-300 rounded-full px-2.5 py-1 active:bg-sela-50">
+                    <i class="ti ti-plus" style="font-size:11px;"></i> 缺貨候補（{{ item.backups|length }}/{{ group.backup_count }}）
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
             {% else %}
             <div class="text-sm text-sela-700/60 mt-1">x{{ item.quantity }}</div>
+            {% if group.enable_backup and item.backups %}
+            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {% set unit_total = (item.subtotal / item.quantity) %}
+                {% for b in item.backups %}
+                {% set diff = b.unit_price - unit_total %}
+                <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/70 rounded-full px-2 py-1">
+                    <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
+                    {% if b.sugar or b.ice %}<span class="text-sela-800/45">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600">+${{ diff|int }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600">-${{ (0 - diff)|int }}</span>{% endif %}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
         </div>
         {% endfor %}
@@ -50,16 +94,47 @@
 
     <!-- 結帳列（購物車內自動釘底）-->
     <div class="order-actions">
-        <div class="flex items-center justify-between mb-2.5">
-            <span class="text-sela-700/70">合計</span>
-            <span class="text-xl font-bold text-sela-800">${{ order.total_amount }}</span>
+        {% set has_discount = group.discount_percent and group.discount_percent < 100 %}
+        {% set over = order.self_pay if group.order_limit and order.self_pay > 0 else 0 %}
+        {% if over > 0 %}
+        {% if group.allow_over_limit %}
+        <div class="mb-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            <i class="ti ti-alert-triangle"></i> 超過每單上限 ${{ group.order_limit|int }}，<span class="font-bold">需自行貼補 ${{ over|int }}</span>
         </div>
+        {% else %}
+        <div class="mb-2.5 p-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <i class="ti ti-alert-circle"></i> 超過每單上限 ${{ group.order_limit|int }}（多 ${{ over|int }}），此團不可超過，請調整品項
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="flex items-center justify-between mb-2.5">
+            <span class="text-sela-700/70">合計{% if has_discount %}<span class="text-xs">（全單 {{ group.discount_percent|int }}%）</span>{% endif %}</span>
+            <span class="text-right">
+                {% if has_discount %}<span class="text-sm text-sela-800/40 line-through mr-1.5">${{ order.total_amount }}</span>{% endif %}
+                <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount }}</span>
+            </span>
+        </div>
+        {% if order.has_fulfillment_changes %}
+        {% set sd = order.settle_diff %}
+        <div class="mb-2.5 p-2.5 bg-sela-50 border border-sela-100 rounded-xl text-sm text-sela-800">
+            <i class="ti ti-replace"></i> 換貨後實際金額 ${{ order.actual_final_amount }}
+            {% if sd > 0 %}・<span class="font-bold text-amber-700">需補 ${{ sd|int }}</span>
+            {% elif sd < 0 %}・<span class="font-bold text-green-700">需退 ${{ (0 - sd)|int }}</span>
+            {% else %}・補退 $0{% endif %}
+        </div>
+        {% endif %}
         {% if is_open %}
         <div class="flex gap-2">
             {% if order.status.value == 'draft' or order.status.value == 'editing' %}
+            {% if over > 0 and not group.allow_over_limit %}
+            <button type="button" disabled class="btn btn-primary flex-1">超過上限，請調整</button>
+            {% else %}
+            {% set bkn = order.items | selectattr('backups') | list | length %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
+                    hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
                     class="btn btn-primary flex-1">確定結單</button>
+            {% endif %}
             {% if order.status.value == 'editing' %}
             <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'" class="btn btn-secondary">取消</button>
@@ -76,10 +151,17 @@
 
     {% else %}
     <!-- 空訂單 -->
-    <div class="text-center py-10 text-sela-700/50">
-        <div class="w-14 h-14 mx-auto rounded-full bg-sela-50 flex items-center justify-center mb-3"><i class="ti ti-shopping-cart" style="font-size:26px;"></i></div>
-        <p class="text-sela-800/70">購物車是空的</p>
-        <p class="text-sm">從菜單選擇品項加入</p>
+    <div class="text-center py-10">
+        <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3">
+            <ellipse cx="44" cy="78" rx="22" ry="4" fill="#E8D9C0" opacity="0.6"/>
+            <rect x="42" y="14" width="6" height="26" rx="3" transform="rotate(14 45 27)" fill="#8A6A38"/>
+            <path d="M25 31 H63 L58.5 71 Q58 75.5 53.5 75.5 H34.5 Q30 75.5 29.5 71 Z" fill="#F3EBDD" stroke="#C9A977" stroke-width="2.5"/>
+            <path d="M27.5 50 H60.5 L58.5 71 Q58 75.5 53.5 75.5 H34.5 Q30 75.5 29.5 71 Z" fill="#DCC8A6"/>
+            <circle cx="37" cy="69" r="3" fill="#5B4733"/><circle cx="45" cy="70" r="3" fill="#5B4733"/><circle cx="52" cy="68" r="3" fill="#5B4733"/>
+            <rect x="22" y="26" width="44" height="8" rx="4" fill="#C9A977"/>
+        </svg>
+        <p class="text-sela-800/70 font-medium">購物車是空的</p>
+        <p class="text-sm text-sela-800/45">從下方菜單選擇品項加入</p>
     </div>
     {% endif %}
 </div>

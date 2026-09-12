@@ -26,6 +26,17 @@ logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 機密設定檢查：缺少時寧可不啟動，也不要用公開預設金鑰簽 JWT
+    _missing = []
+    if settings.secret_key in ("", "change-me-in-production"):
+        _missing.append("SECRET_KEY")
+    if not settings.line_channel_id:
+        _missing.append("LINE_CHANNEL_ID")
+    if not settings.line_channel_secret:
+        _missing.append("LINE_CHANNEL_SECRET")
+    if _missing:
+        raise RuntimeError(f"必要環境變數未設定，拒絕啟動：{', '.join(_missing)}")
+    
     # Startup: create tables
     # Import all models to ensure tables are created
     from app.models import department  # noqa: F401
@@ -109,6 +120,33 @@ async def lifespan(app: FastAPI):
     # Phase 5: 自動催單欄位
     add_column_if_not_exists("groups", "auto_remind_minutes", "INTEGER")
     add_column_if_not_exists("groups", "last_remind_at", "TIMESTAMP")
+    
+    # V2.1.0 每單金額上限
+    add_column_if_not_exists("groups", "order_limit", "NUMERIC(10,2)")
+    add_column_if_not_exists("groups", "allow_over_limit", "BOOLEAN DEFAULT FALSE")
+    
+    # V2.3.0 整單折扣 + 店家單據
+    add_column_if_not_exists("groups", "discount_percent", "NUMERIC(5,2)")
+    add_column_if_not_exists("stores", "provides_invoice", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("stores", "provides_receipt", "BOOLEAN DEFAULT FALSE")
+    
+    # V2.4.0 缺貨候補（order_item_backups 新表由 create_all 自動建立）
+    add_column_if_not_exists("groups", "enable_backup", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("groups", "backup_count", "INTEGER DEFAULT 2")
+    
+    # V2.5.0 缺貨處理
+    # V2.7.0 代購
+    add_column_if_not_exists("stores", "is_personal", "BOOLEAN DEFAULT FALSE")
+    add_column_if_not_exists("stores", "owner_user_id", "INTEGER")
+    add_column_if_not_exists("menu_items", "description", "VARCHAR(200)")
+    add_column_if_not_exists("menu_items", "image_url", "VARCHAR(500)")
+    add_column_if_not_exists("menu_items", "stock_limit", "INTEGER")
+    add_column_if_not_exists("menu_items", "is_available", "BOOLEAN DEFAULT TRUE")
+    add_column_if_not_exists("menu_items", "price_tbd", "BOOLEAN DEFAULT FALSE")
+    
+    add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
+    add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")
+    add_column_if_not_exists("order_items", "diff_settled", "BOOLEAN DEFAULT FALSE")
     
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
@@ -273,6 +311,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     lifespan=lifespan,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
 # 401 未登入處理（V1.4.1）：
@@ -323,9 +364,6 @@ app.include_router(votes.router, tags=["votes"])
 app.include_router(templates_router.router, tags=["templates"])
 
 # 開發模式路由
-if settings.debug:
-    from app.routers import dev
-    app.include_router(dev.router, tags=["dev"])
 
 
 @app.get("/")

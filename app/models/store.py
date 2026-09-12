@@ -40,6 +40,10 @@ class Store(Base):
     foodpanda_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # foodpanda
     google_maps_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Google Maps
     address: Mapped[str | None] = mapped_column(String(300), nullable=True)  # 地址
+    is_personal: Mapped[bool] = mapped_column(Boolean, default=False)  # 個人代購店家（V2.7.0，不進店家列表）
+    owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 個人店家擁有者
+    provides_invoice: Mapped[bool] = mapped_column(Boolean, default=False)  # 可開發票（V2.3.0）
+    provides_receipt: Mapped[bool] = mapped_column(Boolean, default=False)  # 可開收據（V2.3.0）
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     

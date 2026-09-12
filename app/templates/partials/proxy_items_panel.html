@@ -1,0 +1,131 @@
+{# 代購品項管理面板（團主/管理員・htmx multipart 自刷新）#}
+<div class="space-y-4">
+    <!-- 團 icon -->
+    <div class="flex items-center gap-3 p-3 bg-sela-50 rounded-xl">
+        <div class="w-12 h-12 rounded-xl bg-white border border-sela-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+            {% if group.store.logo_url %}
+            <img src="{{ group.store.logo_url }}" alt="代購 icon" class="w-full h-full object-contain p-0.5">
+            {% else %}
+            <i class="ti ti-basket text-sela-800/40 text-xl"></i>
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-sela-800">代購 icon</div>
+            <div class="text-xs text-sela-800/50">會顯示在首頁團卡與團頁（選填）</div>
+        </div>
+        <form hx-post="/groups/{{ group.id }}/store-icon" hx-encoding="multipart/form-data"
+              hx-target="#proxy-items-content" hx-swap="innerHTML">
+            <label class="text-xs font-medium text-sela-800 bg-white border border-sela-200 rounded-full px-3 py-1.5 cursor-pointer active:bg-sela-100">
+                {% if group.store.logo_url %}更換{% else %}上傳{% endif %}
+                <input type="file" name="icon_file" accept="image/*" class="hidden" onchange="this.form.requestSubmit()">
+            </label>
+        </form>
+    </div>
+
+    <!-- 新增品項 -->
+    <form hx-post="/groups/{{ group.id }}/items" hx-encoding="multipart/form-data"
+          hx-target="#proxy-items-content" hx-swap="innerHTML"
+          class="p-3 bg-sela-50 rounded-xl space-y-2">
+        <div class="text-sm font-medium text-sela-800">新增品項</div>
+        <div class="flex gap-2">
+            <input type="text" name="item_name" maxlength="100" placeholder="品名（例：草莓大福）" required
+                   class="flex-1 min-w-0 border border-sela-300 rounded-lg px-3 py-2 text-sm">
+            <div class="flex items-center gap-1 flex-shrink-0">
+                <span class="text-sela-800/50 text-sm">$</span>
+                <input type="number" name="price" min="1" step="1" placeholder="價格" required
+                       class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+                <label class="flex items-center gap-1 text-xs text-sela-800/70 cursor-pointer whitespace-nowrap ml-1">
+                    <input type="checkbox" name="price_tbd" value="true" class="rounded border-sela-300"
+                           onchange="var p=this.closest('form').querySelector('[name=price]'); p.disabled=this.checked; p.required=!this.checked; if(this.checked) p.value='';"> 未訂
+                </label>
+            </div>
+        </div>
+        <input type="text" name="description" maxlength="200" placeholder="說明（選填，例：6 入一盒）"
+               class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 text-sm text-sela-800/60">
+                <span>數量上限</span>
+                <input type="number" name="stock_limit" min="1" step="1" placeholder="不限"
+                       class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+            </div>
+            <label class="ml-auto text-xs text-sela-800 bg-white border border-sela-200 rounded-full px-3 py-1.5 cursor-pointer active:bg-sela-100 inline-flex items-center gap-1">
+                <i class="ti ti-photo"></i> <span class="proxy-img-label">加圖片（選填）</span>
+                <input type="file" name="image_file" accept="image/*" class="hidden"
+                       onchange="this.closest('label').querySelector('.proxy-img-label').textContent = this.files.length ? '已選 1 張' : '加圖片（選填）'">
+            </label>
+        </div>
+        <button type="submit" class="w-full bg-sela-800 text-white rounded-xl py-2.5 text-sm font-semibold active:bg-sela-900">
+            <i class="ti ti-plus"></i> 新增品項
+        </button>
+    </form>
+
+    <!-- 品項列表 -->
+    {% if not items %}
+    <div class="text-center py-6 text-sela-800/45 text-sm">還沒有品項——加入第一項，加好再分享連結</div>
+    {% else %}
+    <div class="space-y-2">
+        {% for item in items %}
+        <details class="border border-sela-100 rounded-xl {% if item.is_available is false %}opacity-55{% endif %}">
+            <summary class="px-3 py-2.5 cursor-pointer flex items-center gap-2.5 text-sm">
+                {% if item.image_url %}
+                <img src="{{ item.image_url }}" alt="" class="w-10 h-10 rounded-lg object-cover flex-shrink-0">
+                {% endif %}
+                <div class="flex-1 min-w-0">
+                    <span class="font-medium text-sela-800">{{ item.name }}</span>
+                    {% if item.is_available is false %}<span class="text-xs bg-sela-100 text-sela-800/55 px-1.5 py-0.5 rounded-full">已下架</span>{% endif %}
+                    {% if item.description %}<div class="text-xs text-sela-800/50 truncate">{{ item.description }}</div>{% endif %}
+                </div>
+                <b class="text-sela-800">{% if item.price_tbd %}<span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal">未訂</span>{% else %}${{ item.price|int }}{% endif %}</b>
+                {% if item.stock_limit %}<span class="text-xs text-sela-800/45">限 {{ item.stock_limit }}</span>{% endif %}
+                <i class="ti ti-chevron-down text-sela-300"></i>
+            </summary>
+            <div class="px-3 pb-3 pt-1 border-t border-sela-100">
+                <form hx-post="/groups/{{ group.id }}/items/{{ item.id }}/update" hx-encoding="multipart/form-data"
+                      hx-target="#proxy-items-content" hx-swap="innerHTML" class="space-y-2">
+                    <div class="flex gap-2">
+                        <input type="text" name="item_name" maxlength="100" value="{{ item.name }}" required
+                               class="flex-1 min-w-0 border border-sela-300 rounded-lg px-3 py-2 text-sm">
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <span class="text-sela-800/50 text-sm">$</span>
+                            <input type="number" name="price" value="{% if not item.price_tbd %}{{ item.price|int }}{% endif %}" min="1" step="1"
+                                   {% if item.price_tbd %}disabled{% else %}required{% endif %}
+                                   class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+                            <label class="flex items-center gap-1 text-xs text-sela-800/70 cursor-pointer whitespace-nowrap ml-1">
+                                <input type="checkbox" name="price_tbd" value="true" class="rounded border-sela-300"
+                                       {% if item.price_tbd %}checked{% endif %}
+                                       onchange="var p=this.closest('form').querySelector('[name=price]'); p.disabled=this.checked; p.required=!this.checked; if(this.checked) p.value='';"> 未訂
+                            </label>
+                        </div>
+                    </div>
+                    <input type="text" name="description" maxlength="200" value="{{ item.description or '' }}" placeholder="說明（選填）"
+                           class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 text-sm text-sela-800/60">
+                            <span>數量上限</span>
+                            <input type="number" name="stock_limit" value="{{ item.stock_limit or '' }}" min="1" placeholder="不限"
+                                   class="w-20 border border-sela-300 rounded-lg px-2 py-2 text-sm">
+                        </div>
+                        <label class="ml-auto text-xs text-sela-800 bg-sela-50 border border-sela-200 rounded-full px-3 py-1.5 cursor-pointer active:bg-sela-100 inline-flex items-center gap-1">
+                            <i class="ti ti-photo"></i> <span class="proxy-img-label">{% if item.image_url %}換圖{% else %}加圖{% endif %}</span>
+                            <input type="file" name="image_file" accept="image/*" class="hidden"
+                                   onchange="this.closest('label').querySelector('.proxy-img-label').textContent = this.files.length ? '已選 1 張' : '加圖'">
+                        </label>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 bg-sela-100 text-sela-800 rounded-xl py-2 text-sm font-semibold active:bg-sela-200">儲存修改</button>
+                        <button type="button"
+                                hx-post="/groups/{{ group.id }}/items/{{ item.id }}/toggle"
+                                hx-target="#proxy-items-content" hx-swap="innerHTML"
+                                {% if item.is_available is not false %}hx-confirm="下架「{{ item.name }}」？團員將看不到此品項（已送出的訂單不受影響）。"{% endif %}
+                                class="px-4 rounded-xl py-2 text-sm font-semibold {% if item.is_available is false %}bg-green-50 text-green-700{% else %}bg-red-50 text-red-600{% endif %}">
+                            {% if item.is_available is false %}重新上架{% else %}下架{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    <p class="text-xs text-sela-800/45">改價／下架不影響已送出的訂單（金額吃當時快照）</p>
+    {% endif %}
+</div>

@@ -1,25 +1,48 @@
-<button @click="openAddItem({
+{# 菜單品項（V2.7.0：圖片/說明/庫存徽章；stock_used 由 group 路由傳入）#}
+{% if item.is_available is not false %}
+{% set rem = (item.stock_limit - stock_used.get(item.id, 0)) if item.stock_limit and stock_used is defined else None %}
+{% set sold_out = rem is not none and rem <= 0 %}
+<button {% if not sold_out %}@click="openAddItem({
             id: {{ item.id }},
             name: '{{ item.name }}',
             price: {{ item.price }},
+            tbd: {{ 'true' if item.price_tbd else 'false' }},
             price_l: {{ item.price_l if item.price_l else 'null' }},
+            remaining: {{ rem if rem is not none else 'null' }},
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
-        })"
+        })"{% else %}disabled{% endif %}
         data-menu-item-id="{{ item.id }}"
-        class="w-full flex items-center justify-between p-3.5 bg-sela-50 active:bg-sela-100 active:scale-[0.99] rounded-xl transition text-left">
-    <div>
-        <div class="font-medium text-sela-800">{{ item.name }}</div>
-        {% if item.options %}
-        <div class="text-xs text-sela-700/60">
-            可加購：{% for opt in item.options %}{{ opt.name }}{% if not loop.last %}、{% endif %}{% endfor %}
-        </div>
+        class="w-full flex items-center justify-between gap-3 p-3.5 bg-sela-50 rounded-xl transition text-left {% if sold_out %}opacity-50{% else %}active:bg-sela-100 active:scale-[0.99]{% endif %}">
+    <div class="flex items-center gap-3 min-w-0">
+        {% if item.image_url %}
+        <img src="{{ item.image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" loading="lazy">
         {% endif %}
+        <div class="min-w-0">
+            <div class="font-medium text-sela-800">{{ item.name }}
+                {% if sold_out %}
+                <span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal">完售</span>
+                {% elif rem is not none and rem <= 5 %}
+                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-normal">剩 {{ rem }}</span>
+                {% endif %}
+            </div>
+            {% if item.description %}
+            <div class="text-xs text-sela-700/60 truncate">{{ item.description }}</div>
+            {% endif %}
+            {% if item.options %}
+            <div class="text-xs text-sela-700/60">
+                可加購：{% for opt in item.options %}{{ opt.name }}{% if not loop.last %}、{% endif %}{% endfor %}
+            </div>
+            {% endif %}
+        </div>
     </div>
-    <div class="text-sela-800 font-medium">
-        {% if item.price_l %}
+    <div class="text-sela-800 font-medium flex-shrink-0">
+        {% if item.price_tbd %}
+        <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">價格未訂</span>
+        {% elif item.price_l %}
         ${{ item.price }}/${{ item.price_l }}
         {% else %}
         ${{ item.price }}
         {% endif %}
     </div>
 </button>
+{% endif %}

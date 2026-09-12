@@ -25,6 +25,17 @@ class Group(Base):
     # 外送費
     delivery_fee: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     
+    # 每單金額上限（V2.1.0）
+    order_limit: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)  # 每單上限，NULL=不限
+    allow_over_limit: Mapped[bool] = mapped_column(Boolean, default=False)  # 可否超過（超過部分自行貼補）
+    
+    # 整單折扣（V2.3.0）例：95 = 全單 95 折，NULL/100 = 無折扣
+    discount_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    
+    # 缺貨候補（V2.4.0）
+    enable_backup: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否開啟候補
+    backup_count: Mapped[int] = mapped_column(Integer, default=2)  # 每品項候補上限 1-3
+    
     # 飲料團設定
     default_sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     default_ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -93,17 +104,17 @@ class Group(Base):
     
     @property
     def delivery_fee_per_person(self) -> Decimal:
-        """每人分攤的外送費"""
+        """每人分攤的外送費（約略值，收款明細採餘數精確分配）"""
         if not self.delivery_fee or self.submitted_count == 0:
             return Decimal("0")
         return (self.delivery_fee / self.submitted_count).quantize(Decimal("1"))  # 四捨五入到整數
     
     @property
     def total_amount(self) -> Decimal:
-        """團單總金額（含外送費）"""
+        """團單總金額（含外送費）。V2.4.1 修：改用折後金額，與收款明細/請客紀錄一致"""
         from app.models.order import OrderStatus
         subtotal = sum(
-            o.total_amount for o in self.orders 
+            o.final_amount for o in self.orders 
             if o.status == OrderStatus.SUBMITTED
         )
         return subtotal + (self.delivery_fee or Decimal("0"))

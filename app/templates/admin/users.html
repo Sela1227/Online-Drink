@@ -36,7 +36,15 @@
         <i class="ti ti-check"></i> 已成功登出所有用戶，所有人需重新登入。
     </div>
     {% endif %}
-    
+
+    <!-- 排序 -->
+    <div class="flex gap-1 bg-sela-100 p-1 rounded-lg text-sm overflow-x-auto">
+        {% for val, label in [('created','建立時間'), ('last_login','最近登入'), ('last_active','最近活動'), ('name','名稱')] %}
+        <a href="/admin/users?sort={{ val }}"
+           class="flex-1 text-center whitespace-nowrap py-2 px-3 rounded-md font-medium transition {{ 'bg-white text-sela-800 shadow-sm' if sort == val else 'text-sela-800/60' }}">{{ label }}</a>
+        {% endfor %}
+    </div>
+
     {% if users %}
     <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for u in users %}

@@ -116,7 +116,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     from app.models.user import User, Announcement
     from datetime import datetime, timedelta
     
-    store_count = db.query(Store).count()
+    store_count = db.query(Store).filter(Store.is_personal != True).count()
     group_count = db.query(Group).count()
     user_count = db.query(User).filter(User.is_guest == False).count()
     
@@ -170,7 +170,7 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
     """店家列表"""
     user = await get_admin_user(request, db)
     
-    stores = db.query(Store).options(
+    stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).order_by(Store.created_at.desc()).all()
     
@@ -403,6 +403,49 @@ async def group_list(request: Request, db: Session = Depends(get_db)):
     })
 
 
+def _delete_group_cascade(db: Session, group: Group):
+    """安全刪團（含 FK 連鎖：請客記錄 / 部門關聯 / 訂單 / 訂單項目的選項與加料）"""
+    from app.models.treat import TreatRecord
+    from app.models.department import GroupDepartment
+    from app.models.order import Order, OrderItemOption, OrderItemTopping
+    db.query(TreatRecord).filter(TreatRecord.group_id == group.id).delete()
+    db.query(GroupDepartment).filter(GroupDepartment.group_id == group.id).delete()
+    orders = db.query(Order).filter(Order.group_id == group.id).all()
+    for order in orders:
+        for item in order.items:
+            db.query(OrderItemOption).filter(OrderItemOption.order_item_id == item.id).delete()
+            db.query(OrderItemTopping).filter(OrderItemTopping.order_item_id == item.id).delete()
+            db.delete(item)
+        db.delete(order)
+    db.delete(group)
+
+
+@router.post("/groups/cleanup-test")
+async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
+    """清除測試團：沒有人下單、或只有團主自己下單的團"""
+    await get_admin_user(request, db)
+    groups = db.query(Group).all()
+    removed = 0
+    for g in groups:
+        # 沒有訂單，或全部訂單都是團主自己的 → 視為測試團
+        if all(o.user_id == g.owner_id for o in g.orders):
+            _delete_group_cascade(db, g)
+            removed += 1
+    db.commit()
+    return RedirectResponse(url=f"/admin/groups?cleaned={removed}", status_code=302)
+
+
+@router.post("/groups/{group_id}/delete")
+async def admin_delete_group(group_id: int, request: Request, db: Session = Depends(get_db)):
+    """管理員刪除單一團單"""
+    await get_admin_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group:
+        _delete_group_cascade(db, group)
+        db.commit()
+    return RedirectResponse(url="/admin/groups", status_code=302)
+
+
 @router.post("/stores/{store_id}/toggle")
 async def toggle_store(store_id: int, request: Request, db: Session = Depends(get_db)):
     """啟用/停用店家"""
@@ -466,6 +509,16 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
         WHERE store_id = :sid
     """), {"sid": sid, "sname": store_name})
 
+    # 候補快照斷開（V2.4.0 新表，原刪除流程未涵蓋 → 會擋住 DELETE menu_items）
+    db.execute(_sql("""
+        UPDATE order_item_backups SET menu_item_id = NULL
+        WHERE menu_item_id IN (
+            SELECT mi.id FROM menu_items mi
+            JOIN menus m ON mi.menu_id = m.id
+            WHERE m.store_id = :sid
+        )
+    """), {"sid": sid})
+    
     # 刪菜單樹（item_options → menu_items → menu_categories → menus）
     db.execute(_sql("""
         DELETE FROM item_options WHERE menu_item_id IN (
@@ -479,6 +532,8 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
     db.execute(_sql("DELETE FROM store_toppings WHERE store_id = :sid"), {"sid": sid})
     db.execute(_sql("DELETE FROM store_options WHERE store_id = :sid"), {"sid": sid})
     db.execute(_sql("DELETE FROM store_branches WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("DELETE FROM user_favorites  WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("DELETE FROM group_templates WHERE store_id = :sid"), {"sid": sid})
     db.execute(_sql("DELETE FROM stores WHERE id = :sid"), {"sid": sid})
 
     db.commit()
@@ -582,6 +637,8 @@ async def update_store(
     google_maps_url: str = Form(None),
     ubereats_url: str = Form(None),
     foodpanda_url: str = Form(None),
+    provides_invoice: bool = Form(False),
+    provides_receipt: bool = Form(False),
     logo_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -601,6 +658,8 @@ async def update_store(
     store.google_maps_url = google_maps_url.strip() if google_maps_url else None
     store.ubereats_url = ubereats_url.strip() if ubereats_url else None
     store.foodpanda_url = foodpanda_url.strip() if foodpanda_url else None
+    store.provides_invoice = provides_invoice
+    store.provides_receipt = provides_receipt
     
     # 分類修改 - 使用 raw SQL 直接用大寫值
     category_map = {
@@ -627,14 +686,23 @@ async def update_store(
 
 
 @router.get("/users")
-async def user_list(request: Request, db: Session = Depends(get_db)):
+async def user_list(request: Request, sort: str = "created", db: Session = Depends(get_db)):
     """使用者列表"""
     user = await get_admin_user(request, db)
     
     from app.models.user import User, SystemSetting
     from datetime import datetime, timedelta
+    from sqlalchemy import nullslast
     
-    users = db.query(User).filter(User.is_guest == False).order_by(User.created_at.desc()).all()
+    sort_map = {
+        "created": User.created_at.desc(),
+        "last_login": nullslast(User.last_login_at.desc()),
+        "last_active": nullslast(User.last_active_at.desc()),
+        "name": User.display_name.asc(),
+    }
+    if sort not in sort_map:
+        sort = "created"
+    users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort]).all()
     
     # 計算在線人數（30分鐘內有活動）
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -652,6 +720,7 @@ async def user_list(request: Request, db: Session = Depends(get_db)):
         "users": users,
         "online_count": online_count,
         "system_setting": system_setting,
+        "sort": sort,
     })
 
 

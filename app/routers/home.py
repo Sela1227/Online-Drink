@@ -131,6 +131,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
         db.rollback()
         groupbuy_groups = []
     
+    # 我的進行中（開放團中，我是團主或已下單）
+    my_active = []
+    for g in (drink_groups + meal_groups + groupbuy_groups):
+        mo = next((o for o in g.orders if o.user_id == user.id), None)
+        if mo:
+            my_active.append({"group": g, "status": mo.status.value})
+        elif g.owner_id == user.id:
+            my_active.append({"group": g, "status": "owner"})
+    my_active.sort(key=lambda x: x["group"].deadline)
+
     # 已截止的團（最近 10 個）
     closed_groups_raw = db.query(Group).options(
         joinedload(Group.store),
@@ -159,7 +169,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
     
     # 店家列表（啟用中，根據部門過濾）
     from app.models.department import StoreDepartment
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
     
@@ -196,6 +206,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "announcement": announcement,
         "active_votes": active_votes,
         "stores": stores,
+        "my_active": my_active,
         "now": now,
     })
 
@@ -278,7 +289,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     ).all()]
     
     # 店家列表（根據部門過濾）
-    all_stores = db.query(Store).options(
+    all_stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
     ).filter(Store.is_active == True).order_by(Store.name).all()
     
@@ -547,13 +558,13 @@ async def toggle_favorite(
     
     if existing:
         db.delete(existing)
-        db.commit()
-        return {"status": "removed"}
     else:
-        favorite = UserFavorite(user_id=user.id, store_id=store_id)
-        db.add(favorite)
-        db.commit()
-        return {"status": "added"}
+        db.add(UserFavorite(user_id=user.id, store_id=store_id))
+    db.commit()
+    
+    if request.headers.get("HX-Request") == "true":
+        return {"status": "removed" if existing else "added"}
+    return RedirectResponse(url=f"/stores/{store_id}", status_code=302)
 
 
 # ============ 用戶部門管理 ============

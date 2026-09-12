@@ -16,18 +16,18 @@ def generate_order_text(db: Session, group: Group) -> str:
     lines.append(f"【{group.name}】")
     
     # 店家資訊（含分店電話）
-    store_info = group.store.name
+    store_info = group.store_display_name  # 店家已刪時回傳快照名稱
     branch_phone = None
     
     if group.branch_id:
         branch = db.query(StoreBranch).filter(StoreBranch.id == group.branch_id).first()
         if branch:
-            store_info = f"{group.store.name} {branch.name}"
+            store_info = f"{group.store_display_name} {branch.name}"
             branch_phone = branch.phone
-    elif group.store.branch:
-        store_info = f"{group.store.name} {group.store.branch}"
+    elif group.store is not None and group.store.branch:
+        store_info = f"{group.store_display_name} {group.store.branch}"
         branch_phone = group.store.phone
-    else:
+    elif group.store is not None:
         branch_phone = group.store.phone
     
     lines.append(f"店家：{store_info}")
@@ -83,6 +83,27 @@ def generate_order_text(db: Session, group: Group) -> str:
         total_quantity += qty
         total_amount += subtotal
     
+    # 缺貨候補對照（誰的哪個品項 → 候補什麼）
+    backup_lines = []
+    for order in orders:
+        for item in order.items:
+            if item.backups:
+                specs = []
+                for b in item.backups:
+                    spec = b.item_name
+                    if b.size:
+                        spec += f"({b.size})"
+                    if b.sugar or b.ice:
+                        spec += f" {b.sugar or ''}/{b.ice or ''}"
+                    if b.extras_text:
+                        spec += f" {b.extras_text}"
+                    specs.append(f"候補{b.priority} {spec} ${int(b.unit_price)}")
+                backup_lines.append(f"- {order.user.show_name} {item.item_name}{f'({item.size})' if item.size else ''} x{item.quantity}：{'、'.join(specs)}")
+    if backup_lines:
+        lines.append("【缺貨候補對照】沒貨時依順位改買，數量同主品項")
+        lines.extend(backup_lines)
+        lines.append("")
+    
     lines.append("=" * 30)
     lines.append(f"總杯數：{total_quantity}")
     # 店家優惠（所有人折扣加總）
@@ -102,58 +123,92 @@ def generate_order_text(db: Session, group: Group) -> str:
 
 
 def generate_payment_text(db: Session, group: Group) -> str:
-    """產生收款文字（個人點餐明細）"""
+    """產生收款文字（個人結帳明細：自動計算折扣、公司補助、個人自付）"""
     from decimal import Decimal
-    
+
     lines = []
-    
-    # 取得所有訂單
+
     orders = db.query(Order).filter(Order.group_id == group.id).all()
-    
-    subtotal = Decimal("0")
+
+    subtotal = Decimal("0")        # 原價小計
+    final_total = Decimal("0")     # 折後小計
+    company_total = Decimal("0")   # 公司補助合計
+    self_total = Decimal("0")      # 個人自付合計
+    actual_self_total = Decimal("0")  # 換貨後個人自付合計（無換貨=同 self_total）
     submitted_orders = []
     pending_users = []
-    
+
     for order in orders:
         if order.status == OrderStatus.SUBMITTED:
             submitted_orders.append(order)
             subtotal += order.total_amount
-        else:
+            final_total += order.final_amount
+            company_total += order.company_pay
+            self_total += order.self_pay
+            actual_self_total += order.actual_self_pay
+        elif order.items:  # 空購物車不算「未送出」
             pending_users.append(order.user.show_name)
-    
-    # 外送費分攤計算
+
+    # 外送費分攤（V2.4.1 修：餘數分配，總和恰等於外送費；依姓名排序前 r 位 +1 元，固定可重現）
     delivery_fee = group.delivery_fee or Decimal("0")
-    delivery_per_person = Decimal("0")
-    if delivery_fee > 0 and len(submitted_orders) > 0:
-        delivery_per_person = (delivery_fee / len(submitted_orders)).quantize(Decimal("1"))
-    
-    total_amount = subtotal + delivery_fee
-    
-    # 標題和總金額（先顯示）
+    sorted_orders = sorted(submitted_orders, key=lambda x: x.user.show_name)
+    delivery_share = {}
+    if delivery_fee > 0 and sorted_orders:
+        n = len(sorted_orders)
+        base = int(delivery_fee) // n
+        r = int(delivery_fee) - base * n
+        for i, o in enumerate(sorted_orders):
+            delivery_share[o.id] = Decimal(base + (1 if i < r else 0))
+
+    has_discount = bool(group.discount_percent and Decimal("0") < group.discount_percent < Decimal("100"))
+    has_limit = bool(group.order_limit)
+
+    # ── 標題與總覽 ──
     lines.append(f"【{group.name}】收款明細")
-    lines.append(f"店家：{group.store.name}")
+    lines.append(f"店家：{group.store_display_name}")
+    docs = []
+    if group.store is not None and group.store.provides_invoice: docs.append("發票")
+    if group.store is not None and group.store.provides_receipt: docs.append("收據")
+    if docs:
+        lines.append(f"單據：可開{('、'.join(docs))}")
     lines.append("")
-    lines.append(f"💰 餐點小計：${subtotal}")
+    lines.append(f"餐點小計：${subtotal}")
+    if has_discount:
+        lines.append(f"整單折扣：{int(group.discount_percent)}%（付原價的 {int(group.discount_percent)}%）→ 折後 ${final_total}")
+    if has_limit:
+        lines.append(f"公司補助：每單上限 ${int(group.order_limit)}，合計 ${company_total}")
     if delivery_fee > 0:
-        lines.append(f"🚗 外送費：${delivery_fee}（每人 ${delivery_per_person}）")
-        lines.append(f"💰 總金額：${total_amount}")
-    lines.append(f"👥 {len(submitted_orders)} 人已結單")
+        _shares = sorted(set(int(v) for v in delivery_share.values()))
+        _share_txt = f"${_shares[0]}" if len(_shares) == 1 else f"${_shares[0]}~{_shares[-1]}"
+        lines.append(f"外送費：${delivery_fee}（每人 {_share_txt}，依名單分攤、總和不差）")
+    if actual_self_total != self_total:
+        _collect = sum((o.settle_diff for o in submitted_orders if o.settle_diff > 0), Decimal("0"))
+        _refund = sum((-o.settle_diff for o in submitted_orders if o.settle_diff < 0), Decimal("0"))
+        lines.append(f"原訂應收：${self_total + delivery_fee}")
+        lines.append(f"換貨補收 +${int(_collect)}／退還 -${int(_refund)}")
+        lines.append(f"最終應收：${actual_self_total + delivery_fee}")
+    else:
+        lines.append(f"應向個人收：${self_total + delivery_fee}")
+    _has_tbd = any(it.menu_item is not None and it.menu_item.price_tbd and it.unit_price == 0 for o in submitted_orders for it in o.items)
+    if _has_tbd:
+        lines.append("※ 含價格未訂品項，團主定價後金額會自動更新，請以更新後為準")
+    lines.append(f"{len(submitted_orders)} 人已送出")
     lines.append("")
     lines.append("=" * 30)
     lines.append("")
-    
-    # 每個人的細項
-    for order in sorted(submitted_orders, key=lambda x: x.user.show_name):
+
+    # ── 每人明細 ──
+    for order in sorted_orders:
         user_name = order.user.show_name
-        order_amount = order.total_amount
-        total_with_delivery = order_amount + delivery_per_person
-        
-        if delivery_fee > 0:
-            lines.append(f"☐ {user_name}：${total_with_delivery}（餐 ${order_amount} + 運 ${delivery_per_person}）")
+        _dp = delivery_share.get(order.id, Decimal("0"))
+        pay = order.self_pay + _dp
+        final_pay = order.actual_self_pay + _dp
+
+        if order.has_fulfillment_changes:
+            lines.append(f"☐ {user_name}：${final_pay}（原 ${pay}，含換貨）")
         else:
-            lines.append(f"☐ {user_name}：${order_amount}")
-        
-        # 顯示點餐細項
+            lines.append(f"☐ {user_name}：${pay}")
+
         for item in order.items:
             item_desc = item.item_name
             if item.size:
@@ -162,17 +217,74 @@ def generate_payment_text(db: Session, group: Group) -> str:
                 item_desc += f" {item.sugar or ''}/{item.ice or ''}"
             if item.quantity > 1:
                 item_desc += f" x{item.quantity}"
-            lines.append(f"   - {item_desc} ${item.subtotal}")
-        # 折扣行（有折扣才顯示）
+            if item.menu_item is not None and item.menu_item.price_tbd and item.unit_price == 0:
+                lines.append(f"   - {item_desc}（價格未訂）")
+            else:
+                lines.append(f"   - {item_desc} ${item.subtotal}")
+            # 缺貨候補（含價差提醒）
+            for b in item.backups:
+                unit_total = item.subtotal / item.quantity
+                diff = b.unit_price - unit_total
+                spec = b.item_name
+                if b.size:
+                    spec += f"({b.size})"
+                if b.sugar or b.ice:
+                    spec += f" {b.sugar or ''}/{b.ice or ''}"
+                if b.extras_text:
+                    spec += f" {b.extras_text}"
+                if diff > 0:
+                    diff_txt = f"（價差 +${int(diff)}/份 需補）"
+                elif diff < 0:
+                    diff_txt = f"（價差 -${int(-diff)}/份 需退）"
+                else:
+                    diff_txt = "（同價）"
+                lines.append(f"     候補{b.priority}: {spec} ${int(b.unit_price)}/份 {diff_txt}")
         if order.discount_amount and order.discount_amount > 0:
             note = f"（{order.discount_note}）" if order.discount_note else ""
             lines.append(f"   - 折扣{note} -${order.discount_amount}")
+        # 結算行（有折扣或補助才逐項顯示計算過程）
+        if has_discount:
+            lines.append(f"   原價 ${order.total_amount} → 折後 ${order.final_amount}")
+        if has_limit:
+            if order.company_pay > 0:
+                lines.append(f"   公司補助 -${order.company_pay}")
+            lines.append(f"   應自付 ${order.self_pay}" + (f" + 運 ${_dp}" if _dp > 0 else ""))
+        elif _dp > 0:
+            lines.append(f"   餐 ${order.final_amount} + 運 ${_dp}")
+        # 缺貨換貨結果（V2.5.0）
+        if order.has_fulfillment_changes:
+            for it in order.items:
+                if it.fulfillment == "substituted" and it.fulfilled_backup:
+                    lines.append(f"   ✕ {it.item_name} → 已換候補{it.fulfilled_backup.priority} {it.fulfilled_backup.item_name}")
+                elif it.fulfillment == "unavailable":
+                    lines.append(f"   ✕ {it.item_name} 缺貨未出（不收費）")
+            sd = order.settle_diff
+            settled = all(it.diff_settled for it in order.items if it.fulfillment)
+            mark = "（已結清）" if settled else "（未結清）"
+            if sd > 0:
+                lines.append(f"   已收 ${pay} 者需向本人補收 ${int(sd)} {mark}")
+            elif sd < 0:
+                lines.append(f"   已收 ${pay} 者需退還本人 ${int(-sd)} {mark}")
+            else:
+                lines.append(f"   換貨後應付不變（補退 $0）")
         lines.append("")
-    
-    # 未結單
+
+    changed_orders = [o for o in submitted_orders if o.has_fulfillment_changes]
+    if changed_orders:
+        collect = sum((o.settle_diff for o in changed_orders if o.settle_diff > 0), Decimal("0"))
+        refund = sum((-o.settle_diff for o in changed_orders if o.settle_diff < 0), Decimal("0"))
+        unsettled = sum(1 for o in changed_orders if not all(it.diff_settled for it in o.items if it.fulfillment))
+        lines.append(f"【換貨統計】{len(changed_orders)} 人有換貨：補收合計 ${int(collect)}／退還合計 ${int(refund)}" + (f"，{unsettled} 人未結清" if unsettled else "，全數結清"))
+        lines.append("")
+
+    has_any_backup = any(b for o in submitted_orders for it in o.items for b in it.backups)
+    if has_any_backup:
+        lines.append("※ 若以候補出貨，請依價差向該員補收/退還")
+        lines.append("")
+
     if pending_users:
-        lines.append("【尚未結單】")
+        lines.append("【未送出】")
         for user_name in sorted(pending_users):
-            lines.append(f"⚠️ {user_name}")
-    
+            lines.append(f"- {user_name}")
+
     return "\n".join(lines)

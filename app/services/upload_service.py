@@ -16,7 +16,10 @@ if settings.cloudinary_cloud_name:
 
 
 async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | None:
-    """上傳圖片到 Cloudinary，回傳 URL"""
+    """上傳圖片到 Cloudinary，回傳 URL。
+    V2.8.0：格式白名單（JPG/PNG/WebP）＋ 5MB 上限（讀取階段即拒絕），失敗回明確 400。"""
+    from fastapi import HTTPException
+    
     if not file or not file.filename:
         return None
     
@@ -25,9 +28,15 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | N
         print("Cloudinary not configured")
         return None
     
+    _ALLOWED = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in _ALLOWED:
+        raise HTTPException(status_code=400, detail="圖片僅支援 JPG／PNG／WebP")
+    _MAX = 5 * 1024 * 1024
+    content = await file.read(_MAX + 1)
+    if len(content) > _MAX:
+        raise HTTPException(status_code=400, detail="圖片請小於 5MB")
+    
     try:
-        content = await file.read()
-        
         # 上傳到 Cloudinary
         result = cloudinary.uploader.upload(
             content,
@@ -39,12 +48,10 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | N
                 {"fetch_format": "auto"}
             ]
         )
-        
         return result.get("secure_url")
     except Exception as e:
-        print(f"Cloudinary upload error: {e}")
-        return None
-
+        print(f"Cloudinary upload failed: {e}")
+        raise HTTPException(status_code=400, detail="圖片上傳失敗，請稍後再試")
 
 def delete_image(url: str) -> bool:
     """刪除 Cloudinary 圖片"""
