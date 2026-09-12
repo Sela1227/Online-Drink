@@ -185,6 +185,53 @@
     </div>
     {% endif %}
     
+    <!-- 飲料選項（V2.10.0：提案 3，補上原本只有 JSON 匯入才建得出來的甜度冰塊） -->
+    {% if store.category and store.category.value == 'drink' %}
+    <div class="bg-white rounded-xl shadow-sm p-5">
+        <h2 class="font-semibold text-sela-800 mb-1"><i class="ti ti-cup"></i> 飲料選項</h2>
+        <p class="text-xs text-sela-800/60 mb-4 leading-relaxed">以逗號分隔，顯示順序就是填寫順序。留空代表這家店不提供該選項。</p>
+        
+        <form action="/admin/stores/{{ store.id }}/options" method="post" class="space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-medium text-sela-800/80">甜度</label>
+                    <button type="button" onclick="document.getElementById('sugar-input').value='無糖,微糖,半糖,少糖,全糖'"
+                            class="text-xs px-2 py-1 rounded-lg border border-sela-300 text-sela-700 active:bg-sela-50">套用標準五段</button>
+                </div>
+                <input type="text" id="sugar-input" name="sugar_options" value="{{ sugar_options }}"
+                       placeholder="無糖,微糖,半糖,少糖,全糖"
+                       class="w-full px-3 py-2 border border-sela-200 rounded-lg text-base focus:outline-none focus:border-sela-500">
+            </div>
+            
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-medium text-sela-800/80">冰塊</label>
+                    <button type="button" onclick="document.getElementById('ice-input').value='正常冰,少冰,微冰,去冰'"
+                            class="text-xs px-2 py-1 rounded-lg border border-sela-300 text-sela-700 active:bg-sela-50">套用標準四段</button>
+                </div>
+                <input type="text" id="ice-input" name="ice_options" value="{{ ice_options }}"
+                       placeholder="正常冰,少冰,微冰,去冰"
+                       class="w-full px-3 py-2 border border-sela-200 rounded-lg text-base focus:outline-none focus:border-sela-500">
+            </div>
+            
+            {% if active_group_count %}
+            <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <i class="ti ti-alert-triangle text-amber-600 mt-0.5"></i>
+                <div class="text-xs text-sela-800/80 leading-relaxed">
+                    這家店目前有 <span class="font-semibold">{{ active_group_count }} 個進行中的團</span>。已送出的訂單記的是當時選的甜度冰塊，不會被改動；但還在點餐的人會看到新的選項。
+                </div>
+            </div>
+            {% endif %}
+            
+            <button type="submit" class="w-full py-2.5 rounded-lg bg-sela-700 text-white font-medium active:bg-sela-800">
+                儲存飲料選項
+            </button>
+        </form>
+        
+        <p class="text-xs text-sela-800/50 mt-4 leading-relaxed">儲存時會整批取代這家店的甜度／冰塊設定，不影響任何歷史訂單。</p>
+    </div>
+    {% endif %}
+    
     <!-- 分店管理 -->
     <div class="bg-white rounded-xl shadow-sm p-5">
         <h2 class="font-semibold text-sela-800 mb-4"><i class="ti ti-building-store"></i> 分店管理</h2>

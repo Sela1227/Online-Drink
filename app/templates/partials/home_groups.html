@@ -1,17 +1,29 @@
 <div class="space-y-6">
     
-    <!-- 公告欄 -->
-    {% if announcement %}
-    <div class="bg-white rounded-2xl p-4 shadow-sm border border-sela-100">
-        <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center flex-shrink-0">
-                <span class="text-lg"><i class="ti ti-speakerphone"></i></span>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-sela-800 mb-1">公告</div>
-                <div class="text-sm text-sela-800/70 whitespace-pre-line">{{ announcement }}</div>
+    <!-- 公告欄（V2.10.0：改讀 announcements 表，最多兩則，置頂優先） -->
+    {% if announcements %}
+    <div class="space-y-2">
+        {% for ann in announcements %}
+        <div class="bg-white rounded-2xl p-4 shadow-sm {% if ann.is_pinned %}border-l-4 border-l-sela-700 border-y border-r border-sela-100{% else %}border border-sela-100{% endif %}">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 {% if ann.is_pinned %}bg-sela-700 text-white{% else %}bg-sela-100{% endif %}">
+                    <span class="text-lg"><i class="ti {% if ann.is_pinned %}ti-pin{% else %}ti-speakerphone{% endif %}"></i></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-sm font-semibold text-sela-800">{{ ann.title }}</span>
+                        {% if ann.is_pinned %}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sela-100 text-sela-700 font-medium">置頂</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm text-sela-800/70 whitespace-pre-line leading-relaxed">{{ ann.content }}</div>
+                    {% if ann.expires_at %}
+                    <div class="text-[11px] text-sela-800/45 mt-2">{{ (ann.expires_at|taipei).strftime('%m/%d %H:%M') }} 前顯示</div>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        {% endfor %}
     </div>
     {% endif %}
     

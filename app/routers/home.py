@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.store import CategoryType, Store
-from app.models.user import SystemSetting
+from app.models.user import Announcement
 from app.services.auth import get_current_user
 
 router = APIRouter()
@@ -27,6 +27,21 @@ def to_taipei_time(dt):
     return utc_dt.astimezone(taipei_tz)
 
 templates.env.filters['taipei'] = to_taipei_time
+
+
+def get_active_announcements(db: Session, limit: int = 2):
+    """首頁公告（V2.10.0）：啟用中且未到期，置頂優先、其次建立時間新到舊。
+
+    資料庫存的是 naive UTC，故以 utcnow() 比對 expires_at。
+    expires_at 為 NULL 代表不設到期，永久顯示。
+    """
+    return db.query(Announcement).filter(
+        Announcement.is_active == True,
+        or_(Announcement.expires_at == None, Announcement.expires_at > datetime.utcnow()),
+    ).order_by(
+        Announcement.is_pinned.desc(),
+        Announcement.created_at.desc(),
+    ).limit(limit).all()
 
 
 def get_hot_items(db: Session, limit: int = 10):
@@ -153,9 +168,8 @@ async def home(request: Request, db: Session = Depends(get_db)):
     # 超夯清單（全站熱門）
     hot_items = get_hot_items(db, limit=10)
     
-    # 公告
-    settings = db.query(SystemSetting).first()
-    announcement = settings.announcement if settings else None
+    # 公告（V2.10.0：改讀 announcements 表）
+    announcements = get_active_announcements(db)
     
     # 進行中的投票
     from app.models.vote import Vote, VoteOption
@@ -203,7 +217,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
-        "announcement": announcement,
+        "announcements": announcements,
         "active_votes": active_votes,
         "stores": stores,
         "my_active": my_active,
@@ -268,9 +282,8 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     # 超夯清單
     hot_items = get_hot_items(db, limit=10)
     
-    # 公告
-    settings = db.query(SystemSetting).first()
-    announcement = settings.announcement if settings else None
+    # 公告（V2.10.0：改讀 announcements 表）
+    announcements = get_active_announcements(db)
     
     # 進行中的投票
     from app.models.vote import Vote, VoteOption
@@ -316,7 +329,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
-        "announcement": announcement,
+        "announcements": announcements,
         "active_votes": active_votes,
         "stores": stores,
     })

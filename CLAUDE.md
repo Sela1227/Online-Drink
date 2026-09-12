@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.9.1（上線前審核修正：六項阻斷級＋低風險四項）
+- **版本：** V2.10.0（管理後台流程第一包：公告二合一＋接線導向＋飲料選項）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -236,6 +236,13 @@
     - 根因二：`generate_receipt_png` 寫死 `pdf[0]`，多頁 PDF 只 render 首頁。修：迴圈 render `len(pdf)` 頁、白底等寬置中直向拼成一張長圖（團主貼 LINE 用，單張最方便）
     - 通用原則：(a) 用 `c.rect` 畫底色塊前，先想清楚它是從錨點往上還往下長、會佔到 baseline 上方多少，間距要 > 那個量才不蓋字。(b) 凡是「PDF → 圖」的轉檔，預設 PDF 可能多頁，一律掃 `len(pdf)` 全頁，別假設只有一頁
 
+24. **批次刪行的錨點若是縮排較深那行的子字串，assert 會假性通過**（V2.10.0 踩到）
+    - 症狀：移除 `_sync_announcement_from_active(db)` 五個呼叫點後，`py_compile` 報 `IndentationError: unexpected indent`
+    - 根因：錨點寫 `"    _sync_announcement_from_active(db)\n"`（4 空格），但其中四處實際是 8 空格縮排（在 `if ann:` 區塊內）。4 空格版是 8 空格版的**子字串**，`str.replace` 從第 5 個字元起匹配成功，只削掉後半段，留下孤兒的 4 個空格黏上下一行，害 `db.commit()` 變成 12 空格。`assert count == 5` 因此通過——它數到的是「1 個真 4 空格 + 4 個假匹配」
+    - 做法：**縮排敏感的整行刪除，錨點一律連同前一行（或後一行）一起寫**，例如 `"        ann.is_active = not ann.is_active\n        _sync...(db)\n"`。只靠單行內容當錨點時，若該行可能出現在不同縮排層級，assert 完全不保護。收尾一定要 `py_compile`，光看 assert 全過不代表沒事
+    - 延伸：這是 V2.8「多行替換注意 try 縮排」的同一族問題，但更陰險——那次是縮排沒補上，這次是 assert 說謊
+
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -274,6 +281,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.10.0 | **管理後台流程第一包（審稿七提案的接線與導向 + 提案 3）**。(1) **公告二合一**：首頁改直接查 `announcements` 表（`home.py` 新增 `get_active_announcements()`，篩啟用中＋未到期、置頂優先、最多 2 則），標題獨立顯示、置頂左粗邊＋圖釘、有到期日顯示「X/X 前顯示」；移除 `_sync_announcement_from_active()` 與其 5 個呼叫點、移除孤兒路由 `POST /admin/announcement`（全站無表單指向它，且會覆寫同步結果造成脫鉤，另與 1486 行函式同名 `update_announcement`）；`SystemSetting.announcement` 欄位保留不動（不碰 schema，僅不再讀寫）；儀表板數字由「公告總數」改「公告顯示中」。**※ 審稿原判斷有誤**：它說 `Announcement` 從未被前台查詢、公告完全不會顯示——實際有同步 helper 接著，真正的問題是只能顯示一則、標題被塞進內文、且 `expires_at` 從未被比對。(2) **公告到期時間時區修正**：`datetime-local` 表單值是台北牆上時間，原本 `fromisoformat` 直接存＝當成 UTC 存，差 8 小時。過去 `expires_at` 沒被用過所以沒人發現，現在首頁要依它過濾，必須正確 → 新增 `_parse_taipei_to_utc()`，列表與編輯頁顯示補 `|taipei`。(3) **核准推薦接匯入頁**（提案 1）：`approve_recommendation` 改導向 `/admin/import?store_id={新ID}`；匯入頁若該店家有對應 `StoreRecommendation`（以 `created_store_id` 反查），顯示推薦人／菜單照片（可開新分頁放大）／菜單網址／備註，右上給「稍後再匯入」出口。**與 Sela 議定不加勾選框**——預設勾起的勾選框實務上沒人取消，多一個要測的分支換不到彈性，出口放匯入頁即可。(4) **匯入完成接菜單頁**（提案 7）：`do_import` 由導回 `/admin` 改為 `/admin/stores/{id}/menus?imported=1&cats=&items=`，兩個分支都取得得到 store_id（完整匯入回 Store、菜單更新回 Menu.store_id）；新增 `_count_import()` 算分類／品項數；菜單頁顯示綠色成功提示，舊菜單有保留時加註第 N 版，附「回店家列表」「繼續匯入其他店家」。(5) **清除測試團排除進行中團單**（審稿 4.1）：`all()` 對零訂單恆為真，且原查詢 `db.query(Group).all()` 不篩狀態 → 早上開、還沒人點的團會被 `_delete_group_cascade` 實體刪除且不可復原。加 `or_(is_closed == True, deadline <= now)`。**兩段式預覽刻意不做**，留 V2.11 與刪店家輸入店名確認、全體登出影響說明一起包成「危險操作」，讓本版維持在「只改導向與查詢條件」的低風險層級（本版與未實測的 V2.9.1 同批部署，排查範圍是兩版總和）。(6) **店家編輯頁補飲料選項**（提案 3）：原本甜度冰塊只有完整 JSON 匯入才建得出來，從推薦核准來的飲料店永遠沒有、後台無處可補。新增 `POST /admin/stores/{id}/options`，甜度／冰塊各一個逗號分隔輸入框＋兩顆常用組合按鈕，有進行中團單時顯示提示。**採整批取代**（刪舊的再依填寫順序重建）而非比照加料逐筆增刪——甜冰有顯示順序，逐筆要另做排序 UI，而它本來就是一次設定好的東西；`OrderItem.sugar/.ice` 是字串快照不吃 `store_options.id`，重建不影響任何歷史訂單。`_parse_option_values()` 容忍全形逗號、去重保序、單值截 50（欄位上限）、上限 20 個。教訓見坑 #24（批次刪行的錨點縮排陷阱）。本版額外寫了 SQLite 煙霧測試驗公告過濾排序／選項解析／時區轉換／匯入計數；`check_routes.py` 這次真的跑起來（裝 requirements 後），135 條路由無重複。 |
 | V2.9.1 | **上線前審核修正（六項阻斷級＋低風險四項）**。(1) **刪除 groups.py 重複的 copy_last_order**——與 orders.py 同路徑，groups router 先註冊者勝，導致 **V2.6 的已送出防護/mode 與 V2.7 的庫存封頂從未生效**、且舊版引用不存在欄位。已建 `scripts/check_routes.py` 重複路由檢查納入發版流程。(2) 收藏按鈕路徑 `/favorites/{id}/add|remove` → `/favorites/{id}`，非 HTMX 請求改回傳 redirect（原本使用者看到裸 JSON）。(3) `delete_store` 補三條外鍵斷鏈：`order_item_backups.menu_item_id` 設 NULL（V2.4 新表未涵蓋會擋刪除）、`user_favorites`、`group_templates`。(4) `export_service` 改用 `group.store_display_name`＋None 防護（店家已刪的歷史團單匯出原本 500）；空購物車不再列入「未送出」。(5) `SECRET_KEY`/LINE 憑證未設定時拒絕啟動（不再用公開預設金鑰簽 JWT；⚠️ 部署前先在 Railway 確認 SECRET_KEY，換金鑰全員需重新登入）。(6) `create_engine` 加 `pool_pre_ping/pool_recycle(1800)/pool_size(5)/max_overflow(10)`——解「早上第一個人打開會錯、重整就好」。(7) 訂單牆截止判斷改 `group.is_open`（原 utcnow 比對有時區/提早結單漏洞）。(8) 正式環境關閉 /docs 與 openapi。(9) 刪死碼 dev/auth_extra/feedback/orders_extra 及 dev include。(10) start.sh 改 3 workers＋proxy-headers。**教訓：每次新增資料表都要回頭檢查刪除流程；每次新增路由都要跑重複路由檢查；橫向一致性（時區、可見性、None 防護）不能只在當下需要的地方套用。** |
 | V2.9.0 | **代購：價格「未訂」**。品項價格可勾「未訂」（不用填價、先開賣），MenuItem 加 `price_tbd`（未訂時 price=0 佔位）。**核心規則：未訂→定價那一刻，自動回寫此團所有引用該品項且仍為 0 元的訂單 unit_price**（含已送出——未訂快照本為暫定，這是唯一允許回寫快照的情境），總額/補助/收款全自動重算。UI：面板新增/修改表單「未訂」勾選（勾了價格欄 disable＋免填、JS 同步 required）、團主列表「未訂」標籤；團員菜單「價格未訂」pill、下單視窗琥珀提示「定價後金額自動補上」、購物車該品項顯示「未訂」；收款明細該品項標（價格未訂）＋總覽 ※ 提醒。注意：未訂品項在每單上限/折扣計算中以 0 計，定價後才反映。 |
 | V2.8.0 | **審稿二修（V2.7 代購審查，P0×4＋P1×4＋P2×2）**。**P0 超賣封堵**：(1) 同單多列同品項——submit 改「依 menu_item_id 彙總後比對」（原逐列各自過檢，3+3 可破上限 5）。(2) 併發超賣——submit/還原交易內 `SELECT FOR UPDATE` 鎖定涉及品項（固定依 ID 排序防死鎖；SQLite no-op 無害），資料庫層保證先送先贏。(3) 佔用口徑改**方案 A：SUBMITTED＋EDITING 皆佔**（進修改不失去已搶到的限量品；減量/刪除仍即時釋放＝「改單會回」）；`_stock_remaining` 加 `exclude_order_id` 防自身重複計算；取消修改還原前重驗庫存（修改中刪掉限量品又被搶走時 400「僅剩 N 份無法完整還原」）；顯示 stock_used 同口徑。(4) **部門限定團權限**：`is_visible_to` 落實到團詳情＋orders 全入口（`_ensure_visible` 共 8 處），不再只靠畫面隱藏。**P1**：(5) 修改快照補存 `fulfillment/fulfilled_backup_priority/diff_settled`，還原時依**順位**重連新候補 id（舊 id 會變）。(6) 缺貨處理限截止後（POST 硬擋 400＋面板鎖定提示）。(7) 收款總覽有換貨時列「原訂應收→補收/退還→**最終應收**（=Σactual_self_pay+運）」，每人頂行直接顯示換貨後金額（原額括注）。(8) 品項上限不可低於已佔量（400 提示）。**P2**：(9) `upload_image` 前置驗證——JPG/PNG/WebP 白名單＋5MB 讀取階段拒絕＋失敗明確 400（原本靜默回 None 品項照建）。(10) 品名 1-100/說明 ≤200/價格 str→Decimal 直轉且 1~100 萬/庫存 1~99999＋前端 maxlength。(11) 核對單標示「原始品項・換貨結果見收款明細」。**待辦沿用**：核對單/Excel 改用 actual 出貨鏈。教訓：**「先查再送」不是庫存機制**——彙總、鎖、排除自身、還原重驗四件缺一不可；佔用口徑改動要同步 helper/顯示/送出/還原四處。 |
@@ -349,7 +357,15 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-> **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為功能性 backlog。
+> **與 Sela 議定的三包規劃**（依序做，審稿 md 各自對應）：
+> - **V2.10.0 管理後台流程第一包 — 已完成**（公告二合一＋提案 1/3/7＋清除測試團安全性）
+> - **V2.11 管理後台流程第二包＋危險操作**：提案 2（手動新增店家表單）、提案 4（部門成員批次加入）、提案 5（使用者列表顯部門＋指派入口）、提案 6（店家列表快捷操作與搜尋）、儀表板重整（修 `/admin/users` 重複連結、分「今天要處理的／管理入口」兩區）、危險操作三項（清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響）、下架兩處訪客清理工具
+> - **V2.12 防再犯基礎設施**：Alembic 評估（注意坑 #1，本專案刻意不用）、授權 dependency 取代 handler 各自檢查、時間單一真相（坑 #24 那類時區問題的根治）、表單輸入 schema — 見「程式碼優化與維護建議」md 的 H/A/G/J 節
+> - **獨立長工 大重構**：巨型 router 拆分（`admin.py` 已 1700+ 行）、`group.html` 1359 行拆 JS、Jinja 環境統一（解坑 #6）、函式內 import 清理 — 功能穩定期再動，需全站回歸
+>
+> **零星待辦**：核對單 PDF/Excel 改用 actual 出貨鏈（兩輪審稿點名，現以「原始品項」標示過渡）；候補列進核對單 PDF（分頁高度計算是已知重疊坑，見坑 #23）
+
+> **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為更早的功能性 backlog。
 
 1. **匯入價格容錯**（V1.7.0 預告的下一步）— `schemas/menu.py` + `import_service.py` 處理「時價」「$30」「30元」「全形數字」等非純數字輸入：能解析的自動轉（$30→30），不能解析的（時價）給明確提示或存為 0 + 標記。單獨做、單獨測，不跟其他混
 2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新

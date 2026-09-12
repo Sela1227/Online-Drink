@@ -39,7 +39,7 @@
             <div>
                 <label class="block text-sm font-medium text-sela-800/80 mb-1">過期時間（選填）</label>
                 <input type="datetime-local" name="expires_at"
-                       value="{{ announcement.expires_at.strftime('%Y-%m-%dT%H:%M') if announcement.expires_at else '' }}"
+                       value="{{ (announcement.expires_at|taipei).strftime('%Y-%m-%dT%H:%M') if announcement.expires_at else '' }}"
                        class="border border-sela-300 rounded-lg px-3 py-2 text-sm">
             </div>
             
