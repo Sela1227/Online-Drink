@@ -6,6 +6,44 @@ from app.database import Base
 from app.models.store import CategoryType
 
 
+def taipei_now():
+    """現在的台北牆上時間（naive），用來跟 `Group.deadline` 比對。
+
+    V2.10.1：`groups.deadline` 存的是台北牆上時間的 naive datetime，不是 UTC。
+    拿 `datetime.utcnow()` 去比會差 8 小時 —— V2.10.0 的清除測試團與飲料選項
+    團數統計就是這樣錯的（坑 #25）。**凡是比對 deadline 一律用這個函式。**
+
+    注意：`announcements.expires_at`、`orders.created_at` 等欄位存的是 UTC，
+    那些場合要用 `datetime.utcnow()`，不要用這個。兩套慣例並存是已知的結構
+    問題，V2.11 的「時間單一真相」會處理。
+    """
+    from datetime import timezone, timedelta
+    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
+
+
+def taipei_to_utc(dt):
+    """台北牆上時間的 naive datetime → UTC 的 naive datetime。
+
+    V2.10.2：用於「使用者心智模型是台北日曆邊界，但要比對 UTC 欄位」的場合，
+    例如統計頁的「本月」＝台北 9/1 00:00，換算後要拿 UTC 8/31 16:00 去比對
+    `Group.created_at`。
+
+    注意這**不是**把所有台北計算都改成 `utcnow()` 就好 —— 日曆邊界仍然要用
+    台北算（那才是使用者要的月份），算完再用這個函式轉。至於滾動窗（近 30 天）
+    則直接從 `utcnow()` 起算即可，不需要經過這裡。
+    """
+    if dt is None:
+        return None
+    from datetime import timezone, timedelta
+    if dt.tzinfo is not None:
+        # V2.10.3：帶時區的輸入直接換算，不要 replace（那是覆寫不是轉換）。
+        # V2.10.1 的 _parse_taipei_to_utc 原本有這個判斷，收斂時漏掉了。
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(
+        timezone.utc
+    ).replace(tzinfo=None)
+
+
 class Group(Base):
     __tablename__ = "groups"
     
@@ -67,10 +105,7 @@ class Group(Base):
     
     @property
     def is_expired(self) -> bool:
-        from datetime import timezone, timedelta
-        taipei_tz = timezone(timedelta(hours=8))
-        now = datetime.now(taipei_tz).replace(tzinfo=None)
-        return now > self.deadline
+        return taipei_now() > self.deadline
     
     @property
     def is_open(self) -> bool:

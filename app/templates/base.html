@@ -111,15 +111,42 @@
                 margin:0 -1rem -1rem; padding:.85rem 1rem calc(.85rem + env(safe-area-inset-bottom));
                 box-shadow:0 -4px 12px rgba(65,51,31,.06); }
     </style>
+    <script>
+    // V2.11.4 S-01：window.toast 必須在 head 定義。
+    // 原本放在 body 尾端，而 group.html 的 script 在主內容區裡、比它先執行，
+    // `if (window.toast)` 不成立就直接略過 —— 「已複製 N 項」永遠不會出現。
+    // V2.11.2 的 setTimeout(300) 剛好掩蓋了這個順序問題，V2.11.3 拿掉後必定失效。
+    //
+    // 元件尚未就緒時先排隊；元件 x-init 時會設定 window._toastShow 並倒出佇列。
+    window._toastQueue = window._toastQueue || [];
+    window.toast = function (m, kind) {
+        var p = { msg: m, kind: kind || 'ok' };
+        if (window._toastShow) { window._toastShow(p); } else { window._toastQueue.push(p); }
+    };
+    </script>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V2.9.0' %}
+{% set app_version = 'V2.11.4' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
+    // V2.11.1 P1-08：htmx 預設不會把 4xx 換進頁面，所以「只剩 N 份」「超過每單
+    // 上限」「團單已截止」「請先進入修改模式」這些 400 訊息，使用者按了完全沒有
+    // 反應，很容易以為已經送出。這裡統一把 detail 顯示出來。
     document.body.addEventListener('htmx:responseError', function(evt) {
-        if (evt.detail.xhr.status === 401) {
+        var xhr = evt.detail.xhr;
+        if (xhr.status === 401) {
             window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
+            return;
         }
+        var msg = '操作失敗，請稍後再試';
+        try {
+            var body = JSON.parse(xhr.responseText);
+            // V2.11.2 N-12：FastAPI 的 422 回應中 detail 是陣列，直接當字串顯示會變 [object Object]
+            if (body && body.detail) {
+                msg = Array.isArray(body.detail) ? '輸入格式有誤，請重新確認' : body.detail;
+            }
+        } catch (e) {}
+        if (window.toast) { window.toast(msg, 'error'); } else { alert(msg); }
     });
     </script>
     
@@ -209,19 +236,49 @@
     {% endif %}
 
     <!-- 全域 Toast 提示 -->
-    <div x-data="{ msg:'', show:false }"
-         @apptoast.window="msg = $event.detail; show = true; clearTimeout(window._toastT); window._toastT = setTimeout(() => show = false, 1800)"
+    <!-- V2.11.4 S-01：Alpine v3 在同一元素上固定先跑 x-init 再掛 x-on（@）。
+         V2.11.3 在 x-init 裡倒佇列、發 apptoast 事件，但 @apptoast.window 監聽器
+         那時還沒掛上，事件發給了不存在的人。改成 x-init 直接把顯示函式交給
+         window._toastShow，並同步倒出佇列 —— 不再依賴指令順序。 -->
+    <div x-data="{
+             msg: '', kind: 'ok', show: false,
+             init() {
+                 // 用 x-data 的 init() 而不是 x-init 表達式：Alpine 會把 x-init 第一個
+                 // 陳述式的結果當回傳值，若是函式就會呼叫一次（_toastShow(undefined) 噴錯）
+                 window._toastShow = (p) => {
+                     this.msg = p.msg; this.kind = p.kind || 'ok'; this.show = true;
+                     clearTimeout(window._toastT);
+                     window._toastT = setTimeout(() => { this.show = false; }, 2600);
+                 };
+                 (window._toastQueue || []).splice(0).forEach(p => window._toastShow(p));
+             }
+         }"
          x-show="show" x-cloak
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
          x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          class="fixed left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
          style="bottom: calc(5rem + env(safe-area-inset-bottom));">
-        <div class="bg-sela-800 text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium flex items-center gap-2">
-            <i class="ti ti-check" style="font-size:18px;"></i><span x-text="msg"></span>
+        <!-- V2.11.3 R-04：錯誤訊息原本也帶打勾圖示，「只剩 N 份」「團單已截止」
+             看起來像成功了。改成依 kind 換圖示與底色。 -->
+        <div :class="kind === 'error' ? 'bg-red-700' : 'bg-sela-800'"
+             class="text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 max-w-[88vw]">
+            <i :class="kind === 'error' ? 'ti ti-alert-circle' : 'ti ti-check'" style="font-size:18px;"></i>
+            <span x-text="msg"></span>
         </div>
     </div>
     <script>
-        window.toast = function(m){ window.dispatchEvent(new CustomEvent('apptoast', { detail: m })); };
+        // V2.11.4 S-02/S-03：表單錯誤的訊息改由後端寫進 sessionStorage 再 history.back()
+        // 回來（見 main.py），這裡在「頁面載入」與「從 bfcache 返回（pageshow）」
+        // 兩個時機各讀一次 —— 從 bfcache 回來時 inline script 不會重跑。
+        // 不再用 ?flash= 網址參數：外站無法寫本站的 sessionStorage，訊息偽造
+        // （用連結讓本站顯示假的紅色系統提示）的問題自然消失。
+        function _consumeFlash() {
+            var m = null;
+            try { m = sessionStorage.getItem('flash'); sessionStorage.removeItem('flash'); } catch (e) {}
+            if (m) { window.toast(m, 'error'); }
+        }
+        _consumeFlash();
+        window.addEventListener('pageshow', function (e) { if (e.persisted) { _consumeFlash(); } });
     </script>
 
     {% if user %}

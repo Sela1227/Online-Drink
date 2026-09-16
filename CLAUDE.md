@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.9.0（代購：價格「未訂」＋定價自動回寫訂單）
+- **版本：** V2.11.4（第四輪複審 S-01～S-07：前端提示失效修正＋jsdom 驗證進版控）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -236,6 +236,124 @@
     - 根因二：`generate_receipt_png` 寫死 `pdf[0]`，多頁 PDF 只 render 首頁。修：迴圈 render `len(pdf)` 頁、白底等寬置中直向拼成一張長圖（團主貼 LINE 用，單張最方便）
     - 通用原則：(a) 用 `c.rect` 畫底色塊前，先想清楚它是從錨點往上還往下長、會佔到 baseline 上方多少，間距要 > 那個量才不蓋字。(b) 凡是「PDF → 圖」的轉檔，預設 PDF 可能多頁，一律掃 `len(pdf)` 全頁，別假設只有一頁
 
+24. **批次刪行的錨點若是縮排較深那行的子字串，assert 會假性通過**（V2.10.0 踩到）
+    - 症狀：移除 `_sync_announcement_from_active(db)` 五個呼叫點後，`py_compile` 報 `IndentationError: unexpected indent`
+    - 根因：錨點寫 `"    _sync_announcement_from_active(db)\n"`（4 空格），但其中四處實際是 8 空格縮排（在 `if ann:` 區塊內）。4 空格版是 8 空格版的**子字串**，`str.replace` 從第 5 個字元起匹配成功，只削掉後半段，留下孤兒的 4 個空格黏上下一行，害 `db.commit()` 變成 12 空格。`assert count == 5` 因此通過——它數到的是「1 個真 4 空格 + 4 個假匹配」
+    - 做法：**縮排敏感的整行刪除，錨點一律連同前一行（或後一行）一起寫**，例如 `"        ann.is_active = not ann.is_active\n        _sync...(db)\n"`。只靠單行內容當錨點時，若該行可能出現在不同縮排層級，assert 完全不保護。收尾一定要 `py_compile`，光看 assert 全過不代表沒事
+    - 延伸：這是 V2.8「多行替換注意 try 縮排」的同一族問題，但更陰險——那次是縮排沒補上，這次是 assert 說謊
+
+25. **`deadline` 是台北牆上時間，不是 UTC — 拿 `utcnow()` 比會差 8 小時**（V2.10.1 修正，外部增補審稿抓到）
+    - 症狀一：「清除測試團」對當天剛截止的團完全沒反應，要等 8 小時後才清得掉，管理員會以為功能壞了
+    - 症狀二：飲料選項的「有 N 個進行中的團」警告高估，已截止 8 小時內的團仍被算成進行中
+    - 根因：`groups.deadline` 存的是**台北牆上時間的 naive datetime**（見 `Group.is_expired` 的原始寫法），但 `announcements.expires_at`、`orders.created_at` 等欄位存的是 **UTC**。同一個 codebase 兩套慣例並存，寫新查詢時選錯只是機率問題——V2.10.0 就是在修完公告時區問題的**同一批程式碼裡**又犯了一次
+    - 做法：`app/models/group.py` 新增模組級 `taipei_now()`，`Group.is_expired` 也改用它成為單一來源。**凡是比對 `deadline` 一律用 `taipei_now()`，永遠不要用 `utcnow()`**；反過來，比對 `expires_at` / `created_at` 這類 UTC 欄位時要用 `utcnow()`，不要用 `taipei_now()`
+    - 自我檢查：改完 grep 一次 `deadline` 與 `utcnow` 同行的殘留
+    - **鏡像案例（V2.10.2 清掉）**：反過來拿台北時間去比對 UTC 欄位也一樣錯。
+      (a) `groups.py` 店家熱門品項的 30 天窗從台北時間起算，比對 UTC 的 `Order.created_at`，窗口實際變成 29 天 16 小時（`home.py::get_hot_items` 做同一件事卻是對的，兩支幾乎相同的函式一對一錯）。
+      (b) 統計頁 `home.py` 的 `date_start/date_end` 全從台北推算，卻比對 UTC 的 `Order/Group.created_at`，「本月」會漏掉每月前 8 小時（台北 9/1 00:00-08:00 開的團不算進本月），「今年」同理漏 1/1 前 8 小時。
+    - **修法有陷阱**：增補審稿建議「兩處都改用 `utcnow()`」，這對**滾動窗**（近 30/90 天）是對的，但對**日曆邊界**（本月/今年）是錯的——改成 `datetime(utcnow.year, utcnow.month, 1)` 會變成「UTC 的九月」＝台北 9/1 08:00 起，只是換個方向漏同樣 8 小時。日曆邊界仍要用台北算（那才是使用者要的月份），算完用 `taipei_to_utc()` 轉；而且統計頁的 `date_start/date_end` 還要顯示在模板的「統計期間」，所以**顯示用台北值、查詢用轉換值，必須拆成兩組**。這正是 `taipei_now()` docstring 那句反向規則想防的矯枉過正
+    - **統計頁的殘餘（V2.10.3 清掉）**：V2.10.2 修了 `query_start/query_end`，但同一個函式裡還有三處沒改到——`extract('hour'/'dow', Order.created_at)` 取的是 UTC 小時與星期（午餐團在台北 09:00-12:00＝UTC 01:00-04:00，畫面會顯示「最常下單 2:00」），以及月度趨勢迴圈的 `month_start/month_end`。**修一個函式時要把整個函式的時間運算掃一遍，不要只改當下看到的那幾行。**
+    - 根治：這只是緩解。兩套慣例並存是結構問題，V2.11「時間單一真相」處理。增補審稿的判斷值得記下——**時間處理是目前唯一一個「已證實會持續產生新缺陷」的結構問題**，所以它在 V2.11 裡排第一，優先於授權 dependency 與 Alembic（那兩項解決的是潛在風險與維護成本，還沒造成實際錯誤）
+
+
+
+26. **測試腳本用 `os.environ.setdefault("DATABASE_URL", ...)` 等於沒有防護**（V2.10.2 修正，外部審稿抓到）
+    - 症狀：`scripts/smoke_test.py` 開頭會 `db.query(model).delete()` 清四張表。若執行時 shell 裡已匯出過正式的 `DATABASE_URL`（剛操作完 Railway、或在 Railway console 裡跑），`setdefault` **不會覆寫**它，四道 DELETE 直接打到正式資料庫
+    - 為什麼「沒出事」不算安全：外鍵約束**可能**在刪 `Group` 時中斷並回滾，但 `announcements` 沒有被任何東西參照，順序剛好就會真的被清掉。這是靠運氣不是靠設計
+    - 做法：偵測到非 SQLite 的 `DATABASE_URL` 直接 `SystemExit` 中止，並用**指派**而非 `setdefault` 覆寫；`SECRET_KEY` 同理。錯誤訊息只印 scheme，不印完整連線字串
+    - 通用原則：**任何會寫入或刪除的腳本，都要主動拒絕非預期的目標，而不是預設一個安全值就當作防住了。** `setdefault` 表達的是「偏好」，不是「限制」
+
+27. **用「固定 30 天」近似月份，會讓月份重複並跳過月份**（V2.10.3 修正，外部審稿抓到）
+    - 症狀：統計頁「最近六個月」的長條圖，某個月出現兩根一模一樣的長條，另一個月整個消失，而且消失那個月的資料不會出現在任何一根裡
+    - 根因：`today.replace(day=1) - timedelta(days=i*30)` 往回推。月份長度是 28-31 天，30 天只是近似，累積誤差會踩過月界。實測 2026-03-01/03-15/04-10/05-20 推出來都只有 **5 個唯一月份**（二月被跳過、另一個月重複）；2026-09 剛好正確，所以平常看不出來
+    - **這種 bug 有季節性**：因為二月只有 28 天，跨過二月的推算必錯，也就是**每年 3 月到 5 月一定出現**，其他月份可能正常。不要因為「現在看起來是對的」就以為沒事
+    - 做法：月份要用月份運算（`month -= 1`，遇 0 則 `year -= 1; month = 12`），不要用天數近似。已抽成 `home.py::month_buckets()`
+    - 通用原則：**凡是「往回推 N 個月/年」的需求，都不要用 timedelta 天數換算。** 日/週可以，月/年不行
+
+28. **測試複製一份被測邏輯來驗，等於沒測**（V2.10.3 自省）
+    - 症狀：`smoke_test.py` 一開始把 `month_buckets` 與 `taipei_slot` 的實作**複製**進測試檔來驗。這樣真正的 `home.py` 改壞了，測試照樣全綠
+    - 做法：把邏輯抽成 `home.py` 的模組級函式，測試 `import` 它。抽函式的成本很低，而且順便讓路由主體變短
+    - 驗證手法：**寫完測試後故意把被測的那行改壞，確認測試會紅、再還原。** V2.10.3 對 `taipei_slot` 做過這個動作（改壞後退出碼 1）。沒做過這個動作的測試，不知道它到底有沒有在保護東西
+    - 同族：V2.10.1 那條「確認舊寫法仍會錯」的 assert 是同一個精神——防止測試隨時間退化成恆真
+
+29. **模板 `<script>` 裡被引號包住的插值，會因為資料含引號而讓整頁 JS 掛掉**（V2.11.0 修正，做選店覆蓋層時順手發現）
+    - 症狀：`name: "{{ item.name }}"` 這種寫法只靠外層雙引號包住值。只要那筆資料含有雙引號，整段 `<script>` 就語法錯誤，該頁的 **Alpine 全部失效**——分類按鈕、選單、快捷鍵全部按了沒反應，而且**畫面上不會有任何錯誤訊息**，只有 console 看得到
+    - 觸發面：`group.html:1091/1096` 的 `item.name` 是**菜單品項名**，來自 JSON 匯入，出現引號的機率不低；那是團員每天在用的點餐頁。`group_new.html` 的 `store.name` 同理
+    - 做法：**`<script>` 內的插值一律過 `| tojson`**，由 Jinja 負責逸出（連 enum 這種「現在很安全」的也要，否則下次照抄旁邊那行就破功），寫成零容忍規則才不用維護白名單
+    - 守護：`scripts/check_template_js.py`——(一) 掃全部模板的 `<script>`，被引號包住又沒 tojson 的插值一律失敗；(二) 用假資料渲染登記過的模板、抽出函式跑 `node --check`。假資料刻意放了含引號與反斜線的店名
+    - 為什麼既有檢查抓不到：`py_compile` 不看模板，Jinja `Environment().parse()` 只驗 Jinja 語法、不管產出的 JS 合不合法。這是三件套之間的縫
+
+30. **批次改碼的錨點：淺縮排版本是深縮排版本的子字串，assert 會假性通過**（坑 #24 的再犯，V2.11.1 又踩兩次）
+    - 這是**同一個坑的第三、四次**。V2.10.0 是 `_sync_announcement_from_active(db)`，V2.11.1 是
+      `    order.status = OrderStatus.DRAFT`（另一處是 8 空格）與 `{"sid": store_id})`
+    - 為什麼一再發生：寫錨點時只看「我要改的那一行長什麼樣」，沒看「這一行還會不會以別的縮排出現在別處」。
+      `s.count(old) == 1` 在子字串情境下**會回傳 2 而不是 1**，看起來像是保護，實際上兩次都是假匹配
+    - **硬規則：整行替換的錨點一律連前一行或後一行一起寫。** 例如不要用
+      `"    order.status = OrderStatus.DRAFT\n"`，要用
+      `"    order.status = OrderStatus.DRAFT\n    db.commit()\n    \n    return ..."`。
+      單行錨點只在該行內容全域唯一（含完整縮排且不可能是他行子字串）時才可用
+    - 收尾一定 `py_compile`。V2.10.0 那次 assert 全過但檔案壞掉；V2.11.1 這兩次 assert 有擋下來（因為數到 2），
+      差別只在運氣
+
+31. **測試用錯前提，會綠得很安心卻什麼都沒驗到**（V2.11.1 自省）
+    - 症狀：寫「非法甜度應被擋下」的測試時，用的團單設了 `lock_sugar=True`。鎖定時甜度會先被團單預設
+      覆寫，根本走不到驗證那行。測試通過，但驗證邏輯壞掉也一樣通過
+    - 做法：寫完測試先確認**它測的路徑真的會被走到**。最快的檢查是把被測的那行改壞，看測試會不會紅（坑 #28）
+    - 同族：坑 #28（測試複製被測邏輯）。共同點是「測試看起來在測某件事，實際上沒有」
+
+32. **`autoflush=False` 下，`db.refresh()` / `db.expire()` 會無聲丟棄尚未 flush 的變更**（V2.11.2 修正，P0 回歸）
+    - 症狀：團主按「提前截止」→ 回到團頁，團**照樣開放點餐**。而且只在「本團沒有修改中訂單」時發生，也就是最常見的情況
+    - 根因：`close_group` 寫成
+      `group.is_closed = True` → `_settle_editing(db, group)` → `db.refresh(group)`。
+      本專案 `SessionLocal(autoflush=False)`，第一行只改記憶體；`settle_editing_orders` 在沒有 EDITING 訂單時直接 `return 0` 不 commit；
+      接著 `db.refresh(group)` 從資料庫重讀，**未 flush 的變更就沒了**，最後的 `db.commit()` 沒有任何 dirty 屬性可寫
+    - 有 EDITING 訂單時之所以正常，只是因為 settle 內部剛好 commit 了 —— 這種「有時候會動」最難查
+    - 做法：**先改屬性、後呼叫任何會查詢或 refresh 的函式時，中間一定要 `db.flush()` 或 `db.commit()`。**
+      `close_group` 改成 `is_closed = True` → `db.commit()` → 結算 → refresh
+    - 同族：`with_for_update()` 也有類似陷阱 —— 它會等到鎖、資料庫也回傳最新列，但 identity map **不會覆蓋同 session 已載入的物件**，
+      要加 `.populate_existing()`（V2.11.2 的抽獎鎖就是這樣失效的）
+    - 通用原則：ORM 的「讀」與「寫」在同一個 session 裡不是各自獨立的，任何 refresh/expire/rollback 都可能把還沒落地的改動吃掉
+
+33. **只修新資料、不處理既有資料，等於沒修**（V2.11.2 修正）
+    - 症狀：V2.11.1 為範本加了 `department_ids` 欄位並在存檔時寫入，但**既有範本的欄位是 NULL**，
+      判斷式 `if not tpl.is_public and tpl.department_ids` 整段不成立 → 舊範本開出來的團仍是「非公開且零個部門」，只有團主看得到
+    - 同一版還有另一個相同形狀的：`clean_http_url` 擋下無協定網址，但資料庫裡早就存著一堆 `maps.app.goo.gl/abc`，
+      結果管理員一編輯店家就整頁存不了，而且訊息不說是哪個欄位
+    - 做法：**每次加欄位或加驗證，都要同時回答「既有資料長什麼樣、會怎麼樣」**，三個選項擇一並寫進交班文件：
+      (a) 遷移時一併補值 (b) 程式對舊資料給明確的錯誤或降級 (c) 上線前的清查 SQL
+    - V2.11.2 的處理：舊範本**擋下**並提示重存（Sela 決定 —— 可見性放寬就收不回來，重存是一次性成本）；
+      無協定網址**自動補 https://**（危險協定仍擋），並在交班文件保留清查 SQL
+
+34. **用 `except` 做流程控制，等於把剛擋下的限制又放回去**（V2.11.3 修正）
+    - 症狀：庫存 5 份的品項，團員已送出 5 份、按修改、複製上次（上次點 3 份）→ 本團合計變成 **8 份**，超賣
+    - 根因：V2.11.2 的寫法是
+      `try: _reserve_stock(...)` / `except HTTPException: _rem = _stock_remaining(..., exclude_order_id=order.id); _copy_qty = min(_copy_qty, _rem)`。
+      `_reserve_stock` 正確判斷 5+3>5 並拋出例外，但 except 分支重算的剩餘量**排除了自己**，
+      於是把剛被擋下的 5 份又當成可用，複製量被封頂為 min(3,5)=3
+    - 做法：不要用例外做流程控制。要「還能再加幾份」就寫一個回答這件事的函式（`_available_for`），
+      讓呼叫端拿數字做決定；例外留給真正的錯誤
+    - **另一半的根因**：`_reserve_stock` 原本用
+      `sum(i.quantity for i in order.items if ...)` 算自有量，讀的是記憶體 collection。
+      迴圈內新建的 `OrderItem(order_id=...)` **不會**自動進入 `order.items`；
+      而刪除並 flush 後，被刪的物件**仍留在** collection 裡直到 expire。兩個方向都會錯。
+      改用 `_own_qty()` 查資料庫（呼叫前確保已 flush）
+    - 通用原則：**牽涉配額、餘額、庫存的計算，一律以資料庫為準，不要相信 ORM collection 的當下狀態**（與坑 #32 同源）
+
+35. **「頁面載入時就要顯示的提示」是後端測試看不見的一類，必須用瀏覽器環境驗**（V2.11.4，S-01）
+    - 症狀：V2.11.3 的 toast 在兩個情境下**永遠不顯示**——複製上次的「已複製 N 項」與所有表單錯誤的 flash。
+      後端 51 項煙霧測試、Jinja parse、`node --check` 全綠。使用者按下去頁面重載，什麼提示都沒有，比整頁 JSON 更難察覺
+    - 根因一（載入順序）：`window.toast` 定義在 body 尾端，但 group.html 的 `<script>` 在 `<main>` 裡、比它先執行，
+      `if (window.toast)` 不成立直接略過。V2.11.2 的 `setTimeout(300)` 剛好掩蓋了這個順序問題，V2.11.3 拿掉後必定失效
+    - 根因二（Alpine 指令順序）：Alpine v3 在同一元素上**固定先跑 `x-init` 再掛 `x-on`（@）**。
+      V2.11.3 在 x-init 裡倒佇列發 `apptoast` 事件，但 `@apptoast.window` 監聽器那時還沒掛上，事件發給了不存在的人
+    - 根因三（求值方式）：Alpine 把 x-init **第一個陳述式的結果**當回傳值，若是函式就會呼叫一次。
+      `x-init="window._toastShow = (p) => {...}; ..."` 的結果是那個箭頭函式 → `_toastShow(undefined)` 噴 console 錯誤。要用 `x-data` 的 `init()`
+    - 做法：`window.toast` 移到 `<head>`（任何位置的 script 都呼叫得到）；元件在 `x-data.init()` 直接把顯示函式交給
+      `window._toastShow` 並同步倒出佇列，不再依賴事件與指令順序
+    - **驗證工具**：新增 `scripts/check_frontend_toast.py` + `jsdom_toast_check.js`——渲染 HTML、載入 jsdom、把 Alpine 放 body 最後
+      模擬 defer、讀 toast 文字。實測用 V2.11.3 的舊 base.html 跑會抓到（`text` 為空、退出碼 1）。沒有 node/jsdom 時自動跳過
+    - 通用原則：**只要一個修正的價值在「使用者會看到什麼」，就不能只靠後端測試說它修好了**
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -274,6 +392,16 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.11.4 | **第四輪複審 S-01～S-07**（上輪 9 項：6 項確認修正、1 項部分、**2 項修法本身失效**——R-03/R-04 後端對了但前端完全看不到）。**S-01（P1，本專案自己改壞的）**：toast 永遠不顯示，三個根因（載入順序、Alpine x-init 先於 x-on、x-init 結果是函式會被呼叫）見坑 #35。`window.toast` 移到 head、元件改 `x-data.init()` 提供 `_toastShow`。**新增第五支檢查** `check_frontend_toast.py`（jsdom + Alpine 模擬 defer），實測舊版會紅。**S-02**：表單錯誤改回極小 HTML「寫 sessionStorage 後 `history.back()`」——V2.11.3 的 303 轉址讓使用者填的表單全部遺失（開團頁選完店家填完欄位因截止時間被擋就整頁重填，與 V2.11.0「換店不丟表單」的設計目標衝突）。同時消除 **S-03**（`?flash=` 可由外部連結偽造紅色系統提示）與 **S-04**（Referer 路徑 `//` 開頭導向外站）。base.html 在載入與 `pageshow`（bfcache 返回）兩個時機讀 sessionStorage。**S-05**：`parse_store_ids()` 讓投票的店家編號負數／不存在／個人店／停用一律 400（原本外鍵 500），`create_vote` 與 `add_option` 共用。**S-06**：範本錯誤訊息改成系統做得到的指示（原本叫使用者「在團單設定部門」，但 edit_group 沒有這功能）。**S-07**：`RequestValidationError`（422）也走 `_form_error_response`。煙霧測試 51 → **55 項**。 |
+| V2.11.3 | **第三輪複審 R-01～R-09 修正**（上輪 16 項：10 項確認修正、4 項修法有缺口、3 項依計畫延後）。**R-01（P1，本專案自己的修法錯誤）**：修改中的「複製上次」仍會超賣 —— V2.11.2 用 try/except 做流程控制，except 分支重算剩餘量時排除了自己，把剛擋下的量又放回去；而 `_reserve_stock` 的自有量讀記憶體 collection，新建的 OrderItem 不在裡面、已刪的還留在裡面。改用 `_own_qty()` / `_available_for()` 以資料庫為準（坑 #34）。**R-02（P1）**：開團選「限定部門」卻一個都沒勾，會建出「非公開且零部門」的團；存成範本後 department_ids 是 NULL，與舊版範本無法區分 → 使用時 400 提示重存，重存結果一樣，**死循環**。從 `create_group` 源頭擋下，`save_template_from_group` 再擋一次。**R-03**：`main.py` 例外處理器改為「非 htmx 的 POST 4xx 導回來源頁並帶 flash」。這條原本排 V2.12，但 N-03 與 N-05 的修正都依賴「讓使用者看到訊息」，而訊息實際上是一整頁 JSON —— 不提前處理等於那兩項沒修。**R-04**：`window.toast` 在 Alpine 尚未初始化時改為排隊（LINE 內建瀏覽器慢網路下訊息會無聲消失）；新增 `kind` 參數，錯誤改用紅底與警示圖示（原本「只剩 N 份」也帶打勾）。**R-05**：清空購物車前先做庫存預檢、新版本無 price_l 時清掉殘留的 L 尺寸、排除已停用加料、甜冰不在現行選項時改為不指定。**R-06**：`department_ids[:200]` 會切在數字中間（`…,74,75,800` → `…,74,75,80`，部門 800 消失、部門 80 憑空取得可見權）→ 改為超長就擋下。**權限清單不截斷。****R-07**：抽出 `parse_department_ids()`，一次處理格式、存在性、啟用狀態（`lstrip("-")` 讓 -3 通過、外鍵 500）。**R-08**：補 `https://` 的判斷收窄成「看起來像網域開頭」，`tel:`／`mailto:` 不再被補成壞掉的連結。**R-09**：店家的店名／電話／地址套 `clean_text`。煙霧測試 43 → **51 項**，R-01 的測試已依審核要求驗過「拿掉 `_own_qty` 會紅」。**未處理**：N-14 多 worker 索引日誌（改以交班文件的人工確認步驟涵蓋）、N-15 匯入 schema、P2-01/03/04/05/12 → V2.12。 |
+| V2.11.2 | **複審 N-01～N-16 修正**（《內部審核 V2.11.1 複審》：上輪 17 項中 11 項確認修正、5 項部分修正、2 項引入新缺陷）。**N-01（P0，本版自己造成的回歸）**：`close_group` 的 `db.refresh()` 丟棄未 flush 的 `is_closed=True` → **提前截止完全失效**，且只在「沒有修改中訂單」時發生（最常見）。改成先 commit 再結算（坑 #32）。**N-04**：抽獎的 `with_for_update()` 少了 `.populate_existing()`，identity map 不覆蓋已載入物件 → 鎖形同虛設，並行時會覆蓋別人剛抽出的中獎者。**N-02**：`/home` 與 `/home/groups` 是兩份複製貼上的查詢 —— 上輪補了進行中團，這輪發現已截止團與進行中投票仍外洩（部門私密投票的標題、票數、截止時間出現在所有人首頁）。抽成 `visible_active_votes()` / `visible_closed_groups()` 共用，不再各改一邊。**N-03（兩項修正的交互作用）**：P1-04 讓匯入一律新增菜單版本（新 id），P1-01 讓複製只認 `menu_item_id` → 店家更新過菜單後「複製上次」一筆都比對不到，而取代模式**先清空購物車**才發現沒東西可複製，畫面上還沒有提示。改成先比 id 再比品名、先算出可複製清單、全部比不到就 400 不動購物車，導向帶 `copied/skipped` 顯示結果。**N-05**：舊範本 `department_ids` 為 NULL 仍開出只有團主看得到的團 → 擋下並提示重存（Sela 決定，坑 #33）。**N-06**：`clean_http_url` 對舊資料的無協定網址一律擋下，害管理員整頁存不了 → 看起來像網域的自動補 `https://`（危險協定仍擋），錯誤訊息帶欄位名稱。**其餘**：N-07 合併後數量上限、N-08 沒設選項的店家甜冰仍限長度、N-09 複製上次套用鎖甜冰/加鎖庫存/刪除後 flush、N-10 `ensure_vote_visible` 與 `visible_vote_clause` 規則對齊（私密無部門一律隱藏）、N-11 抽出 `_parse_deadline()` 供開團與編輯共用（編輯原本靜默忽略格式錯誤）、N-12 422 的 detail 是陣列不能直接當字串、N-13 結算移到權限檢查之後、N-16 `int()` 轉型與 `department_ids` 長度。煙霧測試 38 → **43 項**，新增 N-01 的回歸測試。**未處理**：N-12(b) 表單 400 仍回 JSON 頁、N-15 匯入 schema 長度驗證 → V2.12。 |
+| V2.11.1 | **外部審核 P0×8 ＋ P1×9 全數修正**（《內部審核 V2.11.0》，Sela 決定一次做完）。分四批由低風險到高風險執行。**批次一（空值與刪除流程）**：P0-02 **本專案自己造成的回歸**——V2.11.0 只在 `new_group_page` 補了 `group_counts`/`favorite_store_ids`，`copy_group_page` 渲染同一個模板卻沒補 → 複製開團 100% 500。抽成 `_new_group_context()` 兩條路由共用。P0-01 `Order.id != (子查詢)` 在本團無訂單時子查詢為 NULL、`id != NULL` 為 NULL 而非 TRUE，WHERE 被濾光 → 複製上次永遠 404（而「第一次進團還沒點」正是主要使用情境），改成 `group_id != group_id`。P0-03 刪店家把 `groups.menu_id/store_id` 設為 NULL，之後打開舊團 500；Python 端與模板六處全加 None 防護。P0-04 刪店家補 `vote_options` 等五張表。**批次二（可見性與 XSS）**：P0-05 新增 `app/services/visibility.py`，`/home/groups`（htmx 自動刷新片段）與 `/history` 原本**完全沒有**可見性過濾，私密團會出現在所有人首頁；`order_wall` 任何人讀得到私密團訂單與姓名；投票四支路由補檢查；`/home` 的迴圈過濾換成 SQL 條件順帶解掉 N+1。P0-06 刪掉 `random_item`/`get_favorites` 兩支 f-string 組 HTML 的死路由（114 行，已無前端呼叫且內含 Alpine v2 API），新增 `clean_http_url` 擋 `javascript:` 協定——**Jinja 自動逸出擋不住這個，它逸出的是內容不是協定**。**批次三（輸入驗證與約束）**：P1-06 `orders`/`user_favorites` 唯一索引＋`get_or_create_order` 改衝突回查；**刻意不照審核建議自動刪重複訂單**（那是使用者的餐與錢），建不起來就把排查 SQL 印在啟動日誌。P1-02 抽獎夾 1-20、抽成 service 並加 `with_for_update`、可見性檢查提前到寫入之前。P1-05 `_validate_item_spec()` 擋鎖甜冰繞過、選項重複計價、數量超界。P1-07 請客一團一筆（Sela 決定：已有人請客就擋下）。P1-03 範本加 `department_ids` 並在使用時重建部門。P1-08 htmx 4xx 統一顯示 toast。**批次四（金額與生命週期）**：P1-04 **取消 replace 模式一律新增版本**（Sela 拍板）——`db.delete(category)` 沒 cascade 會把舊品項變成「無分類品項」照樣顯示，而且舊品項被 `order_items` 引用本來就刪不得，replace 語意不成立。P1-01 複製上次改用**現行菜單價**重新計價（原本沿用舊單價，店家改價後金額直接錯）、選項加料重新取價、拿掉會把 EDITING 打回 DRAFT 的那行。P1-09 `_reserve_stock()` 讓修改中的加品項/加量/跟點都走加鎖路徑。P0-07 未訂價回寫補上**修改中訂單的快照**（原本只改訂單列，團員按取消修改就把單價還原成 0）與候補列。P0-08 還原邏輯抽成 `app/services/order_restore.py`，新增 `settle_editing_orders()` 在八個進入點呼叫——**結算必須排在抽獎之前**，否則停在修改中的人被排除在抽獎外。**Sela 決定**：DRAFT 有品項但沒送出維持現狀＝沒點。煙霧測試 30 → **38 項**，新增刪除流程外鍵覆蓋的自動檢查（用 metadata 比對，實測拿掉任一張表會紅）；`check_template_js.py` 改用 `StrictUndefined` 並加渲染複製開團路徑（實測能重現 P0-02）。教訓見坑 #30、#31。 |
+| V2.11.0 | **開團頁選店改全螢幕覆蓋層**（Sela 提：店家一多，原生 `<select>` 完全不好找）。(1) **改法選 C 但用覆蓋層實作**：視覺與空間等同獨立頁（頂部返回、搜尋、圖片網格），但技術上不跳頁，所以**中途按「更換」不會弄丟已填的表單內容**；獨立路由要做表單狀態序列化，以後每加一個欄位都得同步，不划算。接 `history.pushState` + `popstate`，手機返回鍵先關覆蓋層而不是離開開團頁。(2) **分區規則（Sela 定）**：我的最愛 → 熱門（扣掉已在最愛的，再補滿三間）→ 全部（依名稱）。熱門取**全體**開團次數（大家常開的才是推薦，個人偏好由最愛負責）。搜尋有輸入時**攤平成單一清單**，分三區各一筆比不分區還難看。(3) **分區用「打開覆蓋層當下」的收藏快照**：點星號時卡片不會當場從「全部」飛到「我的最愛」，否則手指下的卡片換成別家店很容易誤點。星號即時反應，關掉再開才重新分區。(4) **卡片用 `div`、星號才是 `button`**：覆蓋層在 `<form>` 內，`<button>` 巢狀是無效 HTML 且內層會誤觸送出。(5) 收藏切換用**既有路由** `POST /favorites/{id}`（帶 `HX-Request: true` 回 JSON），不新增路由；樂觀更新，失敗還原並提示。(6) **名稱排序放前端**：PostgreSQL 的 `ORDER BY name` 對中文是碼位序（近似部首序），`localeCompare('zh-Hant')` 才是注音序。後端只傳資料與 `group_counts`/`favorite_store_ids`。(7) **順修模板 JS 插值逸出**（坑 #29）：5 處 `"{{ ... }}"` 全改 `| tojson`，其中 `group.html` 的兩處是菜單品項名，含引號會讓整個點餐頁的 Alpine 掛掉。新增 `scripts/check_template_js.py` 守這條規則，並實測兩種破壞都會讓它退出碼 1。**規模門檻**：目前店家資料整包塞進 HTML 給前端搜尋，一百家沒問題；**超過約五百家要改成後端搜尋 API**。 |
+| V2.10.3 | **統計頁四修**（V2.10.2 增補審稿，全部集中在 `/stats` 這個唯讀函式）。(1) **最常下單時段差 8 小時**（影響最明顯）：`extract('hour', Order.created_at)` 取的是 UTC 小時，午餐團在台北 09:00-12:00＝UTC 01:00-04:00，畫面顯示「2:00」。改為一次撈 `(dow, hour)` 分布再於 Python 位移 +8——**兩者必須一起算**，跨過 24 點時星期要進一天，各自 group by 會算錯。在 Python 位移而非 SQL interval，是為了不綁資料庫方言、煙霧測試能在 SQLite 跑。抽成 `taipei_slot()`。(2) **星期分析**同一個位移一併處理（原本台北 00:00-08:00 的訂單會歸到前一天）。(3) **月度趨勢重複月份並跳過月份**（坑 #27）：`timedelta(days=i*30)` 近似月份，實測 2026-03/04/05 都只推出 5 個唯一月份、二月消失。改用月份運算，抽成 `month_buckets()`。**每年 3-5 月必現，九月剛好正確所以平常看不出來。**(4) **月度桶邊界未轉 UTC**：`month_start/month_end` 是台北日曆邊界卻比對 UTC 的 `created_at`，每月前 8 小時歸錯月 → 套 `taipei_to_utc()`。(5) **`taipei_to_utc()` 補 aware 輸入守衛**：V2.10.1 的 `_parse_taipei_to_utc` 原有 `tzinfo is None` 判斷，V2.10.2 收斂時漏掉，帶時區的輸入會被 `replace` 覆寫而非換算（實務上不可達，但契約不該留這個洞）。(6) 煙霧測試 19 → **23 項**，且把原本複製進測試檔的兩段邏輯改成 import 真函式（坑 #28），並實測「改壞被測程式碼會讓測試紅」。 |
+| V2.10.2 | **落實坑 #25 的反向規則＋煙霧測試安全防護**（V2.10.1 增補審稿）。(1) **`smoke_test.py` 誤刪正式資料的風險**：`os.environ.setdefault("DATABASE_URL", ...)` 在 shell 已匯出正式連線時不會覆寫，而腳本開頭會 DELETE 四張表 → 改為偵測非 SQLite 就中止，並用指派覆寫（坑 #26）。(2) **`groups.py` 熱門品項 30 天窗**：從台北時間起算卻比對 UTC 的 `Order.created_at`，窗口實際是 29 天 16 小時 → 改從 `utcnow()` 起算，與 `home.py::get_hot_items` 一致。(3) **統計頁日期區間**：`date_start/date_end` 從台北推算卻比對 UTC 的 `created_at`，「本月」漏掉每月前 8 小時 → 新增 `taipei_to_utc()`，**顯示仍用台北值（模板的「統計期間」要看）、查詢改用 `query_start/query_end`**，四組比對全改。**※ 審稿建議的「兩處都改 utcnow()」只對一半**——滾動窗對、日曆邊界錯（會變成 UTC 的月份，換個方向漏同樣 8 小時），見坑 #25 的修法陷阱。(4) `admin.py::_parse_taipei_to_utc` 改為呼叫 `taipei_to_utc()`，轉換邏輯收斂單一來源。(5) 煙霧測試 15 → **19 項**（加台北日曆邊界、跨年、None、與 `_parse_taipei_to_utc` 一致性）。**※ 審稿 2.3「ZIP 內含 6 個 `__pycache__`」不成立**：V2.10.1 的 ZIP 實際為 161 檔、`__pycache__` 計數 0。那 6 個目錄是審稿自己執行 `check_routes.py` 與 `smoke_test.py` 後產生的。不過其 SOP 排序建議正確，已寫進 handoff（跑測試 → 清理 → 改名 → 打包）。 |
+| V2.10.1 | **修 V2.10.0 增補審稿抓到的兩處時區錯誤**。(1) `cleanup_test_groups` 與店家編輯頁的 `active_group_count` 都用 `datetime.utcnow()` 比對 `Group.deadline`，但 deadline 存的是台北牆上時間，差 8 小時 → 新增 `app/models/group.py::taipei_now()`，兩處改用它，`Group.is_expired` 也改用它成為單一來源（坑 #25）。前者影響方向是安全的（不會誤刪進行中的團）但已截止的團要 8 小時後才清得掉；後者只影響提示文字會高估團數。(2) **煙霧測試進版控** `scripts/smoke_test.py`（15 項，含坑 #25 的回歸測試，且刻意 assert「舊寫法仍會錯」以確保測試有鑑別力）—— 增補審稿建議保留成檔案而非一次性腳本，採納。(3) 審稿 3.5 指 ZIP 檔名不合規範**不成立**：實際產出是 `Online-Drink V2.10.0.zip`（空格與點），底線版是平台傳檔時的字元置換。**其餘不動**：3.3 儀表板重複卡片、3.4 分類改變後飲料選項殘留，都留在 V2.11 的批次裡。 |
+| V2.10.0 | **管理後台流程第一包（審稿七提案的接線與導向 + 提案 3）**。(1) **公告二合一**：首頁改直接查 `announcements` 表（`home.py` 新增 `get_active_announcements()`，篩啟用中＋未到期、置頂優先、最多 2 則），標題獨立顯示、置頂左粗邊＋圖釘、有到期日顯示「X/X 前顯示」；移除 `_sync_announcement_from_active()` 與其 5 個呼叫點、移除孤兒路由 `POST /admin/announcement`（全站無表單指向它，且會覆寫同步結果造成脫鉤，另與 1486 行函式同名 `update_announcement`）；`SystemSetting.announcement` 欄位保留不動（不碰 schema，僅不再讀寫）；儀表板數字由「公告總數」改「公告顯示中」。**※ 審稿原判斷有誤**：它說 `Announcement` 從未被前台查詢、公告完全不會顯示——實際有同步 helper 接著，真正的問題是只能顯示一則、標題被塞進內文、且 `expires_at` 從未被比對。(2) **公告到期時間時區修正**：`datetime-local` 表單值是台北牆上時間，原本 `fromisoformat` 直接存＝當成 UTC 存，差 8 小時。過去 `expires_at` 沒被用過所以沒人發現，現在首頁要依它過濾，必須正確 → 新增 `_parse_taipei_to_utc()`，列表與編輯頁顯示補 `|taipei`。(3) **核准推薦接匯入頁**（提案 1）：`approve_recommendation` 改導向 `/admin/import?store_id={新ID}`；匯入頁若該店家有對應 `StoreRecommendation`（以 `created_store_id` 反查），顯示推薦人／菜單照片（可開新分頁放大）／菜單網址／備註，右上給「稍後再匯入」出口。**與 Sela 議定不加勾選框**——預設勾起的勾選框實務上沒人取消，多一個要測的分支換不到彈性，出口放匯入頁即可。(4) **匯入完成接菜單頁**（提案 7）：`do_import` 由導回 `/admin` 改為 `/admin/stores/{id}/menus?imported=1&cats=&items=`，兩個分支都取得得到 store_id（完整匯入回 Store、菜單更新回 Menu.store_id）；新增 `_count_import()` 算分類／品項數；菜單頁顯示綠色成功提示，舊菜單有保留時加註第 N 版，附「回店家列表」「繼續匯入其他店家」。(5) **清除測試團排除進行中團單**（審稿 4.1）：`all()` 對零訂單恆為真，且原查詢 `db.query(Group).all()` 不篩狀態 → 早上開、還沒人點的團會被 `_delete_group_cascade` 實體刪除且不可復原。加 `or_(is_closed == True, deadline <= now)`。**兩段式預覽刻意不做**，留 V2.11 與刪店家輸入店名確認、全體登出影響說明一起包成「危險操作」，讓本版維持在「只改導向與查詢條件」的低風險層級（本版與未實測的 V2.9.1 同批部署，排查範圍是兩版總和）。(6) **店家編輯頁補飲料選項**（提案 3）：原本甜度冰塊只有完整 JSON 匯入才建得出來，從推薦核准來的飲料店永遠沒有、後台無處可補。新增 `POST /admin/stores/{id}/options`，甜度／冰塊各一個逗號分隔輸入框＋兩顆常用組合按鈕，有進行中團單時顯示提示。**採整批取代**（刪舊的再依填寫順序重建）而非比照加料逐筆增刪——甜冰有顯示順序，逐筆要另做排序 UI，而它本來就是一次設定好的東西；`OrderItem.sugar/.ice` 是字串快照不吃 `store_options.id`，重建不影響任何歷史訂單。`_parse_option_values()` 容忍全形逗號、去重保序、單值截 50（欄位上限）、上限 20 個。教訓見坑 #24（批次刪行的錨點縮排陷阱）。本版額外寫了 SQLite 煙霧測試驗公告過濾排序／選項解析／時區轉換／匯入計數；`check_routes.py` 這次真的跑起來（裝 requirements 後），135 條路由無重複。 |
+| V2.9.1 | **上線前審核修正（六項阻斷級＋低風險四項）**。(1) **刪除 groups.py 重複的 copy_last_order**——與 orders.py 同路徑，groups router 先註冊者勝，導致 **V2.6 的已送出防護/mode 與 V2.7 的庫存封頂從未生效**、且舊版引用不存在欄位。已建 `scripts/check_routes.py` 重複路由檢查納入發版流程。(2) 收藏按鈕路徑 `/favorites/{id}/add|remove` → `/favorites/{id}`，非 HTMX 請求改回傳 redirect（原本使用者看到裸 JSON）。(3) `delete_store` 補三條外鍵斷鏈：`order_item_backups.menu_item_id` 設 NULL（V2.4 新表未涵蓋會擋刪除）、`user_favorites`、`group_templates`。(4) `export_service` 改用 `group.store_display_name`＋None 防護（店家已刪的歷史團單匯出原本 500）；空購物車不再列入「未送出」。(5) `SECRET_KEY`/LINE 憑證未設定時拒絕啟動（不再用公開預設金鑰簽 JWT；⚠️ 部署前先在 Railway 確認 SECRET_KEY，換金鑰全員需重新登入）。(6) `create_engine` 加 `pool_pre_ping/pool_recycle(1800)/pool_size(5)/max_overflow(10)`——解「早上第一個人打開會錯、重整就好」。(7) 訂單牆截止判斷改 `group.is_open`（原 utcnow 比對有時區/提早結單漏洞）。(8) 正式環境關閉 /docs 與 openapi。(9) 刪死碼 dev/auth_extra/feedback/orders_extra 及 dev include。(10) start.sh 改 3 workers＋proxy-headers。**教訓：每次新增資料表都要回頭檢查刪除流程；每次新增路由都要跑重複路由檢查；橫向一致性（時區、可見性、None 防護）不能只在當下需要的地方套用。** |
 | V2.9.0 | **代購：價格「未訂」**。品項價格可勾「未訂」（不用填價、先開賣），MenuItem 加 `price_tbd`（未訂時 price=0 佔位）。**核心規則：未訂→定價那一刻，自動回寫此團所有引用該品項且仍為 0 元的訂單 unit_price**（含已送出——未訂快照本為暫定，這是唯一允許回寫快照的情境），總額/補助/收款全自動重算。UI：面板新增/修改表單「未訂」勾選（勾了價格欄 disable＋免填、JS 同步 required）、團主列表「未訂」標籤；團員菜單「價格未訂」pill、下單視窗琥珀提示「定價後金額自動補上」、購物車該品項顯示「未訂」；收款明細該品項標（價格未訂）＋總覽 ※ 提醒。注意：未訂品項在每單上限/折扣計算中以 0 計，定價後才反映。 |
 | V2.8.0 | **審稿二修（V2.7 代購審查，P0×4＋P1×4＋P2×2）**。**P0 超賣封堵**：(1) 同單多列同品項——submit 改「依 menu_item_id 彙總後比對」（原逐列各自過檢，3+3 可破上限 5）。(2) 併發超賣——submit/還原交易內 `SELECT FOR UPDATE` 鎖定涉及品項（固定依 ID 排序防死鎖；SQLite no-op 無害），資料庫層保證先送先贏。(3) 佔用口徑改**方案 A：SUBMITTED＋EDITING 皆佔**（進修改不失去已搶到的限量品；減量/刪除仍即時釋放＝「改單會回」）；`_stock_remaining` 加 `exclude_order_id` 防自身重複計算；取消修改還原前重驗庫存（修改中刪掉限量品又被搶走時 400「僅剩 N 份無法完整還原」）；顯示 stock_used 同口徑。(4) **部門限定團權限**：`is_visible_to` 落實到團詳情＋orders 全入口（`_ensure_visible` 共 8 處），不再只靠畫面隱藏。**P1**：(5) 修改快照補存 `fulfillment/fulfilled_backup_priority/diff_settled`，還原時依**順位**重連新候補 id（舊 id 會變）。(6) 缺貨處理限截止後（POST 硬擋 400＋面板鎖定提示）。(7) 收款總覽有換貨時列「原訂應收→補收/退還→**最終應收**（=Σactual_self_pay+運）」，每人頂行直接顯示換貨後金額（原額括注）。(8) 品項上限不可低於已佔量（400 提示）。**P2**：(9) `upload_image` 前置驗證——JPG/PNG/WebP 白名單＋5MB 讀取階段拒絕＋失敗明確 400（原本靜默回 None 品項照建）。(10) 品名 1-100/說明 ≤200/價格 str→Decimal 直轉且 1~100 萬/庫存 1~99999＋前端 maxlength。(11) 核對單標示「原始品項・換貨結果見收款明細」。**待辦沿用**：核對單/Excel 改用 actual 出貨鏈。教訓：**「先查再送」不是庫存機制**——彙總、鎖、排除自身、還原重驗四件缺一不可；佔用口徑改動要同步 helper/顯示/送出/還原四處。 |
 | V2.7.0 | **新功能：代購（團主自訂品項）**。討論定案：品名/價格/說明/圖片（選填）＋數量上限（選填）＋團 icon；隨時可加可改（已送出吃快照）；先開團再加品項；**庫存佔用＝送出才算**。(1) **架構：重用不另起爐灶**——代購團＝自動建「個人店家」（`Store.is_personal`＋`owner_user_id`，每人一家，隱藏）＋每團一份菜單（`is_active=False` 不干擾一般邏輯，**必帶一個 MenuCategory** 否則菜單渲染不出品項）；`category=GROUP_BUY`＋`store.is_personal` 判斷代購，**避開 PostgreSQL enum 加值的坑**（不動 enum）。上限/折扣/補助/候補/缺貨處理/收款明細全部原地生效。(2) **Model**：MenuItem 加 `description/image_url/stock_limit/is_available` 四欄（通用欄位，未來正式菜單也能用）；遷移共 6 欄。(3) **開團**：類別四選一加「代購」（`is_proxy` hidden input、店家選單隱藏＋`:required` 動態解除、後續設定區 `storeId||proxy` 放行）；create_group 分支建個人店家＋菜單＋分類。(4) **管理品項**：團主工具第一顆（深色、代購團限定）→ 底部 sheet（`partials/proxy_items_panel.html`，htmx multipart 自刷新）：團 icon 上傳（＝個人店家 logo，首頁團卡/團頁自動生效）、新增表單（品名/價格/說明/上限/圖片）、品項列表 details 展開改/下架（下架有 confirm、可重新上架）；圖片走 `upload_service.upload_image`（Cloudinary，folder sela/items、sela/proxy）。路由 5 支限團主/管理員＋is_personal。(5) **庫存（推導式，不存狀態）**：`_stock_remaining` = stock_limit − Σ(已送出該品項數量)；**修改模式＝暫時釋放、重新送出＝重佔**（改單會回自動成立）；檢查點 5 處——加入（含售完/下架訊息）、改量（僅增加時檢查差額）、跟點、複製上次（**過濾非本團菜單/已下架＋數量封頂**，代購每團菜單不同、舊 menu_item_id 會漏進來的潛在洞順手補掉）、**送出權威檢查**（先送先贏）。(6) **團員端**：menu_item 全重寫——縮圖/說明/「剩 N」琥珀徽章（≤5 才顯示）/完售 disabled/已下架隱藏；客製視窗 + 鈕封頂到 remaining。(7) **個人店家過濾**：首頁店家列表×2、開團店家來源、一般店家清單、後台列表＋計數（`is_personal != True` NULL 安全）。教訓：**批次腳本任一 assert 失敗＝整段未寫入（全有或全無），錨點必須先 grep 實文**（跟點註解「已結單」沒被 V2.6 用語清掃改到、fastapi import 順序不同都踩過）；**py_compile 不驗 import 名稱**，新用 UploadFile/File 要 AST 驗證 import。 |
@@ -348,7 +476,15 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
-> **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為功能性 backlog。
+> **與 Sela 議定的三包規劃**（依序做，審稿 md 各自對應）：
+> - **V2.10.0 管理後台流程第一包 — 已完成**（公告二合一＋提案 1/3/7＋清除測試團安全性）
+> - **V2.11 管理後台流程第二包＋危險操作**：提案 2（手動新增店家表單）、提案 4（部門成員批次加入）、提案 5（使用者列表顯部門＋指派入口）、提案 6（店家列表快捷操作與搜尋）、儀表板重整（修 `/admin/users` 重複連結、分「今天要處理的／管理入口」兩區）、危險操作三項（清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響）、下架兩處訪客清理工具
+> - **V2.12 防再犯基礎設施**：Alembic 評估（注意坑 #1，本專案刻意不用）、授權 dependency 取代 handler 各自檢查、時間單一真相（坑 #24 那類時區問題的根治）、表單輸入 schema — 見「程式碼優化與維護建議」md 的 H/A/G/J 節
+> - **獨立長工 大重構**：巨型 router 拆分（`admin.py` 已 1700+ 行）、`group.html` 1359 行拆 JS、Jinja 環境統一（解坑 #6）、函式內 import 清理 — 功能穩定期再動，需全站回歸
+>
+> **零星待辦**：核對單 PDF/Excel 改用 actual 出貨鏈（兩輪審稿點名，現以「原始品項」標示過渡）；候補列進核對單 PDF（分頁高度計算是已知重疊坑，見坑 #23）
+
+> **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為更早的功能性 backlog。
 
 1. **匯入價格容錯**（V1.7.0 預告的下一步）— `schemas/menu.py` + `import_service.py` 處理「時價」「$30」「30元」「全形數字」等非純數字輸入：能解析的自動轉（$30→30），不能解析的（時價）給明確提示或存為 0 + 標記。單獨做、單獨測，不跟其他混
 2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
@@ -370,6 +506,13 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
   2. 改 `CLAUDE.md` 第〇章「當前狀態」的版本字串
   3. `CLAUDE.md` 第六章「版本歷程」加新一列
   4. 打包 zip 命名 `Online-Drink VX.Y.Z.zip`
+  5. **跑 `scripts/check_frontend_toast.py`**（V2.11.4 起）：`PYTHONPATH=. python scripts/check_frontend_toast.py`。
+     靜態檢查一定跑；jsdom 實測需要 node_modules 有 jsdom 與 alpinejs（`npm i jsdom@24 alpinejs@3` 或設 `NODE_PATH`），沒有就跳過。
+     **打包前記得清掉 node_modules。** 改到 base.html 的 toast、或任何「頁面載入時就要顯示」的提示時必跑
+  6. **跑 `scripts/check_template_js.py`**（V2.11.0 起）：`PYTHONPATH=. python scripts/check_template_js.py`，沒有 node 時第二道檢查會自動跳過
+  7. **跑 `scripts/smoke_test.py`**（V2.10.1 起）：`pip install -q --break-system-packages -r requirements.txt` 後
+     `SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py`，
+     跑完 `rm -f _smoke.db` 並清 `__pycache__` 再打包。改到公告／飲料選項／匯入／deadline 邏輯時要一併更新這支測試
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作

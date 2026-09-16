@@ -12,6 +12,13 @@ from app.models.menu import Menu
 from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/votes", tags=["votes"])
+
+
+def _ensure_vote_visible(vote, user, db):
+    """投票的可見性（V2.11.1 P0-05）"""
+    from app.services.visibility import ensure_vote_visible
+    ensure_vote_visible(vote, user, db)
+
 templates = Jinja2Templates(directory="app/templates")
 
 # 台北時區
@@ -145,20 +152,25 @@ async def create_vote(
     db.flush()
     
     # 建立投票選項
-    for store_id in store_ids:
-        option = VoteOption(
-            vote_id=vote.id,
-            store_id=int(store_id),
-            added_by_id=user.id,
-        )
-        db.add(option)
+    # V2.11.2 N-16：int() 直接轉，非數字字串會拋 ValueError → 500 而不是 400
+    # V2.11.4 S-05：格式、存在性、啟用狀態、非個人店一次驗
+    from app.services.validation import parse_store_ids
+    _sids = parse_store_ids(store_ids, db)
+    if not _sids:
+        raise HTTPException(status_code=400, detail="請至少選擇一家店")
+    for store_id in _sids:
+        db.add(VoteOption(vote_id=vote.id, store_id=store_id, added_by_id=user.id))
     
     # 如果限定部門，建立關聯
-    if not is_public and department_ids:
+    if not is_public:
+        # V2.11.3 R-02/R-07：與團單同一套規則
+        from app.services.validation import parse_department_ids
         from app.models.vote import VoteDepartment
-        for dept_id in department_ids:
-            vd = VoteDepartment(vote_id=vote.id, department_id=int(dept_id))
-            db.add(vd)
+        _vids = parse_department_ids(department_ids, db)
+        if not _vids:
+            raise HTTPException(status_code=400, detail="選擇「限定部門」時請至少勾選一個部門")
+        for dept_id in _vids:
+            db.add(VoteDepartment(vote_id=vote.id, department_id=dept_id))
     
     db.commit()
     
@@ -178,6 +190,8 @@ async def vote_detail(vote_id: int, request: Request, db: Session = Depends(get_
     
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
+    # V2.11.1 P0-05：部門投票原本任何人都讀得到、投得下去
+    _ensure_vote_visible(vote, user, db)
     
     # 檢查用戶是否已投票
     my_votes = []
@@ -217,6 +231,8 @@ async def cast_vote(
     vote = db.query(Vote).filter(Vote.id == vote_id).first()
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
+    # V2.11.1 P0-05：部門投票原本任何人都讀得到、投得下去
+    _ensure_vote_visible(vote, user, db)
     
     if not vote.is_open:
         raise HTTPException(status_code=400, detail="投票已結束")
@@ -274,9 +290,15 @@ async def add_option(
     vote = db.query(Vote).filter(Vote.id == vote_id).first()
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
+    # V2.11.1 P0-05：部門投票原本任何人都讀得到、投得下去
+    _ensure_vote_visible(vote, user, db)
     
     if not vote.is_open:
         raise HTTPException(status_code=400, detail="投票已結束")
+    
+    # V2.11.4 S-05：店家要存在、啟用、非個人店，否則外鍵 500
+    from app.services.validation import parse_store_ids
+    parse_store_ids([store_id], db)
     
     # 檢查店家是否已在選項中
     existing = db.query(VoteOption).filter(
@@ -335,6 +357,8 @@ async def create_group_from_vote(vote_id: int, request: Request, db: Session = D
     vote = db.query(Vote).filter(Vote.id == vote_id).first()
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
+    # V2.11.1 P0-05：部門投票原本任何人都讀得到、投得下去
+    _ensure_vote_visible(vote, user, db)
     
     if not vote.winner_store_id:
         raise HTTPException(status_code=400, detail="尚無勝出店家")

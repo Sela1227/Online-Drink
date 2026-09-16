@@ -28,6 +28,40 @@
     </div>
     {% endif %}
 
+    {% if recommendation %}
+    <!-- V2.10.0：從推薦核准過來的店家，把原始推薦資料留在視線內 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-200 p-4 space-y-3">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <div class="font-semibold text-sela-800">推薦資料</div>
+                <div class="text-xs text-sela-800/60 mt-0.5">
+                    {{ recommendation.user.show_name }} 於 {{ (recommendation.created_at|taipei).strftime('%Y-%m-%d') }} 推薦
+                </div>
+            </div>
+            <a href="/admin/recommendations" class="text-xs text-sela-700 underline whitespace-nowrap">稍後再匯入</a>
+        </div>
+
+        {% if recommendation.menu_image_url %}
+        <a href="{{ recommendation.menu_image_url }}" target="_blank" rel="noopener"
+           class="block rounded-xl overflow-hidden border border-sela-100">
+            <img src="{{ recommendation.menu_image_url }}" alt="菜單照片" class="w-full object-contain max-h-96 bg-sela-50">
+        </a>
+        <div class="text-xs text-sela-800/50">點照片可開新分頁放大</div>
+        {% endif %}
+
+        {% if recommendation.menu_url %}
+        <div class="text-sm">
+            <span class="text-sela-800/60">菜單網址：</span>
+            <a href="{{ recommendation.menu_url }}" target="_blank" rel="noopener" class="text-sela-700 underline break-all">{{ recommendation.menu_url }}</a>
+        </div>
+        {% endif %}
+
+        {% if recommendation.note %}
+        <div class="text-sm text-sela-800/80 whitespace-pre-line bg-sela-50 rounded-lg p-3">{{ recommendation.note }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- 步驟 1：複製 prompt 給 AI -->
     <div class="bg-white rounded-2xl shadow-sm p-4">
         <div class="flex items-center gap-2 mb-1.5">

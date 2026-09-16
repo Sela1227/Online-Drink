@@ -84,23 +84,128 @@
             <i class="ti ti-info-circle"></i> 代購由你自訂品項與價格——開團後進團按「團主工具 → 管理品項」新增，加好再分享連結
         </div>
 
+        <!-- 選擇店家（V2.11.0：原本是原生 select，店家一多就難找。
+             改為全螢幕覆蓋層——搜尋、分區、圖片辨識，且因為不是跳頁，
+             中途「更換」店家不會弄丟已填的表單內容） -->
         <div x-show="selectedCategory && selectedCategory !== 'proxy'" x-cloak>
             <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇店家</label>
-            <select name="store_id" x-model="storeId" @change="onStoreChange()" :required="selectedCategory !== 'proxy'"
-                    class="w-full border rounded-lg px-3 py-2">
-                <option value="">請選擇...</option>
-                <template x-for="store in filteredStores" :key="store.id">
-                    <option :value="store.id" 
-                            :data-category="store.category"
-                            :data-branches="JSON.stringify(store.branches)"
-                            :data-has-toppings="store.has_toppings"
-                            x-text="store.name">
-                    </option>
-                </template>
-            </select>
-            <p class="text-xs text-sela-800/45 mt-1" x-show="filteredStores.length === 0">
+
+            <button x-show="!storeId" type="button" @click="openPicker()"
+                    class="w-full flex items-center gap-3 p-3.5 border-2 border-dashed border-sela-300 rounded-xl text-left active:bg-sela-100">
+                <div class="w-10 h-10 rounded-lg bg-sela-100 flex items-center justify-center flex-shrink-0">
+                    <i class="ti ti-search text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-sela-800">點此選擇店家</div>
+                    <div class="text-xs text-sela-800/55" x-text="pool.length + ' 家可選'"></div>
+                </div>
+                <i class="ti ti-chevron-right text-sela-800/40"></i>
+            </button>
+
+            <div x-show="storeId" x-cloak
+                 class="flex items-center gap-3 p-3 border-2 border-sela-700 rounded-xl bg-white">
+                <img x-show="selectedStore?.logo_url" :src="selectedStore?.logo_url" alt=""
+                     class="w-10 h-10 rounded-lg object-contain bg-sela-50 flex-shrink-0">
+                <div x-show="!selectedStore?.logo_url"
+                     class="w-10 h-10 rounded-lg bg-sela-700 text-white flex items-center justify-center flex-shrink-0">
+                    <i :class="'ti ' + catIcon(selectedStore?.category)"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-sela-800 truncate" x-text="selectedStore?.name"></div>
+                    <div class="text-xs text-sela-800/55" x-show="selectedStore?.branches?.length"
+                         x-text="(selectedStore?.branches?.length || 0) + ' 家分店'"></div>
+                </div>
+                <button type="button" @click="openPicker()"
+                        class="text-xs px-2.5 py-1.5 rounded-lg border border-sela-300 text-sela-700 flex-shrink-0">更換</button>
+            </div>
+
+            <input type="hidden" name="store_id" :value="storeId">
+            <p class="text-xs text-sela-800/45 mt-1" x-show="pool.length === 0">
                 此類型尚無店家，請先到後台新增
             </p>
+        </div>
+
+        <!-- 全螢幕選店覆蓋層 -->
+        <div x-show="pickerOpen" x-cloak class="fixed inset-0 z-50 bg-sela-50 flex flex-col">
+            <div class="bg-sela-800 text-white px-3 py-3 flex items-center gap-3 flex-shrink-0">
+                <button type="button" @click="closePicker()" class="p-1"><i class="ti ti-arrow-left text-xl"></i></button>
+                <span class="font-medium" x-text="'選擇' + catLabel(selectedCategory)"></span>
+                <span class="ml-auto text-xs text-white/70" x-text="pool.length + ' 家'"></span>
+            </div>
+
+            <div class="p-3 bg-white border-b border-sela-100 flex-shrink-0">
+                <div class="relative">
+                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sela-800/40"></i>
+                    <input type="text" x-model="pickerQuery" placeholder="搜尋店名"
+                           class="w-full pl-9 pr-9 py-2.5 border border-sela-200 rounded-lg text-base focus:outline-none focus:border-sela-500">
+                    <button type="button" x-show="pickerQuery" @click="pickerQuery = ''"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-sela-800/40">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+                <!-- 搜尋中：攤平成單一清單（分成三區各一筆比不分區還難看） -->
+                <template x-if="pickerQuery.trim()">
+                    <div>
+                        <div class="text-xs text-sela-800/55 mb-2" x-text="'符合 ' + searchResults.length + ' 家'"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <template x-for="st in searchResults" :key="'q-' + st.id">
+                                <div @click="pickStore(st)" role="button" tabindex="0"
+                                     class="border border-sela-200 bg-white rounded-xl p-2.5 active:bg-sela-100 cursor-pointer">
+                                    <div class="w-full aspect-square rounded-lg bg-sela-100 flex items-center justify-center mb-2 relative overflow-hidden">
+                                        <img x-show="st.logo_url" :src="st.logo_url" alt="" class="w-full h-full object-contain">
+                                        <i x-show="!st.logo_url" :class="'ti ' + catIcon(st.category) + ' text-2xl'"></i>
+                                        <button type="button" @click.stop="toggleFavorite(st)" :disabled="favBusy === st.id"
+                                                class="absolute -top-1 -right-1 w-9 h-9 flex items-center justify-center">
+                                            <i :class="isFavorite(st) ? 'ti ti-star-filled text-sela-500' : 'ti ti-star text-sela-800/25'" class="text-base"></i>
+                                        </button>
+                                    </div>
+                                    <div class="text-xs font-medium truncate" x-text="st.name"></div>
+                                    <div class="text-[10px] text-sela-800/55" x-text="st.branches.length ? st.branches.length + ' 家分店' : '\u00a0'"></div>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="!searchResults.length" class="text-center py-10 text-sm text-sela-800/50">
+                            找不到符合的店家
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 未搜尋：我的最愛 → 熱門（扣掉重複後補滿三間）→ 全部（依名稱） -->
+                <template x-if="!pickerQuery.trim()">
+                    <div class="space-y-4">
+                        <template x-for="sec in pickerSections" :key="sec.title">
+                            <div x-show="sec.items.length">
+                                <div class="flex items-center gap-1.5 mb-2">
+                                    <i :class="'ti ' + sec.icon + ' text-sela-700'"></i>
+                                    <span class="text-xs font-semibold text-sela-800/75" x-text="sec.title"></span>
+                                    <span class="text-[11px] text-sela-800/45" x-text="sec.note"></span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <template x-for="st in sec.items" :key="sec.title + '-' + st.id">
+                                        <div @click="pickStore(st)" role="button" tabindex="0"
+                                             class="border border-sela-200 bg-white rounded-xl p-2.5 active:bg-sela-100 cursor-pointer">
+                                            <div class="w-full aspect-square rounded-lg bg-sela-100 flex items-center justify-center mb-2 relative overflow-hidden">
+                                                <img x-show="st.logo_url" :src="st.logo_url" alt="" class="w-full h-full object-contain">
+                                                <i x-show="!st.logo_url" :class="'ti ' + catIcon(st.category) + ' text-2xl'"></i>
+                                                <button type="button" @click.stop="toggleFavorite(st)" :disabled="favBusy === st.id"
+                                                        class="absolute -top-1 -right-1 w-9 h-9 flex items-center justify-center">
+                                                    <i :class="isFavorite(st) ? 'ti ti-star-filled text-sela-500' : 'ti ti-star text-sela-800/25'" class="text-base"></i>
+                                                </button>
+                                            </div>
+                                            <div class="text-xs font-medium truncate" x-text="st.name"></div>
+                                            <div class="text-[10px] text-sela-800/55" x-text="st.branches.length ? st.branches.length + ' 家分店' : '\u00a0'"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <div class="h-4"></div>
+            </div>
         </div>
         
         <!-- 分店選擇 -->
@@ -404,16 +509,21 @@ function newGroupForm() {
         {% for store in stores %}
         {
             id: {{ store.id }},
-            name: "{{ store.name }}",
-            category: "{{ store.category.value if store.category else 'meal' }}",
+            name: {{ store.name | tojson }},
+            category: {{ (store.category.value if store.category else 'meal') | tojson }},
             branches: {{ store.branches | tojson if store.branches else "[]" }},
-            has_toppings: {{ 'true' if store.toppings else 'false' }}
+            has_toppings: {{ 'true' if store.toppings else 'false' }},
+            logo_url: {{ store.logo_url | tojson if store.logo_url else 'null' }},
+            group_count: {{ group_counts.get(store.id, 0) }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
     
     // 預選店家 ID
-    const preselectStoreId = '{{ preselect_store_id or "" }}';
+    const preselectStoreId = {{ (preselect_store_id or "") | string | tojson }};
+    
+    // 使用者收藏的店家（V2.11.0 選店覆蓋層分區用）
+    const initialFavoriteIds = {{ favorite_store_ids | tojson }};
     
     return {
         selectedCategory: '{% if copy_from %}{{ copy_from.category.value }}{% endif %}',
@@ -421,11 +531,117 @@ function newGroupForm() {
         branchId: '',
         branches: [],
         
-        get filteredStores() {
+        // V2.11.0 選店覆蓋層
+        pickerOpen: false,
+        pickerQuery: '',
+        favoriteIds: initialFavoriteIds.slice(),
+        favSnapshot: [],
+        favBusy: null,
+        
+        // 目前分類的可選店家
+        get pool() {
             return allStores.filter(s => s.category === this.selectedCategory);
         },
         
+        get selectedStore() {
+            return allStores.find(s => s.id == this.storeId) || null;
+        },
+        
+        catIcon(c) {
+            return { drink: 'ti-cup', meal: 'ti-bowl', group_buy: 'ti-shopping-bag' }[c] || 'ti-building-store';
+        },
+        
+        catLabel(c) {
+            return { drink: '飲料店', meal: '餐點店', group_buy: '團購店家' }[c] || '店家';
+        },
+        
+        // 名稱排序在前端做：PostgreSQL 的 ORDER BY name 對中文是碼位序，
+        // localeCompare('zh-Hant') 才是注音序，也就是使用者預期的順序
+        byName(list) {
+            return [...list].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+        },
+        
+        isFavorite(store) {
+            return this.favoriteIds.includes(store.id);
+        },
+        
+        // 分區：我的最愛優先 → 熱門扣掉重複後補滿三間 → 其餘依名稱。
+        // 用 favSnapshot（打開覆蓋層當下的收藏狀態）而非即時的 favoriteIds，
+        // 否則點星號時卡片會當場從「全部」跳到「我的最愛」，手指下換成別家店很容易誤點。
+        get pickerSections() {
+            const pool = this.pool;
+            const favs = this.byName(pool.filter(s => this.favSnapshot.includes(s.id)));
+            const favIds = favs.map(s => s.id);
+            const hot = [...pool]
+                .filter(s => !favIds.includes(s.id) && s.group_count > 0)
+                .sort((a, b) => b.group_count - a.group_count || a.name.localeCompare(b.name, 'zh-Hant'))
+                .slice(0, 3);
+            const used = favIds.concat(hot.map(s => s.id));
+            const rest = this.byName(pool.filter(s => !used.includes(s.id)));
+            return [
+                { title: '我的最愛', icon: 'ti-star-filled', note: '', items: favs },
+                { title: '熱門', icon: 'ti-flame', note: '大家最常開的', items: hot },
+                { title: '全部', icon: 'ti-list', note: '依名稱', items: rest },
+            ];
+        },
+        
+        get searchResults() {
+            const kw = this.pickerQuery.trim().toLowerCase();
+            if (!kw) return [];
+            return this.byName(this.pool.filter(s => s.name.toLowerCase().includes(kw)));
+        },
+        
+        openPicker() {
+            this.pickerQuery = '';
+            this.favSnapshot = this.favoriteIds.slice();
+            this.pickerOpen = true;
+            // 讓手機返回鍵先關閉覆蓋層，而不是離開整個開團頁
+            history.pushState({ storePicker: true }, '');
+        },
+        
+        closePicker(fromPop) {
+            this.pickerOpen = false;
+            if (!fromPop && history.state && history.state.storePicker) {
+                history.back();
+            }
+        },
+        
+        pickStore(store) {
+            this.storeId = String(store.id);
+            this.onStoreChange();
+            this.closePicker();
+        },
+        
+        async toggleFavorite(store) {
+            if (this.favBusy) return;
+            this.favBusy = store.id;
+            const wasFav = this.favoriteIds.includes(store.id);
+            // 樂觀更新：先動畫面，失敗再還原
+            this.favoriteIds = wasFav
+                ? this.favoriteIds.filter(id => id !== store.id)
+                : this.favoriteIds.concat([store.id]);
+            try {
+                const res = await fetch('/favorites/' + store.id, {
+                    method: 'POST',
+                    headers: { 'HX-Request': 'true' }
+                });
+                if (!res.ok) throw new Error(res.status);
+            } catch (e) {
+                this.favoriteIds = wasFav
+                    ? this.favoriteIds.concat([store.id])
+                    : this.favoriteIds.filter(id => id !== store.id);
+                alert('收藏失敗，請稍後再試');
+            } finally {
+                this.favBusy = null;
+            }
+        },
+        
         init() {
+            // 手機返回鍵：覆蓋層開著時先關它，不要離開開團頁
+            window.addEventListener('popstate', () => {
+                if (this.pickerOpen) this.closePicker(true);
+            });
+            
             // 如果有預選店家
             if (preselectStoreId) {
                 const store = allStores.find(s => s.id == preselectStoreId);
@@ -444,6 +660,7 @@ function newGroupForm() {
             this.storeId = '';
             this.branches = [];
             this.branchId = '';
+            this.pickerQuery = '';
         },
         
         onStoreChange() {

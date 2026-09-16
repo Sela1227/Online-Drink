@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.store import CategoryType, Store
-from app.models.user import SystemSetting
+from app.models.user import Announcement
 from app.services.auth import get_current_user
 
 router = APIRouter()
@@ -27,6 +27,85 @@ def to_taipei_time(dt):
     return utc_dt.astimezone(taipei_tz)
 
 templates.env.filters['taipei'] = to_taipei_time
+
+
+def month_buckets(today, count: int = 6):
+    """往回推 count 個月，回傳 [(年, 月), ...]，最舊在前、當月在最後。
+
+    V2.10.3：原本用 `today.replace(day=1) - timedelta(days=i*30)` 推算，但月份
+    長度是 28-31 天，累積誤差會讓某些月份重複、某些月份消失（2026 年 3-5 月都
+    會漏掉二月）。月份要用月份運算，不要用天數近似。
+    """
+    out, year, month = [], today.year, today.month
+    for _ in range(count):
+        out.append((year, month))
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+    return list(reversed(out))
+
+
+def taipei_slot(utc_dow: int, utc_hour: int) -> tuple[int, int]:
+    """(UTC 星期, UTC 小時) → (台北星期, 台北小時)。
+
+    V2.10.3：`Order.created_at` 是 UTC，`extract` 出來的小時與星期也是 UTC。
+    午餐團多在台北 09:00-12:00＝UTC 01:00-04:00，未位移時「最常下單時段」會
+    顯示 2:00 或 3:00。位移跨過 24 點時星期要進一天，所以兩者必須一起算。
+    dow 慣例 0=週日，PostgreSQL 與 SQLite 一致。
+    """
+    taipei_hour = (utc_hour + 8) % 24
+    taipei_dow = (utc_dow + 1) % 7 if utc_hour + 8 >= 24 else utc_dow
+    return taipei_dow, taipei_hour
+
+
+def visible_active_votes(db: Session, user, now, limit: int = 4):
+    """進行中且該使用者看得到的投票（V2.11.2 N-02）。
+
+    /home 與 /home/groups 原本各有一份逐字相同的查詢，兩份都沒有可見性過濾 ——
+    部門私密投票的標題、票數、截止時間會出現在所有人的首頁上（點進去才 403，
+    但該看不到的資訊已經露出來了）。抽成共用函式，不要再各改一邊。
+    """
+    from app.models.vote import Vote, VoteOption
+    from app.services.visibility import visible_vote_clause
+    return db.query(Vote).options(
+        joinedload(Vote.creator),
+        joinedload(Vote.options).joinedload(VoteOption.voters)
+    ).filter(
+        Vote.is_closed == False,
+        Vote.deadline > now,
+        visible_vote_clause(user),
+    ).order_by(Vote.deadline.asc()).limit(limit).all()
+
+
+def visible_closed_groups(db: Session, user, now, limit: int = 10):
+    """已截止且該使用者看得到的團（V2.11.2 N-02）。
+
+    /home 有過濾、/home/groups 沒有 —— 而首頁在團截止時會自動 htmx 刷新片段，
+    私密的已截止團就從那裡冒出來。
+    """
+    from app.services.visibility import visible_group_clause
+    return db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner)
+    ).filter(
+        or_(Group.is_closed == True, Group.deadline <= now),
+        visible_group_clause(user),
+    ).order_by(Group.deadline.desc()).limit(limit).all()
+
+
+def get_active_announcements(db: Session, limit: int = 2):
+    """首頁公告（V2.10.0）：啟用中且未到期，置頂優先、其次建立時間新到舊。
+
+    資料庫存的是 naive UTC，故以 utcnow() 比對 expires_at。
+    expires_at 為 NULL 代表不設到期，永久顯示。
+    """
+    return db.query(Announcement).filter(
+        Announcement.is_active == True,
+        or_(Announcement.expires_at == None, Announcement.expires_at > datetime.utcnow()),
+    ).order_by(
+        Announcement.is_pinned.desc(),
+        Announcement.created_at.desc(),
+    ).limit(limit).all()
 
 
 def get_hot_items(db: Session, limit: int = 10):
@@ -67,32 +146,13 @@ async def home(request: Request, db: Session = Depends(get_db)):
         UserDepartment.user_id == user.id
     ).all()]
     
-    def filter_visible_groups(groups):
-        """過濾用戶可見的團單"""
-        visible = []
-        for g in groups:
-            # 公開團：所有人可見
-            if g.is_public:
-                visible.append(g)
-                continue
-            # 團主自己可見
-            if g.owner_id == user.id:
-                visible.append(g)
-                continue
-            # 管理員可見
-            if user.is_admin:
-                visible.append(g)
-                continue
-            # 部門交集
-            group_dept_ids = {gd.department_id for gd in db.query(GroupDepartment).filter(
-                GroupDepartment.group_id == g.id
-            ).all()}
-            if group_dept_ids & set(user_dept_ids):
-                visible.append(g)
-        return visible
+    # V2.11.1 P0-05：原本是迴圈內逐筆查部門（N+1），而且只有這支路由有過濾，
+    # /home/groups 與 /history 都沒有。改用 app/services/visibility.py 的共用 SQL 條件。
+    from app.services.visibility import visible_group_clause
+    _visible = visible_group_clause(user)
     
     # 開放中的飲料團（eager load orders 和 store）
-    drink_groups_raw = db.query(Group).options(
+    drink_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
         joinedload(Group.orders)
@@ -100,11 +160,11 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
         Group.deadline > now,
+        _visible,
     ).order_by(Group.deadline.asc()).all()
-    drink_groups = filter_visible_groups(drink_groups_raw)
     
     # 開放中的訂餐團
-    meal_groups_raw = db.query(Group).options(
+    meal_groups = db.query(Group).options(
         joinedload(Group.store),
         joinedload(Group.owner),
         joinedload(Group.orders)
@@ -112,12 +172,12 @@ async def home(request: Request, db: Session = Depends(get_db)):
         Group.category == CategoryType.MEAL,
         Group.is_closed == False,
         Group.deadline > now,
+        _visible,
     ).order_by(Group.deadline.asc()).all()
-    meal_groups = filter_visible_groups(meal_groups_raw)
     
     # 開放中的團購團（新類型，可能不存在）
     try:
-        groupbuy_groups_raw = db.query(Group).options(
+        groupbuy_groups = db.query(Group).options(
             joinedload(Group.store),
             joinedload(Group.owner),
             joinedload(Group.orders)
@@ -125,8 +185,8 @@ async def home(request: Request, db: Session = Depends(get_db)):
             Group.category == CategoryType.GROUP_BUY,
             Group.is_closed == False,
             Group.deadline > now,
+            _visible,
         ).order_by(Group.deadline.asc()).all()
-        groupbuy_groups = filter_visible_groups(groupbuy_groups_raw)
     except Exception:
         db.rollback()
         groupbuy_groups = []
@@ -142,30 +202,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
     my_active.sort(key=lambda x: x["group"].deadline)
 
     # 已截止的團（最近 10 個）
-    closed_groups_raw = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner)
-    ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
-    ).order_by(Group.deadline.desc()).limit(20).all()
-    closed_groups = filter_visible_groups(closed_groups_raw)[:10]
+    closed_groups = visible_closed_groups(db, user, now)
     
     # 超夯清單（全站熱門）
     hot_items = get_hot_items(db, limit=10)
     
-    # 公告
-    settings = db.query(SystemSetting).first()
-    announcement = settings.announcement if settings else None
+    # 公告（V2.10.0：改讀 announcements 表）
+    announcements = get_active_announcements(db)
     
-    # 進行中的投票
-    from app.models.vote import Vote, VoteOption
-    active_votes = db.query(Vote).options(
-        joinedload(Vote.creator),
-        joinedload(Vote.options).joinedload(VoteOption.voters)
-    ).filter(
-        Vote.is_closed == False,
-        Vote.deadline > now
-    ).order_by(Vote.deadline.asc()).limit(4).all()
+    # 進行中的投票（V2.11.2 N-02：共用查詢，含可見性過濾）
+    active_votes = visible_active_votes(db, user, now)
     
     # 店家列表（啟用中，根據部門過濾）
     from app.models.department import StoreDepartment
@@ -203,7 +249,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
-        "announcement": announcement,
+        "announcements": announcements,
         "active_votes": active_votes,
         "stores": stores,
         "my_active": my_active,
@@ -220,6 +266,11 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     taipei_tz = timezone(timedelta(hours=8))
     now = datetime.now(taipei_tz).replace(tzinfo=None)
     
+    # V2.11.1 P0-05：這支是首頁在團截止時 htmx 自動刷新的片段，原本**完全沒有**
+    # 可見性過濾，私密團與部門團會直接出現在所有人的首頁上。
+    from app.services.visibility import visible_group_clause
+    _visible = visible_group_clause(user)
+
     # 開放中的飲料團
     drink_groups = db.query(Group).options(
         joinedload(Group.store),
@@ -229,6 +280,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         Group.category == CategoryType.DRINK,
         Group.is_closed == False,
         Group.deadline > now,
+        _visible,
     ).order_by(Group.deadline.asc()).all()
     
     # 開放中的訂餐團
@@ -240,6 +292,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         Group.category == CategoryType.MEAL,
         Group.is_closed == False,
         Group.deadline > now,
+        _visible,
     ).order_by(Group.deadline.asc()).all()
     
     # 開放中的團購團
@@ -252,35 +305,23 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
             Group.category == CategoryType.GROUP_BUY,
             Group.is_closed == False,
             Group.deadline > now,
+            _visible,
         ).order_by(Group.deadline.asc()).all()
     except Exception:
         db.rollback()
         groupbuy_groups = []
     
     # 已截止的團（最近 10 個）
-    closed_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner)
-    ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
-    ).order_by(Group.deadline.desc()).limit(10).all()
+    closed_groups = visible_closed_groups(db, user, now)
     
     # 超夯清單
     hot_items = get_hot_items(db, limit=10)
     
-    # 公告
-    settings = db.query(SystemSetting).first()
-    announcement = settings.announcement if settings else None
+    # 公告（V2.10.0：改讀 announcements 表）
+    announcements = get_active_announcements(db)
     
-    # 進行中的投票
-    from app.models.vote import Vote, VoteOption
-    active_votes = db.query(Vote).options(
-        joinedload(Vote.creator),
-        joinedload(Vote.options).joinedload(VoteOption.voters)
-    ).filter(
-        Vote.is_closed == False,
-        Vote.deadline > now
-    ).order_by(Vote.deadline.asc()).limit(4).all()
+    # 進行中的投票（V2.11.2 N-02：共用查詢，含可見性過濾）
+    active_votes = visible_active_votes(db, user, now)
     
     # 取得用戶的部門 IDs
     from app.models.department import UserDepartment, StoreDepartment
@@ -316,7 +357,7 @@ async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
         "groupbuy_groups": groupbuy_groups,
         "closed_groups": closed_groups,
         "hot_items": hot_items,
-        "announcement": announcement,
+        "announcements": announcements,
         "active_votes": active_votes,
         "stores": stores,
     })
@@ -420,12 +461,19 @@ async def history(request: Request, page: int = 1, db: Session = Depends(get_db)
     taipei_tz = timezone(timedelta(hours=8))
     now = datetime.now(taipei_tz).replace(tzinfo=None)
     
+    # V2.11.1 P0-06：page<=0 在 PostgreSQL 會讓 OFFSET 變負數而 500
+    page = max(1, page)
     per_page = 20
     offset = (page - 1) * per_page
     
+    # V2.11.1 P0-05：歷史列表原本沒有可見性過濾
+    from app.services.visibility import visible_group_clause
+    _visible = visible_group_clause(user)
+    
     # 總數
     total = db.query(Group).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
+        or_(Group.is_closed == True, Group.deadline <= now),
+        _visible,
     ).count()
     
     # 分頁查詢
@@ -434,7 +482,8 @@ async def history(request: Request, page: int = 1, db: Session = Depends(get_db)
         joinedload(Group.owner),
         joinedload(Group.orders)
     ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
+        or_(Group.is_closed == True, Group.deadline <= now),
+        _visible,
     ).order_by(Group.deadline.desc()).offset(offset).limit(per_page).all()
     
     total_pages = (total + per_page - 1) // per_page
@@ -454,6 +503,8 @@ async def my_orders(request: Request, page: int = 1, db: Session = Depends(get_d
     """我的訂單歷史"""
     user = await get_current_user(request, db)
     
+    page = max(1, page)  # V2.11.1 P0-06：負數 OFFSET 在 PostgreSQL 會 500
+
     per_page = 20
     offset = (page - 1) * per_page
     
@@ -548,7 +599,19 @@ async def toggle_favorite(
     """切換收藏狀態"""
     user = await get_current_user(request, db)
     
+    from sqlalchemy.exc import IntegrityError
+    from app.models.store import Store
     from app.models.user import UserFavorite
+    
+    # V2.11.1 P1-06：原本不檢查店家，傳不存在的 id 會 500（外鍵）。
+    # 個人代購店與停用店家也不該被收藏——它們不會出現在選店清單裡。
+    store = db.query(Store).filter(
+        Store.id == store_id,
+        Store.is_active == True,
+        Store.is_personal != True,
+    ).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
     
     # 檢查是否已收藏
     existing = db.query(UserFavorite).filter(
@@ -559,12 +622,18 @@ async def toggle_favorite(
     if existing:
         db.delete(existing)
         db.commit()
-        return {"status": "removed"}
     else:
-        favorite = UserFavorite(user_id=user.id, store_id=store_id)
-        db.add(favorite)
-        db.commit()
-        return {"status": "added"}
+        # 連點兩下時靠唯一索引仲裁，重複就當作已收藏
+        try:
+            with db.begin_nested():
+                db.add(UserFavorite(user_id=user.id, store_id=store_id))
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+    
+    if request.headers.get("HX-Request") == "true":
+        return {"status": "removed" if existing else "added"}
+    return RedirectResponse(url=f"/stores/{store_id}", status_code=302)
 
 
 # ============ 用戶部門管理 ============
@@ -772,6 +841,11 @@ async def submit_recommendation(
     """提交店家推薦"""
     user = await get_current_user(request, db)
     
+    # V2.11.1 P0-06：menu_url 會被輸出成後台推薦列表與匯入頁的 href，
+    # 核准後又複製到 store.website_url 出現在所有人看得到的頁面。必須驗協定。
+    from app.services.validation import clean_http_url
+    menu_url = clean_http_url(menu_url, field="菜單網址")
+    
     from app.models.user import StoreRecommendation
     from app.config import get_settings
     
@@ -871,12 +945,20 @@ async def stats_page(
         date_start = datetime(today.year, today.month, 1)
         date_end = now
     
+    # V2.10.2：date_start/date_end 是台北牆上時間（日曆邊界才符合使用者心智模型，
+    # 且模板的「統計期間」直接顯示它們）；但 Order/Group.created_at 存的是 UTC，
+    # 所以查詢另用一組轉換後的值。原本直接拿台北值去比，「本月」會漏掉每月前
+    # 8 小時的資料（台北 9/1 00:00-08:00 開的團不算進本月）。坑 #25 的反向案例。
+    from app.models.group import taipei_to_utc
+    query_start = taipei_to_utc(date_start)
+    query_end = taipei_to_utc(date_end)
+    
     # 基礎過濾條件
     base_filters = [
         Order.user_id == user.id,
         Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= date_start,
-        Order.created_at <= date_end
+        Order.created_at >= query_start,
+        Order.created_at <= query_end
     ]
     
     # ===== 基本統計 =====
@@ -963,16 +1045,16 @@ async def stats_page(
     # ===== 開團統計 =====
     groups_created = db.query(Group).filter(
         Group.owner_id == user.id,
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # ===== 抽獎統計 =====
     # 中獎次數
     lucky_wins = db.query(Group).filter(
         Group.lucky_winner_ids.contains(str(user.id)),
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # 被請客次數（在有 treat_user_id 的團中有訂單）
@@ -987,19 +1069,19 @@ async def stats_page(
     # 請客次數
     treat_count = db.query(Group).filter(
         Group.treat_user_id == user.id,
-        Group.created_at >= date_start,
-        Group.created_at <= date_end
+        Group.created_at >= query_start,
+        Group.created_at <= query_end
     ).count()
     
     # ===== 月度趨勢（最近6個月）=====
+    # V2.10.3：月份桶邏輯見 month_buckets()（舊寫法會重複/跳月）
     monthly_trend = []
-    for i in range(5, -1, -1):
-        month_date = today.replace(day=1) - timedelta(days=i*30)
-        month_start = datetime(month_date.year, month_date.month, 1)
-        if month_date.month == 12:
-            month_end = datetime(month_date.year + 1, 1, 1) - timedelta(seconds=1)
+    for bucket_year, bucket_month in month_buckets(today):
+        month_start = datetime(bucket_year, bucket_month, 1)
+        if bucket_month == 12:
+            month_end = datetime(bucket_year + 1, 1, 1) - timedelta(seconds=1)
         else:
-            month_end = datetime(month_date.year, month_date.month + 1, 1) - timedelta(seconds=1)
+            month_end = datetime(bucket_year, bucket_month + 1, 1) - timedelta(seconds=1)
         
         month_amount = db.query(
             func.sum(OrderItem.unit_price * OrderItem.quantity)
@@ -1008,8 +1090,9 @@ async def stats_page(
         ).filter(
             Order.user_id == user.id,
             Order.status == OrderStatus.SUBMITTED,
-            Order.created_at >= month_start,
-            Order.created_at <= month_end
+            # 月份邊界是台北日曆，created_at 是 UTC（坑 #25），要轉
+            Order.created_at >= taipei_to_utc(month_start),
+            Order.created_at <= taipei_to_utc(month_end)
         ).scalar() or Decimal("0")
         
         monthly_trend.append({
@@ -1017,28 +1100,38 @@ async def stats_page(
             "amount": int(month_amount)
         })
     
-    # ===== 時段分析 =====
-    # 取得所有訂單的小時分布
-    hour_stats = db.query(
+    # ===== 時段與星期分析 =====
+    # V2.10.3：created_at 是 UTC，extract 出來的小時與星期也是 UTC。午餐團多在
+    # 台北 09:00-12:00＝UTC 01:00-04:00，原本「最常下單時段」會顯示 2:00 或 3:00。
+    # 一次撈出 (UTC 星期, UTC 小時) 的分布，再於 Python 位移 +8 小時；跨過 24 點
+    # 時星期要進一天，所以兩者必須一起算，不能各自 group by。
+    # 在 Python 位移而非用 SQL 的 interval，是為了不綁資料庫方言，煙霧測試才能在
+    # SQLite 上跑（坑 #25 的同一族問題）。
+    slot_stats = db.query(
+        extract('dow', Order.created_at).label('dow'),
         extract('hour', Order.created_at).label('hour'),
         func.count(Order.id).label('count')
     ).filter(
         *base_filters
-    ).group_by(extract('hour', Order.created_at)).all()
+    ).group_by(
+        extract('dow', Order.created_at),
+        extract('hour', Order.created_at)
+    ).all()
     
-    # 找出最常下單時段
-    peak_hour = max(hour_stats, key=lambda x: x.count).hour if hour_stats else 12
+    hour_counts = {}
+    weekday_counts = {}
+    for row in slot_stats:
+        utc_hour = int(row.hour)
+        utc_dow = int(row.dow)
+        count = int(row.count)
+        taipei_dow, taipei_hour = taipei_slot(utc_dow, utc_hour)
+        hour_counts[taipei_hour] = hour_counts.get(taipei_hour, 0) + count
+        weekday_counts[taipei_dow] = weekday_counts.get(taipei_dow, 0) + count
     
-    # ===== 星期分析 =====
-    weekday_stats = db.query(
-        extract('dow', Order.created_at).label('dow'),
-        func.count(Order.id).label('count')
-    ).filter(
-        *base_filters
-    ).group_by(extract('dow', Order.created_at)).all()
+    peak_hour = max(hour_counts, key=hour_counts.get) if hour_counts else 12
     
     weekday_names = ['日', '一', '二', '三', '四', '五', '六']
-    peak_weekday = max(weekday_stats, key=lambda x: x.count).dow if weekday_stats else 1
+    peak_weekday = max(weekday_counts, key=weekday_counts.get) if weekday_counts else 1
     
     # ===== 甜度冰塊偏好（飲料）=====
     sugar_stats = db.query(

@@ -47,24 +47,30 @@
         <!-- 店家連結（一行圖示）-->
         {% set _phone = branch.phone if branch and branch.phone else store.phone %}
         {% set _addr = branch.address if branch and branch.address else store.address %}
+        {% if not store %}
+        <div class="mt-3 p-3 bg-sela-100 border border-sela-200 rounded-xl text-sm text-sela-800/75">
+            <i class="ti ti-archive"></i> 店家已移除，僅供檢視歷史訂單
+        </div>
+        {% endif %}
+
         {% if _phone or _addr or store.google_maps_url or store.website_url or store.ubereats_url or store.foodpanda_url %}
         <div class="mt-3 flex items-center gap-2 flex-wrap">
             {% if _phone %}
             <a href="tel:{{ _phone }}" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="撥打電話"><i class="ti ti-phone"></i></a>
             {% endif %}
             {% if store.google_maps_url %}
-            <a href="{{ store.google_maps_url }}" target="_blank" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
+            <a href="{{ store.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
             {% elif _addr %}
-            <a href="https://www.google.com/maps/search/?api=1&query={{ _addr|urlencode }}" target="_blank" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
+            <a href="https://www.google.com/maps/search/?api=1&query={{ _addr|urlencode }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
             {% endif %}
             {% if store.website_url %}
-            <a href="{{ store.website_url }}" target="_blank" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="官網"><i class="ti ti-world"></i></a>
+            <a href="{{ store.website_url }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="官網"><i class="ti ti-world"></i></a>
             {% endif %}
             {% if store.ubereats_url %}
-            <a href="{{ store.ubereats_url }}" target="_blank" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">Uber Eats</a>
+            <a href="{{ store.ubereats_url }}" target="_blank" rel="noopener noreferrer" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">Uber Eats</a>
             {% endif %}
             {% if store.foodpanda_url %}
-            <a href="{{ store.foodpanda_url }}" target="_blank" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">foodpanda</a>
+            <a href="{{ store.foodpanda_url }}" target="_blank" rel="noopener noreferrer" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">foodpanda</a>
             {% endif %}
         </div>
         {% endif %}
@@ -215,7 +221,7 @@
         
         {% if store.is_personal and is_open and (is_owner or is_admin) %}
         {% set _item_count = namespace(n=0) %}
-        {% for c in menu.categories %}{% set _item_count.n = _item_count.n + (c.items|length) %}{% endfor %}
+        {% for c in (menu.categories if menu else []) %}{% set _item_count.n = _item_count.n + (c.items|length) %}{% endfor %}
         {% if _item_count.n == 0 %}
         <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
             <i class="ti ti-alert-triangle"></i> 還沒有品項——先到「團主工具 → 管理品項」新增，加好再分享連結
@@ -772,10 +778,10 @@
         <h2 class="font-semibold text-sela-800 mb-3">菜單</h2>
         
         <!-- 分類快速導覽（固定在頂部） -->
-        {% if menu.categories|length > 1 %}
+        {% if menu and menu.categories|length > 1 %}
         <div class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
             <div class="flex gap-2 min-w-max">
-                {% for category in menu.categories %}
+                {% for category in (menu.categories if menu else []) %}
                 <button @click="scrollToCategory('category-{{ category.id }}')"
                         :class="activeCategory === 'category-{{ category.id }}' ? 'bg-sela-800 text-white border-sela-800 shadow-sm' : 'bg-white border-sela-300 text-sela-800 active:bg-sela-50'"
                         class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
@@ -786,7 +792,7 @@
         </div>
         {% endif %}
         
-        {% for category in menu.categories %}
+        {% for category in (menu.categories if menu else []) %}
         <div id="category-{{ category.id }}" class="mb-4 scroll-mt-32 category-section">
             <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2">{{ category.name }}</h3>
             <div class="space-y-2">
@@ -797,7 +803,7 @@
         </div>
         {% endfor %}
         
-        {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
+        {% set uncategorized = (menu.items if menu else []) | selectattr('category_id', 'none') | list %}
         {% if uncategorized %}
         <div class="space-y-2">
             {% for item in uncategorized %}
@@ -1083,17 +1089,35 @@
 </div>
 
 <script>
+// V2.11.2 N-03：複製上次的結果回報。原本導向只帶 copied=1 且畫面完全不處理，
+// 菜單改版後一筆都複製不到時，使用者看不到任何訊息還以為成功了。
+(function () {
+    var q = new URLSearchParams(window.location.search);
+    if (!q.has('copied')) return;
+    var copied = parseInt(q.get('copied') || '0', 10);
+    var skipped = parseInt(q.get('skipped') || '0', 10);
+    var msg = copied > 0 ? ('已複製 ' + copied + ' 項') : '沒有可複製的品項';
+    if (skipped > 0) msg += '，' + skipped + ' 項無法複製';
+    // V2.11.3 R-04：不再用 setTimeout 賭 Alpine 已經載好，window.toast 會自己排隊
+    if (window.toast) { window.toast(msg, copied > 0 ? 'ok' : 'error'); }
+    // 清掉網址參數，重新整理時不會再跳一次
+    q.delete('copied');
+    q.delete('skipped');
+    var url = window.location.pathname + (q.toString() ? '?' + q.toString() : '');
+    window.history.replaceState({}, '', url);
+})();
+
 function orderPage() {
     // 菜單品項列表（用於隨機選擇）
     const menuItems = [
-        {% for category in menu.categories %}
+        {% for category in (menu.categories if menu else []) %}
         {% for item in category.items %}
-        { id: {{ item.id }}, name: "{{ item.name }}", price: {{ item.price }} },
+        { id: {{ item.id }}, name: {{ item.name | tojson }}, price: {{ item.price }} },
         {% endfor %}
         {% endfor %}
-        {% set uncategorized = menu.items | selectattr('category_id', 'none') | list %}
+        {% set uncategorized = (menu.items if menu else []) | selectattr('category_id', 'none') | list %}
         {% for item in uncategorized %}
-        { id: {{ item.id }}, name: "{{ item.name }}", price: {{ item.price }} },
+        { id: {{ item.id }}, name: {{ item.name | tojson }}, price: {{ item.price }} },
         {% endfor %}
     ];
     
@@ -1114,7 +1138,7 @@ function orderPage() {
         showFulfillment: false,
         showItemsPanel: false,
         cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
-        orderStatus: '{{ my_order.status.value if my_order else "none" }}',
+        orderStatus: {{ (my_order.status.value if my_order else "none") | tojson }},
         showRandom: false,
         randomResult: null,
         
@@ -1142,7 +1166,15 @@ function orderPage() {
                     return;
                 }
                 // 先調用修改訂單 API
-                await fetch('/groups/{{ group.id }}/orders/edit', { method: 'POST' });
+                // V2.11.1 P1-08：原本不檢查回應狀態，團單剛截止時這個 POST 會 400，
+                // 但畫面照樣切成 editing 並開啟加點視窗，使用者點完才發現送不出去
+                const _res = await fetch('/groups/{{ group.id }}/orders/edit', { method: 'POST' });
+                if (!_res.ok) {
+                    let _msg = '無法進入修改模式';
+                    try { const _b = await _res.json(); if (_b.detail) _msg = _b.detail; } catch (e) {}
+                    if (window.toast) { window.toast(_msg); } else { alert(_msg); }
+                    return;
+                }
                 this.orderStatus = 'editing';
                 document.body.dispatchEvent(new CustomEvent('orderUpdated'));
             }

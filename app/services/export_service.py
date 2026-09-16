@@ -16,18 +16,18 @@ def generate_order_text(db: Session, group: Group) -> str:
     lines.append(f"【{group.name}】")
     
     # 店家資訊（含分店電話）
-    store_info = group.store.name
+    store_info = group.store_display_name  # 店家已刪時回傳快照名稱
     branch_phone = None
     
     if group.branch_id:
         branch = db.query(StoreBranch).filter(StoreBranch.id == group.branch_id).first()
         if branch:
-            store_info = f"{group.store.name} {branch.name}"
+            store_info = f"{group.store_display_name} {branch.name}"
             branch_phone = branch.phone
-    elif group.store.branch:
-        store_info = f"{group.store.name} {group.store.branch}"
+    elif group.store is not None and group.store.branch:
+        store_info = f"{group.store_display_name} {group.store.branch}"
         branch_phone = group.store.phone
-    else:
+    elif group.store is not None:
         branch_phone = group.store.phone
     
     lines.append(f"店家：{store_info}")
@@ -146,7 +146,7 @@ def generate_payment_text(db: Session, group: Group) -> str:
             company_total += order.company_pay
             self_total += order.self_pay
             actual_self_total += order.actual_self_pay
-        else:
+        elif order.items:  # 空購物車不算「未送出」
             pending_users.append(order.user.show_name)
 
     # 外送費分攤（V2.4.1 修：餘數分配，總和恰等於外送費；依姓名排序前 r 位 +1 元，固定可重現）
@@ -165,10 +165,10 @@ def generate_payment_text(db: Session, group: Group) -> str:
 
     # ── 標題與總覽 ──
     lines.append(f"【{group.name}】收款明細")
-    lines.append(f"店家：{group.store.name}")
+    lines.append(f"店家：{group.store_display_name}")
     docs = []
-    if group.store.provides_invoice: docs.append("發票")
-    if group.store.provides_receipt: docs.append("收據")
+    if group.store is not None and group.store.provides_invoice: docs.append("發票")
+    if group.store is not None and group.store.provides_receipt: docs.append("收據")
     if docs:
         lines.append(f"單據：可開{('、'.join(docs))}")
     lines.append("")

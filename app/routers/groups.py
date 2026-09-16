@@ -11,7 +11,7 @@ import base64
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.group import Group
+from app.models.group import Group, taipei_now
 from app.models.store import Store, StoreBranch, CategoryType
 from app.models.menu import Menu, MenuItem, MenuCategory
 from app.models.order import Order, OrderItem, OrderStatus
@@ -38,6 +38,132 @@ def to_taipei_time(dt):
     return utc_dt.astimezone(taipei_tz)
 
 templates.env.filters['taipei'] = to_taipei_time
+
+
+def _parse_deadline(value: str, *, allow_past: bool):
+    """解析並驗證截止時間（V2.11.2 N-11，開團與編輯共用）。
+
+    - 帶時區的字串（2026-09-16T12:00:00+08:00）會讓 fromisoformat 回傳 aware
+      datetime，與不帶時區的 taipei_now() 比較時拋 TypeError → 500。先轉成
+      台北牆上時間的 naive。
+    - 開團不允許設成過去（一建好就是過期的團）；編輯允許，等同提前截止。
+    - 兩者都限制 30 天內。
+    """
+    try:
+        dt = datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="截止時間格式錯誤")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
+    now = taipei_now()
+    if not allow_past and dt <= now:
+        raise HTTPException(status_code=400, detail="截止時間必須晚於現在")
+    if dt > now + timedelta(days=30):
+        raise HTTPException(status_code=400, detail="截止時間最多 30 天內")
+    return dt
+
+
+def _settle_editing(db, group):
+    """團截止後把 EDITING 訂單還原成 SUBMITTED（V2.11.1 P0-08，冪等）"""
+    from app.services.order_restore import settle_editing_orders
+    return settle_editing_orders(db, group)
+
+
+def _draw_lucky_if_needed(db, group):
+    """截止後抽出免單者，只抽一次（V2.11.1 P1-02）。
+
+    原本直接寫在 group_page 裡、沒有鎖：兩個人同時開已截止的團頁，
+    會各自看到 lucky_winner_ids 是空的、各抽一次，後寫的蓋掉先寫的。
+    改成對 group 列加鎖，並在鎖內重新確認條件。
+
+    `lucky_draw_count` 可能是負數（V2.11.1 之前建立的團沒有邊界檢查），
+    negative 會讓 random.sample 拋 ValueError → 截止後任何人開團頁都 500，
+    而且每次進來都重試一次，等於永久壞掉。這裡用 max(0, ...) 兜住。
+    """
+    import random
+
+    if group.is_open or not group.enable_lucky_draw or group.lucky_winner_ids:
+        return
+    # V2.11.2 N-04：`with_for_update()` 會等到鎖、資料庫也回傳最新的列，但
+    # SQLAlchemy 的 identity map **不會用新值覆蓋同一個 session 已載入的物件**。
+    # 少了 populate_existing()，`locked` 就是記憶體裡那個舊的 group，
+    # lucky_winner_ids 仍是空的 → 另一個請求剛抽出的中獎者會被覆蓋。
+    locked = (
+        db.query(Group)
+        .filter(Group.id == group.id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if locked is None or locked.lucky_winner_ids:
+        return
+    submitted = db.query(Order).filter(
+        Order.group_id == locked.id,
+        Order.status == OrderStatus.SUBMITTED,
+    ).all()
+    if not submitted:
+        db.rollback()
+        return
+    winner_count = max(0, min(locked.lucky_draw_count or 0, len(submitted)))
+    if winner_count:
+        winners = random.sample(submitted, winner_count)
+        locked.lucky_winner_ids = ",".join(str(o.user_id) for o in winners)
+    db.commit()
+
+
+def _ensure_visible(group, user, db):
+    """限定部門／私人團的可見性（V2.11.1 P0-05，與 SQL 層級條件同一套規則）"""
+    from app.services.visibility import ensure_group_visible
+    ensure_group_visible(group, user, db)
+
+
+def _new_group_context(db: Session, user, *, stores, departments,
+                       preselect_store_id=None, copy_from=None) -> dict:
+    """group_new.html 需要的完整 context（V2.11.1 P0-02）。
+
+    開新團與複製開團兩條路由渲染同一個模板。V2.11.0 只在 new_group_page 補了
+    favorite_store_ids / group_counts，copy_group_page 沒補，導致
+    `GET /groups/{id}/copy` 直接 UndefinedError 500 —— 複製開團完全失效。
+    抽成共用函式，之後任何一方加欄位都不會再漏掉另一方。
+    """
+    from sqlalchemy import func
+    from app.models.template import GroupTemplate
+    from app.models.user import UserFavorite
+
+    my_templates = db.query(GroupTemplate).filter(
+        GroupTemplate.user_id == user.id
+    ).options(joinedload(GroupTemplate.store)).order_by(
+        GroupTemplate.use_count.desc()
+    ).limit(5).all()
+
+    # 選店覆蓋層的分區資料：我的最愛優先 → 熱門扣掉重複後補滿三間 → 其餘依名稱。
+    # 名稱排序在前端做：PostgreSQL 的 ORDER BY name 對中文是碼位序（近似部首序），
+    # 前端 localeCompare('zh-Hant') 才是注音序，也就是使用者預期的順序。
+    favorite_store_ids = [
+        f.store_id for f in db.query(UserFavorite).filter(
+            UserFavorite.user_id == user.id
+        ).all()
+    ]
+
+    # 全體開團次數（不是使用者自己的——「大家常開的」才是有用的推薦，
+    # 個人偏好由「我的最愛」那區負責）
+    group_counts = dict(
+        db.query(Group.store_id, func.count(Group.id))
+        .filter(Group.store_id.isnot(None))
+        .group_by(Group.store_id)
+        .all()
+    )
+
+    return {
+        "user": user,
+        "stores": stores,
+        "departments": departments,
+        "my_templates": my_templates,
+        "preselect_store_id": preselect_store_id,
+        "favorite_store_ids": favorite_store_ids,
+        "group_counts": group_counts,
+        "copy_from": copy_from,
+    }
 
 
 @router.get("/new")
@@ -74,19 +200,10 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     # 取得啟用中的部門
     departments = db.query(Department).filter(Department.is_active == True).all()
     
-    # 取得使用者的開團模板
-    from app.models.template import GroupTemplate
-    my_templates = db.query(GroupTemplate).filter(
-        GroupTemplate.user_id == user.id
-    ).options(joinedload(GroupTemplate.store)).order_by(GroupTemplate.use_count.desc()).limit(5).all()
-    
     return templates.TemplateResponse("group_new.html", {
         "request": request,
-        "user": user,
-        "stores": stores,
-        "departments": departments,
-        "my_templates": my_templates,
-        "preselect_store_id": store_id,
+        **_new_group_context(db, user, stores=stores, departments=departments,
+                             preselect_store_id=store_id),
     })
 
 
@@ -165,10 +282,16 @@ async def create_group(
             raise HTTPException(status_code=400, detail="該店家尚無啟用的菜單")
     
     # 解析截止時間
-    try:
-        deadline_dt = datetime.fromisoformat(deadline)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="截止時間格式錯誤")
+    deadline_dt = _parse_deadline(deadline, allow_past=False)
+    from app.services.validation import clean_text, parse_department_ids
+    name = clean_text(name, 100, field="團名", required=True)
+    
+    # V2.11.3 R-02：選「限定部門」卻一個都沒勾，原本會建出「非公開且零部門」的團
+    # ——其他人一律 403，實質上是「只有團主看得到」。這個狀態後來又害範本無法使用
+    # （存下來的 department_ids 是 NULL，與舊版範本無法區分，形成死循環）。從源頭擋下。
+    _valid_dept_ids = parse_department_ids(department_ids, db) if visibility != "public" else []
+    if visibility != "public" and not _valid_dept_ids:
+        raise HTTPException(status_code=400, detail="選擇「限定部門」時請至少勾選一個部門")
     
     # 判斷是否公開
     is_public = visibility == "public"
@@ -195,7 +318,9 @@ async def create_group(
         lock_ice=lock_ice if store.category == CategoryType.DRINK else False,
         is_blind_mode=is_blind_mode,
         enable_lucky_draw=enable_lucky_draw,
-        lucky_draw_count=lucky_draw_count if enable_lucky_draw else 1,
+        # V2.11.1 P1-02：負數會讓 random.sample 拋 ValueError，
+        # 截止後任何人開團頁都 500 且永久無法修復（因為每次進來都會重抽）
+        lucky_draw_count=max(1, min(20, lucky_draw_count)) if enable_lucky_draw else 1,
         min_members=min_members if min_members and min_members >= 2 else None,
         auto_extend=auto_extend if min_members else False,
         auto_remind_minutes=auto_remind_minutes if auto_remind_minutes else None,
@@ -205,11 +330,10 @@ async def create_group(
     db.flush()  # 取得 group.id
     
     # 如果選擇限定部門，建立關聯
-    if not is_public and department_ids:
+    if not is_public:
         from app.models.department import GroupDepartment
-        for dept_id in department_ids:
-            gd = GroupDepartment(group_id=group.id, department_id=int(dept_id))
-            db.add(gd)
+        for dept_id in _valid_dept_ids:
+            db.add(GroupDepartment(group_id=group.id, department_id=dept_id))
     
     db.commit()
     db.refresh(group)
@@ -236,6 +360,10 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
     
+    # V2.11.1 P0-05：檢查要在任何查詢與寫入之前。原本排在抽獎（會寫 DB）
+    # 和一整批查詢之後，等於無權的人已經觸發過副作用了。
+    _ensure_visible(group, user, db)
+    
     # 載入 store 及其 toppings（用於加料選項）
     from app.models.store import Store, StoreTopping
     store = db.query(Store).filter(Store.id == group.store_id).options(
@@ -243,18 +371,14 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         joinedload(Store.branches)
     ).first()
     
+    # V2.11.1 P0-08：團已截止就先把停在「修改中」的訂單還原成已送出，
+    # 否則那些人不會出現在任何匯出裡（店家不會做、也收不到錢）。
+    # 必須排在抽獎之前，不然他們會被排除在抽獎之外。
+    _settle_editing(db, group)
+    
     # 如果團單已過期且啟用隨機免單但尚未抽獎，進行抽獎
-    if not group.is_open and group.enable_lucky_draw and not group.lucky_winner_ids:
-        import random
-        submitted_for_draw = db.query(Order).filter(
-            Order.group_id == group_id,
-            Order.status == OrderStatus.SUBMITTED
-        ).all()
-        if submitted_for_draw:
-            winner_count = min(group.lucky_draw_count, len(submitted_for_draw))
-            winners = random.sample(submitted_for_draw, winner_count)
-            group.lucky_winner_ids = ",".join(str(o.user_id) for o in winners)
-            db.commit()
+    _draw_lucky_if_needed(db, group)
+    db.refresh(group)
     
     # 取得已結單的訂單（訂單牆）- 使用 eager loading
     submitted_orders = db.query(Order).filter(
@@ -324,7 +448,9 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     
     # 取得該店家熱門品項（全站統計，最近 30 天）
     from datetime import timedelta
-    thirty_days_ago = datetime.now(TAIPEI_TZ).replace(tzinfo=None) - timedelta(days=30)
+    # V2.10.2：Order.created_at 是 UTC，門檻若從台北時間算，窗口會變成 29 天 16 小時
+    # （坑 #25 的反向案例）。滾動窗直接從 utcnow() 起算，寫法同 home.py::get_hot_items
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     hot_items = db.query(
         OrderItem.item_name,
         OrderItem.menu_item_id,
@@ -338,9 +464,6 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     ).limit(5).all()
     
     # 限定部門/私人團可見性（V2.8.0 審稿：後端真正阻擋）
-    if not group.is_visible_to(user, db):
-        raise HTTPException(status_code=403, detail="您無權查看此團單")
-    
     # 取得菜單品項（含分類）
     menu = group.menu
 
@@ -356,10 +479,15 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         func.sum(OrderItem.quantity).desc()
     ).limit(8).all()
     _freq_ids = [r[0] for r in my_freq_rows]
+    # V2.11.1 P0-03：刪店家會把 groups.menu_id / store_id 設為 NULL，
+    # 之後打開這些舊團會 AttributeError 500。菜單可能不存在，全部走 None 防護。
     _menu_items_by_id = {}
-    for _cat in menu.categories:
+    for _cat in (menu.categories if menu is not None else []):
         for _it in _cat.items:
             _menu_items_by_id[_it.id] = _it
+    # 無分類品項也要算進去，與模板一致
+    for _it in (menu.items if menu is not None else []):
+        _menu_items_by_id.setdefault(_it.id, _it)
     my_frequent = [_menu_items_by_id[i] for i in _freq_ids if i in _menu_items_by_id][:4]
     
     # 庫存已用量（V2.7.0：已送出佔用；有設上限的品項才需要）
@@ -549,11 +677,46 @@ async def proxy_item_update(
             raise HTTPException(status_code=400, detail=f"已有 {int(_used)} 份被訂走，上限不可低於 {int(_used)}")
     # 未訂 → 定價：回寫此團所有引用此品項且仍為 0 元的訂單（未訂快照本為暫定，唯一允許回寫的情境）
     if item.price_tbd and not price_tbd and price_dec > 0:
+        # (1) 訂單列
         db.query(OrderItem).filter(
             OrderItem.menu_item_id == item.id,
             OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
             OrderItem.unit_price == 0,
         ).update({OrderItem.unit_price: price_dec}, synchronize_session=False)
+        
+        # (2) V2.11.1 P0-07：修改中訂單的快照。
+        # 團員按「修改訂單」時系統會存快照（裡面 unit_price 是 "0.00"），
+        # 團主定價後只更新了訂單列；團員再按「取消修改」，快照還原回去，
+        # 單價就變回 0 —— 這份餐等於免費。
+        # 注意：JSON 欄位就地修改不會被 SQLAlchemy 偵測到，必須重新指派。
+        import copy as _copy
+        _editing = db.query(Order).filter(
+            Order.group_id == group.id,
+            Order.status == OrderStatus.EDITING,
+        ).all()
+        for _o in _editing:
+            _snap = _copy.deepcopy(_o.snapshot or {})
+            _changed = False
+            for _it in _snap.get("items", []):
+                if _it.get("menu_item_id") == item.id and Decimal(str(_it.get("unit_price", "0"))) == 0:
+                    _it["unit_price"] = str(price_dec)
+                    _changed = True
+                for _b in _it.get("backups", []):
+                    if _b.get("menu_item_id") == item.id and Decimal(str(_b.get("unit_price", "0"))) == 0:
+                        _b["unit_price"] = str(price_dec)
+                        _changed = True
+            if _changed:
+                _o.snapshot = _snap  # 重新指派才會寫入
+        
+        # (3) 候補列的 unit_price 也是快照，原本完全沒有回寫
+        from app.models.order import OrderItemBackup
+        db.query(OrderItemBackup).filter(
+            OrderItemBackup.menu_item_id == item.id,
+            OrderItemBackup.unit_price == 0,
+            OrderItemBackup.order_item_id.in_(
+                db.query(OrderItem.id).join(Order).filter(Order.group_id == group.id)
+            ),
+        ).update({OrderItemBackup.unit_price: price_dec}, synchronize_session=False)
     item.price_tbd = price_tbd
     item.name = item_name.strip()
     item.price = price_dec
@@ -616,6 +779,7 @@ async def fulfillment_panel(group_id: int, request: Request, db: Session = Depen
         raise HTTPException(status_code=404, detail="團單不存在")
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="僅團主可操作")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
     
     from app.models.order import OrderItem as OI
     orders = db.query(Order).filter(
@@ -708,9 +872,18 @@ async def close_group(group_id: int, request: Request, db: Session = Depends(get
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以截止團單")
     
+    # V2.11.2 N-01：這裡的順序是有代價的。
+    # 本專案 SessionLocal(autoflush=False)，`group.is_closed = True` 只存在記憶體；
+    # 而 `settle_editing_orders` 在沒有 EDITING 訂單時（最常見）直接 return，不 commit，
+    # 接著的 `db.refresh(group)` 就把這個未 flush 的變更無聲丟棄 —— 團主按了
+    # 「提前截止」，團卻照樣開著（坑 #32）。先 commit 讓它落地再結算。
     group.is_closed = True
+    db.commit()
     
-    # 如果啟用隨機免單，進行抽獎
+    # 提前截止時先結算修改中訂單，他們才算得進抽獎與匯出
+    _settle_editing(db, group)
+    db.refresh(group)
+
     if group.enable_lucky_draw and not group.lucky_winner_ids:
         from app.models.order import Order, OrderStatus
         # 取得所有已結單的訂單
@@ -721,7 +894,7 @@ async def close_group(group_id: int, request: Request, db: Session = Depends(get
         
         if submitted_orders:
             # 抽選幸運兒
-            winner_count = min(group.lucky_draw_count, len(submitted_orders))
+            winner_count = max(0, min(group.lucky_draw_count or 0, len(submitted_orders)))
             winners = random.sample(submitted_orders, winner_count)
             group.lucky_winner_ids = ",".join(str(o.user_id) for o in winners)
     
@@ -776,6 +949,7 @@ async def set_treat(group_id: int, request: Request, db: Session = Depends(get_d
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
+    _ensure_visible(group, user, db)  # V2.11.1 P0-05
     
     # 檢查用戶是否有結單的訂單
     my_order = db.query(Order).filter(
@@ -787,18 +961,35 @@ async def set_treat(group_id: int, request: Request, db: Session = Depends(get_d
     if not my_order:
         raise HTTPException(status_code=400, detail="您尚未結單，無法請客")
     
+    from app.models.treat import TreatRecord
+    
+    # V2.11.1 P1-07：原本每按一次就新增一筆 TreatRecord（按 3 次 3 筆），
+    # 而且 B 在 A 之後按請客時 treat_user_id 會改成 B，但 A 的紀錄永久殘留，
+    # cancel_treat 又只刪目前請客者的，統計就被灌水。
+    if group.treat_user_id is not None:
+        if group.treat_user_id == user.id:
+            # 本人重複按（連點、重新整理），直接返回，不再新增紀錄
+            return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
+        raise HTTPException(status_code=400, detail="已經有人請客了，請先請對方取消")
+    
     # 設定請客者
     group.treat_user_id = user.id
     
-    # 記錄請客歷史
-    from app.models.treat import TreatRecord
-    treat_record = TreatRecord(
-        group_id=group_id,
-        treat_user_id=user.id,
-        amount=group.total_amount
-    )
-    db.add(treat_record)
-    db.commit()
+    # 記錄請客歷史。一團一筆，靠 uq_treat_records_group 唯一索引兜住並行的連點。
+    # amount 是按下當下的金額，之後有人加點或換貨都不會更新 —— 這是已知的取捨，
+    # 真正的結帳金額以收款匯出為準（P1-07 建議改成不存快照，留待 V2.12 評估）。
+    from sqlalchemy.exc import IntegrityError
+    try:
+        with db.begin_nested():
+            db.add(TreatRecord(
+                group_id=group_id,
+                treat_user_id=user.id,
+                amount=group.total_amount,
+            ))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="已經有人請客了，請先請對方取消")
     
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
 
@@ -817,11 +1008,10 @@ async def cancel_treat(group_id: int, request: Request, db: Session = Depends(ge
         raise HTTPException(status_code=403, detail="無權取消請客")
     
     # 刪除請客記錄
+    # V2.11.1 P1-07：原本只刪「目前請客者」的那筆，換過人的團會留下前一人的殘留。
+    # 一團就一筆，直接依 group_id 刪乾淨（也順便清掉 V2.11.1 之前留下的重複）。
     from app.models.treat import TreatRecord
-    db.query(TreatRecord).filter(
-        TreatRecord.group_id == group_id,
-        TreatRecord.treat_user_id == group.treat_user_id
-    ).delete()
+    db.query(TreatRecord).filter(TreatRecord.group_id == group_id).delete()
     
     group.treat_user_id = None
     db.commit()
@@ -837,6 +1027,7 @@ async def treat_history(group_id: int, request: Request, db: Session = Depends(g
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
+    _ensure_visible(group, user, db)  # V2.11.1 P0-05
     
     # 取得此店家的所有請客記錄
     from app.models.treat import TreatRecord
@@ -858,7 +1049,7 @@ async def treat_history(group_id: int, request: Request, db: Session = Depends(g
     return templates.TemplateResponse("partials/treat_history.html", {
         "request": request,
         "records": records,
-        "store_name": group.store.name
+        "store_name": group.store_display_name
     })
 
 
@@ -886,74 +1077,6 @@ async def group_qrcode(group_id: int, db: Session = Depends(get_db)):
         content=f'<img src="data:image/png;base64,{img_str}" alt="QR Code" />',
         status_code=200,
     )
-
-
-@router.post("/{group_id}/orders/copy-last")
-async def copy_last_order(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """複製上次訂單到購物車"""
-    user = await get_current_user(request, db)
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    if not group.is_open:
-        raise HTTPException(status_code=400, detail="團單已截止")
-    
-    # 找到上次在同店家的訂單
-    previous_order = db.query(Order).join(Group).filter(
-        Group.store_id == group.store_id,
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.group_id != group_id
-    ).order_by(Order.created_at.desc()).first()
-    
-    if not previous_order:
-        raise HTTPException(status_code=404, detail="找不到上次訂單")
-    
-    # 取得或建立當前訂單
-    my_order = db.query(Order).filter(
-        Order.group_id == group_id,
-        Order.user_id == user.id
-    ).first()
-    
-    if not my_order:
-        my_order = Order(
-            group_id=group_id,
-            user_id=user.id,
-            status=OrderStatus.DRAFT,
-        )
-        db.add(my_order)
-        db.flush()
-    elif my_order.status == OrderStatus.SUBMITTED:
-        # 已結單，先改為編輯狀態
-        my_order.status = OrderStatus.EDITING
-    
-    # 複製品項
-    for old_item in previous_order.items:
-        # 檢查品項是否還在菜單上
-        menu_item = db.query(MenuItem).filter(
-            MenuItem.id == old_item.menu_item_id,
-            MenuItem.menu_id == group.menu_id
-        ).first()
-        
-        if menu_item:  # 品項還存在才複製
-            new_item = OrderItem(
-                order_id=my_order.id,
-                menu_item_id=old_item.menu_item_id,
-                item_name=old_item.item_name,
-                size=old_item.size,
-                price=old_item.price,
-                sugar=old_item.sugar,
-                ice=old_item.ice,
-                quantity=old_item.quantity,
-                note=old_item.note,
-            )
-            db.add(new_item)
-    
-    db.commit()
-    
-    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
 
 
 @router.post("/{group_id}/orders/{order_id}/discount")
@@ -1008,6 +1131,10 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
     
+    # V2.11.1 P0-05：私密團的設定也不該被別人複製
+    if not group.is_visible_to(user, db):
+        raise HTTPException(status_code=403, detail="您無權查看此團單")
+    
     # 取得店家選項
     stores = db.query(Store).filter(Store.is_active == True, Store.is_personal != True).all()
     
@@ -1017,10 +1144,8 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
     
     return templates.TemplateResponse("group_new.html", {
         "request": request,
-        "user": user,
-        "stores": stores,
-        "departments": departments,
-        "copy_from": group,  # 帶入預設值
+        **_new_group_context(db, user, stores=stores, departments=departments,
+                             preselect_store_id=group.store_id, copy_from=group),
     })
 
 
@@ -1036,6 +1161,7 @@ async def export_order(group_id: int, request: Request, db: Session = Depends(ge
     # 只有團主或管理者可以匯出
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
     
     text = generate_order_text(db, group)
     
@@ -1060,6 +1186,7 @@ async def export_payment(group_id: int, request: Request, db: Session = Depends(
     # 只有團主或管理者可以匯出
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
     
     text = generate_payment_text(db, group)
     
@@ -1101,8 +1228,11 @@ async def edit_group(
         raise HTTPException(status_code=403, detail="只有團主可以編輯")
     
     # 更新團名和備註（任何時候都可以改）
-    group.name = name
-    group.note = note.strip() if note else None
+    # V2.11.2 N-11：edit_group 原本完全沒有套用 P1-05 的驗證，300 字的團名
+    # 在 PostgreSQL 上會 500
+    from app.services.validation import clean_text as _ct
+    group.name = _ct(name, 100, field="團名", required=True)
+    group.note = _ct(note, 500, field="備註")
     
     # 更新外送費
     if delivery_fee is not None:
@@ -1120,12 +1250,10 @@ async def edit_group(
     group.backup_count = max(1, min(3, backup_count))
     
     # 更新截止時間
+    # V2.11.2 N-11：原本 `except ValueError: pass` 是靜默忽略 —— 團主改了時間、
+    # 按了儲存、畫面也沒報錯，但其實沒改到。編輯允許設成過去（等同提前截止）。
     if deadline:
-        try:
-            deadline_dt = datetime.fromisoformat(deadline)
-            group.deadline = deadline_dt
-        except ValueError:
-            pass
+        group.deadline = _parse_deadline(deadline, allow_past=True)
     
     db.commit()
     
@@ -1185,6 +1313,7 @@ async def export_excel(request: Request, group_id: int, db: Session = Depends(ge
     # 只有團主或管理員可以匯出
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
     
     from app.services.excel_service import export_orders_to_excel
     
@@ -1218,6 +1347,7 @@ async def export_receipt_pdf(request: Request, group_id: int, db: Session = Depe
         raise HTTPException(status_code=404, detail="團單不存在")
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
 
     from app.services.receipt_service import generate_receipt_pdf
     pdf_file = generate_receipt_pdf(db, group)
@@ -1248,6 +1378,7 @@ async def export_receipt_png(request: Request, group_id: int, db: Session = Depe
         raise HTTPException(status_code=404, detail="團單不存在")
     if group.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="只有團主可以匯出")
+    _settle_editing(db, group)  # V2.11.2 N-13：權限檢查之後才做寫入
 
     from app.services.receipt_service import generate_receipt_png
     png_file = generate_receipt_png(db, group)

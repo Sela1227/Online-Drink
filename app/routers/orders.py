@@ -7,6 +7,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
+from app.models.store import CategoryType, Store  # V2.11.1 P1-05 驗證用
 from app.models.group import Group
 from app.models.menu import MenuItem, ItemOption
 from app.models.order import Order, OrderItem, OrderItemOption, OrderItemTopping, OrderStatus
@@ -29,22 +30,94 @@ def to_taipei_time(dt):
 templates.env.filters['taipei'] = to_taipei_time
 
 
+def _validate_item_spec(group, store, size, sugar, ice, quantity, options, note):
+    """品項規格的後端驗證（V2.11.1 P1-05）。
+
+    這些原本只靠前端限制，後端全盤照收，實測可以：
+      - 團單設了「鎖定甜度」，仍然送任意 sugar 上來
+      - sugar/ice/size 送任意字串（PostgreSQL 超過欄位長度會 500）
+      - options=[5,5,5] 產生三筆同樣的選項並加價三次
+      - quantity 送 100000
+    表單能改，所以前端限制不是限制。
+    """
+    from app.models.store import OptionType
+
+    if size not in (None, "", "M", "L"):
+        raise HTTPException(status_code=400, detail="尺寸錯誤")
+    size = size or None
+
+    if group.category == CategoryType.DRINK and store is not None:
+        sugars = {o.option_value for o in store.options if o.option_type == OptionType.SUGAR}
+        ices = {o.option_value for o in store.options if o.option_type == OptionType.ICE}
+        # 鎖定時一律用團單預設，不看前端送什麼
+        if group.lock_sugar:
+            sugar = group.default_sugar
+        if group.lock_ice:
+            ice = group.default_ice
+        if sugar and sugars and sugar not in sugars:
+            raise HTTPException(status_code=400, detail="甜度選項不存在")
+        if ice and ices and ice not in ices:
+            raise HTTPException(status_code=400, detail="冰塊選項不存在")
+        # V2.11.2 N-08：店家沒設定甜冰選項時上面兩條整個略過（空集合），
+        # 任意長度字串照收。飲料選項功能 V2.10.0 才有，很多店家目前還沒設。
+        # PostgreSQL 超過 String(50) 會 500，SQLite 照收所以本機測不出來。
+        from app.services.validation import clean_text as _ct
+        sugar = _ct(sugar, 50, field="甜度")
+        ice = _ct(ice, 50, field="冰塊")
+    else:
+        sugar = ice = None
+
+    try:
+        quantity = int(quantity)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="數量錯誤")
+    if not (1 <= quantity <= 99):
+        raise HTTPException(status_code=400, detail="數量需介於 1 到 99")
+
+    # 去重：同一個選項送多次會被加價多次
+    options = list(dict.fromkeys(options or []))
+
+    from app.services.validation import clean_text
+    note = clean_text(note, 200, field="備註")
+
+    return size, (sugar or None), (ice or None), quantity, options, note
+
+
 def get_or_create_order(db: Session, group_id: int, user_id: int) -> Order:
-    """取得或建立訂單"""
+    """取得或建立訂單。
+
+    V2.11.1 P1-06：原本是「先查再建」，兩個請求同時進來（手機連點兩下「加入」）
+    會各自查到 None、各自 insert，產生兩筆 Order。之後 `.first()` 拿到哪筆不確定，
+    兩筆都可能被送出 → 重複收款。改成「建立衝突就回頭查」，搭配
+    `uq_orders_group_user` 唯一索引，讓資料庫來仲裁而不是靠時間差。
+    """
+    from sqlalchemy.exc import IntegrityError
+
     order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user_id,
     ).first()
     
     if not order:
-        order = Order(
-            group_id=group_id,
-            user_id=user_id,
-            status=OrderStatus.DRAFT,
-        )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
+        try:
+            with db.begin_nested():
+                order = Order(
+                    group_id=group_id,
+                    user_id=user_id,
+                    status=OrderStatus.DRAFT,
+                )
+                db.add(order)
+            db.commit()
+            db.refresh(order)
+        except IntegrityError:
+            # 另一個請求先建好了，回頭拿它的
+            db.rollback()
+            order = db.query(Order).filter(
+                Order.group_id == group_id,
+                Order.user_id == user_id,
+            ).first()
+            if order is None:
+                raise
     
     return order
 
@@ -57,6 +130,8 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="團單不存在")
+    # V2.11.1 P0-05：原本沒有檢查，任何人都讀得到私密團的訂單內容與姓名
+    _ensure_visible(group, user, db)
 
     submitted_orders = db.query(Order).filter(
         Order.group_id == group_id,
@@ -66,8 +141,7 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
         joinedload(Order.items).joinedload(OrderItem.selected_options)
     ).all()
 
-    from datetime import datetime
-    is_open = group.deadline > datetime.utcnow() if group.deadline else True
+    is_open = group.is_open
 
     return templates.TemplateResponse("partials/order_wall.html", {
         "request": request,
@@ -128,10 +202,72 @@ def _lock_menu_items(db: Session, menu_item_ids):
     db.query(_MI).filter(_MI.id.in_(ids)).order_by(_MI.id).with_for_update().all()
 
 
+def _own_qty(db: Session, order_id: int, menu_item_id) -> int:
+    """這張訂單目前已經佔用了這個品項幾份（以資料庫為準，V2.11.3 R-01）。
+
+    原本用 `sum(i.quantity for i in order.items ...)` 讀記憶體 collection，兩個方向都會錯：
+      - 迴圈內新建的 OrderItem(order_id=...) **不會**自動加進 order.items，
+        所以複製第二行同品項時不會把第一行已複製的量算進去；
+      - 取代模式刪除並 flush 之後，被刪的物件仍留在 collection 裡直到 expire，
+        又會多算。
+    查資料庫沒有這些問題（呼叫前確保已 flush）。
+    """
+    if not menu_item_id:
+        return 0
+    return int(
+        db.query(func.coalesce(func.sum(OrderItem.quantity), 0)).filter(
+            OrderItem.order_id == order_id,
+            OrderItem.menu_item_id == menu_item_id,
+        ).scalar() or 0
+    )
+
+
+def _available_for(db: Session, group_id: int, menu_item, order) -> int | None:
+    """這張 EDITING 訂單還能再加幾份（None = 不限量）。呼叫前須已 flush。"""
+    if menu_item is None or menu_item.stock_limit is None:
+        return None
+    _lock_menu_items(db, [menu_item.id])
+    remaining = _stock_remaining(db, group_id, menu_item, exclude_order_id=order.id)
+    if remaining is None:
+        return None
+    return max(0, remaining - _own_qty(db, order.id, menu_item.id))
+
+
+def _reserve_stock(db: Session, group_id: int, menu_item, delta: int, order):
+    """在 EDITING 訂單上增量時檢查並佔用庫存（V2.11.1 P1-09）。
+
+    V2.8 定義「佔用 = SUBMITTED + EDITING」，所以在修改中的訂單加品項／加量／
+    跟點會**立即佔用**庫存。但這些路徑原本只有「先查再送」、沒有 `_lock_menu_items`，
+    兩個人同時操作仍可能超賣 —— 這正是 CLAUDE.md 那條「先查再送不是庫存機制」。
+
+    DRAFT 不佔用（送出時才鎖），所以不需要經過這裡。
+    """
+    if menu_item is None or menu_item.stock_limit is None or delta <= 0:
+        return
+    if order.status != OrderStatus.EDITING:
+        return
+    _lock_menu_items(db, [menu_item.id])
+    remaining = _stock_remaining(db, group_id, menu_item, exclude_order_id=order.id)
+    if remaining is None:
+        return
+    # V2.11.3 R-01：改以資料庫為準，不依賴 order.items collection 的狀態
+    mine = _own_qty(db, order.id, menu_item.id)
+    if mine + delta > remaining:
+        left = max(0, remaining - mine)
+        raise HTTPException(
+            status_code=400,
+            detail=f"「{menu_item.name}」只剩 {left} 份" if left else f"「{menu_item.name}」已售完",
+        )
+
+
 def _ensure_visible(group, user, db):
-    """限定部門/私人團可見性（審稿 #10：不能只靠畫面隱藏）"""
-    if not group.is_visible_to(user, db):
-        raise HTTPException(status_code=403, detail="您無權查看此團單")
+    """限定部門/私人團可見性（審稿 #10：不能只靠畫面隱藏）。
+
+    V2.11.1 P0-05：實作收斂到 app/services/visibility.py，與 SQL 層級的
+    visible_group_clause 同一套規則。
+    """
+    from app.services.visibility import ensure_group_visible
+    ensure_group_visible(group, user, db)
 
 
 @router.post("/groups/{group_id}/orders/items")
@@ -173,6 +309,15 @@ async def add_item(
         raise HTTPException(status_code=404, detail="品項不存在或不屬於本團菜單")
     if menu_item.is_available is False:
         raise HTTPException(status_code=400, detail="此品項已下架")
+    
+    # V2.11.1 P1-05：後端驗證規格（鎖甜冰可繞過、選項重複計價、數量無上限）
+    _store = db.query(Store).options(joinedload(Store.options)).filter(
+        Store.id == group.store_id
+    ).first() if group.store_id else None
+    size, sugar, ice, quantity, options, note = _validate_item_spec(
+        group, _store, size, sugar, ice, quantity, options, note
+    )
+    
     if not backup_for:
         _rem = _stock_remaining(db, group_id, menu_item)
         if _rem is not None and quantity > _rem:
@@ -186,9 +331,7 @@ async def add_item(
         if not menu_item.price_l:
             size = None  # 沒有 L 價格就不記錄尺寸
     
-    # 數量驗證（後端防異常值）
-    if not backup_for and not (1 <= quantity <= 99):
-        raise HTTPException(status_code=400, detail="數量需為 1-99")
+    # 數量已在 _validate_item_spec 驗過（V2.11.1 P1-05）
     
     # ── 缺貨候補分支（V2.4.0 資訊型）──
     if backup_for:
@@ -272,6 +415,11 @@ async def add_item(
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="請先進入修改模式")
     
+    # V2.11.1 P1-09：修改中的加品項會立即佔用庫存（V2.8 定義佔用＝SUBMITTED＋EDITING），
+    # 但上面那道只是「先查」沒有鎖。EDITING 走加鎖版本重新驗一次。
+    if order.status == OrderStatus.EDITING and not backup_for:
+        _reserve_stock(db, group_id, menu_item, quantity, order)
+    
     # 檢查是否有相同品項+設定，有的話合併杯數
     existing_item = None
     for item in order.items:
@@ -288,6 +436,10 @@ async def add_item(
                 break
     
     if existing_item:
+        # V2.11.2 N-07：_validate_item_spec 只驗單次送出的量，
+        # 連續加入兩次 99 合併後會變成 198
+        if existing_item.quantity + quantity > 99:
+            raise HTTPException(status_code=400, detail="同一品項最多 99 份")
         existing_item.quantity += quantity
     else:
         # 建立新的訂單品項
@@ -425,13 +577,22 @@ async def update_item(
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="請先進入修改模式")
     
+    # V2.11.1 P1-05：原本沒有上限，實測 quantity=100000 照收
+    if quantity > 99:
+        raise HTTPException(status_code=400, detail="數量最多 99")
+    
     if quantity <= 0:
         db.delete(order_item)
     else:
         if order_item.menu_item is not None and quantity > order_item.quantity:
-            _rem = _stock_remaining(db, order.group_id, order_item.menu_item)
-            if _rem is not None and (quantity - order_item.quantity) > _rem:
-                raise HTTPException(status_code=400, detail=f"「{order_item.item_name}」僅剩 {_rem} 份可再增加")
+            _delta = quantity - order_item.quantity
+            if order.status == OrderStatus.EDITING:
+                # V2.11.1 P1-09：修改中的加量會立即佔用庫存，要加鎖
+                _reserve_stock(db, order.group_id, order_item.menu_item, _delta, order)
+            else:
+                _rem = _stock_remaining(db, order.group_id, order_item.menu_item)
+                if _rem is not None and _delta > _rem:
+                    raise HTTPException(status_code=400, detail=f"「{order_item.item_name}」僅剩 {_rem} 份可再增加")
         order_item.quantity = quantity
     
     db.commit()
@@ -669,72 +830,10 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
             if _rem is not None and _qty > _rem:
                 raise HTTPException(status_code=400, detail=f"原訂單中的「{_mi.name}」目前僅剩 {_rem} 份，無法完整還原，請調整後重新送出")
     
-    # 刪除目前的品項
-    for item in order.items:
-        db.delete(item)
-    
-    # 從快照還原
-    for item_data in order.snapshot["items"]:
-        order_item = OrderItem(
-            order_id=order.id,
-            menu_item_id=item_data["menu_item_id"],
-            item_name=item_data["item_name"],
-            size=item_data.get("size"),
-            sugar=item_data["sugar"],
-            ice=item_data["ice"],
-            quantity=item_data["quantity"],
-            unit_price=Decimal(item_data["unit_price"]),
-            note=item_data["note"],
-        )
-        db.add(order_item)
-        db.flush()
-        
-        for opt_data in item_data["options"]:
-            order_item_option = OrderItemOption(
-                order_item_id=order_item.id,
-                item_option_id=opt_data["item_option_id"],
-                option_name=opt_data["option_name"],
-                price_diff=Decimal(opt_data["price_diff"]),
-            )
-            db.add(order_item_option)
-        
-        # 還原加料（V2.4.1 修：舊版快照漏存導致取消修改後加料遺失）
-        for t_data in item_data.get("toppings", []):
-            db.add(OrderItemTopping(
-                order_item_id=order_item.id,
-                store_topping_id=t_data["store_topping_id"],
-                topping_name=t_data["topping_name"],
-                price=Decimal(t_data["price"]),
-            ))
-        
-        # 還原候補（V2.4.1 修；V2.8.0 加回填出貨狀態）
-        from app.models.order import OrderItemBackup
-        _new_backups = {}
-        for b_data in item_data.get("backups", []):
-            _nb = OrderItemBackup(
-                order_item_id=order_item.id,
-                priority=b_data["priority"],
-                menu_item_id=b_data.get("menu_item_id"),
-                item_name=b_data["item_name"],
-                size=b_data.get("size"),
-                sugar=b_data.get("sugar"),
-                ice=b_data.get("ice"),
-                extras_text=b_data.get("extras_text"),
-                unit_price=Decimal(b_data["unit_price"]),
-            )
-            db.add(_nb)
-            _new_backups[b_data["priority"]] = _nb
-        # 出貨狀態還原（缺貨處理結果不因取消修改消失；fulfilled_backup_id 依順位重連新候補）
-        if item_data.get("fulfillment"):
-            order_item.fulfillment = item_data["fulfillment"]
-            order_item.diff_settled = bool(item_data.get("diff_settled"))
-            _fp = item_data.get("fulfilled_backup_priority")
-            if _fp is not None and _fp in _new_backups:
-                db.flush()
-                order_item.fulfilled_backup_id = _new_backups[_fp].id
-    
-    order.status = OrderStatus.SUBMITTED
-    order.snapshot = None
+    # V2.11.1 P0-08：還原邏輯抽到 app/services/order_restore.py，與截止時的
+    # 自動結算共用同一套，避免兩邊各自維護而漏掉候補或出貨狀態。
+    from app.services.order_restore import restore_snapshot
+    restore_snapshot(db, order)
     db.commit()
     db.refresh(order)
     
@@ -813,9 +912,13 @@ async def follow_item(
     if source_item.menu_item is not None:
         if source_item.menu_item.is_available is False:
             raise HTTPException(status_code=400, detail="此品項已下架")
-        _rem = _stock_remaining(db, group_id, source_item.menu_item)
-        if _rem is not None and _rem < 1:
-            raise HTTPException(status_code=400, detail=f"「{source_item.item_name}」已售完")
+        if order.status == OrderStatus.EDITING:
+            # V2.11.1 P1-09：修改中的跟點會立即佔用庫存，要加鎖
+            _reserve_stock(db, group_id, source_item.menu_item, 1, order)
+        else:
+            _rem = _stock_remaining(db, group_id, source_item.menu_item)
+            if _rem is not None and _rem < 1:
+                raise HTTPException(status_code=400, detail=f"「{source_item.item_name}」已售完")
     
     # 複製品項
     order_item = OrderItem(
@@ -883,7 +986,20 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     
+    # V2.11.1 P0-05：私密／部門團要擋
+    _ensure_visible(group, user, db)
+    
+    # V2.11.1 P0-01：店家已刪除時 group.store_id 是 NULL，
+    # `Group.store_id == None` 會被翻成 IS NULL，反而撈到其他已刪店家的訂單
+    if group.store_id is None:
+        raise HTTPException(status_code=404, detail="店家已移除，無法複製上次訂單")
+    
     # 找到上次在同店家的訂單
+    # V2.11.1 P0-01：原本用 `Order.id != (本團訂單 id 的子查詢)` 排除本團，
+    # 但本團還沒有訂單時子查詢是 NULL，`id != NULL` 在 SQL 中為 NULL 而非 TRUE，
+    # WHERE 整個被濾光 → 永遠 404。而「第一次進團、還沒點」正是這個功能最主要的使用情境。
+    # 而且同一人在本團若有兩筆訂單（P1-06），PostgreSQL 會直接報 more than one row。
+    # 改成直接排除本團 group_id。
     previous_order = db.query(Order).options(
         joinedload(Order.items).joinedload(OrderItem.selected_options),
         joinedload(Order.items).joinedload(OrderItem.selected_toppings),
@@ -891,11 +1007,8 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
         Order.user_id == user.id,
         Group.store_id == group.store_id,
         Order.status == OrderStatus.SUBMITTED,
-        Order.id != db.query(Order.id).filter(
-            Order.group_id == group_id,
-            Order.user_id == user.id,
-        ).scalar_subquery(),
-    ).order_by(Order.created_at.desc()).first()
+        Order.group_id != group_id,
+    ).order_by(Order.updated_at.desc()).first()
     
     if not previous_order:
         raise HTTPException(status_code=404, detail="找不到上次的訂單")
@@ -907,180 +1020,193 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
     if order.status == OrderStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="訂單已送出，請先按「修改訂單」再複製")
     
+    # ── 先算出「複製得成的清單」，確定有東西才動購物車（V2.11.2 N-03）──
+    #
+    # V2.11.1 的兩項修正交互產生了一個靜默失敗：P1-04 讓匯入一律新增菜單版本
+    # （新版本的品項都是新 id），P1-01 讓複製只認 menu_item_id。於是店家只要更新
+    # 過一次菜單，舊訂單的 id 全部指向舊版本，一筆都比對不到 —— 而取代模式會
+    # **先清空購物車**才發現沒東西可複製，使用者已經放進去的就沒了，畫面上還
+    # 沒有任何提示。
+    #
+    # 改法：先比 id（同版本），比不到再比品名（跨版本），全部比不到就直接回 400
+    # 不動購物車。
+    _menu_items = list(group.menu.items) if group.menu else []
+    _by_id = {mi.id: mi for mi in _menu_items}
+    _by_name = {}
+    for _mi in _menu_items:
+        if _mi.is_available is not False:
+            _by_name.setdefault((_mi.name or "").strip(), _mi)
+    
+    def _match_current(_old):
+        _cur = _by_id.get(_old.menu_item_id)
+        if _cur is None:
+            _cur = _by_name.get((_old.item_name or "").strip())
+        return _cur
+    
+    _plan = [(o, _match_current(o)) for o in previous_order.items]
+    _skipped = sum(1 for _, m in _plan if m is None or m.is_available is False)
+    _plan = [(o, m) for o, m in _plan if m is not None and m.is_available is not False]
+    if not _plan:
+        raise HTTPException(status_code=400, detail="上次點的品項在目前菜單都找不到了")
+    
+    # V2.11.3 R-05：上面只過濾「比對不到」與「已下架」，沒有過濾「已售完」。
+    # 若全部都會在迴圈裡因庫存被跳過，購物車已經清掉了才發現 copied=0 ——
+    # 正是 N-03 要避免的情況。先做一次庫存可用性預檢。
+    # 取代模式待會兒會刪光現有品項，所以預檢時要把自己的量視為 0。
+    _any_available = False
+    for _o, _m in _plan:
+        if _m.stock_limit is None:
+            _any_available = True
+            break
+        _pre_rem = _stock_remaining(
+            db, group_id, _m,
+            exclude_order_id=order.id if (mode != "append" or order.status == OrderStatus.EDITING) else None,
+        )
+        if _pre_rem is None:
+            _any_available = True
+            break
+        if mode == "append" and order.status == OrderStatus.EDITING:
+            _pre_rem -= _own_qty(db, order.id, _m.id)
+        if _pre_rem >= 1:
+            _any_available = True
+            break
+    if not _any_available:
+        raise HTTPException(status_code=400, detail="上次點的品項目前都已售完")
+    
     # 取代模式才清空現有品項；加入模式保留
     if mode != "append":
-        for item in order.items:
+        for item in list(order.items):
             for opt in item.selected_options:
                 db.delete(opt)
             for topping in item.selected_toppings:
                 db.delete(topping)
             db.delete(item)
+        # V2.11.2 N-09：autoflush=False，不 flush 的話下面算庫存時
+        # 仍會把剛刪掉的量算成佔用，在 EDITING 訂單上會少複製
+        db.flush()
     
-    # 複製上次訂單的品項（V2.7.0：過濾非本團菜單/已下架，數量封頂到剩餘庫存）
-    _menu_item_ids = {mi.id for cat in group.menu.categories for mi in cat.items} if group.menu else set()
-    for old_item in previous_order.items:
-        if old_item.menu_item_id and _menu_item_ids and old_item.menu_item_id not in _menu_item_ids:
-            continue
-        _mi = old_item.menu_item
-        if _mi is not None and _mi.is_available is False:
-            continue
+    # 店家現行的甜冰選項（供比對；店家沒設就是空集合＝不比對）
+    _store_opts = None
+    if group.category == CategoryType.DRINK and group.store is not None:
+        from app.models.store import OptionType as _OT
+        _store_opts = (
+            {o.option_value for o in group.store.options if o.option_type == _OT.SUGAR},
+            {o.option_value for o in group.store.options if o.option_type == _OT.ICE},
+        )
+    _skipped_opt = False
+    
+    _copied = 0
+    for old_item, _mi in _plan:
         _copy_qty = old_item.quantity
-        if _mi is not None:
+        if order.status == OrderStatus.EDITING:
+            # V2.11.3 R-01：修改中的訂單會立即佔用庫存，要問「還能再加幾份」。
+            # V2.11.2 用 try/except 做流程控制是錯的 —— except 分支算的剩餘量
+            # 排除了自己（exclude_order_id=order.id），等於把剛被擋下的量又放回去：
+            # 已送出 5 份、上次點 3 份、庫存 5，結果複製成 8 份。
+            _avail = _available_for(db, group_id, _mi, order)
+            if _avail is not None:
+                if _avail < 1:
+                    _skipped += 1
+                    continue
+                _copy_qty = min(_copy_qty, _avail)
+        else:
             _rem = _stock_remaining(db, group_id, _mi)
             if _rem is not None:
                 if _rem < 1:
+                    _skipped += 1
                     continue
                 _copy_qty = min(_copy_qty, _rem)
+        # V2.11.2 N-09：團單若鎖定甜冰，複製過來的也要照團單走，
+        # 否則等於從這條路徑繞過 P1-05 的鎖定
+        _sugar = group.default_sugar if group.lock_sugar else old_item.sugar
+        _ice = group.default_ice if group.lock_ice else old_item.ice
+        # V2.11.3 R-05：新版本品項若沒有 price_l，單價會以 M 價算，但 size 仍記成
+        # "L"，核對單就顯示 L。add_item 在同樣情況會把 size 清成 None，比照處理。
+        _size = old_item.size if (old_item.size != 'L' or _mi.price_l) else None
+        # 甜冰若已不在店家現行選項中（店家改過選項），改為不指定而不是照抄舊值
+        if group.category == CategoryType.DRINK and _store_opts is not None:
+            if _sugar and _store_opts[0] and _sugar not in _store_opts[0]:
+                _sugar = None
+                _skipped_opt = True
+            if _ice and _store_opts[1] and _ice not in _store_opts[1]:
+                _ice = None
+                _skipped_opt = True
         new_item = OrderItem(
             order_id=order.id,
-            menu_item_id=old_item.menu_item_id,
-            item_name=old_item.item_name,
-            size=old_item.size,
-            sugar=old_item.sugar,
-            ice=old_item.ice,
+            menu_item_id=_mi.id,
+            item_name=_mi.name,
+            size=_size,
+            sugar=_sugar,
+            ice=_ice,
             quantity=_copy_qty,
-            unit_price=old_item.unit_price,
+            # V2.11.1 P1-01：原本沿用 old_item.unit_price。店家在後台改價時
+            # menu_item 的 id 不變，複製過來的就是舊價，結帳金額直接錯。
+            unit_price=(_mi.price_l if (_size == 'L' and _mi.price_l) else _mi.price),
             note=old_item.note,
         )
         db.add(new_item)
         db.flush()
         
-        # 複製選項
+        # 複製選項（V2.11.1 P1-01：以現行 ItemOption 重新取價；已不存在的略過）
         for old_opt in old_item.selected_options:
-            new_opt = OrderItemOption(
+            # 先比 id，跨菜單版本時 id 也換了，再以名稱在新品項的選項裡找
+            _cur_opt = db.query(ItemOption).filter(
+                ItemOption.id == old_opt.item_option_id,
+                ItemOption.menu_item_id == _mi.id,
+            ).first() if old_opt.item_option_id else None
+            if _cur_opt is None:
+                _cur_opt = next(
+                    (o for o in _mi.options if (o.name or "").strip() == (old_opt.option_name or "").strip()),
+                    None,
+                )
+            if _cur_opt is None:
+                continue
+            db.add(OrderItemOption(
                 order_item_id=new_item.id,
-                item_option_id=old_opt.item_option_id,
-                option_name=old_opt.option_name,
-                price_diff=old_opt.price_diff,
-            )
-            db.add(new_opt)
+                item_option_id=_cur_opt.id,
+                option_name=_cur_opt.name,
+                price_diff=_cur_opt.price_diff,
+            ))
         
-        # 複製加料
+        # 複製加料（同上，以現行 StoreTopping 重新取價）
         for old_topping in old_item.selected_toppings:
-            new_topping = OrderItemTopping(
+            # V2.11.3 R-05：原本沒有排除已停用的加料
+            _cur_top = db.query(StoreTopping).filter(
+                StoreTopping.id == old_topping.store_topping_id,
+                StoreTopping.store_id == group.store_id,
+                StoreTopping.is_active == True,
+            ).first() if old_topping.store_topping_id else None
+            if _cur_top is None:
+                _cur_top = db.query(StoreTopping).filter(
+                    StoreTopping.store_id == group.store_id,
+                    StoreTopping.name == (old_topping.topping_name or "").strip(),
+                    StoreTopping.is_active == True,
+                ).first()
+            if _cur_top is None:
+                continue
+            db.add(OrderItemTopping(
                 order_item_id=new_item.id,
-                store_topping_id=old_topping.store_topping_id,
-                topping_name=old_topping.topping_name,
-                price=old_topping.price,
-            )
-            db.add(new_topping)
+                store_topping_id=_cur_top.id,
+                topping_name=_cur_top.name,
+                price=_cur_top.price,
+            ))
+        _copied += 1
     
-    order.status = OrderStatus.DRAFT
+    # V2.11.1 P1-01：原本無條件設成 DRAFT。在「修改中」執行複製上次，會讓訂單
+    # 從 EDITING 掉回 DRAFT：庫存佔用被釋放、快照殘留、「取消修改」按鈕也消失
+    # （因為狀態不是 EDITING）。新建的訂單本來就是 DRAFT，這行只會造成傷害。
     db.commit()
     
-    return RedirectResponse(url=f"/groups/{group_id}?copied=1", status_code=302)
+    return RedirectResponse(
+        url=f"/groups/{group_id}?copied={_copied}&skipped={_skipped}",
+        status_code=302,
+    )
 
 
-@router.get("/groups/{group_id}/random")
-async def random_item(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """隨機推薦品項"""
-    import random
-    from app.models.menu import Menu, MenuItem
-    
-    user = await get_current_user(request, db)
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    # 取得該菜單的所有品項
-    items = db.query(MenuItem).filter(MenuItem.menu_id == group.menu_id).all()
-    
-    if not items:
-        return HTMLResponse("<div class='text-center text-gray-500'>此菜單沒有品項</div>")
-    
-    # 隨機選一個
-    chosen = random.choice(items)
-    
-    return HTMLResponse(f"""
-    <div class="text-center p-4">
-        <div class="text-4xl mb-3">🎲</div>
-        <div class="text-xl font-bold text-gray-800 mb-1">{chosen.name}</div>
-        <div class="text-orange-600 text-lg mb-3">${chosen.price}</div>
-        <button onclick="scrollToItem({chosen.id}); document.querySelector('[x-data]').__x.$data.showRandom = false;"
-                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
-            去點這個！
-        </button>
-        <button onclick="htmx.trigger(this.closest('.random-result'), 'refreshRandom')"
-                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm ml-2">
-            🔄 再抽一次
-        </button>
-    </div>
-    """)
 
-
-@router.get("/groups/{group_id}/favorites")
-async def get_favorites(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """取得用戶在此店家的最常點品項"""
-    from sqlalchemy import func
-    from app.models.menu import MenuItem
-    
-    user = await get_current_user(request, db)
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    # 查詢用戶在此店家的歷史訂單品項，按品項名稱分組計數
-    favorites = db.query(
-        OrderItem.item_name,
-        OrderItem.sugar,
-        OrderItem.ice,
-        OrderItem.size,
-        func.sum(OrderItem.quantity).label('total_qty'),
-        func.max(OrderItem.unit_price).label('price'),
-        func.max(OrderItem.menu_item_id).label('menu_item_id'),
-    ).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Group.store_id == group.store_id,
-        Order.status == OrderStatus.SUBMITTED,
-    ).group_by(
-        OrderItem.item_name,
-        OrderItem.sugar,
-        OrderItem.ice,
-        OrderItem.size,
-    ).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(10).all()
-    
-    if not favorites:
-        return HTMLResponse("""
-        <div class="text-center py-8 text-gray-500">
-            <div class="text-3xl mb-2">📝</div>
-            <p>還沒有點過這家店</p>
-            <p class="text-sm">點過幾次後就會出現你的最愛！</p>
-        </div>
-        """)
-    
-    # 生成 HTML
-    items_html = ""
-    for fav in favorites:
-        spec_parts = []
-        if fav.size:
-            spec_parts.append(fav.size)
-        if fav.sugar:
-            spec_parts.append(fav.sugar)
-        if fav.ice:
-            spec_parts.append(fav.ice)
-        spec = " / ".join(spec_parts) if spec_parts else ""
-        
-        items_html += f"""
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
-             onclick="scrollToItem({fav.menu_item_id}); document.querySelector('[x-data]').__x.$data.showFavorites = false;">
-            <div class="flex-1">
-                <div class="font-medium text-gray-800">{fav.item_name}</div>
-                <div class="text-xs text-gray-500">{spec}</div>
-            </div>
-            <div class="flex items-center gap-3">
-                <span class="text-orange-600">${fav.price}</span>
-                <span class="text-xs text-gray-400">點過 {int(fav.total_qty)} 次</span>
-            </div>
-        </div>
-        """
-    
-    return HTMLResponse(f"""
-    <div class="space-y-2">
-        {items_html}
-    </div>
-    <p class="text-xs text-gray-400 text-center mt-4">點擊品項可快速跳到菜單位置</p>
-    """)
+# V2.11.1 P0-06：已刪除 `GET /groups/{id}/random` 與 `GET /groups/{id}/favorites`。
+#   原因一：兩支用 f-string 直接組 HTML，完全沒有逸出。代購品名由任何使用者建立，
+#           實測 `<img src=x onerror=alert(1)>` 會原樣輸出；sugar/ice/size 同樣直通。
+#   原因二：前端早已不呼叫它們（隨機推薦改在前端跑、常點清單由模板渲染），
+#           而且內含 Alpine v2 的 `__x.$data` API，在 v3 下本來就是壞的。
+#   若日後要恢復，一律改用 TemplateResponse，交給 Jinja 自動逸出，不要自己拼 HTML。

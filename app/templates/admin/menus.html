@@ -6,6 +6,26 @@
 {% block content %}
 {{ nav.back('/admin/stores/' ~ store.id, store.name) }}
 <div class="space-y-4">
+    {% if imported %}
+    <!-- V2.10.0：匯完直接來這裡驗收，順手給後續動作 -->
+    <div class="bg-green-50 border border-green-200 rounded-2xl p-4">
+        <div class="flex items-start gap-2">
+            <i class="ti ti-circle-check text-green-600 mt-0.5"></i>
+            <div class="flex-1">
+                <div class="text-sm font-semibold text-sela-800">
+                    已匯入 {{ imported_cats }} 個分類、{{ imported_items }} 個品項
+                </div>
+                {% if kept_version %}
+                <div class="text-xs text-sela-800/70 mt-1">舊菜單已保留為第 {{ kept_version }} 版，可隨時切回。</div>
+                {% endif %}
+                <div class="flex flex-wrap gap-3 mt-2 text-xs">
+                    <a href="/admin/stores" class="text-sela-700 underline">回店家列表</a>
+                    <a href="/admin/import" class="text-sela-700 underline">繼續匯入其他店家</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800">菜單管理</h1>
         <div class="flex items-center gap-3">

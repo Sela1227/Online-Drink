@@ -26,6 +26,17 @@ logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 機密設定檢查：缺少時寧可不啟動，也不要用公開預設金鑰簽 JWT
+    _missing = []
+    if settings.secret_key in ("", "change-me-in-production"):
+        _missing.append("SECRET_KEY")
+    if not settings.line_channel_id:
+        _missing.append("LINE_CHANNEL_ID")
+    if not settings.line_channel_secret:
+        _missing.append("LINE_CHANNEL_SECRET")
+    if _missing:
+        raise RuntimeError(f"必要環境變數未設定，拒絕啟動：{', '.join(_missing)}")
+    
     # Startup: create tables
     # Import all models to ensure tables are created
     from app.models import department  # noqa: F401
@@ -230,6 +241,66 @@ async def lifespan(app: FastAPI):
                 print(f"Unique constraint check: {e}")
     
     add_unique_constraint_if_not_exists()
+
+    def add_v2111_unique_indexes():
+        """V2.11.1 P1-06：orders 與 user_favorites 的唯一索引。
+
+        `get_or_create_order` 是「先查再建」，手機連點兩下「加入」就可能建出
+        兩筆 Order，之後 `.first()` 拿到哪筆不確定，兩筆都可能被送出 → 重複收款。
+        收藏也一樣，V2.11.0 新增的星號讓連點更容易發生。
+
+        **收藏的重複可以直接刪**（收藏是冪等的，刪掉多的不影響任何人）；
+        **訂單的重複絕對不自動刪** —— 那是某個人的餐與金額。建不起來就把
+        排查 SQL 印在啟動日誌裡，由人決定怎麼合併。
+        """
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    DELETE FROM user_favorites a USING user_favorites b
+                    WHERE a.id > b.id AND a.user_id = b.user_id AND a.store_id = b.store_id
+                """))
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_favorites "
+                    "ON user_favorites (user_id, store_id)"
+                ))
+            print("Unique index uq_user_favorites: OK")
+        except Exception as e:
+            print(f"Unique index uq_user_favorites failed: {e}")
+
+        try:
+            with engine.begin() as conn:
+                # V2.11.1 P1-07：一團一筆請客紀錄。重複的直接刪（純統計資料，
+                # 且重複本身就是 bug 產生的，保留最早的那筆即可）
+                conn.execute(text("""
+                    DELETE FROM treat_records a USING treat_records b
+                    WHERE a.id > b.id AND a.group_id = b.group_id
+                """))
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_treat_records_group "
+                    "ON treat_records (group_id)"
+                ))
+            print("Unique index uq_treat_records_group: OK")
+        except Exception as e:
+            print(f"Unique index uq_treat_records_group failed: {e}")
+
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_orders_group_user "
+                    "ON orders (group_id, user_id)"
+                ))
+            print("Unique index uq_orders_group_user: OK")
+        except Exception as e:
+            print("=" * 70)
+            print("!! 無法建立 uq_orders_group_user，很可能已有重複訂單。")
+            print("!! 不會自動刪除（那是使用者的餐與金額）。請手動排查：")
+            print("!!   SELECT group_id, user_id, COUNT(*) FROM orders")
+            print("!!   GROUP BY 1,2 HAVING COUNT(*) > 1;")
+            print(f"!! 原始錯誤：{e}")
+            print("=" * 70)
+
+    add_v2111_unique_indexes()
+    add_column_if_not_exists("group_templates", "department_ids", "VARCHAR(200)")
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
@@ -300,6 +371,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     lifespan=lifespan,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
 # 401 未登入處理（V1.4.1）：
@@ -310,15 +384,75 @@ from fastapi.responses import JSONResponse
 
 @app.exception_handler(StarletteHTTPException)
 async def auth_aware_exception_handler(request: Request, exc: StarletteHTTPException):
-    if exc.status_code == 401:
-        is_htmx = request.headers.get("HX-Request") == "true"
-        wants_html = "text/html" in request.headers.get("accept", "")
-        if not is_htmx and wants_html:
-            return RedirectResponse(
-                url=f"/auth/login?next={request.url.path}",
-                status_code=302,
-            )
+    """V2.11.3 R-03：一般表單送出失敗時，不要回一整頁 JSON。
+
+    htmx 請求由 base.html 的 htmx:responseError 顯示 toast；但 `<form method="post">`
+    送出失敗時，瀏覽器會直接把 `{"detail":"..."}` 當成頁面顯示在手機上。
+    V2.11.2 新增的兩條錯誤訊息（複製上次找不到品項、範本未記錄部門）都掉進這裡，
+    等於那兩項修正的「讓使用者看到訊息」從來沒有生效。
+
+    改成導回來源頁並帶上 flash 參數，由 base.html 統一顯示 toast。
+    只導回站內路徑，避免開放轉址。
+    """
+    is_htmx = request.headers.get("HX-Request") == "true"
+    wants_html = "text/html" in request.headers.get("accept", "")
+
+    if exc.status_code == 401 and not is_htmx and wants_html:
+        return RedirectResponse(
+            url=f"/auth/login?next={request.url.path}",
+            status_code=302,
+        )
+
+    if (400 <= exc.status_code < 500 and not is_htmx and wants_html
+            and request.method == "POST" and isinstance(exc.detail, str)):
+        return _form_error_response(exc.detail, exc.status_code)
+
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+def _form_error_response(message: str, status_code: int = 400):
+    """一般表單送出失敗時的回應（V2.11.4 S-02）。
+
+    V2.11.3 用 303 導回來源頁並帶 ?flash=，有三個問題：
+      - 導回是一次新的 GET，**使用者填的表單內容全部遺失** —— 開團頁選完店家、
+        填完團名截止時間備註部門，因為「截止時間必須晚於現在」被擋下，整頁重填。
+        V2.11.0 特地做的「換店不丟表單」在這裡被自己打掉（S-02）。
+      - 訊息放在網址上，任何人都能用連結讓本站顯示假的紅色系統提示（S-03）。
+      - Referer 路徑以 // 開頭時會變成協定相對網址導向外站（S-04）。
+
+    改成回一個極小的 HTML：把訊息寫進 sessionStorage，然後 history.back()。
+    多數瀏覽器返回時會保留表單內容；網址不出現訊息；外站寫不進本站的 sessionStorage。
+    """
+    import json
+    from fastapi.responses import HTMLResponse
+
+    safe = json.dumps(message).replace("<", "\\u003c").replace(">", "\\u003e")
+    html = (
+        "<!doctype html><html lang='zh-Hant'><meta charset='utf-8'>"
+        "<title>返回中</title><body>"
+        "<script>"
+        f"try{{sessionStorage.setItem('flash',{safe});}}catch(e){{}}"
+        "if(history.length>1){history.back();}else{location.replace('/home');}"
+        "</script>"
+        "<noscript><p>請按上一頁返回。</p></noscript>"
+        "</body></html>"
+    )
+    return HTMLResponse(html, status_code=status_code)
+
+
+# V2.11.4 S-07：表單缺必填欄位時 FastAPI 拋的是 RequestValidationError（422），
+# 不會進上面的 StarletteHTTPException 處理器，一般 UI 幾乎不會觸發，但瀏覽器
+# 自動填入異常或舊頁面快取時仍可能整頁 JSON。
+from fastapi.exceptions import RequestValidationError
+
+
+@app.exception_handler(RequestValidationError)
+async def form_validation_handler(request: Request, exc: RequestValidationError):
+    is_htmx = request.headers.get("HX-Request") == "true"
+    wants_html = "text/html" in request.headers.get("accept", "")
+    if not is_htmx and wants_html and request.method == "POST":
+        return _form_error_response("輸入格式有誤，請重新確認", 422)
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -350,9 +484,6 @@ app.include_router(votes.router, tags=["votes"])
 app.include_router(templates_router.router, tags=["templates"])
 
 # 開發模式路由
-if settings.debug:
-    from app.routers import dev
-    app.include_router(dev.router, tags=["dev"])
 
 
 @app.get("/")

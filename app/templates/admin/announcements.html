@@ -70,7 +70,7 @@
                         <div class="text-xs text-sela-800/45 mt-2">
                             {{ ann.created_by.show_name }} · {{ ann.created_at.strftime('%Y/%m/%d %H:%M') }}
                             {% if ann.expires_at %}
-                            · 過期：{{ ann.expires_at.strftime('%m/%d %H:%M') }}
+                            · 過期：{{ (ann.expires_at|taipei).strftime('%m/%d %H:%M') }}
                             {% endif %}
                         </div>
                     </div>

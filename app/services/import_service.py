@@ -91,27 +91,19 @@ def import_menu(db: Session, data: MenuImport) -> Menu:
     """
     store_id = data.store_id
     content = data.menu
-    mode = data.mode
 
-    if mode == "replace":
-        # 替換模式：找到現有菜單並更新
-        existing_menu = db.query(Menu).filter(
-            Menu.store_id == store_id,
-            Menu.is_active == True
-        ).first()
-
-        if existing_menu:
-            # 刪除舊的分類和項目
-            for category in existing_menu.categories:
-                db.delete(category)
-            db.flush()
-
-            # 重新填充菜單
-            _populate_menu(db, existing_menu, content)
-            db.commit()
-            return existing_menu
-
-    # 新增模式：停用舊菜單，建立新菜單
+    # V2.11.1 P1-04：**取消 replace 模式，一律新增版本。**
+    #
+    # 原本的 replace 有兩個無法修的問題：
+    #   1. `db.delete(category)` 時 MenuCategory.items 沒有設 cascade，ORM 預設
+    #      把子列的 category_id 設為 NULL 而不是刪除。舊品項因此變成「無分類品項」，
+    #      而點餐頁會把無分類品項顯示出來 → 新舊菜單混在一起、舊價格仍可點。
+    #   2. 就算修掉 cascade 也不能真的刪：舊品項被 order_items.menu_item_id 引用，
+    #      刪掉會斷掉所有歷史訂單。所以 replace 在語意上本來就不成立。
+    #   3. 這個 menu 正被進行中與歷史團單透過 groups.menu_id 引用，replace 會
+    #      直接改變它們的菜單內容。
+    #
+    # 改成一律新增版本後：進行中的團仍指向舊 menu_id 不受影響，新開的團才用新菜單。
     db.query(Menu).filter(Menu.store_id == store_id).update({"is_active": False})
 
     menu = _create_menu(db, store_id, content, is_active=True)
