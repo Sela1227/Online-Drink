@@ -1,15 +1,17 @@
 # SELA-handoff — 快點來點餐 Online-Drink
 
-**交班時間:** 2026-09-12 **目前版本:V2.11.4(已打包,待部署實測)**
-**⚠ V2.9.1 ~ V2.11.4 共十版皆未上線,一起部署 — 出問題時排查範圍是四版總和。堆越多版,出事時越難定位,建議盡快部署**
+**交班時間:** 2026-09-12 **目前版本:V2.11.5(桌機選店寬度修正);V2.11.4 已於 2026-09-16 上線,手機版實測正常**
+**2026-09-16 V2.9.1~V2.11.4 十版已一次上線,手機版實測正常。** 桌機版選店覆蓋層滿版問題於 V2.11.5 修正。
+**V2.11.5 為純模板改動(group_new.html 一檔),可直接部署。** 不再為 T-02~T-05(皆為 scripts/ 與文件)打新版本;T-01 等真機實測點 32 的結果再決定。
+**部署順序**:① Railway 設 SECRET_KEY ② 跑第七之二節清查 SQL ③ 部署 ④ 看首次啟動日誌(第七節 N-14)⑤ 手機跑第八節,**優先 30、31、32**
 
 ## 一、專案概況
 - LINE 登入的團體訂餐 web app(約 30 人團隊用),FastAPI + SQLAlchemy + PostgreSQL(Railway)+ Jinja2 + Tailwind CDN + Alpine + htmx,圖床 Cloudinary(`app/services/upload_service.py::upload_image(file, folder)`)
 - 無 Alembic:既有表加欄走 `app/main.py` 的 `add_column_if_not_exists` 啟動遷移;**新表**由 create_all 自動建;**絕不動 PostgreSQL enum**(新類別用旗標判斷,如代購=GROUP_BUY+`store.is_personal`)
 
 ## 二、新對話啟動方式
-1. 附上 `Online-Drink V2.11.4.zip` + 本檔 +(要做哪包就附哪份審稿 md)
-2. 還原:`mkdir -p /home/claude/sela && cd /home/claude/sela && unzip "/mnt/user-data/uploads/Online-Drink_V2_11_4.zip"`(outputs 掛載偶有延遲,失敗先 ls 再試)
+1. 附上 `Online-Drink V2.11.5.zip` + 本檔 +(要做哪包就附哪份審稿 md)
+2. 還原:`mkdir -p /home/claude/sela && cd /home/claude/sela && unzip "/mnt/user-data/uploads/Online-Drink_V2_11_5.zip"`(outputs 掛載偶有延遲,失敗先 ls 再試)
 3. 完整版本歷程/教訓在包內 `CLAUDE.md`,**動工前先讀**
 
 ## 三、版本升級 SOP(四處,每版必做)
@@ -17,7 +19,10 @@
 驗證三件套:`py_compile` 全 .py、Jinja `Environment().parse()` 全模板、`python scripts/check_routes.py`。
 **V2.10.0 起:check_routes 可以真的跑** — `pip install -q --break-system-packages -r requirements.txt`(約 1 分鐘)後 `SECRET_KEY=dummy DATABASE_URL="sqlite:///./_check.db" PYTHONPATH=. python scripts/check_routes.py`。裝完記得清 `__pycache__` 和 `_check.db` 再打包。
 **打包順序寫死**(V2.10.2,審稿建議):`跑測試 → 清 __pycache__ 與 *.db → 改資料夾名 → 打包`。跑測試會產生 __pycache__,清理一定要在跑完之後。
-**V2.11.4 起共五支檢查**,新的是 `scripts/check_frontend_toast.py`(jsdom+Alpine 模擬 defer 載入,驗「頁面載入時的提示真的會出現」;需 node_modules 有 jsdom/alpinejs,沒有自動跳過;**打包前清 node_modules**)。
+**V2.11.4 起共五支檢查**,新的是 `scripts/check_frontend_toast.py`(jsdom+Alpine 模擬 defer 載入,驗「頁面載入時的提示真的會出現」)。
+**⚠ 新對話啟動時必做**:`cd /home/claude && mkdir -p jsdom_env && cd jsdom_env && npm init -y && npm i jsdom@24 alpinejs@3` 然後 `export NODE_PATH=/home/claude/jsdom_env/node_modules`。
+**沒裝的話這支檢查會「跳過」並顯示全部通過,等於防線關閉**(審核 T-03)。**打包前清 node_modules**。
+**V2.12 要修的測試債**(審核 T-02~T-04):COPIED_SCRIPT 是複製一份 group.html 的邏輯(違反坑 #28),要改用 TestClient 渲染真實團單頁;「跳過」預設應視為失敗;jsdom 腳本的字串替換要用函式形式並逸出 `</script>`。
 **V2.11.0 起多一支** `scripts/check_template_js.py`(模板 <script> 的插值逸出+渲染後 node --check;無 node 自動跳過)。
 **V2.10.1 起煙霧測試已進版控**:`scripts/smoke_test.py`(55 項);非 SQLite 的 DATABASE_URL 會直接中止)。跑完 `rm -f _smoke.db`、清 `__pycache__` 再打包。改到公告/飲料選項/匯入/deadline 邏輯時要一併更新它。
 無法跑 live app,每版列「部署後實測點」給 Sela。
@@ -30,15 +35,16 @@
 - 審稿 md 的判斷不一定對,實作前先驗證(V2.10.0 就發現公告那段診斷有誤)
 
 ## 五、V2.x 主要功能地圖(細節見 CLAUDE.md)
-V2.1 每單上限/補助 → V2.2 去 geek 化+團主工具收合 → V2.3 結帳自動化(final_amount 單一真相/整單折扣%) → V2.4 缺貨候補(order_item_backups) → V2.5 缺貨處理(fulfillment 三欄+actual 金額鏈+settle_diff) → V2.6 UX 收尾(狀態統一 未送出/修改中/已送出、催單、匯出分組) → V2.7 代購(個人店家+每團菜單+品項圖/庫存 stock_limit) → V2.8 審稿二修(庫存彙總+FOR UPDATE 鎖、佔用=SUBMITTED+EDITING、_ensure_visible×8) → V2.9 價格未訂(price_tbd,定價回寫) → V2.9.1 六阻斷級(重複路由/收藏/刪店家 FK/匯出 None/SECRET_KEY 拒啟動/連線池) → **V2.10.0 管理後台流程第一包(公告二合一+接線導向+飲料選項)** → **V2.10.1 兩處 deadline 時區修正+煙霧測試進版控** → **V2.10.2 反向時區規則落實(三處)+煙霧測試安全防護** → **V2.10.3 統計頁四修(時段差 8 小時/月份重複跳月)** → **V2.11.0 開團選店改全螢幕覆蓋層+模板 JS 逸出** → **V2.11.1 外部審核 P0×8+P1×9 全修** → **V2.11.2 複審 N-01~N-16(含提前截止失效回歸)** → **V2.11.3 三審 R-01~R-09(超賣/範本死循環/表單錯誤呈現)** → **V2.11.4 四審 S-01~S-07(前端提示失效+jsdom 驗證)**
+V2.1 每單上限/補助 → V2.2 去 geek 化+團主工具收合 → V2.3 結帳自動化(final_amount 單一真相/整單折扣%) → V2.4 缺貨候補(order_item_backups) → V2.5 缺貨處理(fulfillment 三欄+actual 金額鏈+settle_diff) → V2.6 UX 收尾(狀態統一 未送出/修改中/已送出、催單、匯出分組) → V2.7 代購(個人店家+每團菜單+品項圖/庫存 stock_limit) → V2.8 審稿二修(庫存彙總+FOR UPDATE 鎖、佔用=SUBMITTED+EDITING、_ensure_visible×8) → V2.9 價格未訂(price_tbd,定價回寫) → V2.9.1 六阻斷級(重複路由/收藏/刪店家 FK/匯出 None/SECRET_KEY 拒啟動/連線池) → **V2.10.0 管理後台流程第一包(公告二合一+接線導向+飲料選項)** → **V2.10.1 兩處 deadline 時區修正+煙霧測試進版控** → **V2.10.2 反向時區規則落實(三處)+煙霧測試安全防護** → **V2.10.3 統計頁四修(時段差 8 小時/月份重複跳月)** → **V2.11.0 開團選店改全螢幕覆蓋層+模板 JS 逸出** → **V2.11.1 外部審核 P0×8+P1×9 全修** → **V2.11.2 複審 N-01~N-16(含提前截止失效回歸)** → **V2.11.3 三審 R-01~R-09(超賣/範本死循環/表單錯誤呈現)** → **V2.11.4 四審 S-01~S-07(前端提示失效+jsdom 驗證)【已上線】** → **V2.11.5 桌機選店寬度**
 
 ## 六、待辦(依序做)
 **V2.11 管理後台流程第二包＋危險操作**(附「管理後台流程優化建議」md):提案 2 手動新增店家表單、提案 4 部門成員批次加入、提案 5 使用者列表顯部門+指派入口、提案 6 店家列表快捷操作與搜尋、儀表板重整(修 `/admin/users` 重複連結、分兩區)、危險操作三項(清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響)、下架兩處訪客清理工具
+**V2.12 第一批(審核 T-02~T-05 + 上輪遺留)**:前端檢查改測真實頁面、跳過視為失敗、jsdom 替換穩健化、表單錯誤頁改 PRG 避免重送(T-05)、匯入 schema 驗證(N-15)、統計與核對單金額口徑(P2-04/05,排前段)、相依套件升級(python-multipart/jinja2/python-jose)
 **V2.12 防再犯基礎設施**(附「程式碼優化與維護建議」md 的 H/A/G/J 節):**時間單一真相排第一**(增補審稿:這是唯一已證實會持續產生新缺陷的結構問題,坑 #25)、統一 Jinja2 環境(坑 #6;`home_groups.html` 已用 `|taipei`,哪天別的 router 重用這個 partial 就會 500)、授權 dependency、Alembic 評估(注意坑 #1 本專案刻意不用)、表單輸入 schema
 **獨立長工 大重構**:`admin.py` 已 1700+ 行要拆、group.html 1359 行拆 JS、Jinja 環境統一(坑 #6)、函式內 import 清理 → 功能穩定期再動,需全站回歸
 **零星**:核對單 PDF/Excel 改用 actual 出貨鏈(兩輪審稿點名,現以「原始品項」標示過渡);候補列進核對單 PDF(分頁高度計算是已知重疊坑,坑 #23)
 
-## 七、部署注意(V2.9.1 ~ V2.11.4 十版一起上,都未實測)
+## 七、部署注意(V2.9.1~V2.11.4 已上線;以下為上線前的注意事項,保留供回溯)
 - ⚠️ **先在 Railway 設 `SECRET_KEY`**(`python -c "import secrets; print(secrets.token_urlsafe(48))"`)否則拒絕啟動(刻意);換金鑰全員重登,選非用餐時段
 - ⚠️ **公告改版後,舊的 `SystemSetting.announcement` 內容會從首頁消失**。部署前先去後台「公告管理」確認 `announcements` 表裡有沒有現在掛在首頁的那則(多半有,它就是同步來源),沒有的話部署後重發一次
 - ⚠️ **公告到期時間的時區修正只影響「之後新設的」**。V2.10.0 之前設過 expires_at 的舊公告,資料庫裡存的是台北時間被當 UTC,會比預期晚 8 小時過期。
@@ -113,7 +119,10 @@ SELECT id, lucky_draw_count FROM groups WHERE lucky_draw_count < 1;
 29. **限定部門要勾部門(R-02)**:開團選「限定部門」但不勾任何部門 → 應被擋下並提示,不該建成團
 30. **表單錯誤要看得到(R-03,V2.11.4 才真正生效)**:在菜單完全對不上的團按「複製上次」→ 應看到紅底 toast,**不是整頁 JSON**,**且剛才填的內容還在**
 31. **手機慢網路的提示(R-04,V2.11.4 才真正生效)**:在 LINE 內建瀏覽器用行動網路按「複製上次」→ 應看得到「已複製 N 項」,不會無聲消失
-32. **開團表單錯誤不丟內容(S-02)**:開團頁填好全部欄位,截止時間故意填過去 → 送出 → 應看到紅底提示,**且表單內容仍在**(LINE 內建瀏覽器要特別測,返回是否保留表單內容審核無法在沙盒確認)
+32. **開團表單錯誤不丟內容(S-02)**:開團頁填好全部欄位,截止時間故意填過去 → 送出 → 應看到紅底提示,**且表單內容仍在**。
+    **請分別用 LINE iOS 與 LINE Android 各測一次。** Android WebView 過去預設不啟用 bfcache,返回時 Alpine 會重新初始化:
+    店家選擇會消失、「限定部門」勾著但部門清單不顯示(審核 V2.11.4 T-01,jsdom 模擬結果)。
+    **若任一手機失敗**:依審核 T-01 把開團頁改成 fetch 送出、錯誤時不離開頁面(約 25 行),並在 check_frontend_toast.py 加開團頁錯誤案例
 33. **提示不可偽造(S-03)**:用瀏覽器直接開 `(本站)/home?flash=測試` → **不應**出現紅色提示
 34. **飲料選項的進行中團數**:對一家只有「已截止團」的飲料店開編輯頁,不應顯示琥珀色「有 N 個進行中的團」提示
 
