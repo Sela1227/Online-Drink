@@ -108,14 +108,14 @@
         <input type="hidden" name="store_id" value="{{ selected_store_id }}">
         {% else %}
         <div>
-            <label class="block text-sm font-medium text-sela-800 mb-1"><i class="ti ti-building-store"></i> 匯到既有店家？（選填）</label>
+            <label class="block text-sm font-medium text-sela-800 mb-1"><i class="ti ti-building-store"></i> 匯到既有店家</label>
             <select name="store_id" class="w-full border border-sela-300 rounded-xl px-3 py-2.5 text-sela-800">
-                <option value="">— 新增店家／JSON 自帶 store_id —</option>
+                <option value="">— 不選：用 JSON 新增一家店 —</option>
                 {% for s in stores %}
-                <option value="{{ s.id }}">{{ s.name }}（編號 {{ s.id }}）</option>
+                <option value="{{ s.id }}">{{ s.name }}</option>
                 {% endfor %}
             </select>
-            <p class="text-xs text-sela-800/50 mt-1">貼「新增店家」JSON 留空；貼「既有店家菜單」JSON 在此選店家即可。</p>
+            <p class="text-xs text-sela-800/50 mt-1">選了店家，JSON 只要有 menu 就好；裡面的 store_id 之類欄位會直接忽略。</p>
         </div>
         {% endif %}
 
@@ -202,10 +202,8 @@
 }</pre>
             </div>
             <div>
-                <div class="text-sm font-medium text-sela-800/70 mb-2">菜單匯入（既有店家）</div>
+                <div class="text-sm font-medium text-sela-800/70 mb-2">菜單匯入（既有店家，店家由上方選單決定）</div>
                 <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
-  "store_id": 1,
-  "mode": "new",
   "menu": {
     "categories": [
       { "name": "便當類", "items": [
@@ -240,7 +238,7 @@ function importForm() {
             '   - 飲料、茶飲、咖啡店 → "drink"',
             '   - 便當、餐廳、小吃、麵食、漢堡等現做餐點 → "meal"',
             '   - 團購、預購、宅配、農場直送、箱購商品 → "group_buy"',
-            '4. 所有價格欄位（price、price_l、price_diff、加料 price）一律純數字，不可有「元」「$」「NT」或任何文字。看不清或寫「時價」的，一律填 0。',
+            '4. 所有價格欄位（price、price_l、price_diff、加料 price）一律純數字，不可有「元」「$」「NT」或任何文字。菜單寫「時價」「市價」的品項，price 填字串 "時價"（不要填 0——0 代表免費）；真的看不清的才填 0。',
             '5. store 各欄位規則：',
             '   - name：店名字串（菜單上常沒有店名，若看不到，先用空字串 ""，最後我會自己補）。',
             '   - logo_url：一律填 null（圖片我自己上傳）。',
@@ -252,6 +250,8 @@ function importForm() {
             '   - name：品項名稱（字串）。',
             '   - price：基本價（純數字）。飲料若有中/大杯，price 放中杯（或預設杯），price_l 放大杯；沒有大杯就把 price_l 設為 null。',
             '   - options：該品項專屬的加價選項，每個是 {"name":"加蛋","price_diff":10}；price_diff 是加價金額，不加價填 0；沒有選項就設為 null。',
+            '   - is_available：菜單上劃掉、寫「售完」「暫停供應」的品項，加 "is_available": false，仍要列出；正常供應的不要加這個欄位。',
+            '   - note：品項旁的小字說明（例：「限午間」「需提前預訂」「辣」），放 "note"，最多 200 字；沒有就不要這個欄位。',
             '8. 欄位名稱、巢狀結構、引號、逗號都必須完全符合下方範例，不要自創欄位、不要漏逗號、不要多逗號。',
             '',
             '==== 完整範例（請完全照這個結構輸出）====',
@@ -346,18 +346,14 @@ function importForm() {
             '',
             '==== 嚴格規範（務必全部遵守）====',
             '1. 只輸出 JSON 本身，不要說明文字，不要 markdown 的三個反引號標記。',
-            '2. 最外層必須有三個鍵：store_id、mode、menu。',
-            '   - store_id：先填 0，我會自己改成正確的店家編號。',
-            '   - mode：固定填 "new"（新增一個菜單版本）。',
-            '3. 所有價格（price、price_l、price_diff）一律純數字，不可有「元」「$」文字；看不清或「時價」填 0。',
+            '2. 最外層只有一個鍵：menu。不要輸出 store_id、mode 或任何店家資訊，店家我會在系統裡選。',
+            '3. 所有價格（price、price_l、price_diff）一律純數字，不可有「元」「$」文字。菜單寫「時價」「市價」的品項，price 填字串 "時價"（不要填 0——0 代表免費）。',
             '4. menu.categories 是陣列，每個分類有 name 與 items，依菜單分區整理。',
-            '5. 每個品項：name（名稱）、price（基本價）、price_l（大杯價，沒有就 null）、options（加價選項陣列，每個 {"name":..,"price_diff":..}，沒有就 null）。',
+            '5. 每個品項：name（名稱）、price（基本價）、price_l（大杯價，沒有就 null）、options（加價選項陣列，每個 {"name":..,"price_diff":..}，沒有就 null）。劃掉或售完的品項加 "is_available": false；品項旁的小字說明放 "note"（最多 200 字）；沒有就不要這兩個欄位。',
             '6. 欄位名稱、結構、引號、逗號必須完全符合下方範例。',
             '',
             '==== 完整範例（請完全照這個結構輸出）====',
             '{',
-            '  "store_id": 0,',
-            '  "mode": "new",',
             '  "menu": {',
             '    "categories": [',
             '      {',
@@ -389,9 +385,10 @@ function importForm() {
             '',
             '【輸出規則】',
             '1. 只輸出 JSON，不要任何說明文字、不要 markdown 的 ``` 標記。',
-            '2. price 一律用純數字，不要加「元」「$」或文字。看不清楚或寫「時價」的品項，price 填 0。',
+            '2. price 一律用純數字，不要加「元」「$」或文字。寫「時價」「市價」的品項，price 填字串 "時價"（不要填 0——0 代表免費）。',
             '3. 飲料若有大杯價用 price_l；沒有就省略。',
             '4. 加價選項放 options，price_diff 是加價金額（純數字，不加價填 0）。',
+            '4b. 劃掉或售完的品項加 "is_available": false；品項旁的小字說明放 "note"（最多 200 字）；沒有就不要這兩個欄位。',
             '5. 依菜單分區整理 categories。',
             '',
             '【輸出格式】',

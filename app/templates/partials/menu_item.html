@@ -37,7 +37,8 @@
     </div>
     <div class="text-sela-800 font-medium flex-shrink-0">
         {% if item.price_tbd %}
-        <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">價格未訂</span>
+        {# V2.14.0：一般店家的時價品項顯示「時價」，代購團維持「價格未訂」 #}
+        <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">{% if group is defined and group.store and group.store.is_personal %}價格未訂{% else %}時價{% endif %}</span>
         {% elif item.price_l %}
         ${{ item.price }}/${{ item.price_l }}
         {% else %}

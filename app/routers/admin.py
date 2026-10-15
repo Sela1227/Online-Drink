@@ -15,6 +15,8 @@ from app.models.group import Group, taipei_now, taipei_to_utc
 from app.schemas.menu import MenuImport, FullImport, MenuContent
 from app.services.auth import get_admin_user
 from app.services.import_service import import_store_and_menu, import_menu
+from app.services.import_analysis import analyze_menu_content, describe_loc, json_error_context
+from app.services.menu_diff import diff_menu
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -68,8 +70,11 @@ def _translate_error_type(err: dict) -> str:
     t = err.get("type", "")
     if t == "missing":
         return "缺少此必填欄位"
+    if t == "value_error":
+        # V2.14.0：schema 自己寫的中文訊息（價格容錯、說明長度）直接用
+        return str(err.get("msg", "")).replace("Value error, ", "", 1) or "格式錯誤"
     if "decimal" in t or "float" in t:
-        return "不是有效的數字（例如「時價」「$30」需改成純數字 30）"
+        return "不是有效的數字（「$30」「30元」會自動轉換；時價請填 \"時價\"）"
     if "int" in t:
         return "不是有效的整數"
     if t == "literal_error" or "enum" in t:
@@ -83,11 +88,17 @@ def _translate_error_type(err: dict) -> str:
     return err.get("msg", "格式錯誤")
 
 
-def humanize_validation_error(e: ValidationError) -> list[str]:
-    """把 Pydantic ValidationError 轉成一串中文錯誤訊息"""
+def humanize_validation_error(e: ValidationError, raw: dict | None = None) -> list[str]:
+    """把 Pydantic ValidationError 轉成一串中文錯誤訊息。
+
+    V2.12.0：傳入原始資料時，路徑會帶名稱——
+    「分類[3]「小菜」→ 品項[6]「黃金泡菜」→ 價格：不是有效的數字」
+    而不是「第 3 個分類的第 6 個品項的價格」要人自己去數。
+    """
     msgs = []
     for err in e.errors():
-        loc_cn = _translate_loc(err.get("loc", ()))
+        loc = err.get("loc", ())
+        loc_cn = describe_loc(loc, raw) if raw is not None else _translate_loc(loc)
         msg_cn = _translate_error_type(err)
         msgs.append(f"{loc_cn}：{msg_cn}")
     return msgs
@@ -95,7 +106,10 @@ def humanize_validation_error(e: ValidationError) -> list[str]:
 
 def _render_import_result(request, user, *, error_messages=None, data=None,
                           is_full_import=False, existing_menu=None,
-                          duplicate_store=None, json_str=None):
+                          duplicate_store=None, json_str=None,
+                          target_store=None, source_label=None, analysis=None,
+                          error_context=None, ignored_store_block=False,
+                          diff=None, existing_version=0):
     """render 匯入結果片段（htmx 用），錯誤或成功預覽二擇一"""
     return templates.TemplateResponse("admin/partials/import_result.html", {
         "request": request,
@@ -106,6 +120,13 @@ def _render_import_result(request, user, *, error_messages=None, data=None,
         "existing_menu": existing_menu,
         "duplicate_store": duplicate_store,
         "json_str": json_str,
+        "target_store": target_store,
+        "source_label": source_label,
+        "analysis": analysis,
+        "error_context": error_context,
+        "ignored_store_block": ignored_store_block,
+        "diff": diff,
+        "existing_version": existing_version,
     })
 
 
@@ -168,11 +189,29 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
     """店家列表"""
     user = await get_admin_user(request, db)
     
+    from sqlalchemy import func as _f
     stores = db.query(Store).filter(Store.is_personal != True).options(
         joinedload(Store.branches)
-    ).order_by(Store.created_at.desc()).all()
-    
+    ).all()
+
+    # V2.13.0：列表要顯示「現行菜單品項數」與「上次開團」——各一次聚合查詢，不逐店查（N+1）。
+    # 排序交給前端按店名注音序（PostgreSQL 的 ORDER BY name 對中文是碼位序）。
+    item_counts = dict(
+        db.query(Menu.store_id, _f.count(MenuItem.id))
+        .join(MenuItem, MenuItem.menu_id == Menu.id)
+        .filter(Menu.is_active == True)
+        .group_by(Menu.store_id).all()
+    )
+    last_groups = dict(
+        db.query(Group.store_id, _f.max(Group.created_at))
+        .filter(Group.store_id.isnot(None))
+        .group_by(Group.store_id).all()
+    )
+    from app.models.group import taipei_to_utc as _t2u  # noqa: F401  (保留匯入點以供日後時區統一)
+
     return templates.TemplateResponse("admin/stores.html", {
+        "item_counts": item_counts,
+        "last_groups": last_groups,
         "request": request,
         "user": user,
         "stores": stores,
@@ -180,38 +219,10 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/stores/{store_id}/menus")
-async def menu_list(
-    store_id: int,
-    request: Request,
-    imported: int = 0,
-    cats: int = 0,
-    items: int = 0,
-    db: Session = Depends(get_db),
-):
-    """菜單版本列表"""
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    menus = db.query(Menu).filter(Menu.store_id == store_id).order_by(Menu.created_at.desc()).all()
-
-    # 計算店內版本序號（最舊 = 第 1 版）。menus 是新到舊排序，所以最新的序號 = 總數
-    total = len(menus)
-    menu_versions = [(menu, total - idx) for idx, menu in enumerate(menus)]
-
-    return templates.TemplateResponse("admin/menus.html", {
-        "request": request,
-        "user": user,
-        "store": store,
-        "menus": menus,
-        "menu_versions": menu_versions,
-        "imported": imported,
-        "imported_cats": cats,
-        "imported_items": items,
-        "kept_version": total - 1 if imported and total > 1 else 0,
-    })
+async def menu_list(store_id: int, imported: int = 0, cats: int = 0, items: int = 0):
+    """V2.13.0：菜單版本頁併入工作台的「菜單」分頁"""
+    q = f"?tab=menu&imported={imported}&cats={cats}&items={items}" if imported else "?tab=menu"
+    return RedirectResponse(url=f"/admin/stores/{store_id}{q}", status_code=301)
 
 
 @router.post("/stores/{store_id}/menus/{menu_id}/activate")
@@ -228,7 +239,7 @@ async def activate_menu(store_id: int, menu_id: int, request: Request, db: Sessi
         menu.is_active = True
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/menus", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=menu", status_code=302)
 
 
 @router.get("/import")
@@ -280,18 +291,23 @@ async def import_preview(
     if store_id and str(store_id).strip().isdigit():
         store_id_int = int(store_id)
 
-    # 取得 JSON 字串：貼上優先，否則讀上傳檔案
+    # 取得 JSON 字串。V2.12.0：**上傳檔案優先**。原本是貼上優先，textarea 若留有
+    # 上一次的內容，切到上傳分頁選了檔案，檔案會被無聲忽略、匯進去的是舊文字。
+    # 使用者主動選了檔案，意圖很明確，應以檔案為準。
     json_str = None
-    if json_text and json_text.strip():
-        json_str = json_text.strip()
-    elif json_file and json_file.filename:
+    source_label = None
+    if json_file and json_file.filename:
         content = await json_file.read()
         try:
-            json_str = content.decode("utf-8")
+            json_str = content.decode("utf-8-sig")
         except UnicodeDecodeError:
             return _render_import_result(request, user, error_messages=[
                 "檔案編碼不是 UTF-8，請另存成 UTF-8 編碼的 JSON 檔再上傳"
             ])
+        source_label = f"上傳檔案「{json_file.filename}」"
+    elif json_text and json_text.strip():
+        json_str = json_text.strip()
+        source_label = "貼上的文字"
     if not json_str:
         return _render_import_result(request, user, error_messages=[
             "請貼上 JSON 內容，或切換到「上傳檔案」分頁選擇檔案"
@@ -301,24 +317,34 @@ async def import_preview(
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError as e:
+        # V2.12.0：附上出錯行前後三行原文，不然「第 42 行第 1 字」對使用者毫無幫助
         return _render_import_result(request, user, error_messages=[
             f"JSON 格式有誤（第 {e.lineno} 行第 {e.colno} 字附近）：常見原因是少了逗號、引號或大括號沒有成對"
-        ])
+        ], error_context=json_error_context(json_str, e.lineno))
 
-    # 判斷匯入類型
+    # 判斷匯入類型（V2.12.1：店家只由畫面上的選擇決定，JSON 裡的 store_id / mode 一律忽略）
+    #
+    # 原本有第三條分支「JSON 自帶 store_id」。它的存在讓使用者必須知道「店家編號」這個
+    # 內部概念，AI 提示詞還得教人「先填 0 我再改」——結果就是 0 被原樣貼進來、各種
+    # 「store_id 還是 0」的訊息、對照表。既然畫面上本來就能選店家，JSON 就不該再帶
+    # 任何店家識別。有也不報錯，直接丟掉。
+    ignored_store_block = False
     if store_id_int:
         menu_data = data.get("menu", data)
-        data = {"store_id": store_id_int, "mode": "replace", "menu": menu_data}
+        if isinstance(data, dict) and "store" in data:
+            # 使用者選了店家，卻貼了「新增店家」格式的 JSON：以畫面選的為準，但要告訴他
+            ignored_store_block = True
+        data = {"store_id": store_id_int, "mode": "new", "menu": menu_data}
         json_str = json.dumps(data, ensure_ascii=False)
         is_full_import = False
     elif "store" in data:
         is_full_import = True
-    elif "store_id" in data:
-        is_full_import = False
+        data = {"store": data["store"], "menu": data.get("menu", {})}
+        json_str = json.dumps(data, ensure_ascii=False)
     else:
         return _render_import_result(request, user, error_messages=[
-            "JSON 需要包含 store 欄位（新增店家），或 store_id 欄位（更新既有店家的菜單）；"
-            "也可以先選擇店家再匯入菜單"
+            "沒有選定店家。請在上方「匯到既有店家」選擇要匯入的店家，或從店家頁按「匯入新菜單」進來；",
+            "若是要新增一家店，JSON 需要包含 store 欄位（店名與類別）。",
         ])
 
     # Pydantic 驗證
@@ -328,28 +354,19 @@ async def import_preview(
         else:
             validated = MenuImport(**data)
     except ValidationError as e:
-        return _render_import_result(request, user, error_messages=humanize_validation_error(e))
+        return _render_import_result(request, user, error_messages=humanize_validation_error(e, data))
 
     # 菜單匯入需確認店家存在
     existing_menu = None
     duplicate_store = None
+    target_store = None
     if not is_full_import:
-        # store_id 還是 0（prompt 佔位值沒改）→ 給明確指引
-        if validated.store_id == 0:
-            return _render_import_result(request, user, error_messages=[
-                "這份 JSON 的 store_id 還是 0（AI 產生的佔位值）。請從以下二擇一：",
-                "方法一（推薦）：回到該店家頁面，點「匯入菜單」按鈕進來，系統會自動帶入正確店家，不用管 store_id。",
-                "方法二：手動把 JSON 裡的 store_id 從 0 改成正確的店家編號（在店家列表可查到）。",
-            ])
+        # V2.12.1：store_id 只可能來自畫面選擇，不可能是 0；找不到代表店家被刪了
         store = db.query(Store).filter(Store.id == validated.store_id).first()
+        target_store = store
         if not store:
-            # 列出現有店家供對照
-            stores = db.query(Store).order_by(Store.id).all()
-            store_list = "、".join(f"{s.id}={s.name}" for s in stores[:20]) or "目前沒有店家"
             return _render_import_result(request, user, error_messages=[
-                f"找不到店家編號 {validated.store_id}。",
-                f"現有店家編號對照：{store_list}",
-                "或回到該店家頁面點「匯入菜單」按鈕，系統會自動帶入正確店家。",
+                "選定的店家已不存在（可能剛被刪除），請重新選擇店家。",
             ])
         existing_menu = db.query(Menu).filter(
             Menu.store_id == validated.store_id,
@@ -358,8 +375,25 @@ async def import_preview(
     else:
         # 完整匯入：偵測同名店家（完全比對）
         duplicate_store = db.query(Store).filter(Store.name == validated.store.name).first()
+        if duplicate_store:
+            # 同名店家會把菜單匯進既有店家，一樣要跟它的使用中版本比
+            existing_menu = db.query(Menu).filter(
+                Menu.store_id == duplicate_store.id,
+                Menu.is_active == True
+            ).first()
 
-    # 成功 → 回傳預覽片段
+    # V2.13.1：有使用中版本就算差異，讓管理員按確認前看到這版會改掉什麼
+    diff = None
+    existing_version = 0
+    if existing_menu:
+        diff = diff_menu(existing_menu, validated.menu)
+        # 店內序號（坑 #17：不用全域主鍵），最舊=第 1 版
+        existing_version = db.query(Menu).filter(
+            Menu.store_id == existing_menu.store_id,
+            Menu.created_at <= existing_menu.created_at,
+        ).count()
+
+    # 成功 → 回傳預覽片段（V2.12.0：帶匯入對象、來源、品質分析）
     return _render_import_result(
         request, user,
         data=validated,
@@ -367,6 +401,12 @@ async def import_preview(
         existing_menu=existing_menu,
         duplicate_store=duplicate_store,
         json_str=json_str,
+        target_store=(target_store if not is_full_import else None),
+        source_label=source_label,
+        analysis=analyze_menu_content(validated.menu),
+        ignored_store_block=ignored_store_block,
+        diff=diff,
+        existing_version=existing_version,
     )
 
 
@@ -402,9 +442,12 @@ async def do_import(
                 raise HTTPException(status_code=400, detail="JSON 缺少 menu 內容")
             validated = MenuImport(
                 store_id=data["store_id"],
-                mode=data.get("mode", "replace"),
+                mode="new",  # V2.11.1 P1-04：忽略外部送進來的 mode
                 menu=menu_data
             )
+            # V2.12.1：店家必須存在，否則 import_menu 會在外鍵上 500
+            if not db.query(Store.id).filter(Store.id == validated.store_id).first():
+                raise HTTPException(status_code=400, detail="選定的店家不存在，請回匯入頁重新選擇")
             menu = import_menu(db, validated)
             target_store_id = menu.store_id
         elif "store" in data:
@@ -415,10 +458,15 @@ async def do_import(
         else:
             raise HTTPException(status_code=400, detail="JSON 格式錯誤")
         
+        # V2.12.0：blockers 在後端也要擋，不能只靠預覽頁不顯示按鈕
+        _blk = analyze_menu_content(validated.menu)["blockers"]
+        if _blk:
+            raise HTTPException(status_code=400, detail="菜單有必須修正的問題：" + "；".join(_blk[:3]))
+        
         # V2.10.0：匯完直接去菜單版本頁驗收，不再丟回儀表板
         cat_count, item_count = _count_import(validated.menu)
         return RedirectResponse(
-            url=f"/admin/stores/{target_store_id}/menus?imported=1&cats={cat_count}&items={item_count}",
+            url=f"/admin/stores/{target_store_id}?tab=menu&imported=1&cats={cat_count}&items={item_count}",
             status_code=302,
         )
     except ValidationError as e:
@@ -503,20 +551,22 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
         db.commit()
     
     # 檢查來源頁面，回到對應頁面
-    referer = request.headers.get("referer", "")
-    if "/edit" in referer:
-        return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=more", status_code=302)
 
 
 @router.post("/stores/{store_id}/delete")
-async def delete_store(store_id: int, request: Request, db: Session = Depends(get_db)):
+async def delete_store(store_id: int, request: Request, confirm_name: str = Form(""), db: Session = Depends(get_db)):
     """刪除店家（V1.10.0：斷開團單/訂單連結但保留歷史，不再被舊團單擋）"""
     user = await get_admin_user(request, db)
 
     store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
+
+    # V2.13.0：不可復原的操作改成輸入店名確認（V2.11 審稿的危險操作包，延到現在）。
+    # 歷史團的 store_id 會被清成 NULL、菜單全部刪除，confirm() 一下就刪太輕率。
+    if confirm_name.strip() != store.name.strip():
+        raise HTTPException(status_code=400, detail="輸入的店名與要刪除的店家不符，未刪除")
 
     store_name = store.name
 
@@ -580,6 +630,17 @@ async def delete_store(store_id: int, request: Request, db: Session = Depends(ge
     db.execute(_sql("DELETE FROM store_branches WHERE store_id = :sid"), {"sid": sid})
     db.execute(_sql("DELETE FROM user_favorites  WHERE store_id = :sid"), {"sid": sid})
     db.execute(_sql("DELETE FROM group_templates WHERE store_id = :sid"), {"sid": sid})
+    # V2.11.1 P0-04：vote_options.store_id 是 NOT NULL 外鍵，原本完全沒處理，
+    # 店家只要被任何投票引用過就會在最後一步觸發 IntegrityError（500），刪不掉。
+    # 「每加新表要回頭檢查刪除流程」這條教訓在這裡又發生一次。
+    db.execute(_sql("DELETE FROM vote_records WHERE option_id IN "
+                    "(SELECT id FROM vote_options WHERE store_id = :sid)"), {"sid": sid})
+    db.execute(_sql("DELETE FROM vote_options WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("UPDATE votes SET winner_store_id = NULL WHERE winner_store_id = :sid"), {"sid": sid})
+    # 不要依賴 ON DELETE CASCADE（P2-02：store_departments 實際上沒有設定）
+    db.execute(_sql("DELETE FROM store_departments WHERE store_id = :sid"), {"sid": sid})
+    db.execute(_sql("UPDATE store_recommendations SET created_store_id = NULL WHERE created_store_id = :sid"), {"sid": sid})
+
     db.execute(_sql("DELETE FROM stores WHERE id = :sid"), {"sid": sid})
 
     db.commit()
@@ -616,16 +677,73 @@ async def update_store_visibility(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+
+
+@router.get("/stores/new")
+async def new_store_page(request: Request, db: Session = Depends(get_db)):
+    """手動新增店家（V2.13.0；上一輪管理後台審稿的提案 2）。
+
+    原本新增店家只能靠 JSON 匯入帶 store 區塊、或核准推薦。只填店名與類別就建，
+    建好直接進工作台，頂部就有「更新菜單」。
+    注意：這條路由必須排在 /stores/{store_id} 之前，否則 "new" 會被當成 store_id 而 422。
+    """
+    user = await get_admin_user(request, db)
+    existing = [s.name for s in db.query(Store.name).filter(Store.is_personal != True).all()]
+    return templates.TemplateResponse("admin/store_new.html", {
+        "request": request, "user": user, "existing_names": existing,
+    })
+
+
+@router.post("/stores/new")
+async def create_store_manual(
+    request: Request,
+    name: str = Form(...),
+    category: str = Form(...),
+    phone: str = Form(None),
+    address: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    user = await get_admin_user(request, db)
+    from app.services.validation import clean_text
+    name = clean_text(name, 100, field="店名", required=True)
+    if category not in ("drink", "meal", "group_buy"):
+        raise HTTPException(status_code=400, detail="類別錯誤")
+    store = Store(
+        name=name,
+        category=CategoryType(category),
+        phone=clean_text(phone, 50, field="電話"),
+        address=clean_text(address, 300, field="地址"),
+        is_active=True,
+    )
+    db.add(store)
+    db.commit()
+    return RedirectResponse(url=f"/admin/stores/{store.id}?tab=menu&created=1", status_code=302)
 
 
 @router.get("/stores/{store_id}")
-async def store_detail_page(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """店家詳情頁面"""
+async def store_workbench(
+    store_id: int,
+    request: Request,
+    tab: str = "menu",
+    created: int = 0,
+    imported: int = 0,
+    cats: int = 0,
+    items: int = 0,
+    db: Session = Depends(get_db),
+):
+    """店家工作台（V2.13.0）：一頁取代 store_detail + store_edit + menus。
+
+    原本同一家店要管三個網址，而且 detail 與 edit **都有**分店新增／刪除與停用／刪除
+    （detail 的分店有啟用切換、edit 的沒有——已經不同步了）。合併後每個功能只有一處。
+    分頁用 Alpine x-show 切換不跳頁，填到一半切去看別的分頁不會丟；各區保留自己的
+    儲存鈕，因為後端是六支獨立的 POST，一顆全域儲存鈕不可能原子保存。
+    """
     from app.models.store import StoreBranch, StoreTopping
     from app.models.department import Department, StoreDepartment
+    from sqlalchemy import func as _f
     user = await get_admin_user(request, db)
-    
+
     store = db.query(Store).options(
         joinedload(Store.branches),
         joinedload(Store.toppings),
@@ -633,15 +751,45 @@ async def store_detail_page(store_id: int, request: Request, db: Session = Depen
     ).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 取得所有部門
+
     departments = db.query(Department).filter(Department.is_active == True).all()
-    
-    # 取得店家已綁定的部門 ID
-    store_depts = db.query(StoreDepartment).filter(StoreDepartment.store_id == store_id).all()
-    store_dept_ids = [sd.department_id for sd in store_depts]
-    
-    return templates.TemplateResponse("admin/store_detail.html", {
+    store_dept_ids = [sd.department_id for sd in db.query(StoreDepartment).filter(StoreDepartment.store_id == store_id).all()]
+
+    # 菜單版本：新到舊；序號最舊=第 1 版
+    menus = db.query(Menu).filter(Menu.store_id == store_id).order_by(Menu.created_at.desc()).all()
+    total = len(menus)
+    menu_versions = [(m, total - idx) for idx, m in enumerate(menus)]
+    active_menu = next((m for m in menus if m.is_active), None)
+    active_version = next((v for m, v in menu_versions if active_menu and m.id == active_menu.id), 0)
+    active_item_count = sum(len(c.items) for c in active_menu.categories) + len([i for i in active_menu.items if i.category_id is None]) if active_menu else 0
+
+    last_group = db.query(_f.max(Group.created_at)).filter(Group.store_id == store_id).scalar()
+    group_count = db.query(_f.count(Group.id)).filter(Group.store_id == store_id).scalar() or 0
+    active_group_count = db.query(_f.count(Group.id)).filter(
+        Group.store_id == store_id, Group.is_closed == False, Group.deadline > taipei_now()
+    ).scalar() or 0
+
+    def _joined(opt_type):
+        vals = sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)
+        return ",".join(o.option_value for o in vals)
+
+    if tab not in ("menu", "info", "ops", "more"):
+        tab = "menu"
+
+    return templates.TemplateResponse("admin/store_workbench.html", {
+        "tab": tab,
+        "created": created,
+        "imported": imported, "imported_cats": cats, "imported_items": items,
+        "menu_versions": menu_versions,
+        "active_menu": active_menu,
+        "active_version": active_version,
+        "active_item_count": active_item_count,
+        "last_group": last_group,
+        "group_count": group_count,
+        "menu_count": total,
+        "active_group_count": active_group_count,
+        "sugar_options": _joined(OptionType.SUGAR),
+        "ice_options": _joined(OptionType.ICE),
         "request": request,
         "user": user,
         "store": store,
@@ -651,44 +799,9 @@ async def store_detail_page(store_id: int, request: Request, db: Session = Depen
 
 
 @router.get("/stores/{store_id}/edit")
-async def edit_store_page(store_id: int, request: Request, db: Session = Depends(get_db)):
-    """編輯店家頁面"""
-    from app.models.store import StoreBranch, StoreTopping
-    user = await get_admin_user(request, db)
-    
-    store = db.query(Store).options(
-        joinedload(Store.branches),
-        joinedload(Store.toppings),
-        joinedload(Store.options)
-    ).filter(Store.id == store_id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # V2.10.0：飲料選項以逗號分隔字串呈現，依 sort_order 還原順序
-    def _joined(opt_type):
-        vals = sorted(
-            [o for o in store.options if o.option_type == opt_type],
-            key=lambda o: o.sort_order,
-        )
-        return ",".join(o.option_value for o in vals)
-    
-    # 改選項時提醒管理員：已送出的訂單是快照不受影響，但還在點餐的人會看到新選項
-    # 不能用 Group.is_open（Python property 進不了 SQL），只能手寫條件，
-    # 所以更要注意 deadline 的時區（V2.10.1，坑 #25）
-    active_group_count = db.query(Group).filter(
-        Group.store_id == store_id,
-        Group.is_closed == False,
-        Group.deadline > taipei_now(),
-    ).count()
-    
-    return templates.TemplateResponse("admin/store_edit.html", {
-        "request": request,
-        "user": user,
-        "store": store,
-        "sugar_options": _joined(OptionType.SUGAR),
-        "ice_options": _joined(OptionType.ICE),
-        "active_group_count": active_group_count,
-    })
+async def edit_store_page(store_id: int):
+    """V2.13.0：編輯頁併入工作台，舊連結與書籤轉過去"""
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=info", status_code=301)
 
 
 def _parse_option_values(raw: str) -> list[str]:
@@ -747,7 +860,7 @@ async def update_store_options(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/edit")
@@ -776,13 +889,17 @@ async def update_store(
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
-    store.name = name
-    store.phone = phone.strip() if phone else None
-    store.address = address.strip() if address else None
-    store.website_url = website_url.strip() if website_url else None
-    store.google_maps_url = google_maps_url.strip() if google_maps_url else None
-    store.ubereats_url = ubereats_url.strip() if ubereats_url else None
-    store.foodpanda_url = foodpanda_url.strip() if foodpanda_url else None
+    # V2.11.3 R-09：原本只 strip 不限長度。SQLite 照收，PostgreSQL 超過欄位長度會 500
+    from app.services.validation import clean_text
+    store.name = clean_text(name, 100, field="店名", required=True)
+    store.phone = clean_text(phone, 50, field="電話")
+    store.address = clean_text(address, 300, field="地址")
+    # V2.11.1 P0-06：只 strip 不驗協定，javascript: 會被原樣寫進 href
+    from app.services.validation import clean_http_url
+    store.website_url = clean_http_url(website_url, field="官網網址")
+    store.google_maps_url = clean_http_url(google_maps_url, field="Google 地圖網址")
+    store.ubereats_url = clean_http_url(ubereats_url, field="Uber Eats 網址")
+    store.foodpanda_url = clean_http_url(foodpanda_url, field="foodpanda 網址")
     store.provides_invoice = provides_invoice
     store.provides_receipt = provides_receipt
     
@@ -807,7 +924,7 @@ async def update_store(
     
     db.commit()
     
-    return RedirectResponse(url="/admin/stores", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=info", status_code=302)
 
 
 @router.get("/users")
@@ -1054,7 +1171,7 @@ async def add_branch(
     db.add(branch)
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/delete")
@@ -1077,7 +1194,7 @@ async def delete_branch(
         db.delete(branch)
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}")
@@ -1105,7 +1222,7 @@ async def update_branch(
         branch.address = address.strip() if address else None
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/toggle")
@@ -1128,7 +1245,7 @@ async def toggle_branch(
         branch.is_active = not branch.is_active
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/toppings")
@@ -1162,7 +1279,7 @@ async def add_topping(
     db.add(topping)
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/toppings/{topping_id}/delete")
@@ -1185,7 +1302,7 @@ async def delete_topping(
         db.delete(topping)
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.post("/stores/{store_id}/toppings/{topping_id}/toggle")
@@ -1208,7 +1325,7 @@ async def toggle_topping(
         topping.is_active = not topping.is_active
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}/edit", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
 
 @router.get("/feedbacks")
@@ -1603,6 +1720,15 @@ async def update_announcement(
     return RedirectResponse(url="/admin/announcements", status_code=302)
 
 
+def _safe_url_or_none(value):
+    """驗不過就回 None（V2.11.1 P0-06，用於複製既有資料的場合）"""
+    from app.services.validation import clean_http_url
+    try:
+        return clean_http_url(value)
+    except Exception:
+        return None
+
+
 def _parse_taipei_to_utc(value: str):
     """datetime-local 表單值（台北牆上時間）→ naive UTC，與全站儲存慣例一致。
 
@@ -1678,7 +1804,9 @@ async def approve_recommendation(
     new_store = Store(
         name=rec.store_name,
         category=category_map.get(rec.category, CategoryType.MEAL),
-        website_url=rec.menu_url,
+        # V2.11.1 P0-06：舊資料可能是核准前就存進去的惡意協定，複製時再驗一次；
+        # 擋不過就留空而不是讓整個核准失敗（推薦本身沒問題，只是網址不能用）
+        website_url=_safe_url_or_none(rec.menu_url),
     )
     db.add(new_store)
     db.flush()  # 取得新店家 ID

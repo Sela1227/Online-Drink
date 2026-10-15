@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
+
+{% block title %}新增店家 - 店家管理{% endblock %}
+
+{% block content %}
+{{ nav.back('/admin/stores', '店家管理') }}
+{# V2.13.0：手動新增店家。只要店名與類別，建好直接進工作台。
+   打店名時即時比對同名店家並提示——同名不一定是同一家，允許繼續。 #}
+<div class="max-w-lg space-y-4" x-data="{ name: '', cat: '', existing: {{ existing_names | tojson }} }">
+    <h1 class="text-xl font-bold text-sela-800">新增店家</h1>
+    <form action="/admin/stores/new" method="post" class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4 space-y-4">
+        <div>
+            <label class="block text-xs text-sela-800/60 mb-1">店名 <span class="text-red-500">*</span></label>
+            <input type="text" name="name" x-model="name" required maxlength="100" placeholder="例：小妞魯味"
+                   class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+            <div x-show="name.trim() && existing.includes(name.trim())" x-cloak
+                 class="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
+                已有一家「<span x-text="name.trim()"></span>」。同名不一定是同一家——若是要更新它的菜單，請改到那家店的工作台；確定是另一家就繼續。
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs text-sela-800/60 mb-2">類別 <span class="text-red-500">*</span></label>
+            <div class="grid grid-cols-3 gap-2">
+                {% for val, label, icon in [('drink','飲料','ti-cup'), ('meal','餐廳','ti-bowl'), ('group_buy','團購','ti-shopping-cart')] %}
+                <label class="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 cursor-pointer text-sm"
+                       :class="cat === {{ val | tojson }} ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200'">
+                    <input type="radio" name="category" value="{{ val }}" x-model="cat" required class="sr-only">
+                    <i class="ti {{ icon }}"></i> {{ label }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <details class="text-sm">
+            <summary class="cursor-pointer text-sela-800/70">電話、地址（選填，之後也能補）</summary>
+            <div class="space-y-2 mt-2">
+                <input type="text" name="phone" placeholder="電話" maxlength="50" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <input type="text" name="address" placeholder="地址" maxlength="300" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+            </div>
+        </details>
+        <button type="submit" :disabled="!name.trim() || !cat"
+                class="w-full py-3 rounded-lg bg-sela-700 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed">建立店家</button>
+        <p class="text-xs text-sela-800/45">建立後直接進工作台，可以馬上匯入菜單，也可以稍後再說。Logo、甜冰、加料、分店都在工作台設定。</p>
+    </form>
+</div>
+{% endblock %}

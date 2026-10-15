@@ -5,100 +5,125 @@
 
 {% block content %}
 {{ nav.back('/admin', '管理後台') }}
-<div class="space-y-4" x-data="{ filter: 'all' }">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
+{# V2.13.0：列表改成操作入口。搜尋、篩選、按店名注音序、每列直達菜單／編輯。
+   搜尋與篩選記在 sessionStorage，從工作台返回時不用重設。 #}
+<div class="space-y-4" x-data="storeList()" x-init="init()">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
         <h1 class="text-xl font-bold text-sela-800">店家管理</h1>
-        <div class="flex items-center gap-3">
-            <a href="/admin/import" class="bg-sela-500 hover:bg-sela-600 text-sela-800 px-3 py-1.5 rounded-lg text-sm font-medium">
-                + 匯入
+        <div class="flex items-center gap-2">
+            <a href="/admin/stores/new" class="bg-sela-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                <i class="ti ti-plus"></i> 新增店家
             </a>
-            
+            <a href="/admin/import" class="bg-white border border-sela-200 px-3 py-1.5 rounded-lg text-sm text-sela-800/80">
+                <i class="ti ti-inbox"></i> 匯入
+            </a>
         </div>
     </div>
-    
-    <!-- 分類篩選 -->
-    <div class="flex gap-2 overflow-x-auto pb-1">
-        <button @click="filter = 'all'" 
-                :class="filter === 'all' ? 'bg-sela-500 text-sela-800' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
-                class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            全部 ({{ stores|length }})
-        </button>
-        <button @click="filter = 'drink'" 
-                :class="filter === 'drink' ? 'bg-amber-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
-                class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            <i class="ti ti-cup"></i> 飲料店
-        </button>
-        <button @click="filter = 'meal'" 
-                :class="filter === 'meal' ? 'bg-green-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
-                class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            <i class="ti ti-bowl"></i> 餐廳
-        </button>
-        <button @click="filter = 'group_buy'" 
-                :class="filter === 'group_buy' ? 'bg-blue-500 text-white' : 'bg-white text-sela-800/70 hover:bg-sela-50'"
-                class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap">
-            <i class="ti ti-shopping-cart"></i> 團購
-        </button>
+
+    <div class="bg-white rounded-xl border border-sela-100 p-3 space-y-2">
+        <div class="relative">
+            <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sela-800/40"></i>
+            <input type="text" x-model="q" placeholder="搜尋店名、電話、地址"
+                   class="w-full pl-9 pr-9 py-2 border border-sela-200 rounded-lg text-base focus:outline-none focus:border-sela-500">
+            <button type="button" x-show="q" @click="q = ''" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-sela-800/40"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="flex gap-1.5 flex-wrap text-xs items-center">
+            <template x-for="c in cats" :key="c[0]">
+                <button type="button" @click="cat = c[0]"
+                        :class="cat === c[0] ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
+                        class="px-2.5 py-1 rounded-full" x-text="c[1] + ' (' + countCat(c[0]) + ')'"></button>
+            </template>
+            <span class="w-px h-4 bg-sela-200 mx-1"></span>
+            <button type="button" @click="showInactive = !showInactive"
+                    :class="showInactive ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
+                    class="px-2.5 py-1 rounded-full">含已停用</button>
+            <span class="ml-auto text-sela-800/45" x-text="filtered.length + ' 家'"></span>
+        </div>
     </div>
-    
-    {% if stores %}
-    <!-- 卡片網格 -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {% for store in stores %}
-        <a href="/admin/stores/{{ store.id }}"
-           class="block bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition group"
-           x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
-            
-            <!-- Logo 區域 -->
-            <div class="aspect-square bg-gradient-to-br from-sela-50 to-sela-100 flex items-center justify-center relative">
-                {% if store.logo_url %}
-                <img src="{{ store.logo_url }}" alt="{{ store.name }}" 
-                     class="w-full h-full object-contain p-4 group-hover:scale-105 transition">
-                {% else %}
-                <span class="text-5xl opacity-50">
-                    {% if store.category and store.category.value == 'drink' %}<i class="ti ti-cup"></i>
-                    {% elif store.category and store.category.value == 'group_buy' %}<i class="ti ti-shopping-cart"></i>
-                    {% else %}<i class="ti ti-bowl"></i>{% endif %}
-                </span>
-                {% endif %}
-                
-                <!-- 狀態標籤 -->
-                <div class="absolute top-2 right-2">
-                    {% if store.is_active %}
-                    <span class="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full shadow">啟用</span>
-                    {% else %}
-                    <span class="text-xs bg-sela-300 text-white px-2 py-0.5 rounded-full shadow">停用</span>
-                    {% endif %}
+
+    <div class="bg-white rounded-xl border border-sela-100 divide-y divide-sela-100">
+        <template x-for="s in filtered" :key="s.id">
+            <a :href="'/admin/stores/' + s.id" class="flex items-center gap-3 px-3 py-2.5 hover:bg-sela-50">
+                <div class="w-11 h-11 rounded-lg bg-sela-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <img x-show="s.logo" :src="s.logo" alt="" class="w-full h-full object-cover">
+                    <i x-show="!s.logo" :class="'ti ' + icon(s.category) + ' text-xl text-sela-700'"></i>
                 </div>
-                
-                <!-- 類型標籤 -->
-                <div class="absolute top-2 left-2">
-                    <span class="text-xs bg-white/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm">
-                        {% if store.category and store.category.value == 'drink' %}飲料
-                        {% elif store.category and store.category.value == 'group_buy' %}團購
-                        {% else %}餐廳{% endif %}
-                    </span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-sela-800 truncate" x-text="s.name"></span>
+                        <span x-show="!s.active" class="text-[10px] px-1.5 py-0.5 rounded bg-sela-100 text-sela-800/60 whitespace-nowrap"><i class="ti ti-player-pause"></i> 已停用</span>
+                        <span x-show="s.active && s.items === 0" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 whitespace-nowrap"><i class="ti ti-alert-triangle"></i> 無菜單</span>
+                    </div>
+                    <div class="text-xs text-sela-800/55 truncate">
+                        <span x-text="catLabel(s.category)"></span>
+                        <span x-show="s.items"> · <span x-text="s.items"></span> 品項</span>
+                        <span x-show="s.branches"> · <span x-text="s.branches"></span> 家分店</span>
+                        <span> · </span><span x-text="s.lastGroup ? '上次開團 ' + s.lastGroup : '尚未開過團'"></span>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- 資訊區域 -->
-            <div class="p-3">
-                <div class="font-semibold text-sela-800 truncate">{{ store.name }}</div>
-                <div class="text-xs text-sela-800/45 mt-0.5">
-                    {% if store.branches %}{{ store.branches|length }} 間分店{% else %}無分店{% endif %}
+                <div class="hidden sm:flex items-center gap-1 flex-shrink-0">
+                    <a :href="'/admin/stores/' + s.id + '?tab=menu'" @click.stop
+                       class="px-2.5 py-1.5 rounded-lg text-xs border border-sela-200 hover:bg-sela-100"><i class="ti ti-clipboard-list"></i> 菜單</a>
+                    <a :href="'/admin/stores/' + s.id + '?tab=info'" @click.stop
+                       class="px-2.5 py-1.5 rounded-lg text-xs border border-sela-200 hover:bg-sela-100"><i class="ti ti-pencil"></i> 編輯</a>
                 </div>
-            </div>
-        </a>
-        {% endfor %}
+                <i class="ti ti-chevron-right text-sela-800/30 sm:hidden"></i>
+            </a>
+        </template>
+        <div x-show="!filtered.length" class="py-10 text-center text-sm text-sela-800/50">
+            <span x-show="stores.length">找不到符合的店家</span>
+            <span x-show="!stores.length">還沒有店家，先「新增店家」或「匯入」</span>
+        </div>
     </div>
-    {% else %}
-    <div class="text-center py-16 bg-white rounded-xl">
-        <div class="text-5xl mb-3"><i class="ti ti-building-store"></i></div>
-        <p class="text-sela-800/60 mb-4">還沒有任何店家</p>
-        <a href="/admin/import" class="inline-block bg-sela-500 hover:bg-sela-600 text-sela-800 px-6 py-2 rounded-lg">
-            匯入第一間店家
-        </a>
-    </div>
-    {% endif %}
 </div>
+
+<script>
+function storeList() {
+    const stores = [
+        {% for s in stores %}
+        {
+            id: {{ s.id }},
+            name: {{ s.name | tojson }},
+            category: {{ (s.category.value if s.category else 'meal') | tojson }},
+            active: {{ 'true' if s.is_active else 'false' }},
+            logo: {{ s.logo_url | tojson if s.logo_url else 'null' }},
+            phone: {{ (s.phone or '') | tojson }},
+            address: {{ (s.address or '') | tojson }},
+            items: {{ item_counts.get(s.id, 0) }},
+            branches: {{ (s.branches | selectattr('is_active') | list | length) if s.branches else 0 }},
+            lastGroup: {{ ((last_groups[s.id] | taipei).strftime('%m/%d') if last_groups.get(s.id) else '') | tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const KEY = 'admin_store_list_state';
+    return {
+        stores, q: '', cat: 'all', showInactive: false,
+        cats: [['all', '全部'], ['drink', '飲料'], ['meal', '餐廳'], ['group_buy', '團購']],
+        init() {
+            try {
+                const st = JSON.parse(sessionStorage.getItem(KEY) || '{}');
+                if (st.q) this.q = st.q;
+                if (st.cat) this.cat = st.cat;
+                if (st.showInactive) this.showInactive = true;
+            } catch (e) {}
+            this.$watch('q', () => this.save());
+            this.$watch('cat', () => this.save());
+            this.$watch('showInactive', () => this.save());
+        },
+        save() {
+            try { sessionStorage.setItem(KEY, JSON.stringify({ q: this.q, cat: this.cat, showInactive: this.showInactive })); } catch (e) {}
+        },
+        icon(c) { return { drink: 'ti-cup', meal: 'ti-bowl', group_buy: 'ti-shopping-cart' }[c] || 'ti-building-store'; },
+        catLabel(c) { return { drink: '飲料', meal: '餐廳', group_buy: '團購' }[c] || ''; },
+        countCat(c) { return this.stores.filter(s => (c === 'all' || s.category === c) && (this.showInactive || s.active)).length; },
+        get filtered() {
+            const kw = this.q.trim().toLowerCase();
+            return this.stores
+                .filter(s => (this.cat === 'all' || s.category === this.cat) && (this.showInactive || s.active)
+                    && (!kw || s.name.toLowerCase().includes(kw) || s.phone.includes(kw) || s.address.toLowerCase().includes(kw)))
+                .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+        },
+    };
+}
+</script>
 {% endblock %}

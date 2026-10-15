@@ -36,6 +36,10 @@ class GroupTemplate(Base):
     
     # 可見範圍
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
+    # V2.11.1 P1-03：部門限定團存成範本後，部門關聯整組遺失，用範本開的新團
+    # 變成 is_public=False 且沒有任何部門 → 只剩團主看得到。以逗號分隔的
+    # department_id 存下來（不另開關聯表，避免又多一張要維護刪除流程的表）。
+    department_ids: Mapped[str | None] = mapped_column(String(200), nullable=True)
     
     # 使用次數
     use_count: Mapped[int] = mapped_column(Integer, default=0)
