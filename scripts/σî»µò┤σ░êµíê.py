@@ -12,7 +12,7 @@ from datetime import datetime
 IGNORE_DIRS = {'.git', '__pycache__', '.venv', 'venv', 'node_modules', '.idea', '.vscode', 'dist', 'build', '__MACOSX'}
 IGNORE_FILES = {'.DS_Store', 'Thumbs.db', '.gitignore', '*.pyc', '*.pyo'}
 CODE_EXTENSIONS = {'.py', '.js', '.ts', '.html', '.css', '.json', '.yaml', '.yml', '.md', '.txt', '.sql', '.sh', '.env.example'}
-MAX_FILE_SIZE = 100 * 1024  # 100KB，超過的檔案只顯示路徑不顯示內容
+MAX_FILE_SIZE = 200 * 1024  # 200KB（V2.16.1：CLAUDE.md 已 159KB，不能被略過），超過的檔案只顯示路徑不顯示內容
 
 
 def should_ignore(path: Path) -> bool:

@@ -590,6 +590,10 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
   8. **跑 `scripts/check_frontend_import.py`**（V2.15.0 起）：`PYTHONPATH=. python scripts/check_frontend_import.py`。
      需要 node_modules 有 jsdom、alpinejs、htmx.org（`npm i jsdom@24 alpinejs@3 htmx.org@1.9.10` 或設 NODE_PATH），沒有就跳過。
      改到匯入頁的 htmx 觸發器或拖檔邏輯時必跑
+  9. **更新 Claude Project「快點來點餐」的背景文件**（V2.16.1 起，Sela 指示：改程式若背景需要更新就一併更新）。Project 裡有五份 md ＋ 一份程式碼快照：
+     - 《SELA-菜單匯入格式規範》改到匯入就同步；《專案架構精簡》改到資料表／路由／套件就同步；《部署檢查清單》改到檢查流程就同步；《常見錯誤與解決方案》新坑值得速查就加；《開發指導手冊》業務規則或排程變了就同步。都是 `project_write` 原地覆蓋同檔名。
+     - 程式碼快照 `線上訂餐_bundle_VX.Y.Z.txt`：每版用 `python scripts/匯整專案.py "Online-Drink VX.Y.Z" 線上訂餐_bundle_VX.Y.Z.txt` 產生（約 1.4MB，含 CLAUDE.md），**先 `project_delete` 舊版號的那份再寫新的**（檔名帶版號，不會自動覆蓋；用 `local_path` 上傳時會落在 `claude/` 命名空間，路徑是 `claude/線上訂餐_bundle_VX.Y.Z.txt`）。
+     - 這四份背景 md **不再放在 zip 的 `docs/`**（V2.16.1 移除，避免兩邊漂移）；zip 裡只留 CLAUDE.md 與 handoff。
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作
