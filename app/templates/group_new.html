@@ -37,47 +37,28 @@
     {% endif %}
 
 <div class="bg-white rounded-2xl shadow-sm p-4">
-    <h1 class="text-xl font-bold text-sela-800 mb-4">
+    <h1 class="text-lg font-bold text-sela-800 mb-4">
         {% if copy_from %}複製開團{% else %}開新團{% endif %}
     </h1>
     
-    <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()">
-        <!-- 分類選擇 -->
+    <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()" @invalid.capture="if ($event.target.closest('#advanced-body')) advOpen = true">
+        <!-- 類型（V2.19.0：4 格大按鈕 → 一列 chip） -->
         <div>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇類型</label>
-            <div class="grid grid-cols-4 gap-2">
-                <button type="button" @click="selectCategory('drink')"
-                        :class="selectedCategory === 'drink' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
-                        class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1"><i class="ti ti-cup"></i></div>
-                    <div class="text-sm font-medium">飲料店</div>
-                </button>
-                <button type="button" @click="selectCategory('meal')"
-                        :class="selectedCategory === 'meal' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
-                        class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1"><i class="ti ti-bowl"></i></div>
-                    <div class="text-sm font-medium">餐廳</div>
-                </button>
-                <button type="button" @click="selectCategory('group_buy')"
-                        :class="selectedCategory === 'group_buy' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
-                        class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1"><i class="ti ti-shopping-cart"></i></div>
-                    <div class="text-sm font-medium">團購</div>
-                </button>
-                <button type="button" @click="selectCategory('proxy')"
-                        :class="selectedCategory === 'proxy' ? 'bg-sela-800 border-sela-800 text-white' : 'bg-sela-50 border-sela-200 text-sela-800/70'"
-                        class="p-3 rounded-lg border-2 text-center transition">
-                    <div class="text-2xl mb-1"><i class="ti ti-basket"></i></div>
-                    <div class="text-sm font-medium">代購</div>
-                </button>
+            <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">類型</label>
+            <div class="flex gap-1.5 flex-wrap">
+                {% for key, label, icon in [('drink', '飲料', 'ti-cup'), ('meal', '餐廳', 'ti-bowl'), ('group_buy', '團購', 'ti-shopping-cart'), ('proxy', '代購', 'ti-basket')] %}
+                <button type="button" @click='selectCategory({{ key | tojson }})'
+                        :class='selectedCategory === {{ key | tojson }} ? "bg-sela-800 border-sela-800 text-white" : "bg-white border-sela-300 text-sela-800/75"'
+                        class="px-3.5 py-1.5 rounded-full border text-sm transition"><i class="ti {{ icon }}"></i> {{ label }}</button>
+                {% endfor %}
             </div>
             <input type="hidden" name="is_proxy" :value="selectedCategory === 'proxy' ? 'true' : ''">
         </div>
-        
+
         <!-- 店家選擇 -->
         <!-- 代購提示 -->
         <div x-show="selectedCategory === 'proxy'" x-cloak class="p-3 bg-sela-100 rounded-xl text-sm text-sela-800/75">
-            <i class="ti ti-info-circle"></i> 代購由你自訂品項與價格——開團後進團按「團主工具 → 管理品項」新增，加好再分享連結
+            <i class="ti ti-info-circle"></i> 代購由你自訂品項與價格——開團後在團頁按「更多 → 管理 → 管理品項」新增，加好再分享連結
         </div>
 
         <!-- 選擇店家（V2.11.0：原本是原生 select，店家一多就難找。
@@ -221,288 +202,202 @@
         
         <!-- 分店選擇 -->
         <div x-show="branches.length > 0" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇分店</label>
-            <select name="branch_id" x-model="branchId" class="w-full border rounded-lg px-3 py-2">
+            <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">分店</label>
+            <select name="branch_id" x-model="branchId" class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white">
                 <option value="">不指定分店</option>
                 <template x-for="branch in branches" :key="branch.id">
                     <option :value="branch.id" x-text="branch.name + (branch.phone ? ' (' + branch.phone + ')' : '')"></option>
                 </template>
             </select>
         </div>
-        
-        <!-- 團名 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">團名</label>
-            <input type="text" name="name" required placeholder="例：下午茶團"
-                   class="w-full border rounded-lg px-3 py-2"
-                   value="{% if copy_from %}{{ copy_from.name }}{% endif %}">
-        </div>
-        
-        <!-- 備註 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">備註（選填）</label>
-            <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間"
-                      class="w-full border rounded-lg px-3 py-2 text-sm">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
-        </div>
-        
-        <!-- 外送費 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">外送費（選填）</label>
-            <div class="flex items-center gap-2">
-                <span class="text-sela-800/60">$</span>
-                <input type="number" name="delivery_fee" min="0" step="1" placeholder="0"
-                       class="w-32 border rounded-lg px-3 py-2"
-                       value="{% if copy_from and copy_from.delivery_fee %}{{ copy_from.delivery_fee|int }}{% endif %}">
-                <span class="text-sm text-sela-800/60">會自動平均分攤給所有人</span>
-            </div>
-        </div>
 
-        <!-- 每單金額上限 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ hasLimit: {% if copy_from and copy_from.order_limit %}true{% else %}false{% endif %} }">
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">每單金額上限（選填）</label>
-            <div class="flex items-center gap-2">
-                <span class="text-sela-800/60">$</span>
-                <input type="number" name="order_limit" min="0" step="1" placeholder="不限"
-                       class="w-32 border rounded-lg px-3 py-2"
-                       @input="hasLimit = $event.target.value > 0"
-                       value="{% if copy_from and copy_from.order_limit %}{{ copy_from.order_limit|int }}{% endif %}">
-                <span class="text-sm text-sela-800/60">例：公司補助每人 $100</span>
-            </div>
-            <label x-show="hasLimit" x-cloak class="flex items-start gap-2 mt-2 cursor-pointer">
-                <input type="checkbox" name="allow_over_limit" value="true" class="mt-0.5 rounded border-sela-300"
-                       {% if copy_from and copy_from.allow_over_limit %}checked{% endif %}>
-                <span class="text-sm text-sela-800/70">允許超過上限<span class="block text-xs text-sela-800/50">勾選＝可以點超過，超過的部分自行貼補；不勾＝不能結單超過上限的訂單</span></span>
-            </label>
-        </div>
-        
-        <!-- 缺貨候補 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ bkOn: {% if copy_from and copy_from.enable_backup %}true{% else %}false{% endif %} }">
-            <div class="flex items-center justify-between mb-1">
-                <div>
-                    <label class="block text-sm font-medium text-sela-800/80">缺貨候補</label>
-                    <p class="text-xs text-sela-800/50">讓大家為品項填候補，臨時沒貨照候補買</p>
-                </div>
-                <label class="cursor-pointer">
-                    <input type="checkbox" name="enable_backup" value="true" class="peer hidden" @change="bkOn = $event.target.checked"
-                           {% if copy_from and copy_from.enable_backup %}checked{% endif %}>
-                    <span class="block w-11 h-6 rounded-full bg-sela-200 peer-checked:bg-sela-800 relative transition-colors
-                                 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5"></span>
-                </label>
-            </div>
-            <div x-show="bkOn" x-cloak class="flex items-center gap-2 mt-2">
-                <span class="text-sm text-sela-800/60">每個品項最多可填</span>
-                {% set bc = copy_from.backup_count if copy_from and copy_from.backup_count else 2 %}
-                <div class="flex gap-1 bg-sela-100 p-1 rounded-lg">
-                    {% for n in [1, 2, 3] %}
-                    <label class="cursor-pointer">
-                        <input type="radio" name="backup_count" value="{{ n }}" class="peer hidden" {% if bc == n %}checked{% endif %}>
-                        <span class="block px-3.5 py-1 rounded-md text-sm font-medium text-sela-800/55 peer-checked:bg-sela-800 peer-checked:text-white transition">{{ n }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-                <span class="text-sm text-sela-800/60">個候補</span>
-            </div>
-        </div>
-        
-        <!-- 可見範圍 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak x-data="{ isPublic: true }">
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">可見範圍</label>
-            <div class="space-y-2">
-                <label class="flex items-center gap-2">
-                    <input type="radio" name="visibility" value="public" checked
-                           @change="isPublic = true">
-                    <span class="text-sm"><i class="ti ti-world"></i> 公開（所有人可見）</span>
-                </label>
-                <label class="flex items-center gap-2">
-                    <input type="radio" name="visibility" value="departments"
-                           @change="isPublic = false">
-                    <span class="text-sm"><i class="ti ti-users"></i> 限定部門</span>
-                </label>
-            </div>
-            
-            <!-- 部門選擇 -->
-            <div x-show="!isPublic" x-cloak class="mt-3 p-3 bg-sela-50 rounded-lg">
-                {% if departments %}
-                <div class="space-y-2">
-                    {% for dept in departments %}
-                    <label class="flex items-center gap-2">
-                        <input type="checkbox" name="department_ids" value="{{ dept.id }}">
-                        <span class="text-sm">{{ dept.name }}</span>
-                        <span class="text-xs text-sela-800/45">({{ dept.member_count }}人)</span>
-                    </label>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-sm text-sela-800/60">尚未建立部門，請至後台建立</p>
-                {% endif %}
-            </div>
-        </div>
-        
-        <!-- 截止時間 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">截止時間</label>
-            <div class="flex flex-wrap gap-2 mb-2">
-                <button type="button" @click="setDeadline('30m')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
-                    30分鐘後
-                </button>
-                <button type="button" @click="setDeadline('1h')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
-                    1小時後
-                </button>
+        {# ============================================================
+           V2.19.0：主畫面只問「截止」與「團名」，其他全部進「進階設定」。
+           欄位 name 與後端驗證都不變，只是位置與外觀換了（畫面稿 preview_groupnew_v2190.html）。
+           ============================================================ #}
+        <!-- 截止（選好店預設 1 小時後） -->
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak id="deadline-field">
+            <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">截止</label>
+            <div class="flex flex-wrap gap-1.5 mb-2">
                 {# V2.16.3 審核 P1-2c：過了中午按「今天 12:00」其實是明天，標籤要跟著算 #}
-                <button type="button" @click="setDeadline('12:00')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50" x-text="presetLabel('12:00')">
-                </button>
-                <button type="button" @click="setDeadline('17:00')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50" x-text="presetLabel('17:00')">
-                </button>
+                <template x-for="p in deadlinePresets" :key="p">
+                    <button type="button" @click="setDeadline(p)"
+                            :class="deadlinePreset === p ? 'bg-sela-800 border-sela-800 text-white' : 'bg-white border-sela-300 text-sela-800/75'"
+                            class="text-sm px-3 py-1 rounded-full border transition" x-text="presetLabel(p)"></button>
+                </template>
             </div>
             <input type="datetime-local" name="deadline" x-ref="deadline" required
-                   class="w-full border rounded-lg px-3 py-2">
+                   @input="deadlinePreset = ''; autoName()"
+                   class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white">
         </div>
-        
-        <!-- 飲料團設定 -->
-        <div x-show="selectedCategory === 'drink' && storeId" x-cloak class="space-y-4 p-4 bg-sela-50 rounded-lg">
-            <h3 class="font-medium text-sela-800/80">飲料團設定</h3>
-            
-            {# V2.16.3 審核 P0-2：原本寫死「正常糖…」，店家的選項是「全糖…」時選了＋鎖定整團沒人能點。改依所選店家的 store_options 產生；店家沒設就顯示提示 #}
-            <template x-if="selectedStore && selectedStore.sugar_options.length">
-            <div>
-                <label class="block text-sm text-sela-800/70 mb-1">預設甜度</label>
-                <select name="default_sugar" class="w-full border rounded px-3 py-2">
-                    <option value="">不指定</option>
-                    <template x-for="o in selectedStore.sugar_options" :key="o"><option :value="o" x-text="o"></option></template>
-                </select>
-            </div>
-            </template>
-            <template x-if="selectedStore && selectedStore.ice_options.length">
-            <div>
-                <label class="block text-sm text-sela-800/70 mb-1">預設冰塊</label>
-                <select name="default_ice" class="w-full border rounded px-3 py-2">
-                    <option value="">不指定</option>
-                    <template x-for="o in selectedStore.ice_options" :key="o"><option :value="o" x-text="o"></option></template>
-                </select>
-            </div>
-            </template>
-            <p x-show="selectedStore && !selectedStore.sugar_options.length && !selectedStore.ice_options.length" class="text-xs text-sela-800/55">這家店還沒設定甜度／冰塊選項，團員點餐時不會有甜冰可選；管理員可到店家工作台「營運設定」補。</p>
-            
-            <!-- 鎖定選項 -->
-            <div class="flex gap-4">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="lock_sugar" value="true">
-                    <span class="text-sm text-sela-800/70">鎖定甜度</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="lock_ice" value="true">
-                    <span class="text-sm text-sela-800/70">鎖定冰塊</span>
-                </label>
-            </div>
+
+        <!-- 團名（自動帶「店名 · 時段」，自己改過就不再換） -->
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak>
+            <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">團名 <span class="font-normal text-sela-800/45" x-show="!nameTouched">自動帶入，可改</span></label>
+            <input type="text" name="name" required maxlength="100" placeholder="例：下午茶團"
+                   x-model="groupName" @input="nameTouched = true"
+                   class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white">
         </div>
-        
-        <!-- 趣味功能設定 -->
-        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak class="p-4 bg-sela-50 rounded-lg" x-data="{ showFunOptions: false }">
-            <button type="button" @click="showFunOptions = !showFunOptions"
-                    class="flex items-center justify-between w-full text-left">
-                <h3 class="font-medium text-sela-800"><i class="ti ti-confetti"></i> 趣味功能（選用）</h3>
-                <span class="text-sela-800" x-text="showFunOptions ? '▲' : '▼'"></span>
+
+        <!-- 進階設定（收合；摘要一行告訴你目前設了什麼） -->
+        <div x-show="storeId || selectedCategory === 'proxy'" x-cloak id="advanced"
+             class="rounded-xl border overflow-hidden" :class="copiedCount ? 'border-sela-300' : 'border-sela-200'">
+            <button type="button" @click="advOpen = !advOpen" class="w-full flex items-center justify-between gap-2 px-3 py-3 text-left text-sm" :class="advOpen && 'bg-sela-50'">
+                <span class="font-medium text-sela-800 flex-shrink-0"><i class="ti ti-adjustments"></i> 進階設定
+                    <span x-show="copiedCount" x-cloak class="ml-1 text-[10px] font-normal bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded" x-text="'已帶入 ' + copiedCount + ' 項'"></span>
+                </span>
+                <span class="text-xs text-sela-800/50 truncate" x-text="advOpen ? '收起' : (advSummary() + ' ›')"></span>
             </button>
-            
-            <div x-show="showFunOptions" x-cloak class="mt-4 space-y-4">
-                <!-- 盲點模式 -->
-                <div class="flex items-start gap-3 p-3 bg-white rounded-lg">
-                    <input type="checkbox" name="is_blind_mode" value="true" class="mt-1">
+            <div x-show="advOpen" x-collapse x-cloak class="border-t border-sela-200 p-3 space-y-4" id="advanced-body">
+
+                <!-- 誰看得到 -->
+                <div>
+                    <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">誰看得到</label>
+                    <div class="flex gap-1.5">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="visibility" value="public" class="peer hidden" x-model="visibility">
+                            <span class="block px-3 py-1.5 rounded-full border text-sm border-sela-300 bg-white text-sela-800/75 peer-checked:bg-sela-800 peer-checked:border-sela-800 peer-checked:text-white"><i class="ti ti-world"></i> 所有人</span>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="visibility" value="departments" class="peer hidden" x-model="visibility">
+                            <span class="block px-3 py-1.5 rounded-full border text-sm border-sela-300 bg-white text-sela-800/75 peer-checked:bg-sela-800 peer-checked:border-sela-800 peer-checked:text-white"><i class="ti ti-users"></i> 限定部門</span>
+                        </label>
+                    </div>
+                    <div x-show="visibility === 'departments'" x-cloak class="mt-2 p-3 bg-sela-50 rounded-lg">
+                        {% if departments %}
+                        <div class="space-y-2">
+                            {% for dept in departments %}
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="department_ids" value="{{ dept.id }}">
+                                <span class="text-sm">{{ dept.name }}</span>
+                                <span class="text-xs text-sela-800/45">({{ dept.member_count }}人)</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-sela-800/60">尚未建立部門，請至後台建立</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 備註 -->
+                <div>
+                    <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">備註</label>
+                    <textarea name="note" rows="2" placeholder="例：取餐地點在 3F 茶水間" x-model="note"
+                              class="w-full border border-sela-300 rounded-xl px-3 py-2 text-sm bg-white">{% if copy_from and copy_from.note %}{{ copy_from.note }}{% endif %}</textarea>
+                </div>
+
+                <!-- 外送費／每單上限 -->
+                <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <div class="font-medium text-sela-800/80"><i class="ti ti-eye-off"></i> 盲點模式</div>
-                        <p class="text-xs text-sela-800/60">截止前隱藏其他人的選擇，截止後一起揭曉</p>
+                        <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">外送費</label>
+                        <div class="flex items-center gap-1"><span class="text-sela-800/50">$</span>
+                            <input type="number" name="delivery_fee" min="0" step="1" placeholder="0" x-model="deliveryFee"
+                                   class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white">
+                        </div>
+                        <p class="text-[11px] text-sela-800/45 mt-1">自動平均分攤</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">每單上限</label>
+                        <div class="flex items-center gap-1"><span class="text-sela-800/50">$</span>
+                            <input type="number" name="order_limit" min="0" step="1" placeholder="不限" x-model="orderLimit"
+                                   class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white">
+                        </div>
+                        <p class="text-[11px] text-sela-800/45 mt-1">例：公司補助每人 $100</p>
                     </div>
                 </div>
-                
-                <!-- 隨機免單 -->
-                <div class="p-3 bg-white rounded-lg" x-data="{ enableLucky: false }">
-                    <div class="flex items-start gap-3">
-                        <input type="checkbox" name="enable_lucky_draw" value="true" 
-                               @change="enableLucky = $event.target.checked" class="mt-1">
-                        <div class="flex-1">
-                            <div class="font-medium text-sela-800/80"><i class="ti ti-confetti"></i> 隨機免單</div>
-                            <p class="text-xs text-sela-800/60">結單時隨機抽選幸運兒免單</p>
-                        </div>
+                <label x-show="orderLimit > 0" x-cloak class="flex items-start gap-2 -mt-2 cursor-pointer">
+                    <input type="checkbox" name="allow_over_limit" value="true" class="mt-0.5 rounded border-sela-300"
+                           {% if copy_from and copy_from.allow_over_limit %}checked{% endif %}>
+                    <span class="text-sm text-sela-800/70">允許超過上限<span class="block text-xs text-sela-800/50">勾選＝可以點超過，超過的部分自行貼補；不勾＝不能送出超過上限的訂單</span></span>
+                </label>
+
+                <!-- 飲料預設（只在飲料店） -->
+                <div x-show="selectedCategory === 'drink' && storeId" x-cloak>
+                    <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">飲料預設 <span class="font-normal text-sela-800/45">選項來自店家</span></label>
+                    {# V2.16.3 審核 P0-2：原本寫死「正常糖…」，店家的選項是「全糖…」時選了＋鎖定整團沒人能點。改依所選店家的 store_options 產生；店家沒設就顯示提示 #}
+                    <div class="grid grid-cols-2 gap-2">
+                        <template x-if="selectedStore && selectedStore.sugar_options.length">
+                            <select name="default_sugar" class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white" aria-label="預設甜度">
+                                <option value="">甜度不指定</option>
+                                <template x-for="o in selectedStore.sugar_options" :key="o"><option :value="o" x-text="o"></option></template>
+                            </select>
+                        </template>
+                        <template x-if="selectedStore && selectedStore.ice_options.length">
+                            <select name="default_ice" class="w-full border border-sela-300 rounded-xl px-3 py-2 bg-white" aria-label="預設冰塊">
+                                <option value="">冰塊不指定</option>
+                                <template x-for="o in selectedStore.ice_options" :key="o"><option :value="o" x-text="o"></option></template>
+                            </select>
+                        </template>
                     </div>
-                    <div x-show="enableLucky" x-cloak class="mt-3 flex items-center gap-2 pl-6">
-                        <span class="text-sm text-sela-800/70">免單人數</span>
-                        <input type="number" name="lucky_draw_count" value="1" min="1" max="5"
-                               class="w-16 border rounded px-2 py-1 text-center">
-                        <span class="text-sm text-sela-800/70">人</span>
+                    <p x-show="selectedStore && !selectedStore.sugar_options.length && !selectedStore.ice_options.length" class="text-xs text-sela-800/55">這家店還沒設定甜度／冰塊選項，團員點餐時不會有甜冰可選；管理員可到店家工作台「營運設定」補。</p>
+                    <div class="flex gap-4 mt-2">
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="lock_sugar" value="true"><span class="text-sm text-sela-800/70">鎖定甜度</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="lock_ice" value="true"><span class="text-sm text-sela-800/70">鎖定冰塊</span></label>
                     </div>
                 </div>
-                
-                <!-- 湊團制 -->
-                <div class="p-3 bg-white rounded-lg" x-data="{ enableMinMembers: false }">
-                    <div class="flex items-start gap-3">
-                        <input type="checkbox" 
-                               @change="enableMinMembers = $event.target.checked" class="mt-1">
-                        <div class="flex-1">
-                            <div class="font-medium text-sela-800/80"><i class="ti ti-target"></i> 湊團制</div>
-                            <p class="text-xs text-sela-800/60">設定最少成團人數</p>
+
+                <!-- 開關類：一列一個，打開才出現細項（關掉的細項用 :disabled，不會送出——坑 #42） -->
+                {% macro toggle(name_attr, model, label, hint='', checked_expr='') -%}
+                <label class="flex items-center justify-between gap-3 px-3 py-2.5 cursor-pointer">
+                    <span class="text-sm text-sela-800">{{ label }}{% if hint %} <span class="text-xs text-sela-800/45">{{ hint }}</span>{% endif %}</span>
+                    <input type="checkbox" {% if name_attr %}name="{{ name_attr }}" value="true"{% endif %} class="peer hidden" x-model="{{ model }}" @change="{{ model }} = $event.target.checked">
+                    <span class="block w-10 h-6 rounded-full bg-sela-200 peer-checked:bg-sela-800 relative transition-colors flex-shrink-0
+                                 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4"></span>
+                </label>
+                {%- endmacro %}
+                <div class="rounded-xl border border-sela-100 divide-y divide-sela-100" id="advanced-toggles">
+                    {{ toggle('enable_backup', 'bkOn', '缺貨候補', '臨時沒貨照候補買') }}
+                    <div x-show="bkOn" x-cloak class="px-3 py-2 bg-sela-50 flex items-center gap-2 text-sm text-sela-800/70">
+                        每個品項最多
+                        {% set bc = copy_from.backup_count if copy_from and copy_from.backup_count else 2 %}
+                        <div class="flex gap-1 bg-sela-100 p-1 rounded-lg">
+                            {% for n in [1, 2, 3] %}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="backup_count" value="{{ n }}" class="peer hidden" :disabled="!bkOn" {% if bc == n %}checked{% endif %}>
+                                <span class="block px-3 py-0.5 rounded-md text-sm font-medium text-sela-800/55 peer-checked:bg-sela-800 peer-checked:text-white transition">{{ n }}</span>
+                            </label>
+                            {% endfor %}
                         </div>
+                        個候補
                     </div>
-                    <div x-show="enableMinMembers" x-cloak class="mt-3 space-y-2 pl-6">
+                    {{ toggle('is_blind_mode', 'blind', '盲點模式', '截止後才看得到別人點什麼') }}
+                    {{ toggle('enable_lucky_draw', 'enableLucky', '隨機免單', '截止時抽') }}
+                    <div x-show="enableLucky" x-cloak class="px-3 py-2 bg-sela-50 flex items-center gap-2 text-sm text-sela-800/70">
+                        抽 <input type="number" name="lucky_draw_count" value="1" min="1" max="5" :disabled="!enableLucky" class="w-16 border rounded px-2 py-1 text-center"> 人免單
+                    </div>
+                    {{ toggle('', 'enableMinMembers', '湊團制', '設定最少成團人數') }}
+                    <div x-show="enableMinMembers" x-cloak class="px-3 py-2 bg-sela-50 space-y-2 text-sm text-sela-800/70">
                         <div class="flex items-center gap-2">
-                            <span class="text-sm text-sela-800/70">最少</span>
+                            最少
                             {# V2.16.3 審核 P0-1：被 x-show 藏起來的欄位照樣送出，每個團都被寫入湊團 5 人；disabled 才不送 #}
-                            <input type="number" name="min_members" value="5" min="2" max="50" :disabled="!enableMinMembers"
-                                   class="w-16 border rounded px-2 py-1 text-center">
-                            <span class="text-sm text-sela-800/70">人成團</span>
+                            <input type="number" name="min_members" value="5" min="2" max="50" :disabled="!enableMinMembers" class="w-16 border rounded px-2 py-1 text-center">
+                            人成團
                         </div>
-                        <label class="flex items-center gap-2 text-sm text-sela-800/70">
+                        <label class="flex items-center gap-2">
                             <input type="checkbox" name="auto_extend" value="true" :disabled="!enableMinMembers">
                             <span>未達人數自動延長 30 分鐘</span>
                         </label>
                     </div>
-                </div>
-                
-                <!-- 自動催單 -->
-                <div class="p-3 bg-white rounded-lg" x-data="{ enableRemind: false }">
-                    <div class="flex items-start gap-3">
-                        <input type="checkbox" 
-                               @change="enableRemind = $event.target.checked" class="mt-1">
-                        <div class="flex-1">
-                            <div class="font-medium text-sela-800/80"><i class="ti ti-alarm"></i> 自動催單</div>
-                            <p class="text-xs text-sela-800/60">截止前自動提醒尚未結單的人</p>
-                        </div>
-                    </div>
-                    <div x-show="enableRemind" x-cloak class="mt-3 flex items-center gap-2 pl-6">
-                        <span class="text-sm text-sela-800/70">截止前</span>
+                    {{ toggle('', 'enableRemind', '自動催單', '截止前提醒還沒送出的人') }}
+                    <div x-show="enableRemind" x-cloak class="px-3 py-2 bg-sela-50 flex items-center gap-2 text-sm text-sela-800/70">
+                        截止前
                         <select name="auto_remind_minutes" :disabled="!enableRemind" class="border rounded px-2 py-1 text-sm">
                             <option value="10">10 分鐘</option>
                             <option value="15" selected>15 分鐘</option>
                             <option value="30">30 分鐘</option>
                         </select>
-                        <span class="text-sm text-sela-800/70">提醒</span>
+                        提醒
                     </div>
-                </div>
-                
-                <!-- 我請客 -->
-                <div class="p-3 bg-white rounded-lg">
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" name="i_treat" value="true" class="mt-1">
-                        <div class="flex-1">
-                            <div class="font-medium text-red-600"><i class="ti ti-heart"></i> 這單我請客</div>
-                            <p class="text-xs text-sela-800/60">本團將由你買單</p>
-                        </div>
-                    </label>
+                    {{ toggle('i_treat', 'treat', '這單我請客', '本團由你買單') }}
                 </div>
             </div>
         </div>
-        
-        <!-- 送出按鈕 -->
-        <div class="flex gap-2 pt-4" x-show="storeId || selectedCategory === 'proxy'" x-cloak>
-            <a href="/home" class="flex-1 py-3 text-center rounded-lg border hover:bg-sela-50">
-                取消
-            </a>
-            <button type="submit" class="flex-1 py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
-                開團
-            </button>
+
+        <!-- 送出 -->
+        <div class="pt-2 space-y-2" x-show="storeId || selectedCategory === 'proxy'" x-cloak>
+            <button type="submit" class="btn btn-primary w-full py-3 text-base">開團</button>
+            <a href="/home" class="block text-center text-sm text-sela-800/50 underline py-1">取消</a>
         </div>
     </form>
 </div>
@@ -538,6 +433,25 @@ function newGroupForm() {
     return {
         selectedCategory: '{% if copy_from %}{{ copy_from.category.value }}{% endif %}',
         storeId: '{% if copy_from %}{{ copy_from.store_id }}{% endif %}',
+
+        // V2.19.0：主畫面只問截止＋團名，其他收進進階設定
+        groupName: {{ (copy_from.name if copy_from else '') | tojson }},
+        nameTouched: {{ 'true' if copy_from else 'false' }},   // 複製開團沿用舊團名，不自動換
+        deadlinePreset: '',
+        deadlinePresets: ['30m', '1h', '12:00', '17:00'],
+        advOpen: false,
+        visibility: 'public',
+        note: {{ (copy_from.note if copy_from and copy_from.note else '') | tojson }},
+        deliveryFee: {{ ((copy_from.delivery_fee|int|string) if copy_from and copy_from.delivery_fee else '') | tojson }},
+        orderLimit: {{ ((copy_from.order_limit|int|string) if copy_from and copy_from.order_limit else '') | tojson }},
+        bkOn: {{ 'true' if copy_from and copy_from.enable_backup else 'false' }},
+        blind: false,
+        enableLucky: false,
+        enableMinMembers: false,
+        enableRemind: false,
+        treat: false,
+        // 複製開團帶入了幾項非預設的設定（進階列標「已帶入 N 項」）
+        copiedCount: {{ ([copy_from.note, copy_from.delivery_fee, copy_from.order_limit, copy_from.enable_backup] | select | list | length) if copy_from else 0 }},
         branchId: '',
         branches: [],
         
@@ -690,6 +604,8 @@ function newGroupForm() {
             this.branches = [];
             this.branchId = '';
             this.pickerQuery = '';
+            if (!this.nameTouched) this.groupName = '';
+            if (category === 'proxy') this.$nextTick(() => this.ensureDefaults());
         },
         
         onStoreChange() {
@@ -700,9 +616,51 @@ function newGroupForm() {
                 this.branches = [];
             }
             this.branchId = '';
+            if (store) this.$nextTick(() => this.ensureDefaults());
+        },
+
+        // 選好店（或選代購）：截止沒填就預設 1 小時後，團名自動帶
+        ensureDefaults() {
+            const el = this.$refs.deadline;
+            if (el && !el.value) this.setDeadline('1h');
+            else this.autoName();
+        },
+
+        // 團名＝店名 · 時段（依截止時間）；團購只帶店名、代購帶日期；自己改過就不動
+        slotOf(hour) {
+            if (hour < 10) return '早餐';
+            if (hour < 14) return '午餐';
+            if (hour < 17) return '下午茶';
+            return '晚餐';
+        },
+        autoName() {
+            if (this.nameTouched) return;
+            const el = this.$refs.deadline;
+            const dl = el && el.value ? new Date(el.value) : null;
+            if (this.selectedCategory === 'proxy') {
+                this.groupName = dl ? '代購 · ' + (dl.getMonth() + 1) + '/' + dl.getDate() : '代購';
+                return;
+            }
+            const st = this.selectedStore;
+            if (!st) return;
+            if (this.selectedCategory === 'group_buy' || !dl) { this.groupName = st.name; return; }
+            this.groupName = st.name + ' · ' + this.slotOf(dl.getHours());
+        },
+
+        // 進階設定收合時的一行摘要
+        advSummary() {
+            const parts = [this.visibility === 'departments' ? '限定部門' : '公開'];
+            parts.push(Number(this.orderLimit) > 0 ? '上限 $' + Number(this.orderLimit) : '無上限');
+            parts.push(Number(this.deliveryFee) > 0 ? '外送 $' + Number(this.deliveryFee) : '無外送費');
+            if (this.bkOn) parts.push('候補');
+            if (this.note && this.note.trim()) parts.push('有備註');
+            const fun = [this.blind && '盲點', this.enableLucky && '免單', this.enableMinMembers && '湊團', this.enableRemind && '催單', this.treat && '請客'].filter(Boolean);
+            return parts.concat(fun).join(' · ');
         },
         
         presetLabel(hm) {
+            if (hm === '30m') return '30 分鐘後';
+            if (hm === '1h') return '1 小時後';
             const [h, m] = hm.split(':').map(Number);
             const now = new Date(); const t = new Date(now); t.setHours(h, m, 0, 0);
             return (t <= now ? '明天 ' : '今天 ') + hm;
@@ -732,6 +690,8 @@ function newGroupForm() {
                 const h = String(target.getHours()).padStart(2, '0');
                 const min = String(target.getMinutes()).padStart(2, '0');
                 this.$refs.deadline.value = `${y}-${m}-${d}T${h}:${min}`;
+                this.deadlinePreset = preset;
+                this.autoName();
             }
         }
     }

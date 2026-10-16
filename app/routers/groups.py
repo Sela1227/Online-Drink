@@ -959,7 +959,7 @@ async def fulfillment_action(
         Order.status == OrderStatus.SUBMITTED,
     ).first()
     if not item:
-        raise HTTPException(status_code=404, detail="品項不存在或未結單")
+        raise HTTPException(status_code=404, detail="品項不存在或還沒送出")
     
     if action == "backup":
         backup = next((b for b in item.backups if b.id == backup_id), None)
@@ -1087,7 +1087,7 @@ async def set_treat(group_id: int, request: Request, db: Session = Depends(get_d
     ).first()
     
     if not my_order:
-        raise HTTPException(status_code=400, detail="您尚未結單，無法請客")
+        raise HTTPException(status_code=400, detail="先送出訂單才能請客")
     
     from app.models.treat import TreatRecord
     

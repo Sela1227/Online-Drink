@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 
 {% block title %}{{ group.name }} - SELA 快點來點餐{% endblock %}
+{# V2.18.0：團頁隱藏底部導航（左上「‹ 今天」回去），底部留給常駐結帳列 #}
+{% block bottom_nav %}{% endblock %}
 
 {% block content %}
 <div class="space-y-4" x-data="orderPage()">
-    <!-- Header -->
-    <div class="bg-white rounded-2xl shadow-sm p-4">
+    {# ============================================================
+       V2.18.0 團頁重排：身分 × 階段決定畫面（畫面稿 preview_group_v2180.html）
+       團員開放中＝點餐；團員已送出＝看自己點了什麼、要不要再加；團主開放中＝盯進度、分享、催；
+       團主已截止＝傳店家、核對、收錢。標頭壓成一張卡，詳細資訊收合；團主工具 7 格 → 團主列三顆。
+       ============================================================ #}
+    <!-- 標頭卡 -->
+    <div class="bg-white rounded-2xl shadow-sm p-4" x-data="{ details: false }">
         <!-- 候補模式提示條 -->
         <div x-show="backupMode" x-cloak x-transition
              class="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-30 mb-3 bg-sela-800 text-white rounded-xl px-3.5 py-2.5 text-sm flex items-center gap-2 shadow-lg">
@@ -15,9 +22,8 @@
         </div>
         <a href="/home" class="back-link"><i class="ti ti-chevron-left"></i><span>今天</span></a>
 
-        <!-- 店家資訊：大縮圖 + 分行文字 -->
         <div class="flex items-start gap-3">
-            <div class="w-14 h-14 bg-sela-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <div class="w-12 h-12 bg-sela-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {% if store.logo_url %}
                 <img src="{{ store.logo_url }}" alt="{{ store.name }}" class="w-full h-full object-contain p-1">
                 {% else %}
@@ -29,109 +35,103 @@
                 {% endif %}
             </div>
             <div class="flex-1 min-w-0">
-                <h1 class="font-bold text-lg text-sela-800 leading-snug mb-1">{{ group.name }}</h1>
-                <div class="text-sm text-sela-800/60">
-                    {{ store.name }}{% if branch %}<span class="text-sela-800">（{{ branch.name }}）</span>{% endif %}
+                <h1 class="font-bold text-base text-sela-800 leading-snug">
+                    {{ group.name }}{% if is_owner %} <span class="text-[10px] font-normal bg-sela-100 text-sela-800 px-1 py-0.5 rounded align-middle">你開的</span>{% endif %}
+                </h1>
+                <div class="text-sm text-sela-800/60 truncate flex items-center gap-1.5">
+                    <span class="truncate">{{ store.name }}{% if branch %}（{{ branch.name }}）{% endif %}{% if not is_owner %} · {{ group.owner.show_name }}{% endif %}</span>
+                    <button onclick="toggleFavorite({{ store.id }})" id="fav-btn" class="flex-shrink-0 active:scale-95 transition-transform" title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}" aria-label="收藏店家">
+                        <span class="{% if is_favorited %}text-sela-500{% else %}text-sela-800/50{% endif %}"><i class="ti {% if is_favorited %}ti-star-filled{% else %}ti-star{% endif %}"></i></span><span id="fav-text" class="sr-only">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
+                    </button>
                 </div>
-                <div class="text-sm text-sela-800/45 mb-1">{{ group.owner.show_name }}</div>
-                <button onclick="toggleFavorite({{ store.id }})"
-                        id="fav-btn"
-                        class="flex items-center gap-0.5 active:scale-95 transition-transform"
-                        title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
-                    {# V2.16.3 審核 P1-2b：收藏與否都是空心星，改實心＋主色 #}
-                    <span class="text-base {% if is_favorited %}text-sela-500{% else %}text-sela-800{% endif %}"><i class="ti {% if is_favorited %}ti-star-filled{% else %}ti-star{% endif %}"></i></span>
-                    <span class="text-xs text-sela-800/45" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
-                </button>
+                {# 小標籤：有設定才出現；全部細節在「詳細資訊」 #}
+                <div class="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11px]">
+                    {% if is_open %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"
+                          x-data='countdown({{ group.deadline.isoformat() | tojson }})'>
+                        <i class="ti ti-clock"></i> 截止 {{ group.deadline.strftime('%m/%d %H:%M') }} · <span :class="urgent ? 'text-red-600 font-medium' : ''"><i class="ti ti-flame" x-show="urgent" x-cloak></i>剩 <span x-text="display"></span></span>
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-200 text-sela-800"><i class="ti ti-lock"></i> 已截止 {{ group.deadline.strftime('%m/%d %H:%M') }}</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-users"></i> {{ group.submitted_count }} 人{% if group.submitted_count > 0 %} · ${{ group.total_amount|money }}{% endif %}</span>
+                    {% endif %}
+                    {% if group.order_limit %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-coin"></i> 上限 ${{ group.order_limit|money }}</span>{% endif %}
+                    {% if group.delivery_fee %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-car"></i> 外送 ${{ group.delivery_fee|money }}</span>{% endif %}
+                    {% if group.discount_percent and group.discount_percent < 100 %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-discount"></i> 全單 {{ group.discount_percent|int }}%</span>{% endif %}
+                    {% if group.enable_backup %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-replace"></i> 候補</span>{% endif %}
+                    {% if group.min_members %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full {% if group.has_enough_members %}bg-green-50 text-green-700{% else %}bg-amber-50 text-amber-700{% endif %}"><i class="ti ti-target"></i> 湊團 {{ group.submitted_count }}/{{ group.min_members }}</span>{% endif %}
+                    {% if group.is_blind_mode and is_open %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-eye-off"></i> 盲點</span>{% endif %}
+                    {% if group.enable_lucky_draw %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-confetti"></i> 抽 {{ group.lucky_draw_count }} 人免單</span>{% endif %}
+                    {% if group.treat_user_id %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700"><i class="ti ti-heart"></i> {{ treat_user.show_name if treat_user else '某人' }} 請客</span>{% endif %}
+                    {% if (is_owner or is_admin) and group.auto_remind_minutes and is_open %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sela-100 text-sela-800"><i class="ti ti-bell"></i> 催單 {{ group.auto_remind_minutes }} 分前</span>{% endif %}
+                </div>
             </div>
         </div>
-        
-        <!-- 店家連結（一行圖示）-->
-        {% set _phone = branch.phone if branch and branch.phone else store.phone %}
-        {% set _addr = branch.address if branch and branch.address else store.address %}
+
         {% if not store %}
         <div class="mt-3 p-3 bg-sela-100 border border-sela-200 rounded-xl text-sm text-sela-800/75">
             <i class="ti ti-archive"></i> 店家已移除，僅供檢視歷史訂單
         </div>
         {% endif %}
 
-        {% if _phone or _addr or store.google_maps_url or store.website_url or store.ubereats_url or store.foodpanda_url %}
+        <!-- 店家連結（一行圖示）＋ 詳細資訊 -->
+        {% set _phone = branch.phone if branch and branch.phone else store.phone %}
+        {% set _addr = branch.address if branch and branch.address else store.address %}
         <div class="mt-3 flex items-center gap-2 flex-wrap">
             {% if _phone %}
-            <a href="tel:{{ _phone }}" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="撥打電話"><i class="ti ti-phone"></i></a>
+            <a href="tel:{{ _phone }}" class="w-9 h-9 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="撥打電話"><i class="ti ti-phone"></i></a>
             {% endif %}
             {% if store.google_maps_url %}
-            <a href="{{ store.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
+            <a href="{{ store.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="w-9 h-9 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
             {% elif _addr %}
-            <a href="https://www.google.com/maps/search/?api=1&query={{ _addr|urlencode }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
+            <a href="https://www.google.com/maps/search/?api=1&query={{ _addr|urlencode }}" target="_blank" rel="noopener noreferrer" class="w-9 h-9 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="地圖"><i class="ti ti-map-pin"></i></a>
             {% endif %}
             {% if store.website_url %}
-            <a href="{{ store.website_url }}" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="官網"><i class="ti ti-world"></i></a>
+            <a href="{{ store.website_url }}" target="_blank" rel="noopener noreferrer" class="w-9 h-9 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 active:bg-sela-50" aria-label="官網"><i class="ti ti-world"></i></a>
             {% endif %}
             {% if store.ubereats_url %}
-            <a href="{{ store.ubereats_url }}" target="_blank" rel="noopener noreferrer" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">Uber Eats</a>
+            <a href="{{ store.ubereats_url }}" target="_blank" rel="noopener noreferrer" class="h-9 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">Uber Eats</a>
             {% endif %}
             {% if store.foodpanda_url %}
-            <a href="{{ store.foodpanda_url }}" target="_blank" rel="noopener noreferrer" class="h-10 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">foodpanda</a>
+            <a href="{{ store.foodpanda_url }}" target="_blank" rel="noopener noreferrer" class="h-9 px-3 rounded-xl bg-white border border-sela-200 flex items-center justify-center text-sela-700 text-xs active:bg-sela-50">foodpanda</a>
             {% endif %}
+            <button type="button" @click="details = !details" class="ml-auto text-xs text-sela-800/60 underline py-2" x-text="details ? '收起' : '詳細資訊 ›'">詳細資訊 ›</button>
         </div>
-        {% endif %}
-        
-        <!-- 趣味功能狀態提示 -->
+
+        <!-- 詳細資訊（原本的資訊卡＋趣味功能說明，收合） -->
+        <div x-show="details" x-collapse x-cloak>
         {% if group.is_blind_mode and is_open %}
         <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800">
             <i class="ti ti-eye-off"></i> <strong>盲點模式</strong>：截止前無法看到其他人點了什麼，截止後一起揭曉！
         </div>
         {% endif %}
-        
         {% if group.enable_lucky_draw %}
         <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800">
-            <i class="ti ti-confetti"></i> <strong>隨機免單</strong>：結單時將抽選 {{ group.lucky_draw_count }} 人免單！
-            {% if not is_open and group.lucky_winner_ids %}
-            <div class="mt-2 font-bold text-lg">
-                <i class="ti ti-confetti"></i> 恭喜 
-                {% for winner_id in group.lucky_winner_ids.split(',') %}
-                    {% for order in submitted_orders if order.user_id == winner_id|int %}
-                        {{ order.user.show_name }}{% if not loop.last %}、{% endif %}
-                    {% endfor %}
-                {% endfor %}
-                 中獎免單！
-            </div>
-            {% endif %}
+            <i class="ti ti-confetti"></i> <strong>隨機免單</strong>：截止時抽 {{ group.lucky_draw_count }} 人免單！
         </div>
         {% endif %}
-        
         {% if group.treat_user_id %}
         <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
-            <div>
-                <i class="ti ti-heart"></i> <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單
-            </div>
+            <div><i class="ti ti-heart"></i> <strong>{{ treat_user.show_name if treat_user else '某人' }} 請客！</strong> 本團由 TA 買單</div>
             {% if user.id == group.treat_user_id or is_owner or is_admin %}
-            <form action="/groups/{{ group.id }}/cancel-treat" method="post" class="inline"
-                  onsubmit="return confirm('確定要取消請客嗎？')">
+            <form action="/groups/{{ group.id }}/cancel-treat" method="post" class="inline" onsubmit="return confirm('確定要取消請客嗎？')">
                 <button type="submit" class="text-red-600 hover:text-red-700 text-xs">取消請客</button>
             </form>
             {% endif %}
         </div>
         {% endif %}
-        
-        <!-- 團單資訊卡（唯一彩色＝語意點）-->
         <div class="mt-3 rounded-xl border border-sela-100 divide-y divide-sela-100">
-            <!-- 結單時間＋倒數 -->
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-clock text-sela-800/50"></i>
-                <span class="text-sela-800/50 w-14 flex-shrink-0">結單</span>
+                <span class="text-sela-800/50 w-14 flex-shrink-0">截止</span>
                 <span class="font-medium text-sela-800">{{ group.deadline.strftime('%m/%d %H:%M') }}</span>
-                {% if is_open %}
-                <span class="ml-auto text-xs font-medium inline-flex items-center gap-1"
-                      x-data='countdown({{ group.deadline.isoformat() | tojson }})'
-                      :class="urgent ? 'text-red-600' : 'text-sela-800/55'">
-                    <i class="ti ti-flame" x-show="urgent" x-cloak></i>剩 <span x-text="display"></span>
-                </span>
-                {% else %}
-                <span class="ml-auto text-xs text-sela-800/45">已截止</span>
-                {% endif %}
+                {% if not is_open %}<span class="ml-auto text-xs text-sela-800/45">已截止</span>{% endif %}
             </div>
-            <!-- 備註 -->
+            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
+                <i class="ti ti-user text-sela-800/50"></i>
+                <span class="text-sela-800/50 w-14 flex-shrink-0">團主</span>
+                <span class="text-sela-800">{{ group.owner.show_name }}</span>
+            </div>
             {% if group.note %}
             <div class="flex items-start gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-pencil text-sela-800/50 mt-0.5"></i>
@@ -139,7 +139,6 @@
                 <span class="text-sela-800 flex-1">{{ group.note }}</span>
             </div>
             {% endif %}
-            <!-- 每單上限 -->
             {% if group.order_limit %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-coin text-sela-800/50"></i>
@@ -148,16 +147,14 @@
                 <span class="ml-auto text-xs text-sela-800/45">{% if group.allow_over_limit %}可超過・自行貼補{% else %}不可超過{% endif %}</span>
             </div>
             {% endif %}
-            <!-- 外送費 -->
             {% if group.delivery_fee %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-car text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">外送費</span>
                 <span class="font-medium text-sela-800">${{ group.delivery_fee|money }}</span>
-                <span class="ml-auto text-xs text-sela-800/45">{% if group.submitted_count > 0 %}每人約 ${{ group.delivery_fee_per_person|money }}（{{ group.submitted_count }} 人）{% else %}結單後分攤{% endif %}</span>
+                <span class="ml-auto text-xs text-sela-800/45">{% if group.submitted_count > 0 %}每人約 ${{ group.delivery_fee_per_person|money }}（{{ group.submitted_count }} 人）{% else %}截止後分攤{% endif %}</span>
             </div>
             {% endif %}
-            <!-- 整單折扣 -->
             {% if group.discount_percent and group.discount_percent < 100 %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-discount text-sela-800/50"></i>
@@ -166,7 +163,6 @@
                 <span class="ml-auto text-xs text-sela-800/45">結帳金額自動重算</span>
             </div>
             {% endif %}
-            <!-- 單據 -->
             {% if store.provides_invoice or store.provides_receipt %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-receipt text-sela-800/50"></i>
@@ -174,7 +170,6 @@
                 <span class="text-sela-800">可開{% if store.provides_invoice %}發票{% endif %}{% if store.provides_invoice and store.provides_receipt %}、{% endif %}{% if store.provides_receipt %}收據{% endif %}</span>
             </div>
             {% endif %}
-            <!-- 缺貨候補 -->
             {% if group.enable_backup %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-replace text-sela-800/50"></i>
@@ -183,7 +178,6 @@
                 <span class="ml-auto text-xs text-sela-800/45">臨時缺貨照候補買</span>
             </div>
             {% endif %}
-            <!-- 湊團 -->
             {% if group.min_members %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-target text-sela-800/50"></i>
@@ -201,122 +195,88 @@
                 {% endif %}
             </div>
             {% endif %}
-            <!-- 點餐狀況（團主/管理員限定）-->
-            {% if (is_owner or is_admin) and is_open and pending_count > 0 %}
-            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
-                <i class="ti ti-users text-sela-800/50"></i>
-                <span class="text-sela-800/50 w-14 flex-shrink-0">狀況</span>
-                <span class="text-sela-800">{{ pending_count }} 人未送出</span>
-                <button @click="showReminder = true" class="ml-auto text-xs font-medium text-sela-800 bg-sela-100 px-2.5 py-1 rounded-full active:bg-sela-200">查看名單</button>
-            </div>
-            {% endif %}
-            <!-- V2.14.0：時價品項待定價（團主/管理員限定，截止後）-->
-            {% if (is_owner or is_admin) and not is_open and tbd_pending_count %}
-            <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
-                <i class="ti ti-tag text-amber-600"></i>
-                <span class="text-sela-800/50 w-14 flex-shrink-0">時價</span>
-                <span class="text-amber-700">{{ tbd_pending_count }} 個時價品項待定價</span>
-                <button @click="showFulfillment = true" class="ml-auto text-xs font-medium text-sela-800 bg-sela-100 px-2.5 py-1 rounded-full active:bg-sela-200">去定價</button>
-            </div>
-            {% endif %}
-            <!-- 自動催單（團主/管理員限定）-->
             {% if (is_owner or is_admin) and group.auto_remind_minutes and is_open %}
             <div class="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                 <i class="ti ti-bell text-sela-800/50"></i>
                 <span class="text-sela-800/50 w-14 flex-shrink-0">催單</span>
-                <span class="text-xs text-sela-800/45">截止前 {{ group.auto_remind_minutes }} 分鐘自動提醒未結單的人</span>
+                <span class="text-xs text-sela-800/45">截止前 {{ group.auto_remind_minutes }} 分鐘自動提醒還沒送出的人</span>
             </div>
             {% endif %}
         </div>
-        
+        </div>
+
+        {# 抽獎結果：截止後揭曉，不收合 #}
+        {% if group.enable_lucky_draw and not is_open and group.lucky_winner_ids %}
+        <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 font-bold">
+            <i class="ti ti-confetti"></i> 恭喜
+            {% for winner_id in group.lucky_winner_ids.split(',') %}{% for order in submitted_orders if order.user_id == winner_id|int %}{{ order.user.show_name }}{% if not loop.last %}、{% endif %}{% endfor %}{% endfor %}
+            中獎免單！
+        </div>
+        {% endif %}
+
         {% if store.is_personal and is_open and (is_owner or is_admin) %}
         {% set _item_count = namespace(n=0) %}
         {% for c in (menu.categories if menu else []) %}{% set _item_count.n = _item_count.n + (c.items|length) %}{% endfor %}
         {% if _item_count.n == 0 %}
         <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-            <i class="ti ti-alert-triangle"></i> 還沒有品項——先到「團主工具 → 管理品項」新增，加好再分享連結
+            <i class="ti ti-alert-triangle"></i> 還沒有品項——先到「更多 → 管理品項」新增，加好再分享連結
         </div>
         {% endif %}
-        {% endif %}
-
-        {% if is_owner or is_admin %}
-        <!-- 團主工具（收合・團員不顯示）-->
-        <div class="mt-3 pt-3 border-t border-sela-100" x-data="{ toolsOpen: false, showExport: false }">
-            <button @click="toolsOpen = !toolsOpen" class="w-full flex items-center gap-2 text-sm font-medium text-sela-800/80 py-1.5">
-                <i class="ti ti-tool"></i> 團主工具
-                <i class="ti ti-chevron-right ml-auto transition-transform text-sela-800/40" :class="toolsOpen && 'rotate-90'"></i>
-            </button>
-            <div x-show="toolsOpen" x-transition x-cloak class="mt-2">
-                <div class="grid grid-cols-3 gap-2">
-                    {% if store.is_personal %}
-                    <button @click="showItemsPanel = true; toolsOpen = false" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-800 text-white active:bg-sela-900">
-                        <i class="ti ti-list-details text-lg"></i><span class="text-xs">管理品項</span>
-                    </button>
-                    {% endif %}
-                    <button @click="copyLink()" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-link text-lg"></i><span class="text-xs">複製連結</span>
-                    </button>
-                    <button @click="showQR = true" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-qrcode text-lg"></i><span class="text-xs">QR Code</span>
-                    </button>
-                    <button @click="showSaveTemplate = true" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-clipboard-list text-lg"></i><span class="text-xs">存模板</span>
-                    </button>
-                    <button @click="showExport = !showExport" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-download text-lg"></i><span class="text-xs">匯出單據</span>
-                    </button>
-                    <button @click="showSettings = true" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-settings text-lg"></i><span class="text-xs">修改設定</span>
-                    </button>
-                    <button @click="showFulfillment = true; toolsOpen = false" class="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                        <i class="ti ti-replace text-lg"></i><span class="text-xs">缺貨處理</span>
-                    </button>
-                    {% if is_open %}
-                    <form action="/groups/{{ group.id }}/close" method="post"
-                          onsubmit="return confirm('確定要提早結單嗎？結單後將無法再{% if group.category.value == 'group_buy' %}下單{% else %}點餐{% endif %}。')">
-                        <button type="submit" class="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl bg-sela-50 text-sela-800/80 active:bg-sela-100">
-                            <i class="ti ti-clock-stop text-lg"></i><span class="text-xs">提早結單</span>
-                        </button>
-                    </form>
-                    {% endif %}
-                </div>
-
-                <!-- 匯出單據（依用途分組）-->
-                <div x-show="showExport" x-transition class="mt-2 p-3 bg-sela-50 rounded-xl space-y-3">
-                    <div>
-                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-send"></i> 傳給店家（下單用）</div>
-                        <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                            <i class="ti ti-building-store"></i> 點餐彙總（含候補對照）
-                        </a>
-                    </div>
-                    <div>
-                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-checklist"></i> 現場核對（原始品項・換貨結果見收款明細）</div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <a href="/groups/{{ group.id }}/export/receipt.pdf" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                                <i class="ti ti-file-text"></i> 核對單 PDF
-                            </a>
-                            <a href="/groups/{{ group.id }}/export/receipt.png" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                                <i class="ti ti-photo"></i> 核對單圖片
-                            </a>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-coin"></i> 收款與留存</div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800 text-sm active:bg-sela-100">
-                                <i class="ti ti-coin"></i> 收款明細（向大家收錢）
-                            </a>
-                            <a href="/groups/{{ group.id }}/export/excel" class="flex items-center justify-center gap-1 py-2 bg-white rounded-lg text-sela-800/70 text-sm active:bg-sela-100">
-                                <i class="ti ti-table"></i> Excel（存檔）
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         {% endif %}
     </div>
-    
+
+    {% if is_owner or is_admin %}
+    {% if is_open %}
+    <!-- 團主列：進度一行＋分享／催單／更多（取代原本的 7 格團主工具） -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-300 p-4" id="owner-bar">
+        <div class="flex items-center justify-between text-sm gap-2">
+            <span class="text-sela-800"><strong>{{ group.submitted_count }} 人已送出</strong>{% if group.submitted_count > 0 %} · ${{ group.total_amount|money }}{% endif %}</span>
+            {% if pending_count > 0 %}<span class="text-amber-700 text-xs">{{ pending_count }} 人點了還沒送出</span>{% else %}<span class="text-sela-800/45 text-xs">沒有人卡在購物車</span>{% endif %}
+        </div>
+        <span id="remind-text" hidden data-text="【{{ group.name }}】{{ group.deadline.strftime('%m/%d %H:%M') }} 截止，還沒點的快來點餐：__ORIGIN__/groups/{{ group.id }}{% if pending_count > 0 %}（還有 {{ pending_count }} 位點了還沒送出）{% endif %}"></span>
+        <div class="mt-2.5 grid grid-cols-3 gap-2 text-xs">
+            <button type="button" @click="showShare = true" class="py-2 rounded-full bg-white border border-sela-300 text-sela-800 active:bg-sela-50"><i class="ti ti-share"></i> 分享</button>
+            {% if pending_count > 0 %}
+            <button type="button" @click="copyRemind()" class="py-2 rounded-full bg-sela-800 text-white active:bg-sela-900"><i class="ti ti-speakerphone"></i> 催單 <span class="bg-white/25 rounded px-1">{{ pending_count }}</span></button>
+            {% else %}
+            <button type="button" @click="copyRemind()" class="py-2 rounded-full bg-white border border-sela-300 text-sela-800 active:bg-sela-50"><i class="ti ti-speakerphone"></i> 催單</button>
+            {% endif %}
+            <button type="button" @click="showMore = true" class="py-2 rounded-full bg-white border border-sela-300 text-sela-800 active:bg-sela-50"><i class="ti ti-dots"></i> 更多</button>
+        </div>
+    </div>
+    {% else %}
+    <!-- 下一步卡：截止後團主的三步 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-300 p-4" id="next-steps">
+        <div class="font-semibold text-sela-800 mb-2.5">下一步</div>
+        <div class="space-y-2.5 text-sm">
+            <div class="flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-sela-800 text-white text-xs flex items-center justify-center flex-shrink-0">1</span>
+                <div class="flex-1 min-w-0"><div class="font-medium text-sela-800">傳給店家</div><div class="text-xs text-sela-800/50">點餐彙總（含候補對照）</div></div>
+                <a href="/groups/{{ group.id }}/export/order" class="px-3 py-1.5 rounded-full bg-sela-800 text-white text-xs">開啟</a>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-sela-800 text-white text-xs flex items-center justify-center flex-shrink-0">2</span>
+                <div class="flex-1 min-w-0"><div class="font-medium text-sela-800">現場核對</div><div class="text-xs text-sela-800/50">核對單（原始品項）</div></div>
+                <a href="/groups/{{ group.id }}/export/receipt.pdf" class="px-2.5 py-1.5 rounded-full border border-sela-300 text-sela-800 text-xs">PDF</a>
+                <a href="/groups/{{ group.id }}/export/receipt.png" class="px-2.5 py-1.5 rounded-full border border-sela-300 text-sela-800 text-xs">圖片</a>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-sela-800 text-white text-xs flex items-center justify-center flex-shrink-0">3</span>
+                <div class="flex-1 min-w-0"><div class="font-medium text-sela-800">向大家收錢</div><div class="text-xs text-sela-800/50">收款明細（含補助、換貨補退）</div></div>
+                <a href="/groups/{{ group.id }}/export/payment" class="px-3 py-1.5 rounded-full border border-sela-300 text-sela-800 text-xs">開啟</a>
+            </div>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-sela-100 space-y-1.5 text-sm">
+            {% if tbd_pending_count %}
+            <button type="button" @click="showFulfillment = true" class="w-full flex items-center justify-between text-amber-700"><span><i class="ti ti-tag"></i> {{ tbd_pending_count }} 個時價品項待定價</span><span class="underline text-xs">去定價 ›</span></button>
+            {% endif %}
+            <button type="button" @click="showFulfillment = true" class="w-full flex items-center justify-between text-sela-800/70"><span><i class="ti ti-replace"></i> 店家說有缺貨？</span><span class="underline text-xs">缺貨處理 ›</span></button>
+            <button type="button" @click="showMore = true" class="w-full flex items-center justify-between text-sela-800/70"><span><i class="ti ti-dots"></i> 更多（Excel、存成範本、複製開團、刪除…）</span><span class="text-xs">›</span></button>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
     <!-- 團單設定 Modal -->
     {% if is_owner or is_admin %}
     <div x-show="showSettings" x-cloak
@@ -405,7 +365,7 @@
                 </div>
                 
                 <!-- 轉移團主 -->
-                <div class="border rounded-lg p-3">
+                <div class="border rounded-lg p-3" id="transfer-owner">
                     <h4 class="font-medium text-sela-800 mb-2">轉移團主</h4>
                     <form action="/groups/{{ group.id }}/transfer" method="post"
                           onsubmit="return confirm('確定要將團主轉移給選擇的用戶嗎？')">
@@ -427,7 +387,7 @@
                 </div>
                 
                 <!-- 刪除團單 -->
-                <div class="border border-red-200 rounded-lg p-3 bg-red-50">
+                <div class="border border-red-200 rounded-lg p-3 bg-red-50" id="delete-group">
                     <h4 class="font-medium text-red-800 mb-2">刪除團單</h4>
                     <p class="text-sm text-red-600 mb-3">
                         {% if group.orders|length > 0 %}
@@ -455,11 +415,11 @@
          @click.self="showReminder = false">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
-                <h3 class="font-semibold text-sela-800"><i class="ti ti-speakerphone"></i> 催單提醒</h3>
+                <h3 class="font-semibold text-sela-800"><i class="ti ti-users"></i> 還沒送出的名單</h3>
             </div>
             
             <div class="p-4">
-                <p class="text-sm text-sela-800/70 mb-3">以下 {{ pending_orders|length }} 人尚未結單：</p>
+                <p class="text-sm text-sela-800/70 mb-3">以下 {{ pending_orders|length }} 人點了還沒送出：</p>
                 
                 <div class="bg-sela-50 rounded-lg p-3 mb-4 max-h-60 overflow-y-auto">
                     <div class="space-y-2">
@@ -491,7 +451,7 @@
                 
                 <!-- 提示文字 -->
                 <p class="text-xs text-sela-800/45 mb-4">
-                    你可以複製名單，貼到 LINE 群組提醒大家結單
+                    你可以複製名單，貼到 LINE 群組提醒大家送出訂單
                 </p>
             </div>
             
@@ -509,187 +469,42 @@
         const input = document.getElementById('pending-names');
         input.select();
         document.execCommand('copy');
-        alert('已複製名單！');
+        window.toast('已複製名單');
     }
     </script>
     {% endif %}
 
-    <!-- 訂單牆 -->
-    <div id="order-wall" hx-get="/groups/{{ group.id }}/orders/wall" hx-trigger="load, orderUpdated from:body">
-        {% include "partials/order_wall.html" %}
-    </div>
-
-    <!-- 我的訂單（已結單時顯示在頁面上） -->
+    <!-- 我的訂單（已送出時顯示在頁面上） -->
     <div id="my-order-display" x-show="orderStatus === 'submitted'">
-        {% if not group.treat_user_id %}
-        <div class="flex justify-end mb-1.5">
+        <div id="my-order-content" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
+            {% include "partials/my_order.html" %}
+        </div>
+        {% if not group.treat_user_id and is_open %}
+        <div class="flex justify-end mt-1.5">
             <form action="/groups/{{ group.id }}/treat" method="post"
                   onsubmit="return confirm('確定要請客嗎？本團將由你買單！')">
-                <button type="submit" class="text-xs bg-red-50 text-red-600 active:bg-red-100 px-3 py-1.5 rounded-full transition">
+                <button type="submit" class="text-xs text-red-600 active:bg-red-50 px-3 py-1.5 rounded-full transition">
                     <i class="ti ti-heart"></i> 我請客
                 </button>
             </form>
         </div>
         {% endif %}
-        <div id="my-order-content" hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body">
-            {% include "partials/my_order.html" %}
-        </div>
     </div>
 
-    <!-- 快速下單（團開放中且尚未結單時顯示） -->
+    <!-- 訂單牆（V2.18.0：一行摘要，展開每人一行＋跟單） -->
+    <div id="order-wall" hx-get="/groups/{{ group.id }}/orders/wall" hx-trigger="load, orderUpdated from:body">
+        {% include "partials/order_wall.html" %}
+    </div>
+
     {% if is_open %}
-    <div class="bg-white rounded-2xl shadow-sm p-4" x-show="orderStatus !== 'submitted'" x-data="{ quickTab: 'hot' }">
-        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-bolt"></i> {% if group.category.value == 'group_buy' %}快速下單{% else %}快速點餐{% endif %}</h2>
-
-        {% if my_frequent %}
-        <div class="mb-3">
-            <div class="text-xs text-sela-800/55 mb-1.5 flex items-center gap-1"><i class="ti ti-rotate-clockwise"></i> 你的常點</div>
-            <div class="flex flex-wrap gap-2">
-                {% for item in my_frequent %}
-                <button @click='openAddItem({ id: {{ item.id }}, name: {{ item.name | tojson }}, description: {{ (item.description or "") | tojson }}, price: {{ item.price }}, tbd: {{ "true" if item.price_tbd else "false" }}, price_l: {{ item.price_l if item.price_l else "null" }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })'
-                        class="flex items-center gap-1.5 px-3 py-2 bg-sela-800 text-white rounded-lg text-sm active:bg-sela-900 transition">
-                    <i class="ti ti-plus"></i> {{ item.name }}
-                </button>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="flex flex-wrap gap-2 mb-3">
-            <!-- 複製上次訂單 -->
-            {% if last_order and last_order_items %}
-            <button @click="showLastOrder = true"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
-                <i class="ti ti-clipboard-list"></i> 上次訂單
-            </button>
-            {% endif %}
-            
-            <!-- 看別人點什麼（盲點模式下隱藏） -->
-            {% if submitted_orders|length > 0 and not group.is_blind_mode %}
-            <button @click="showOthersOrders = true"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
-                <i class="ti ti-eye"></i> 看別人點什麼
-            </button>
-            {% endif %}
-            
-            <!-- 隨機選擇器 -->
-            <button @click="randomPick()"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-sela-50 text-sela-800 rounded-lg text-sm active:bg-sela-100 transition">
-                <i class="ti ti-dice"></i> 隨機選
-            </button>
-        </div>
-        
-        <!-- 快速選項分頁 -->
-        {% if hot_items or favorite_items %}
-        <div class="border-t pt-3">
-            <!-- 分頁切換 -->
-            <div class="flex gap-2 mb-2">
-                {% if hot_items %}
-                <button @click="quickTab = 'hot'"
-                        :class="quickTab === 'hot' ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
-                        class="text-xs px-3 py-1 rounded-full font-medium transition">
-                    <i class="ti ti-flame"></i> 熱門
-                </button>
-                {% endif %}
-                {% if favorite_items %}
-                <button @click="quickTab = 'mine'"
-                        :class="quickTab === 'mine' ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
-                        class="text-xs px-3 py-1 rounded-full font-medium transition">
-                    <i class="ti ti-heart"></i> 我的最愛
-                </button>
-                {% endif %}
-            </div>
-            
-            <!-- 熱門品項 -->
-            {% if hot_items %}
-            <div x-show="quickTab === 'hot'" class="flex flex-wrap gap-2">
-                {% for item in hot_items %}
-                <button onclick="scrollToItem({{ item.menu_item_id }})"
-                        class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-800 rounded-full active:bg-sela-100 transition">
-                    {{ item.item_name }} <span class="text-sela-800/50">({{ item.total_qty|int }}份)</span>
-                </button>
-                {% endfor %}
-            </div>
-            {% endif %}
-            
-            <!-- 我的常點 -->
-            {% if favorite_items %}
-            <div x-show="quickTab === 'mine'" class="flex flex-wrap gap-2">
-                {% for fav in favorite_items %}
-                <button onclick="scrollToItem({{ fav.menu_item_id }})"
-                        class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-800 rounded-full hover:bg-sela-100 transition">
-                    {{ fav.item_name }} <span class="text-sela-800">({{ fav.count|int }}份)</span>
-                </button>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-    </div>
-    
-    <!-- 看別人點什麼 Modal -->
-    {% if submitted_orders|length > 0 %}
-    <div x-show="showOthersOrders" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-         @click.self="showOthersOrders = false">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 max-h-[80vh] flex flex-col">
-            <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="font-semibold text-sela-800"><i class="ti ti-eye"></i> 大家都點什麼</h3>
-                <button @click="showOthersOrders = false" class="text-sela-800/45 hover:text-sela-800/70 text-xl">&times;</button>
-            </div>
-            
-            <div class="p-4 overflow-y-auto flex-1">
-                <div class="space-y-3">
-                    {% for order in submitted_orders %}
-                    {% if order.user_id != user.id %}
-                    <div class="bg-sela-50 rounded-lg p-3">
-                        <div class="font-medium text-sela-800 mb-2">{{ order.user.show_name }}</div>
-                        <div class="space-y-2">
-                            {% for item in order.items %}
-                            <div class="flex items-center justify-between text-sm gap-2">
-                                <div class="flex-1 min-w-0">
-                                    <span class="text-sela-800/80">{{ item.item_name }}</span>
-                                    {% if item.sugar or item.ice %}
-                                    <span class="text-sela-800/45 text-xs">({{ item.sugar }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice }})</span>
-                                    {% endif %}
-                                </div>
-                                <div class="flex items-center gap-2 flex-shrink-0">
-                                    <span class="text-sela-800/45">×{{ item.quantity }}</span>
-                                    <button hx-post="/groups/{{ group.id }}/orders/follow/{{ item.id }}"
-                                            hx-target="#my-order"
-                                            hx-swap="innerHTML"
-                                            hx-on::after-request="
-                                                this.dispatchEvent(new CustomEvent('orderUpdated', {bubbles: true}));
-                                                this.innerHTML = '<i class="ti ti-check"></i>';
-                                                this.disabled = true;
-                                                this.classList.remove('bg-sela-500', 'hover:bg-sela-600');
-                                                this.classList.add('bg-sela-200');
-                                                if (window.Alpine) {
-                                                    const comp = Alpine.$data(document.querySelector('[x-data]'));
-                                                    if (comp) {
-                                                        comp.orderStatus = 'draft';
-                                                        comp.updateCartCount();
-                                                    }
-                                                }
-                                            "
-                                            class="text-xs text-sela-800 bg-sela-500 hover:bg-sela-600 px-2 py-1 rounded transition">
-                                        跟單
-                                    </button>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-                
-                <p class="text-xs text-sela-800/45 text-center mt-4">點「跟單」直接加入購物車</p>
-            </div>
-        </div>
-    </div>
+    <!-- 上次點的（一行；原本的「上次訂單」彈窗保留） -->
+    {% if last_order and last_order_items %}
+    <button type="button" @click="showLastOrder = true" x-show="orderStatus !== 'submitted'"
+            class="w-full bg-sela-50 border border-sela-200 rounded-2xl px-4 py-3 text-sm flex items-center justify-between gap-2 active:bg-sela-100">
+        <span class="truncate text-sela-800"><i class="ti ti-rotate-clockwise"></i> 上次點的：{{ last_order_items[0].item_name }}{% if last_order_items[0].size %}（{{ last_order_items[0].size }}）{% endif %}{% if last_order_items|length > 1 %} 等 {{ last_order_items|length }} 項{% endif %}</span>
+        <span class="flex-shrink-0 text-xs px-3 py-1 rounded-full bg-white border border-sela-300 text-sela-800">一樣再來</span>
+    </button>
     {% endif %}
-    
     <!-- 上次訂單 Modal -->
     {% if last_order and last_order_items %}
     <div x-show="showLastOrder" x-cloak
@@ -782,9 +597,13 @@
     </div>
     {% endif %}
 
-    <!-- 菜單 -->
+    <!-- 菜單（V2.18.0：已送出後收合成「再加點 ›」；常點／熱門／骰子併進導覽列） -->
     {% if is_open %}
-    <div class="bg-white rounded-2xl shadow-sm p-4 pb-24" x-data="menuNav()">
+    <button type="button" x-show="orderStatus === 'submitted' && !menuOpen" x-cloak @click="menuOpen = true"
+            class="w-full bg-white rounded-2xl shadow-sm px-4 py-3.5 text-sm flex items-center justify-between active:bg-sela-50" id="menu-collapsed">
+        <span class="text-sela-800"><i class="ti ti-menu-2"></i> 菜單</span><span class="text-sela-800 underline">再加點 ›</span>
+    </button>
+    <div class="bg-white rounded-2xl shadow-sm p-4" x-data="menuNav()" x-show="orderStatus !== 'submitted' || menuOpen" id="menu-section">
         {# V2.16.0 A-8：菜單更新日期＋回報價格不符（團員發現價格跟店內不一樣時能判斷是不是菜單太舊） #}
         <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
             <h2 class="font-semibold text-sela-800">菜單</h2>
@@ -803,16 +622,67 @@
             {% if visible %}{% set _ = nav_cats.append(('category-' ~ category.id, category.name, visible | length)) %}{% endif %}
         {% endfor %}
         {% if uncategorized %}{% set _ = nav_cats.append(('category-other', '其他', uncategorized | length)) %}{% endif %}
+        {# V2.18.0：常點／熱門是導覽列前兩顆（捲到菜單頂部的兩小段），骰子是最後一顆 #}
+        {% set quick_cats = [] %}
+        {% if my_frequent or favorite_items %}{% set _ = quick_cats.append(('quick-mine', '常點', 'ti-rotate-clockwise')) %}{% endif %}
+        {% if hot_items %}{% set _ = quick_cats.append(('quick-hot', '熱門', 'ti-flame')) %}{% endif %}
 
         <!-- 分類快速導覽（固定在頂部） -->
-        {% if nav_cats | length > 1 %}
-        <div class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto">
+        {% if nav_cats | length + quick_cats | length > 1 %}
+        <div class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur py-2 -mx-4 px-4 border-y border-sela-200 shadow-sm z-10 overflow-x-auto" id="menu-nav">
             <div class="flex gap-2 min-w-max">
+                {% for qid, qname, qicon in quick_cats %}
+                <button @click='scrollToCategory({{ qid | tojson }})'
+                        :class='activeCategory === {{ qid | tojson }} ? "bg-sela-800 text-white border-sela-800 shadow-sm" : "bg-white border-sela-300 text-sela-800 active:bg-sela-50"'
+                        class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
+                    <i class="ti {{ qicon }}"></i> {{ qname }}
+                </button>
+                {% endfor %}
                 {% for cid, cname, ccount in nav_cats %}
                 <button @click='scrollToCategory({{ cid | tojson }})'
                         :class='activeCategory === {{ cid | tojson }} ? "bg-sela-800 text-white border-sela-800 shadow-sm" : "bg-white border-sela-300 text-sela-800 active:bg-sela-50"'
                         class="text-xs px-3 py-1.5 rounded-full border-2 font-medium transition whitespace-nowrap">
                     {{ cname }} <span :class='activeCategory === {{ cid | tojson }} ? "opacity-70" : "text-sela-800/50"'>{{ ccount }}</span>
+                </button>
+                {% endfor %}
+                <button @click="randomPick()" class="text-xs px-3 py-1.5 rounded-full border-2 bg-white border-sela-300 text-sela-800 active:bg-sela-50 whitespace-nowrap" aria-label="隨機選一個"><i class="ti ti-dice"></i></button>
+            </div>
+        </div>
+        {% endif %}
+
+        {# 常點：你的常點（一鍵開客製視窗）＋大家常點（捲到品項）。原本的「快速點餐」卡拿掉，內容搬到這裡 #}
+        {% if my_frequent or favorite_items %}
+        <div id="quick-mine" class="mb-4 scroll-mt-32 category-section">
+            {% if my_frequent %}
+            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2"><i class="ti ti-rotate-clockwise"></i> 你的常點 <span class="text-xs font-normal text-sela-800/45">點了直接加</span></h3>
+            <div class="flex flex-wrap gap-2">
+                {% for item in my_frequent %}
+                <button @click='openAddItem({ id: {{ item.id }}, name: {{ item.name | tojson }}, description: {{ (item.description or "") | tojson }}, price: {{ item.price }}, tbd: {{ "true" if item.price_tbd else "false" }}, price_l: {{ item.price_l if item.price_l else "null" }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })'
+                        class="flex items-center gap-1.5 px-3 py-2 bg-sela-800 text-white rounded-full text-sm active:bg-sela-900 transition">
+                    <i class="ti ti-plus"></i> {{ item.name }}
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if favorite_items %}
+            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-3"><i class="ti ti-heart"></i> 你點過的 <span class="text-xs font-normal text-sela-800/45">點了捲到品項</span></h3>
+            <div class="flex flex-wrap gap-2">
+                {% for fav in favorite_items %}
+                <button onclick="scrollToItem({{ fav.menu_item_id }})" class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-800 rounded-full active:bg-sela-100 transition">
+                    {{ fav.item_name }} <span class="text-sela-800/50">({{ fav.count|int }}份)</span>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if hot_items %}
+        <div id="quick-hot" class="mb-4 scroll-mt-32 category-section">
+            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2"><i class="ti ti-flame"></i> 大家常點 <span class="text-xs font-normal text-sela-800/45">點了捲到品項</span></h3>
+            <div class="flex flex-wrap gap-2">
+                {% for item in hot_items %}
+                <button onclick="scrollToItem({{ item.menu_item_id }})" class="text-xs px-2.5 py-1.5 bg-sela-50 text-sela-800 rounded-full active:bg-sela-100 transition">
+                    {{ item.item_name }} <span class="text-sela-800/50">({{ item.total_qty|int }}份)</span>
                 </button>
                 {% endfor %}
             </div>
@@ -845,72 +715,39 @@
         {% endif %}
     </div>
     
-    <!-- 懸浮按鈕區域 -->
-    <div class="fixed bottom-20 right-4 z-40 flex flex-col gap-2">
-        <!-- 返回頂端按鈕 -->
-        <button @click="window.scrollTo({top: 0, behavior: 'smooth'})"
-                x-data="{ showTop: false }"
-                x-init="window.addEventListener('scroll', () => showTop = window.scrollY > 300)"
-                x-show="showTop"
-                x-transition
-                class="bg-white text-sela-700 border border-sela-200 rounded-full w-11 h-11 shadow-md active:scale-90 transition flex items-center justify-center" aria-label="返回頂端">
-            <i class="ti ti-arrow-up" style="font-size:20px;"></i>
-        </button>
-        
-        <!-- 購物車按鈕（只有未結單時顯示） -->
-        <button @click="showCart = true"
-                x-show="orderStatus !== 'submitted'"
-                class="bg-sela-800 text-white rounded-full w-14 h-14 shadow-lg active:scale-90 transition flex items-center justify-center relative" aria-label="購物車">
-            <i class="ti ti-shopping-cart" style="font-size:24px;"></i>
-            <span x-show="cartCount > 0"
-                  class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center ring-2 ring-white"
-                  x-text="cartCount"></span>
-        </button>
-    </div>
-    
-    {% if (is_owner or is_admin) and store.is_personal %}
-    <!-- 代購品項管理視窗 -->
-    <div x-show="showItemsPanel" x-cloak class="fixed inset-0 z-50">
-        <div class="absolute inset-0 bg-black/40" @click="showItemsPanel = false"></div>
-        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90vh]"
-             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
-             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
-            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
-            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
-                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-list-details"></i> 管理品項</h3>
-                <button @click="showItemsPanel = false; location.reload()" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
-                    <i class="ti ti-x" style="font-size:20px;"></i>
-                </button>
-            </div>
-            <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" id="proxy-items-content"
-                 hx-get="/groups/{{ group.id }}/items-panel" hx-trigger="load" hx-swap="innerHTML">
-            </div>
+    <!-- 返回頂端 -->
+    <button @click="window.scrollTo({top: 0, behavior: 'smooth'})"
+            x-data="{ showTop: false }"
+            x-init="window.addEventListener('scroll', () => showTop = window.scrollY > 300)"
+            x-show="showTop" x-transition
+            class="fixed right-4 z-40 bg-white text-sela-700 border border-sela-200 rounded-full w-11 h-11 shadow-md active:scale-90 transition flex items-center justify-center" style="bottom: calc(5rem + env(safe-area-inset-bottom));" aria-label="返回頂端">
+        <i class="ti ti-arrow-up" style="font-size:20px;"></i>
+    </button>
+
+    <!-- 底部常駐結帳列（V2.18.0：取代右下角購物車圓鈕；團頁隱藏底部導航才有這個位置） -->
+    <div class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-sela-200 shadow-[0_-4px_12px_rgba(91,71,51,.08)]" id="checkout-bar"
+         style="padding-bottom: env(safe-area-inset-bottom);">
+        <div class="max-w-lg mx-auto px-4 h-16 flex items-center justify-between gap-3">
+            <template x-if="orderStatus !== 'submitted'">
+                <div class="flex items-center justify-between gap-3 w-full">
+                    <div class="min-w-0">
+                        <div class="font-semibold text-sela-800 text-sm" x-text="cartCount > 0 ? (cartCount + ' 件 · $' + cartTotal) : '還沒選東西'"></div>
+                        <div class="text-[11px] text-sela-800/50 truncate" x-text="cartCount > 0 ? (orderStatus === 'editing' ? '修改中 · 改完要再按「送出訂單」' : '還沒送出 · 截止前要按「送出訂單」') : '點菜單加入品項'"></div>
+                    </div>
+                    <button type="button" @click="showCart = true" :disabled="cartCount === 0"
+                            class="flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold bg-sela-800 text-white active:bg-sela-900 disabled:bg-sela-200 disabled:text-sela-800/40" aria-label="查看購物車並送出">
+                        查看並送出 <i class="ti ti-chevron-right"></i>
+                    </button>
+                </div>
+            </template>
+            <template x-if="orderStatus === 'submitted'">
+                <div class="w-full text-center text-xs text-sela-800/50"><i class="ti ti-check text-green-600"></i> 已送出，截止前都還能修改</div>
+            </template>
         </div>
     </div>
-    {% endif %}
+    <div style="height: calc(4rem + env(safe-area-inset-bottom));"></div>
 
-    {% if is_owner or is_admin %}
-    <!-- 缺貨處理視窗（團主/管理員）-->
-    <div x-show="showFulfillment" x-cloak class="fixed inset-0 z-50">
-        <div class="absolute inset-0 bg-black/40" @click="showFulfillment = false"></div>
-        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[88vh]"
-             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
-             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
-            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
-            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
-                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-replace"></i> 缺貨處理</h3>
-                <button @click="showFulfillment = false" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
-                    <i class="ti ti-x" style="font-size:20px;"></i>
-                </button>
-            </div>
-            <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" id="fulfillment-content"
-                 hx-get="/groups/{{ group.id }}/fulfillment" hx-trigger="load, orderUpdated from:body" hx-swap="innerHTML">
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- 購物車（底部 sheet・只有未結單時使用）-->
+    <!-- 購物車（底部 sheet・還沒送出時使用）-->
     <div x-show="showCart" x-cloak class="fixed inset-0 z-50">
         <div class="absolute inset-0 bg-black/40" @click="showCart = false"
              x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
@@ -930,6 +767,84 @@
             <div class="flex-1 overflow-y-auto px-3 pt-1" id="cart-content"
                  hx-get="/groups/{{ group.id }}/orders/mine" hx-trigger="load, orderUpdated from:body" hx-swap="innerHTML">
                 {% include "partials/my_order.html" %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_owner or is_admin %}
+    <!-- 分享（團主列）：複製連結／QR Code -->
+    <div x-show="showShare" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" @click="showShare = false"></div>
+        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl p-4 pb-6"
+             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0">
+            <div class="w-10 h-1 rounded-full bg-sela-200 mx-auto mb-3"></div>
+            <div class="font-semibold text-sela-800 mb-2">分享這個團</div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <button type="button" @click="copyLink(); showShare = false" class="py-3 rounded-xl bg-sela-800 text-white active:bg-sela-900"><i class="ti ti-link"></i> 複製連結</button>
+                <button type="button" @click="showShare = false; showQR = true" class="py-3 rounded-xl bg-white border border-sela-300 text-sela-800 active:bg-sela-50"><i class="ti ti-qrcode"></i> QR Code</button>
+            </div>
+            <p class="text-xs text-sela-800/50 mt-3">對方點開後用自己的 LINE 登入就能一起點餐</p>
+        </div>
+    </div>
+
+    <!-- 更多（團主列）：設定／匯出／管理 三分頁 -->
+    <div x-show="showMore" x-cloak class="fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" @click="showMore = false"></div>
+        <div class="absolute left-0 right-0 bottom-0 max-w-lg mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[80vh]"
+             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0">
+            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
+            <div class="px-4 pb-2 flex items-center gap-1.5 text-xs flex-shrink-0" id="more-tabs">
+                <template x-for="t in [['settings', '設定'], ['export', '匯出'], ['manage', '管理']]" :key="t[0]">
+                    <button type="button" @click="moreTab = t[0]" class="px-3 py-1.5 rounded-full border"
+                            :class="moreTab === t[0] ? 'bg-sela-800 text-white border-sela-800' : 'bg-white border-sela-300 text-sela-800/70'" x-text="t[1]"></button>
+                </template>
+                <button type="button" @click="showMore = false" class="ml-auto w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉"><i class="ti ti-x"></i></button>
+            </div>
+            <div class="overflow-y-auto px-4 pb-6 text-sm">
+                <div x-show="moreTab === 'settings'" class="rounded-xl border border-sela-100 divide-y divide-sela-100">
+                    <button type="button" @click="showMore = false; showSettings = true" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-pencil"></i> 修改團單<span class="text-xs text-sela-800/50 ml-1">截止時間、備註、上限、折扣…</span></span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    {% if store and not store.is_personal and group.store_id %}
+                    <button type="button" @click="showMore = false; showSaveTemplate = true" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-bookmark"></i> 存成範本</span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    {% endif %}
+                    <a href="/groups/{{ group.id }}/copy" class="w-full flex items-center justify-between px-3 py-3 active:bg-sela-50"><span><i class="ti ti-copy"></i> 複製開團</span><i class="ti ti-chevron-right text-sela-800/35"></i></a>
+                    {% if is_open and pending_orders %}
+                    <button type="button" @click="showMore = false; showReminder = true" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-users"></i> 還沒送出的名單<span class="text-xs text-sela-800/50 ml-1">{{ pending_orders|length }} 人</span></span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    {% endif %}
+                    {% if is_open %}
+                    <form action="/groups/{{ group.id }}/close" method="post" data-confirm="確定要提前截止嗎？截止後將無法再{% if group.category.value == 'group_buy' %}下單{% else %}點餐{% endif %}。" onsubmit="return confirm(this.dataset.confirm)">
+                        <button type="submit" class="w-full flex items-center justify-between px-3 py-3 text-left text-amber-700 active:bg-amber-50"><span><i class="ti ti-clock-stop"></i> 提前截止</span><i class="ti ti-chevron-right text-amber-700/50"></i></button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div x-show="moreTab === 'export'" x-cloak class="space-y-3">
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-send"></i> 傳給店家（下單用）</div>
+                        <a href="/groups/{{ group.id }}/export/order" class="flex items-center justify-center gap-1 py-2.5 bg-sela-50 rounded-xl text-sela-800 active:bg-sela-100"><i class="ti ti-building-store"></i> 點餐彙總（含候補對照）</a>
+                    </div>
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-checklist"></i> 現場核對（原始品項・換貨結果見收款明細）</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/groups/{{ group.id }}/export/receipt.pdf" class="flex items-center justify-center gap-1 py-2.5 bg-sela-50 rounded-xl text-sela-800 active:bg-sela-100"><i class="ti ti-file-text"></i> 核對單 PDF</a>
+                            <a href="/groups/{{ group.id }}/export/receipt.png" class="flex items-center justify-center gap-1 py-2.5 bg-sela-50 rounded-xl text-sela-800 active:bg-sela-100"><i class="ti ti-photo"></i> 核對單圖片</a>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-sela-800/60 mb-1.5"><i class="ti ti-coin"></i> 收款與留存</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/groups/{{ group.id }}/export/payment" class="flex items-center justify-center gap-1 py-2.5 bg-sela-50 rounded-xl text-sela-800 active:bg-sela-100"><i class="ti ti-coin"></i> 收款明細</a>
+                            <a href="/groups/{{ group.id }}/export/excel" class="flex items-center justify-center gap-1 py-2.5 bg-sela-50 rounded-xl text-sela-800/70 active:bg-sela-100"><i class="ti ti-table"></i> Excel（存檔）</a>
+                        </div>
+                    </div>
+                </div>
+                <div x-show="moreTab === 'manage'" x-cloak class="rounded-xl border border-sela-100 divide-y divide-sela-100">
+                    {% if store.is_personal %}
+                    <button type="button" @click="showMore = false; showItemsPanel = true" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-list-details"></i> 管理品項<span class="text-xs text-sela-800/50 ml-1">代購團</span></span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    {% endif %}
+                    <button type="button" @click="showMore = false; showFulfillment = true" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-replace"></i> 缺貨處理{% if tbd_pending_count %}<span class="text-xs text-amber-700 ml-1">含 {{ tbd_pending_count }} 個時價待定價</span>{% endif %}</span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    <button type="button" @click="showMore = false; showSettings = true; $nextTick(() => { const el = document.getElementById('transfer-owner'); if (el) el.scrollIntoView({ block: 'start' }); })" class="w-full flex items-center justify-between px-3 py-3 text-left active:bg-sela-50"><span><i class="ti ti-user-share"></i> 轉移團主</span><i class="ti ti-chevron-right text-sela-800/35"></i></button>
+                    <button type="button" @click="showMore = false; showSettings = true; $nextTick(() => { const el = document.getElementById('delete-group'); if (el) el.scrollIntoView({ block: 'start' }); })" class="w-full flex items-center justify-between px-3 py-3 text-left text-red-600 active:bg-red-50"><span><i class="ti ti-trash"></i> 刪除團單</span><i class="ti ti-chevron-right text-red-600/40"></i></button>
+                </div>
             </div>
         </div>
     </div>
@@ -1187,8 +1102,11 @@ function orderPage() {
         showSettings: false,
         showReminder: false,
         showLastOrder: false,
-        showOthersOrders: false,
         showSaveTemplate: false,
+        showShare: false,      // V2.18.0 團主列「分享」
+        showMore: false,       // V2.18.0 團主列「更多」
+        moreTab: 'settings',
+        menuOpen: false,       // V2.18.0 已送出後菜單收合，「再加點」展開
         selectedItem: null,
         selectedSize: 'M',
         quantity: 1,
@@ -1196,7 +1114,8 @@ function orderPage() {
         backupMode: null,
         showFulfillment: false,
         showItemsPanel: false,
-        cartCount: {{ (my_order.items|length if my_order and my_order.status.value != 'submitted' else 0) }},
+        cartCount: {{ (my_order.total_quantity if my_order and my_order.status.value != 'submitted' else 0) }},
+        cartTotal: {{ (my_order.final_amount|money if my_order and my_order.status.value != 'submitted' else 0) | tojson }},
         orderStatus: {{ (my_order.status.value if my_order else "none") | tojson }},
         showRandom: false,
         randomResult: null,
@@ -1221,7 +1140,7 @@ function orderPage() {
         },
         
         async openAddItem(item) {
-            // 如果已結單，先問是否要加點
+            // 如果已送出，先問是否要加點
             if (this.orderStatus === 'submitted') {
                 if (!confirm('您已送出訂單，是否要加點？\n\n選「確定」將修改訂單並加點\n選「取消」則不加點')) {
                     return;
@@ -1301,16 +1220,33 @@ function orderPage() {
         },
         
         updateCartCount() {
-            setTimeout(() => {
-                const items = document.querySelectorAll('#cart-content [data-item-id]');
-                this.cartCount = items.length;
-            }, 100);
+            // V2.18.0：結帳列要件數與金額，從 my_order 片段的 data 屬性讀（單一來源＝後端算好的 final_amount）
+            setTimeout(() => this.readCart(), 100);
+        },
+        readCart() {
+            const root = document.querySelector('#cart-content [data-cart-count]');
+            if (root) {
+                this.cartCount = parseInt(root.dataset.cartCount) || 0;
+                this.cartTotal = root.dataset.cartTotal || '0';
+            } else {
+                this.cartCount = document.querySelectorAll('#cart-content [data-item-id]').length;
+            }
         },
         
         copyLink() {
             // 複製團單網址。對方點了若未登入會自動導向 LINE 登入，登入後用自己身分跟團
-            navigator.clipboard.writeText(window.location.href);
-            alert('團單連結已複製！分享給要跟團的人，他們點開後用自己的 LINE 登入即可一起點餐。');
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                window.toast('連結已複製，貼到 LINE 群組就能一起點餐');
+            }).catch(() => { prompt('複製失敗，請手動複製：', window.location.href); });
+        },
+
+        // V2.18.0 團主列「催單」：直接複製催單文字（與首頁同一句），名單在「更多」裡
+        copyRemind() {
+            const el = document.getElementById('remind-text');
+            const text = el ? el.dataset.text.replace('__ORIGIN__', window.location.origin) : window.location.href;
+            navigator.clipboard.writeText(text).then(() => {
+                window.toast('催單文字已複製，貼到 LINE 群組吧');
+            }).catch(() => { prompt('複製失敗，請手動複製：', text); });
         },
         
     }
@@ -1351,15 +1287,23 @@ function countdown(deadline) {
     }
 }
 
-// 監聯訂單更新事件
+// 監聽訂單更新事件：htmx 換完片段後把件數與金額讀回 Alpine（結帳列用）
 document.body.addEventListener('orderUpdated', function() {
     setTimeout(() => {
-        const items = document.querySelectorAll('#cart-content [data-item-id]');
-        const countEl = document.querySelector('[x-text="cartCount"]');
-        if (countEl) {
-            countEl.textContent = items.length;
-        }
-    }, 100);
+        try {
+            const comp = window.Alpine && Alpine.$data(document.querySelector('[x-data^="orderPage"]'));
+            if (comp && comp.readCart) comp.readCart();
+        } catch (e) {}
+    }, 150);
+});
+// 片段靠 htmx 的 load 觸發器載入，第一次載完也要讀一次（server 算的初始值只在整頁渲染時給）
+document.body.addEventListener('htmx:afterSwap', function(ev) {
+    if (ev.target && ev.target.id === 'cart-content') {
+        try {
+            const comp = window.Alpine && Alpine.$data(document.querySelector('[x-data^="orderPage"]'));
+            if (comp && comp.readCart) comp.readCart();
+        } catch (e) {}
+    }
 });
 
 // 滾動到指定品項

@@ -126,7 +126,7 @@
     </script>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V2.17.0' %}
+{% set app_version = 'V2.19.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     // V2.11.1 P1-08：htmx 預設不會把 4xx 換進頁面，所以「只剩 N 份」「超過每單
@@ -168,6 +168,7 @@
     <!-- 底部導航（V2.17.0 IA 重整：今天｜店家｜＋｜紀錄｜我的，五格對稱）
          規則：物件的所有動作都在物件自己的頁面——店家的事在店家頁、團的事在團頁、我的事在我的頁。
          投票沒有自己的格子：有進行中的投票才出現在首頁卡片，發起入口在開團頁。 -->
+    {% block bottom_nav %}
     {% if user %}
     {% set path = request.url.path %}
     {% set nav_stores = path.startswith('/stores') or path.startswith('/recommend') %}
@@ -203,6 +204,7 @@
     </nav>
     <div style="height: calc(3.5rem + env(safe-area-inset-bottom));"></div> <!-- 底部導航佔位 -->
     {% endif %}
+    {% endblock %}
 
     <!-- 全域 Toast 提示 -->
     <!-- V2.11.4 S-01：Alpine v3 在同一元素上固定先跑 x-init 再掛 x-on（@）。

@@ -1,12 +1,15 @@
-<div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+{# V2.18.0：根元素帶件數與金額，團頁的結帳列從這裡讀（單一來源） #}
+<div class="bg-white rounded-2xl shadow-sm border {% if order and order.status.value == 'submitted' %}border-green-200{% else %}border-sela-100{% endif %} p-4"
+     data-cart-count="{{ order.total_quantity if (order and order.status.value != 'submitted') else 0 }}"
+     data-cart-total="{{ order.final_amount|money if (order and order.status.value != 'submitted') else 0 }}">
     <h2 class="font-semibold text-sela-800 mb-3 flex items-center gap-2">
+        {% if order and order.status.value == 'submitted' %}
+        <span class="text-green-700"><i class="ti ti-check"></i> 你已送出</span>
+        <span class="ml-auto text-sela-800">${{ order.final_amount|money }}</span>
+        {% elif order and order.status.value == 'editing' %}
+        我的訂單 <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
+        {% else %}
         我的訂單
-        {% if order %}
-        {% if order.status.value == 'submitted' %}
-        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已送出</span>
-        {% elif order.status.value == 'editing' %}
-        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
-        {% endif %}
         {% endif %}
     </h2>
 
@@ -114,6 +117,10 @@
                 <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount|money }}</span>
             </span>
         </div>
+        {% if group.order_limit and order.status.value == 'submitted' and over == 0 %}
+        {# V2.18.0：送出後一行講清楚補助與自付（原本只有超過上限才有提示） #}
+        <div class="-mt-1.5 mb-2.5 text-xs text-sela-800/50">補助 ${{ group.order_limit|money }} 內 · 自付 $0</div>
+        {% endif %}
         {% if order.has_fulfillment_changes %}
         {% set sd = order.settle_diff %}
         <div class="mb-2.5 p-2.5 bg-sela-50 border border-sela-100 rounded-xl text-sm text-sela-800">
@@ -133,7 +140,7 @@
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
                     hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount|money }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
-                    class="btn btn-primary flex-1">確定結單</button>
+                    class="btn btn-primary flex-1">送出訂單</button>
             {% endif %}
             {% if order.status.value == 'editing' %}
             <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
@@ -161,7 +168,7 @@
             <rect x="22" y="26" width="44" height="8" rx="4" fill="#C9A977"/>
         </svg>
         <p class="text-sela-800/70 font-medium">購物車是空的</p>
-        <p class="text-sm text-sela-800/45">從下方菜單選擇品項加入</p>
+        <p class="text-sm text-sela-800/45">從菜單選擇品項加入</p>
     </div>
     {% endif %}
 </div>

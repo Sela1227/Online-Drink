@@ -140,13 +140,15 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
         Order.status == OrderStatus.SUBMITTED,
     ).options(
         joinedload(Order.user),
-        joinedload(Order.items).joinedload(OrderItem.selected_options)
+        joinedload(Order.items).joinedload(OrderItem.selected_options),
+        joinedload(Order.items).joinedload(OrderItem.selected_toppings),
     ).all()
 
     is_open = group.is_open
 
     return templates.TemplateResponse("partials/order_wall.html", {
         "request": request,
+        "user": user,  # V2.18.0：訂單牆標「（你）」、自己的列不出跟單鈕
         "submitted_orders": submitted_orders,
         "group_id": group_id,
         "group": group,
@@ -725,7 +727,7 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="訂單不存在")
     
     if order.status != OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="只能修改已結單的訂單")
+        raise HTTPException(status_code=400, detail="只能修改已送出的訂單")
     
     # 保存快照
     snapshot = {
@@ -910,7 +912,7 @@ async def follow_item(
     
     # V2.4.1 修：已結單不再靜默改狀態（原本偷偷進 EDITING 且無快照，取消修改會壞）
     if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先在「我的訂單」按修改訂單，再跟點")
+        raise HTTPException(status_code=400, detail="你已送出訂單，先按「修改訂單」再跟單")
     
     # V2.7.0：跟點也吃庫存/上下架
     if source_item.menu_item is not None:

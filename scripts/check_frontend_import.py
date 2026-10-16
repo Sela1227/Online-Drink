@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 NODE_SCRIPT = ROOT / "scripts" / "jsdom_import_check.js"
 SORT_SCRIPT = ROOT / "scripts" / "jsdom_store_sort_check.js"  # V2.16.2 店家排序
+GROUP_SCRIPT = ROOT / "scripts" / "jsdom_group_check.js"  # V2.18.0 團頁
 
 os.environ["DATABASE_URL"] = "sqlite:///./_importcheck.db"
 os.environ["SECRET_KEY"] = "template_check_only"
@@ -88,6 +89,40 @@ def _render_pages() -> dict:
     db.add(UserFavorite(user_id=u.id, store_id=yi.id)); db.commit()
     home_r.get_current_user = fake_user
     pages["__catalog__"] = c.get("/stores").text
+
+    # V2.18.0 團頁：member＝別人開的團、我購物車有 1 件 $100；owner＝我開的團、別人點了還沒送出
+    from app.models.order import Order, OrderItem, OrderStatus
+    from app.models.menu import MenuItem
+    import app.routers.orders as ord_r
+    other = User(line_user_id="importcheck-other", display_name="別人"); db.add(other); db.commit()
+    mn_jia = db.query(Menu).filter(Menu.store_id == jia.id).first()
+    from app.models.menu import MenuCategory
+    cat = MenuCategory(menu_id=mn_jia.id, name="主食", sort_order=0); db.add(cat); db.flush()
+    mi = MenuItem(menu_id=mn_jia.id, category_id=cat.id, name="雞腿飯", price=100, sort_order=0); db.add(mi); db.flush()
+    from app.models.group import taipei_now
+    g_member = Group(owner_id=other.id, store_id=jia.id, menu_id=mn_jia.id, name="別人開的", category=CategoryType.MEAL,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
+    g_owner = Group(owner_id=u.id, store_id=jia.id, menu_id=mn_jia.id, name="我開的", category=CategoryType.MEAL,
+                    deadline=taipei_now() + timedelta(hours=2), is_public=True)
+    db.add_all([g_member, g_owner]); db.flush()
+    o_me = Order(group_id=g_member.id, user_id=u.id, status=OrderStatus.DRAFT); db.add(o_me); db.flush()
+    db.add(OrderItem(order_id=o_me.id, menu_item_id=mi.id, item_name="雞腿飯", unit_price=100, quantity=1))
+    o_other = Order(group_id=g_member.id, user_id=other.id, status=OrderStatus.SUBMITTED); db.add(o_other); db.flush()
+    db.add(OrderItem(order_id=o_other.id, menu_item_id=mi.id, item_name="雞腿飯", unit_price=100, quantity=2))
+    o_pending = Order(group_id=g_owner.id, user_id=other.id, status=OrderStatus.DRAFT); db.add(o_pending); db.flush()
+    db.add(OrderItem(order_id=o_pending.id, menu_item_id=mi.id, item_name="雞腿飯", unit_price=100, quantity=1))
+    db.commit()
+    async def fake_user_opt(request, d):
+        return d.query(User).filter(User.line_user_id == "importcheck").first(), None
+    grp.get_current_user_optional = fake_user_opt
+    ord_r.get_current_user = fake_user
+    pages["__group_member__"] = c.get(f"/groups/{g_member.id}").text
+    pages["__group_member_mine__"] = c.get(f"/groups/{g_member.id}/orders/mine").text
+    pages["__group_member_wall__"] = c.get(f"/groups/{g_member.id}/orders/wall").text
+    pages["__group_owner__"] = c.get(f"/groups/{g_owner.id}").text
+    pages["__group_owner_mine__"] = c.get(f"/groups/{g_owner.id}/orders/mine").text
+    pages["__group_owner_wall__"] = c.get(f"/groups/{g_owner.id}/orders/wall").text
+    assert 'data-cart-count="1"' in pages["__group_member_mine__"], "member 購物車片段應有 1 件"
     db.close()
     return pages
 
@@ -112,6 +147,7 @@ def main():
         sim_path = Path(td) / "similar.html"
         sim_path.write_text(pages.pop("__similar__"), encoding="utf-8")
         sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__"), "catalog": pages.pop("__catalog__")}
+        group_pages = {k: (pages.pop(f"__group_{k}__"), pages.pop(f"__group_{k}_mine__"), pages.pop(f"__group_{k}_wall__")) for k in ("member", "owner")}
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -142,6 +178,23 @@ def main():
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")
                 print(f"  !   sort/{mode}：{res.get('msg')}")
+        # V2.18.0：團頁（結帳列／菜單收合／團主列／更多 sheet／催單文字）
+        print("[前端] 團頁（jsdom）")
+        for mode, (html, mine, wall) in group_pages.items():
+            p = Path(td) / f"group_{mode}.html"; p.write_text(html, encoding="utf-8")
+            pm = Path(td) / f"group_{mode}_mine.html"; pm.write_text(mine, encoding="utf-8")
+            pw = Path(td) / f"group_{mode}_wall.html"; pw.write_text(wall, encoding="utf-8")
+            r = subprocess.run(["node", str(GROUP_SCRIPT), str(p), mode, str(pm), str(pw)], env=env, capture_output=True, text=True, timeout=60)
+            line = (r.stdout.strip().splitlines() or [""])[-1]
+            try:
+                res = json.loads(line)
+            except Exception:
+                res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
+            if res.get("ok"):
+                print(f"  OK  {mode}：" + ("結帳列讀到件數金額、查看並送出開 sheet、導覽列常點／熱門／骰子、送出後菜單收合與再加點、訂單牆跟單鈕" if mode == "member" else "團主列三顆、更多 sheet 切匯出、催單文字含截止、複製連結"))
+            else:
+                problems.append(f"group/{mode}：{res.get('msg')}")
+                print(f"  !   group/{mode}：{res.get('msg')}")
     for f in (ROOT / "_importcheck.db",):
         if f.exists():
             f.unlink()

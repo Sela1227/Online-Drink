@@ -1852,6 +1852,112 @@ def main():
         assert not (Path("app/templates") / _dead).exists(), f"{_dead} 已由紀錄／店家頁取代，不該留著"
     check("舊頁面模板（歷史／我的訂單／我的團單／收藏／超夯）已移除")
 
+    # ---------- 29. V2.18.0 團頁重排 ----------
+    print("\n[29] V2.18.0 團頁重排（身分 × 階段／結帳列／訂單牆跟單／用語）")
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    _ord.get_current_user = _fake_owner
+    try:
+        # 團主・開放中：團主列（分享／催單 N／更多）、沒有團主工具、沒有下一步、有結帳列、沒有底部導航
+        r = _c.get(f"/groups/{ga.id}"); t = _T(r)
+        assert r.status_code == 200 and 'id="owner-bar"' in r.text and "分享" in t and "催單 1" in t and "更多" in t
+        assert "團主工具" not in t and 'id="next-steps"' not in r.text and 'id="checkout-bar"' in r.text
+        assert "<nav" not in r.text, "團頁要隱藏底部導航"
+        assert 'id="remind-text"' in r.text and "截止，還沒點的快來點餐：__ORIGIN__/groups/" in r.text and "結單" not in t
+        assert 'id="more-tabs"' in r.text and "提前截止" in t and "存成範本" in t and "複製開團" in t and "還沒送出的名單" in t
+        assert 'href="/groups/%d/export/order"' % ga.id in r.text and 'href="/groups/%d/export/payment"' % ga.id in r.text
+        assert "快速點餐" not in t and 'id="quick-mine"' in r.text and 'id="quick-hot"' in r.text and 'id="menu-nav"' in r.text and "ti-dice" in r.text
+        assert "詳細資訊 ›" in t and "剩 " in t
+        check("團主開放中：團主列三顆＋更多 sheet 三分頁；團主工具／快速點餐卡拿掉；常點／熱門／骰子進導覽列；結帳列在、底部導航不在")
+
+        # 團主・已截止：下一步卡三步＋時價／缺貨入口；沒有結帳列、沒有團主列、沒有菜單
+        ga.is_closed = True; db.commit()
+        r = _c.get(f"/groups/{ga.id}"); t = _T(r)
+        assert 'id="next-steps"' in r.text and "傳給店家" in t and "現場核對" in t and "向大家收錢" in t
+        assert 'href="/groups/%d/export/receipt.pdf"' % ga.id in r.text and "缺貨處理 ›" in t
+        assert 'id="owner-bar"' not in r.text and 'id="checkout-bar"' not in r.text and 'id="menu-section"' not in r.text
+        assert "已截止 " in t
+        check("團主已截止：下一步卡（傳店家／核對／收錢）＋缺貨入口；結帳列、團主列、菜單都不出現")
+        ga.is_closed = False; db.commit()
+
+        # 團員・已送出：菜單收合列、訂單牆一行摘要、自己的列標（你）且沒有跟單鈕
+        r = _c.get(f"/groups/{gc.id}"); t = _T(r)
+        assert 'id="owner-bar"' not in r.text and 'id="next-steps"' not in r.text
+        assert 'id="menu-collapsed"' in r.text and "再加點 ›" in t and 'id="order-wall-card"' in r.text and "看大家點什麼 ›" in t
+        assert "（你）" in t and "/orders/follow/" not in r.text, "自己的品項不該有跟單鈕"
+        check("團員已送出：菜單收合成「再加點 ›」、訂單牆一行摘要、自己的列標（你）無跟單鈕")
+
+        # 訂單牆片段：別人的品項才有跟單；跟單成功回 my_order 片段帶件數金額
+        _oc = db.query(_O2).filter(_O2.group_id == gc.id, _O2.user_id == user.id).first()
+        _oc_item = _oc.items[0]
+        _home.get_current_user = _fake_owner
+        import app.routers.orders as _ordm
+        async def _fake_other(request, db_):
+            return db_.query(User).filter(User.id == _other.id).first()
+        _ordm.get_current_user = _fake_other
+        r = _c.get(f"/groups/{gc.id}/orders/wall")
+        assert r.status_code == 200 and f"/orders/follow/{_oc_item.id}" in r.text and "（你）" not in r.text
+        r = _c.post(f"/groups/{gc.id}/orders/follow/{_oc_item.id}", headers={"HX-Request": "true"})
+        assert r.status_code == 200 and 'data-cart-count="1"' in r.text and 'data-cart-total="100"' in r.text and "送出訂單" in _T(r) and "確定結單" not in r.text
+        check("訂單牆：別人的品項有跟單鈕；跟單後回購物車片段帶 data-cart-count／total，按鈕是「送出訂單」")
+
+        # 盲點模式：訂單牆只給人數金額、不列品項
+        gc.is_blind_mode = True; db.commit()
+        r = _c.get(f"/groups/{gc.id}/orders/wall"); t = _T(r)
+        assert "盲點" in t and "便當" not in t and "/orders/follow/" not in r.text
+        gc.is_blind_mode = False; db.commit()
+        check("盲點模式：訂單牆只有人數與金額")
+
+        # 用語：團頁相關模板與錯誤訊息不再有「結單」
+        _ordm.get_current_user = _fake_owner
+        r = _c.post(f"/groups/{gc.id}/treat", follow_redirects=False)  # 已送出 → 可請客（302）
+        _left = []
+        for _tp in Path("app/templates").rglob("*.html"):
+            if "admin" in _tp.parts:
+                continue
+            if "結單" in _tp.read_text(encoding="utf-8"):
+                _left.append(_tp.name)
+        assert not _left, _left
+        for _py in ("app/routers/orders.py", "app/routers/groups.py", "app/services/export_service.py"):
+            _src = Path(_py).read_text(encoding="utf-8")
+            assert 'detail="' not in _src or "結單" not in _re.sub(r"#.*|\"\"\".*?\"\"\"", "", _src, flags=_re.S), f"{_py} 使用者看得到的字串還有「結單」"
+        check("用語統一：前台模板與錯誤訊息沒有「結單」（截止／送出訂單／提前截止）")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+        _ord.get_current_user = _orig_ord_cu
+        _home.get_current_user = _orig_home_cu
+
+    # ---------- 30. V2.19.0 開團頁只問店家＋截止 ----------
+    print("\n[30] V2.19.0 開團頁（主畫面只問截止＋團名、進階設定收合、複製開團帶入提示）")
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        r = _c.get("/groups/new"); t = r.text
+        assert r.status_code == 200 and 'id="advanced"' in t and 'id="advanced-body"' in t and "advSummary()" in t
+        assert "groupName: \"\"" in t and "nameTouched: false" in t and "copiedCount: 0" in t
+        assert 'class="btn btn-primary w-full' in t and "選擇類型" not in t and "趣味功能（選用）" not in t
+        # 進階裡的欄位 name 都還在（後端不變）
+        for _n in ("visibility", "note", "delivery_fee", "order_limit", "allow_over_limit", "enable_backup", "backup_count",
+                   "is_blind_mode", "enable_lucky_draw", "lucky_draw_count", "min_members", "auto_extend", "auto_remind_minutes", "i_treat",
+                   "lock_sugar", "lock_ice", "deadline", "name"):
+            assert f'name="{_n}"' in t, _n
+        # 開關細項都 :disabled（坑 #42）
+        for _n in ("min_members", "auto_remind_minutes", "lucky_draw_count"):
+            _i = t.index(f'name="{_n}"'); assert ":disabled=" in t[_i:_i + 200], _n
+        check("開團頁：主畫面截止＋團名、其他進「進階設定」收合；欄位 name 全保留、開關細項 :disabled、開團是主鈕")
+
+        # 複製開團：沿用舊團名（不自動換）、帶入 N 項
+        _gcp = db.query(Group).filter(Group.name == "C 別人開我已送出").first()
+        _gcp.note = "3F 茶水間"; _gcp.delivery_fee = 100; _gcp.order_limit = 140; _gcp.enable_backup = False; db.commit()
+        r = _c.get(f"/groups/{_gcp.id}/copy"); t = r.text
+        assert r.status_code == 200 and "nameTouched: true" in t and ("groupName: " + json.dumps("C 別人開我已送出")) in t
+        assert "copiedCount: 3" in t and 'deliveryFee: "100"' in t and 'orderLimit: "140"' in t and ("note: " + json.dumps("3F 茶水間")) in t
+        check("複製開團：沿用舊團名、進階標「已帶入 3 項」（備註／外送費／上限），值經 tojson 帶入")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")
 

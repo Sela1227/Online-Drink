@@ -93,6 +93,44 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     [...d.querySelectorAll("div[role=button]")].find(e => e.textContent.includes("甲店")).click();
     await sleep(100);
     if (d.querySelector("select[name=default_sugar]")) fail("餐廳不該有預設甜度");
+
+    // ---- V2.19.0：選好店 → 截止預設 1 小時後（chip 亮）、團名自動「店名 · 時段」 ----
+    const comp = w.Alpine.$data(form);
+    const dl = d.querySelector("input[name=deadline]");
+    if (!dl.value) fail("選好店後截止應預設填好");
+    const dlDate = new Date(dl.value), mins = (dlDate - new Date()) / 60000;
+    if (mins < 55 || mins > 61) fail("預設截止應為 1 小時後（實際差 " + Math.round(mins) + " 分）");
+    if (comp.deadlinePreset !== "1h") fail("「1 小時後」chip 應亮著（" + comp.deadlinePreset + "）");
+    const slot = (h) => h < 10 ? "早餐" : h < 14 ? "午餐" : h < 17 ? "下午茶" : "晚餐";
+    for (const [h, want] of [[9, "早餐"], [10, "午餐"], [13, "午餐"], [14, "下午茶"], [16, "下午茶"], [17, "晚餐"]]) {
+      if (comp.slotOf(h) !== want) fail(h + " 點應是「" + want + "」（" + comp.slotOf(h) + "）");
+    }
+    const nameEl = d.querySelector("input[name=name]");
+    if (nameEl.value !== "甲店 · " + slot(dlDate.getHours())) fail("團名應自動帶「甲店 · 時段」（" + nameEl.value + "）");
+    // 換截止 → 團名跟著換（12:00 必為午餐）
+    [...d.querySelectorAll("button")].find(b => /(今天|明天) 12:00/.test(b.textContent.trim())).click(); await sleep(60);
+    if (nameEl.value !== "甲店 · 午餐") fail("換成 12:00 截止團名應變「甲店 · 午餐」（" + nameEl.value + "）");
+    // 自己改過團名 → 再換截止也不動
+    nameEl.value = "我的團"; nameEl.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(40);
+    [...d.querySelectorAll("button")].find(b => /(今天|明天) 17:00/.test(b.textContent.trim())).click(); await sleep(60);
+    if (nameEl.value !== "我的團") fail("改過團名後不該再自動換（" + nameEl.value + "）");
+    // 進階設定：預設收合、摘要一行；改設定摘要跟著變
+    const adv = d.getElementById("advanced");
+    if (!adv) fail("找不到進階設定");
+    if (comp.advOpen) fail("進階設定預設應收合");
+    const summary = () => adv.querySelector("button").textContent.replace(/\s+/g, " ");
+    if (!summary().includes("公開 · 無上限 · 無外送費")) fail("進階摘要不對（" + summary() + "）");
+    const lim = d.querySelector("input[name=order_limit]"); lim.value = "140"; lim.dispatchEvent(new w.Event("input", { bubbles: true }));
+    const dep = d.querySelector("input[name=visibility][value=departments]"); dep.checked = true; dep.dispatchEvent(new w.Event("change", { bubbles: true }));
+    await sleep(60);
+    if (!summary().includes("限定部門 · 上限 $140") || !summary().includes("湊團")) fail("改設定後摘要應跟著變（" + summary() + "）");
+    adv.querySelector("button").click(); await sleep(60);
+    if (!comp.advOpen) fail("按進階設定應展開");
+    const sub = [...d.querySelectorAll("button[type=submit]")].find(b => b.textContent.trim() === "開團");
+    if (!sub || !sub.className.includes("btn-primary")) fail("「開團」應是 .btn-primary 主鈕");
+    const fd2 = fd();
+    if (fd2.name !== "我的團" || !fd2.deadline || fd2.order_limit !== "140" || fd2.visibility !== "departments") fail("送出的欄位不對 " + JSON.stringify(fd2));
+    if ("lucky_draw_count" in fd2) fail("沒開隨機免單卻送出 lucky_draw_count");
     // 切到飲料、選丁店（有 全糖/半糖 與 去冰）
     [...d.querySelectorAll("button")].find(b => b.textContent.includes("飲料") && (b.getAttribute("@click") || "").includes("selectCategory")).click();
     await sleep(80);
