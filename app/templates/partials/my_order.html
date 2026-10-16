@@ -1,17 +1,15 @@
 {# V2.18.0：根元素帶件數與金額，團頁的結帳列從這裡讀（單一來源） #}
-<div class="bg-white rounded-2xl shadow-sm border {% if order and order.status.value == 'submitted' %}border-green-200{% else %}border-sela-100{% endif %} p-4"
+{% set in_cart = not (order and order.status.value == 'submitted') %}
+<div class="{% if in_cart %}px-1{% else %}bg-white rounded-2xl shadow-sm border border-green-200 p-4{% endif %}"
      data-cart-count="{{ order.total_quantity if (order and order.status.value != 'submitted') else 0 }}"
      data-cart-total="{{ order.final_amount|money if (order and order.status.value != 'submitted') else 0 }}">
+    {# V2.20.0：購物車 sheet 自己有標題（購物車 · N 件／修改中），這裡只在「已送出」的頁面卡上放標題 #}
+    {% if not in_cart %}
     <h2 class="font-semibold text-sela-800 mb-3 flex items-center gap-2">
-        {% if order and order.status.value == 'submitted' %}
         <span class="text-green-700"><i class="ti ti-check"></i> 你已送出</span>
         <span class="ml-auto text-sela-800">${{ order.final_amount|money }}</span>
-        {% elif order and order.status.value == 'editing' %}
-        我的訂單 <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
-        {% else %}
-        我的訂單
-        {% endif %}
     </h2>
+    {% endif %}
 
     {% if order and order.items %}
     <!-- 品項列表 -->
@@ -39,16 +37,20 @@
 
             {% if is_open and order.status.value != 'submitted' %}
             <div class="flex items-center gap-2 mt-2">
+                {% if item.quantity <= 1 %}
+                {# V2.20.0：減到 0 即移除（後端數量 0＝刪除），取代每列的獨立刪除鈕 #}
+                <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": 0}' hx-confirm="移除「{{ item.item_name }}」？"
+                        hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="$dispatch('orderUpdated')"
+                        class="w-9 h-9 rounded-full bg-sela-100 text-red-500 active:scale-90 transition flex items-center justify-center" aria-label="移除品項"><i class="ti ti-trash"></i></button>
+                {% else %}
                 <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": {{ item.quantity - 1 }}}'
                         hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="$dispatch('orderUpdated')"
                         class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 active:scale-90 transition flex items-center justify-center text-lg leading-none" aria-label="減少數量">−</button>
+                {% endif %}
                 <span class="w-7 text-center font-medium text-sela-800">{{ item.quantity }}</span>
                 <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": {{ item.quantity + 1 }}}'
                         hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="$dispatch('orderUpdated')"
                         class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 active:scale-90 transition flex items-center justify-center text-lg leading-none" aria-label="增加數量">+</button>
-                <button hx-delete="/orders/items/{{ item.id }}" hx-target="#cart-content" hx-swap="innerHTML" hx-confirm="確定要刪除？"
-                        @htmx:after-request="$dispatch('orderUpdated')"
-                        class="ml-auto w-9 h-9 rounded-full text-red-400 active:bg-red-50 transition flex items-center justify-center" aria-label="刪除品項"><i class="ti ti-trash"></i></button>
             </div>
             {% if group.enable_backup %}
             {% set unit_total = (item.subtotal / item.quantity) %}
@@ -67,7 +69,7 @@
                 {% endfor %}
                 {% if item.backups|length < group.backup_count %}
                 <button type="button"
-                        @click='startBackup({{ item.id }}, {{ item.item_name | tojson }}, {{ item.backups|length + 1 }})'
+                        @click='startBackup({{ item.id }}, {{ item.item_name | tojson }}, {{ item.backups|length + 1 }}, {{ (item.subtotal / item.quantity)|float }})'
                         class="inline-flex items-center gap-1 text-xs text-sela-700 border border-dashed border-sela-300 rounded-full px-2.5 py-1 active:bg-sela-50">
                     <i class="ti ti-plus" style="font-size:11px;"></i> 缺貨候補（{{ item.backups|length }}/{{ group.backup_count }}）
                 </button>
@@ -138,20 +140,19 @@
             {% else %}
             {% set bkn = order.items | selectattr('backups') | list | length %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
-                    hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount|money }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
-                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
-                    class="btn btn-primary flex-1">送出訂單</button>
+                    hx-confirm="{% if order.status.value == 'editing' %}送出修改{% else %}送出訂單{% endif %}？共 {{ order.total_quantity }} 件、${{ order.final_amount|money }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('{% if order.status.value == 'editing' %}已送出修改{% else %}已送出訂單{% endif %}')"
+                    class="btn btn-primary {% if order.status.value == 'editing' %}flex-[2] order-2{% else %}flex-1{% endif %} py-3">{% if order.status.value == 'editing' %}送出修改{% else %}送出訂單{% endif %}</button>
             {% endif %}
             {% if order.status.value == 'editing' %}
+            {# V2.20.0：「取消」改「取消修改」，避免以為是關視窗 #}
             <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'" class="btn btn-secondary">取消</button>
+                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; window.toast('已取消修改')" class="btn btn-secondary flex-1 order-1">取消修改</button>
             {% endif %}
             {% else %}
             <button hx-post="/groups/{{ group.id }}/orders/edit" hx-target="#cart-content" hx-swap="innerHTML"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='editing'" class="btn btn-secondary flex-1">修改訂單</button>
             {% endif %}
-            <button hx-delete="/groups/{{ group.id }}/orders" hx-target="#cart-content" hx-swap="innerHTML" hx-confirm="確定要刪除整張訂單嗎？"
-                    @htmx:after-request="$dispatch('orderUpdated'); orderStatus='none'; cartCount=0; showCart=false; window.toast('已刪除訂單')" class="btn btn-danger" aria-label="刪除整張訂單"><i class="ti ti-trash"></i></button>
         </div>
         {% endif %}
     </div>

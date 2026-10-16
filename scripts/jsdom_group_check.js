@@ -8,6 +8,7 @@
  *   member 模式：結帳列讀到「1 件 · $100」→ 按「查看並送出」開購物車 sheet → 導覽列有 常點／熱門／骰子、
  *               按骰子開隨機視窗 → 模擬送出（orderStatus='submitted'）後菜單收合、結帳列變說明、
  *               按「再加點 ›」菜單展開
+ *               V2.20.0：加點 sheet 主鈕帶金額、＋ 數量金額加倍、備註收合、✕ 關閉；購物車數量 1 是垃圾桶、⋯ 才有清空
  *   owner 模式：團主列三顆 → 按「更多」開 sheet、切「匯出」分頁看到點餐彙總 → 按「催單」寫進剪貼簿的文字含「截止」不含「結單」
  *
  * 用法：node scripts/jsdom_group_check.js <html檔> <member|owner> <mine片段html> <wall片段html>
@@ -101,6 +102,35 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     comp.showRandom = false;
     if (d.querySelector("#quick-mine") == null || d.querySelector("#quick-hot") == null) fail("菜單頂部應有 常點／熱門 兩段");
     if ([...d.querySelectorAll("h2")].some(h => text(h).includes("快速點餐"))) fail("「快速點餐」卡應已拿掉");
+    // 3b) V2.20.0 加點 sheet：主鈕帶金額、＋ 數量金額跟著變、＋ 加備註展開、✕ 關閉
+    const addBtn = [...d.querySelectorAll("button")].find(b => (b.getAttribute("@click") || "").startsWith("openAddItem("));
+    if (!addBtn) fail("找不到可加點的菜單品項");
+    addBtn.click(); await sleep(120);
+    const sheet = d.getElementById("add-item-sheet");
+    if (!comp.showAddItem || !visible(sheet)) fail("按品項後加點 sheet 沒開");
+    const submit = d.getElementById("add-item-submit");
+    const m1 = text(submit).match(/^加入購物車・\$(\d+)$/);
+    if (!m1 || Number(m1[1]) <= 0) fail("加點主鈕應為「加入購物車・$金額」（" + text(submit) + "）");
+    const plus = [...sheet.querySelectorAll("button")].find(b => b.getAttribute("aria-label") === "增加數量");
+    plus.click(); await sleep(60);
+    if (text(submit) !== "加入購物車・$" + (Number(m1[1]) * 2)) fail("數量 2 時主鈕金額應加倍（" + text(submit) + "）");
+    if ([...sheet.querySelectorAll("button")].some(b => text(b) === "取消")) fail("加點 sheet 底部不該再有「取消」（改右上 ✕）");
+    const noteInput = sheet.querySelector("input[name=note]");
+    if (visible(noteInput.closest("[x-show]"))) fail("備註應預設收合");
+    [...sheet.querySelectorAll("button")].find(b => text(b) === "＋ 加備註").click(); await sleep(60);
+    if (!comp.noteOpen || !visible(noteInput.closest("[x-show]"))) fail("按「＋ 加備註」沒展開輸入框");
+    sheet.querySelector("button[aria-label='關閉']").click(); await sleep(60);
+    if (comp.showAddItem) fail("按 ✕ 沒關掉加點 sheet");
+    // 3c) 購物車 sheet：數量 1 的「−」是垃圾桶（數量 0）；⋯ 選單才有「清空購物車」
+    comp.showCart = true; await sleep(60);
+    const trash = d.querySelector("#cart-content button[aria-label='移除品項']");
+    if (!trash || !(trash.getAttribute("hx-vals") || "").includes('"quantity": 0')) fail("數量 1 的品項應顯示垃圾桶（hx-vals quantity 0）");
+    if (d.querySelector("#cart-content [hx-delete$='/orders']")) fail("整單刪除應已移出購物車內容（改在 ⋯）");
+    const clear = d.getElementById("clear-cart");
+    if (!clear || visible(clear.closest("[x-show]"))) fail("「清空購物車」應收在 ⋯ 選單、預設隱藏");
+    d.querySelector("#cart-header button[aria-label='更多']").click(); await sleep(60);
+    if (!visible(clear.closest("[x-show]"))) fail("按 ⋯ 沒出現「清空購物車」");
+    comp.showCart = false; await sleep(30);
     // 4) 送出後：菜單收合、結帳列變說明；「再加點」展開
     const collapsed = d.getElementById("menu-collapsed"), section = d.getElementById("menu-section");
     if (!visible(section) || visible(collapsed)) fail("還沒送出時菜單應展開、收合列隱藏");

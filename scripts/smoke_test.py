@@ -1958,6 +1958,66 @@ def main():
         _grp.get_current_user = _orig_cu
         _grp.get_current_user_optional = _orig_cuo
 
+    # ---------- 31. V2.20.0 加點彈窗與購物車 sheet ----------
+    print("\n[31] V2.20.0 加點彈窗與購物車 sheet（✕／按鈕帶金額／減到 0 移除／清空收進 ⋯／送出修改）")
+    import app.routers.orders as _ordm31
+    from app.models.order import Order as _O31, OrderItem as _OI31, OrderStatus as _OS31
+    _orig_ordm_cu = _ordm31.get_current_user
+    async def _fake_other31(request, db_):
+        return db_.query(User).filter(User.id == _other.id).first()
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        # 團頁：加點改成底部 sheet（✕、備註收合、按鈕帶金額），購物車 sheet 標題列有 ⋯ 清空
+        r = _c.get(f"/groups/{gc.id}"); t = r.text
+        assert 'id="add-item-sheet"' in t and 'id="add-item-submit"' in t and "addButtonLabel()" in t and "本品小計" not in _T(r)
+        assert "＋ 加備註" in t and 'x-ref="itemNote"' in t and 'id="last-pref-note"' in t
+        assert 'id="cart-header"' in t and 'id="clear-cart"' in t and f'hx-delete="/groups/{gc.id}/orders"' in t
+        assert "'加入購物車・$' + this.itemSubtotal()" in t and "'設為候補 ' + this.backupMode.priority" in t
+        check("團頁：加點是底部 sheet（✕、＋ 加備註、主鈕帶金額、上次偏好提示）；購物車標題列 ⋯ 清空購物車")
+
+        # 購物車片段（未送出）：沒有第二個「我的訂單」標題；數量 1 的「−」是垃圾桶＝數量 0；片段內不再有整單刪除與每列刪除鈕
+        _ordm31.get_current_user = _fake_other31
+        _oo = db.query(_O31).filter(_O31.group_id == gc.id, _O31.user_id == _other.id).first()
+        assert _oo is not None and _oo.status == _OS31.DRAFT
+        _it = _oo.items[0]
+        _bk_prev = (gc.enable_backup, gc.backup_count); gc.enable_backup = True; gc.backup_count = 2; db.commit()
+        r = _c.get(f"/groups/{gc.id}/orders/mine"); t = r.text
+        gc.enable_backup, gc.backup_count = _bk_prev; db.commit()
+        assert r.status_code == 200 and "我的訂單" not in t and "送出訂單" in _T(r)
+        assert f'hx-put="/orders/items/{_it.id}" hx-vals=\'{{"quantity": 0}}\'' in t and "移除品項" in t
+        assert f'hx-delete="/groups/{gc.id}/orders"' not in t and f'hx-delete="/orders/items/{_it.id}"' not in t
+        assert f", {float(_it.subtotal / _it.quantity)})" in t, "候補要帶主品項每份總價（算價差）"
+        check("購物車片段：無雙標題；數量 1 的「−」變垃圾桶（數量 0＝移除）；整單／每列刪除鈕移出；候補帶每份價")
+
+        # 數量 2：回到「−」（數量 1）
+        _it.quantity = 2; db.commit()
+        r = _c.get(f"/groups/{gc.id}/orders/mine"); t = r.text
+        assert f'hx-vals=\'{{"quantity": 1}}\'' in t and "移除品項" not in t
+        _it.quantity = 1; db.commit()
+        check("數量 2 時是一般「−」（數量 1），不是垃圾桶")
+
+        # 修改中：主鈕「送出修改」＋「取消修改」
+        _oo.status = _OS31.EDITING; db.commit()
+        r = _c.get(f"/groups/{gc.id}/orders/mine"); tt = _T(r)
+        assert "送出修改" in tt and "取消修改" in tt and "送出訂單" not in tt and "我的訂單" not in r.text
+        _oo.status = _OS31.DRAFT; db.commit()
+        check("修改中：主鈕「送出修改」、旁邊「取消修改」")
+
+        # 垃圾桶的實際行為：PUT 數量 0 → 品項（連同候補）刪掉，回空購物車片段
+        from app.models.order import OrderItemBackup as _OIB31
+        db.add(_OIB31(order_item_id=_it.id, priority=1, item_name="候補綠茶", unit_price=_it.unit_price)); db.commit()
+        _iid = _it.id
+        r = _c.put(f"/orders/items/{_iid}", data={"quantity": "0"}, headers={"HX-Request": "true"})
+        db.expire_all()
+        assert r.status_code == 200 and 'data-cart-count="0"' in r.text, r.text[:300]
+        assert db.query(_OI31).filter(_OI31.id == _iid).first() is None and db.query(_OIB31).filter(_OIB31.order_item_id == _iid).count() == 0
+        check("垃圾桶＝PUT 數量 0：品項與候補一起刪除，片段件數歸零")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+        _ordm31.get_current_user = _orig_ordm_cu
+
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")
 

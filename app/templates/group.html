@@ -757,9 +757,24 @@
              x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full">
             <!-- 抓握條 -->
             <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
-            <div class="px-4 pb-2 flex items-center justify-between flex-shrink-0">
-                <h3 class="font-semibold text-lg text-sela-800 flex items-center gap-2"><i class="ti ti-shopping-cart"></i> 購物車</h3>
-                <button @click="showCart = false" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
+            {# V2.20.0：標題只有這一個（片段裡不再有「我的訂單」）；整單刪除收進 ⋯，不再和送出鈕並排 #}
+            <div class="px-4 pb-2 flex items-center gap-1 flex-shrink-0" id="cart-header" x-data="{ menu: false }">
+                <h3 class="font-semibold text-lg text-sela-800 flex-1 flex items-center gap-2">購物車
+                    <span x-show="orderStatus === 'editing'" x-cloak class="text-[11px] font-normal bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">修改中</span>
+                    <span x-show="orderStatus !== 'editing' && cartCount > 0" class="text-sm font-normal text-sela-800/50" x-text="cartCount + ' 件'"></span>
+                </h3>
+                <div class="relative">
+                    <button type="button" @click="menu = !menu" :disabled="cartCount === 0 && orderStatus !== 'editing'" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100 disabled:opacity-30" aria-label="更多">
+                        <i class="ti ti-dots" style="font-size:20px;"></i>
+                    </button>
+                    <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-0 top-10 z-10 w-40 bg-white border border-sela-200 rounded-xl shadow-lg text-sm overflow-hidden">
+                        <button type="button" id="clear-cart"
+                                hx-delete="/groups/{{ group.id }}/orders" hx-target="#cart-content" hx-swap="innerHTML" hx-confirm="確定要清空購物車嗎？"
+                                @htmx:after-request="menu = false; if ($event.detail.successful) { $dispatch('orderUpdated'); orderStatus = 'none'; cartCount = 0; showCart = false; window.toast('已清空購物車') }"
+                                class="w-full text-left px-3 py-2.5 text-red-600 active:bg-red-50"><i class="ti ti-trash"></i> 清空購物車</button>
+                    </div>
+                </div>
+                <button type="button" @click="showCart = false" class="w-9 h-9 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100" aria-label="關閉">
                     <i class="ti ti-x" style="font-size:20px;"></i>
                 </button>
             </div>
@@ -893,28 +908,38 @@
         </div>
     </div>
 
-    <!-- 加入品項 Modal -->
-    <div x-show="showAddItem" x-cloak
-         class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
-         @click.self="showAddItem = false">
-        <div class="bg-white rounded-t-2xl sm:rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
-            <div x-show="backupMode" x-cloak class="mb-2">
-                <span class="inline-block text-xs text-sela-700 bg-sela-50 border border-dashed border-sela-300 rounded-lg px-2.5 py-1.5">
-                    候補 <span x-text="backupMode?.priority"></span>・「<span x-text="backupMode?.itemName"></span>」缺貨時改買
-                </span>
+    <!-- 加入品項（V2.20.0：底部 sheet——右上 ✕、拖曳條、中間捲動、底部數量＋帶金額的按鈕） -->
+    <div x-show="showAddItem" x-cloak class="fixed inset-0 z-50" id="add-item-sheet">
+        <div class="absolute inset-0 bg-black/40" @click="showAddItem = false"></div>
+        <div class="absolute left-0 right-0 bottom-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[88vh]">
+            <div class="pt-2.5 pb-1 flex justify-center flex-shrink-0"><div class="w-10 h-1 rounded-full bg-sela-200"></div></div>
+            <div class="px-4 flex items-start gap-2 flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div x-show="backupMode" x-cloak class="mb-1">
+                        <span class="inline-block text-xs text-sela-700 bg-sela-50 border border-dashed border-sela-300 rounded-lg px-2.5 py-1">
+                            候補 <span x-text="backupMode?.priority"></span>・「<span x-text="backupMode?.itemName"></span>」缺貨時改買
+                        </span>
+                    </div>
+                    <h3 class="font-semibold text-lg text-sela-800" x-text="selectedItem?.name"></h3>
+                    {# V2.16.0 A-2：彈窗顯示完整說明 #}
+                    <p x-show="selectedItem?.description" class="text-sm text-sela-800/60" x-text="selectedItem?.description"></p>
+                </div>
+                <button type="button" @click="showAddItem = false" class="w-9 h-9 -mr-1 rounded-full flex items-center justify-center text-sela-700 active:bg-sela-100 flex-shrink-0" aria-label="關閉">
+                    <i class="ti ti-x" style="font-size:20px;"></i>
+                </button>
             </div>
-            <h3 class="font-semibold text-lg" x-text="selectedItem?.name"></h3>
-            {# V2.16.0 A-2：彈窗顯示完整說明（原本彈窗完全看不到） #}
-            <p x-show="selectedItem?.description" class="text-sm text-sela-800/60 mt-1 mb-4" x-text="selectedItem?.description"></p>
-            <div x-show="!selectedItem?.description" class="mb-4"></div>
-            
+            <div x-show="lastPrefNote" x-cloak class="px-4 mt-1.5 flex-shrink-0">
+                <span class="inline-flex items-center gap-1 text-[11px] bg-sela-50 border border-sela-200 rounded-full px-2.5 py-1 text-sela-800/70" id="last-pref-note"><i class="ti ti-rotate-clockwise"></i> 已帶入上次：<span x-text="lastPrefNote"></span></span>
+            </div>
+
             {# V2.16.3 審核 P1-2e：店家有甜冰選項卻沒選就送，原本後端收 None、團主匯出看到空白；現在送出前先提示 #}
-            <form hx-post="/groups/{{ group.id }}/orders/items" 
+            <form hx-post="/groups/{{ group.id }}/orders/items"
                   hx-target="#cart-content"
                   hx-swap="innerHTML"
                   @htmx:after-request="afterAddItem()"
-                  @htmx:config-request="if (!checkDrinkOptions($el)) $event.preventDefault()">
-                
+                  @htmx:config-request="if (!checkDrinkOptions($el)) $event.preventDefault()"
+                  class="flex flex-col min-h-0 flex-1">
+            <div class="overflow-y-auto px-4 pt-3 pb-2 flex-1 min-h-0">
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
                 <!-- 尺寸選擇 -->
@@ -1013,37 +1038,31 @@
                     </div>
                 </div>
                 
-                <!-- 數量 -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-sela-800 mb-2">數量</label>
-                    <input type="hidden" name="backup_for" :value="backupMode ? backupMode.itemId : ''">
-                    <div class="flex items-center gap-3" x-show="!backupMode">
-                        <button type="button" @click="quantity = Math.max(1, quantity - 1)" class="stepper" aria-label="減少數量">−</button>
-                        <input type="number" name="quantity" x-model="quantity" min="1"
-                               class="w-16 text-center border border-sela-300 rounded-xl py-2.5 text-sela-800 font-medium">
-                        <button type="button" @click="quantity = (selectedItem && selectedItem.remaining != null) ? Math.min(selectedItem.remaining, quantity + 1) : quantity + 1" class="stepper" aria-label="增加數量">+</button>
+                <input type="hidden" name="backup_for" :value="backupMode ? backupMode.itemId : ''">
+                <p x-show="backupMode" x-cloak class="text-xs text-sela-800/50 mb-3">候補數量會跟隨主品項</p>
+                <p x-show="selectedItem?.tbd" x-cloak class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 mb-3"><i class="ti ti-info-circle"></i> 此品項價格未訂，團主定價後金額會自動補上</p>
+
+                <!-- 備註（收合） -->
+                <div class="mb-2">
+                    <button type="button" x-show="!noteOpen" @click="noteOpen = true; $nextTick(() => $refs.itemNote.focus())" class="text-sm text-sela-800/60 underline">＋ 加備註</button>
+                    <div x-show="noteOpen" x-cloak>
+                        <label class="block text-sm font-medium text-sela-800 mb-2">備註</label>
+                        <input type="text" name="note" x-ref="itemNote" placeholder="特殊需求..." maxlength="100"
+                               class="w-full border border-sela-300 rounded-xl px-3 py-2">
                     </div>
-                    <p x-show="backupMode" x-cloak class="text-xs text-sela-800/50 mt-1">候補數量會跟隨主品項</p>
-                    <p x-show="selectedItem?.tbd" x-cloak class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 mt-1"><i class="ti ti-info-circle"></i> 此品項價格未訂，團主定價後金額會自動補上</p>
                 </div>
-                
-                <!-- 備註 -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-sela-800 mb-2">備註</label>
-                    <input type="text" name="note" placeholder="特殊需求..." 
-                           class="w-full border rounded px-3 py-2">
+            </div>
+
+            <!-- 底部：數量＋帶金額的按鈕（不會被選項擠出畫面） -->
+            <div class="border-t border-sela-200 px-4 py-3 flex items-center gap-3 flex-shrink-0" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
+                <div class="flex items-center gap-2" x-show="!backupMode">
+                    <button type="button" @click="quantity = Math.max(1, quantity - 1)" class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 text-lg flex items-center justify-center active:scale-90" aria-label="減少數量">−</button>
+                    <input type="number" name="quantity" x-model="quantity" min="1" aria-label="數量"
+                           class="w-10 text-center font-semibold text-sela-800 bg-transparent border-0 p-0">
+                    <button type="button" @click="quantity = (selectedItem && selectedItem.remaining != null) ? Math.min(selectedItem.remaining, quantity + 1) : quantity + 1" class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 text-lg flex items-center justify-center active:scale-90" aria-label="增加數量">+</button>
                 </div>
-                
-                <!-- 本品小計 -->
-                <div class="flex items-center justify-between mb-3 px-1">
-                    <span class="text-sm text-sela-700/70">本品小計</span>
-                    <span class="text-lg font-bold text-sela-800" x-text="'$' + itemSubtotal()"></span>
-                </div>
-                <!-- 按鈕 -->
-                <div class="flex gap-2">
-                    <button type="button" @click="showAddItem = false" class="btn btn-secondary flex-1">取消</button>
-                    <button type="submit" class="btn btn-primary flex-1"><span x-text="backupMode ? ('設為候補 ' + backupMode.priority) : '加入購物車'"></span></button>
-                </div>
+                <button type="submit" class="btn btn-primary flex-1 py-3" id="add-item-submit"><span x-text="addButtonLabel()"></span></button>
+            </div>
             </form>
         </div>
     </div>
@@ -1098,6 +1117,8 @@ function orderPage() {
         },
         showQR: false,
         showAddItem: false,
+        noteOpen: false,
+        lastPrefNote: '',
         showCart: false,
         showSettings: false,
         showReminder: false,
@@ -1163,12 +1184,15 @@ function orderPage() {
             this.selectedSize = 'M';
             this.quantity = 1;
             this.extraToppings = 0;
+            this.noteOpen = false;      // V2.20.0：備註收合
+            this.lastPrefNote = '';
             this.showAddItem = true;
             this.$nextTick(() => this.applyLastPref());
         },
         
-        startBackup(itemId, itemName, nextPriority) {
-            this.backupMode = { itemId: itemId, itemName: itemName, priority: nextPriority };
+        startBackup(itemId, itemName, nextPriority, baseUnit) {
+            // V2.20.0：帶主品項每份總價，候補按鈕顯示價差
+            this.backupMode = { itemId: itemId, itemName: itemName, priority: nextPriority, base: Number(baseUnit) || 0 };
             this.showCart = false;
             window.toast('點選菜單品項作為候補');
         },
@@ -1198,9 +1222,12 @@ function orderPage() {
         applyLastPref() {
             try {
                 const pref = JSON.parse(localStorage.getItem('selapref_{{ store.id if store else 0 }}') || '{}');
-                if (pref.size) this.selectedSize = pref.size;
-                if (pref.sugar) { const r = document.querySelector(`input[name=sugar][value="${pref.sugar}"]`); if (r) r.checked = true; }
-                if (pref.ice)   { const r = document.querySelector(`input[name=ice][value="${pref.ice}"]`);   if (r) r.checked = true; }
+                // V2.20.0：帶入了什麼就顯示一行「已帶入上次：…」（原本悄悄帶入，看不出來）
+                const applied = [];
+                if (pref.size && this.selectedItem && this.selectedItem.price_l) { this.selectedSize = pref.size; applied.push(pref.size); }
+                if (pref.sugar) { const r = document.querySelector(`#add-item-sheet input[name=sugar][value="${pref.sugar}"]`); if (r) { r.checked = true; applied.push(pref.sugar); } }
+                if (pref.ice)   { const r = document.querySelector(`#add-item-sheet input[name=ice][value="${pref.ice}"]`);   if (r) { r.checked = true; applied.push(pref.ice); } }
+                this.lastPrefNote = applied.join('・');
             } catch (e) {}
         },
 
@@ -1212,6 +1239,16 @@ function orderPage() {
             } catch (e) {}
         },
         
+        // V2.20.0：加點按鈕直接帶金額；候補模式帶價差
+        addButtonLabel() {
+            if (this.backupMode) {
+                const diff = Math.round(this.itemSubtotal() / Math.max(1, parseInt(this.quantity) || 1) - this.backupMode.base);
+                return '設為候補 ' + this.backupMode.priority + (diff > 0 ? '・+$' + diff : diff < 0 ? '・-$' + (-diff) : '');
+            }
+            if (this.selectedItem && this.selectedItem.tbd) return '加入購物車';
+            return '加入購物車・$' + this.itemSubtotal();
+        },
+
         itemSubtotal() {
             if (!this.selectedItem) return 0;
             const base = (this.selectedSize === 'L' && this.selectedItem.price_l) ? this.selectedItem.price_l : this.selectedItem.price;
