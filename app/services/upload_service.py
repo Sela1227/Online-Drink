@@ -15,9 +15,11 @@ if settings.cloudinary_cloud_name:
     )
 
 
-async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | None:
+async def upload_image(file: UploadFile, folder: str = "sela/stores", max_size: int = 400) -> str | None:
     """上傳圖片到 Cloudinary，回傳 URL。
-    V2.8.0：格式白名單（JPG/PNG/WebP）＋ 5MB 上限（讀取階段即拒絕），失敗回明確 400。"""
+    V2.8.0：格式白名單（JPG/PNG/WebP）＋ 5MB 上限（讀取階段即拒絕），失敗回明確 400。
+    V2.16.2：`max_size` 是長邊上限——logo／品項圖 400 夠用，菜單照片要看得到字，用 1600；
+    白名單加 HEIC／HEIF（iPhone 預設格式，Cloudinary 會轉）。"""
     from fastapi import HTTPException
     
     if not file or not file.filename:
@@ -28,9 +30,9 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | N
         print("Cloudinary not configured")
         return None
     
-    _ALLOWED = {"image/jpeg", "image/png", "image/webp"}
+    _ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
     if file.content_type not in _ALLOWED:
-        raise HTTPException(status_code=400, detail="圖片僅支援 JPG／PNG／WebP")
+        raise HTTPException(status_code=400, detail="圖片僅支援 JPG／PNG／WebP／HEIC")
     _MAX = 5 * 1024 * 1024
     content = await file.read(_MAX + 1)
     if len(content) > _MAX:
@@ -43,7 +45,7 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores") -> str | N
             folder=folder,
             resource_type="image",
             transformation=[
-                {"width": 400, "height": 400, "crop": "limit"},
+                {"width": max_size, "height": max_size, "crop": "limit"},
                 {"quality": "auto"},
                 {"fetch_format": "auto"}
             ]

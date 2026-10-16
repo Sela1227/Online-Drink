@@ -52,7 +52,7 @@
                             {{ group.store_display_name }} ・ {{ group.owner.display_name }}
                         </div>
                         <div class="text-xs text-sela-800/45">
-                            {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            {{ (group.created_at|taipei).strftime('%Y-%m-%d %H:%M') }}
                             ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已送出
                         </div>
                     </div>

@@ -61,8 +61,8 @@
                 <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-sela-800/60">
                     {% if r.nickname %}<span>暱稱：{{ r.nickname }}</span>{% endif %}
                     <span><i class="ti ti-shopping-cart"></i> {{ r.order_count }} 筆訂單</span>
-                    {% if r.created_at %}<span>註冊 {{ r.created_at.strftime('%Y/%m/%d') }}</span>{% endif %}
-                    {% if r.last_active_at %}<span>活躍 {{ r.last_active_at.strftime('%Y/%m/%d') }}</span>
+                    {% if r.created_at %}<span>註冊 {{ (r.created_at|taipei).strftime('%Y/%m/%d') }}</span>{% endif %}
+                    {% if r.last_active_at %}<span>活躍 {{ (r.last_active_at|taipei).strftime('%Y/%m/%d') }}</span>
                     {% else %}<span class="text-sela-800/45">從未活躍</span>{% endif %}
                     {% if not r.has_picture %}<span class="text-amber-500">無頭像</span>{% endif %}
                 </div>

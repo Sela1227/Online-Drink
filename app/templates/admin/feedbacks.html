@@ -26,7 +26,7 @@
                         <img src="{{ feedback.user.picture_url }}" class="w-6 h-6 rounded-full">
                         {% endif %}
                         <span class="font-medium text-sela-800/80">{{ feedback.user.show_name }}</span>
-                        <span class="text-xs text-sela-800/45">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</span>
+                        <span class="text-xs text-sela-800/45">{{ (feedback.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</span>
                     </div>
                     
                     <!-- 內容 -->
@@ -37,7 +37,7 @@
                 <div class="flex flex-col gap-2 flex-shrink-0">
                     <!-- 複製按鈕 -->
                     <button @click="
-                        const text = `[{{ feedback.user.show_name }}] {{ feedback.created_at.strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
+                        const text = `[{{ feedback.user.show_name }}] {{ (feedback.created_at|taipei).strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
                         navigator.clipboard.writeText(text);
                         copied = true;
                         setTimeout(() => copied = false, 2000);
@@ -90,7 +90,7 @@
                             <img src="{{ feedback.user.picture_url }}" class="w-6 h-6 rounded-full">
                             {% endif %}
                             <span class="font-medium text-sela-800/70">{{ feedback.user.show_name }}</span>
-                            <span class="text-xs text-sela-800/45">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</span>
+                            <span class="text-xs text-sela-800/45">{{ (feedback.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</span>
                         </div>
                         
                         <!-- 內容 -->
@@ -101,7 +101,7 @@
                     <div class="flex flex-col gap-2 flex-shrink-0">
                         <!-- 複製按鈕 -->
                         <button @click="
-                            const text = `[{{ feedback.user.show_name }}] {{ feedback.created_at.strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
+                            const text = `[{{ feedback.user.show_name }}] {{ (feedback.created_at|taipei).strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
                             navigator.clipboard.writeText(text);
                             copied = true;
                             setTimeout(() => copied = false, 2000);

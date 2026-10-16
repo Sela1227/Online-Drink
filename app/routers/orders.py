@@ -57,9 +57,9 @@ def _validate_item_spec(group, store, size, sugar, ice, quantity, options, note)
         if group.lock_ice:
             ice = group.default_ice
         if sugar and sugars and sugar not in sugars:
-            raise HTTPException(status_code=400, detail="甜度選項不存在")
+            raise HTTPException(status_code=400, detail="請重新選擇甜度（這個選項不在店家目前的清單裡）")
         if ice and ices and ice not in ices:
-            raise HTTPException(status_code=400, detail="冰塊選項不存在")
+            raise HTTPException(status_code=400, detail="請重新選擇冰塊（這個選項不在店家目前的清單裡）")
         # V2.11.2 N-08：店家沒設定甜冰選項時上面兩條整個略過（空集合），
         # 任意長度字串照收。飲料選項功能 V2.10.0 才有，很多店家目前還沒設。
         # PostgreSQL 超過 String(50) 會 500，SQLite 照收所以本機測不出來。

@@ -220,11 +220,18 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
         .filter(Group.store_id.isnot(None))
         .group_by(Group.store_id).all()
     )
+    # V2.16.2：排序可選熱門——全體累計開團次數
+    group_counts = dict(
+        db.query(Group.store_id, _f.count(Group.id))
+        .filter(Group.store_id.isnot(None))
+        .group_by(Group.store_id).all()
+    )
     from app.models.group import taipei_to_utc as _t2u  # noqa: F401  (保留匯入點以供日後時區統一)
 
     return templates.TemplateResponse("admin/stores.html", {
         "item_counts": item_counts,
         "last_groups": last_groups,
+        "group_counts": group_counts,
         "request": request,
         "user": user,
         "stores": stores,

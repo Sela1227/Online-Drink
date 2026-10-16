@@ -46,7 +46,7 @@
             <!-- 公告資訊 -->
             <div class="bg-sela-50 rounded-lg p-3 text-xs text-sela-800/60">
                 <div>建立者：{{ announcement.created_by.show_name }}</div>
-                <div>建立時間：{{ announcement.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
+                <div>建立時間：{{ (announcement.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</div>
             </div>
             
             <div class="flex gap-3 pt-2">

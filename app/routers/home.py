@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
@@ -812,6 +813,9 @@ async def store_menu_view(store_id: int, request: Request, db: Session = Depends
     })
 
 
+RECOMMEND_MAX_PHOTOS = 5  # V2.16.2：推薦店家的菜單照片上限
+
+
 @router.get("/recommend")
 async def recommend_store_page(request: Request, db: Session = Depends(get_db)):
     """推薦店家頁面"""
@@ -828,6 +832,7 @@ async def recommend_store_page(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "user": user,
         "recommendations": my_recommendations,
+        "max_photos": RECOMMEND_MAX_PHOTOS,
     })
 
 
@@ -838,10 +843,10 @@ async def submit_recommendation(
     category: str = Form(...),
     menu_url: str = Form(None),
     note: str = Form(None),
-    menu_image: UploadFile = File(None),
+    menu_image: list[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """提交店家推薦"""
+    """提交店家推薦。V2.16.2：菜單照片可多張（最多 5），改走 upload_service（審核 P2-F5）"""
     user = await get_current_user(request, db)
     
     # V2.11.1 P0-06：menu_url 會被輸出成後台推薦列表與匯入頁的 href，
@@ -850,40 +855,24 @@ async def submit_recommendation(
     menu_url = clean_http_url(menu_url, field="菜單網址")
     
     from app.models.user import StoreRecommendation
-    from app.config import get_settings
-    
-    menu_image_url = None
-    
-    # 處理圖片上傳到 Cloudinary
-    if menu_image and menu_image.filename:
-        settings = get_settings()
-        if settings.cloudinary_cloud_name:
-            try:
-                import cloudinary
-                import cloudinary.uploader
-                
-                cloudinary.config(
-                    cloud_name=settings.cloudinary_cloud_name,
-                    api_key=settings.cloudinary_api_key,
-                    api_secret=settings.cloudinary_api_secret
-                )
-                
-                contents = await menu_image.read()
-                result = cloudinary.uploader.upload(
-                    contents,
-                    folder="sela/recommendations",
-                    resource_type="image"
-                )
-                menu_image_url = result.get("secure_url")
-            except Exception as e:
-                print(f"Cloudinary upload error: {e}")
-    
+    from app.services.upload_service import upload_image
+    files = [f for f in (menu_image or []) if f and f.filename]
+    if len(files) > RECOMMEND_MAX_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"菜單照片最多 {RECOMMEND_MAX_PHOTOS} 張")
+    # 一張失敗整筆 400（格式／大小／Cloudinary），不會留下半筆推薦
+    urls = []
+    for f in files:
+        u = await upload_image(f, folder="sela/recommendations", max_size=1600)
+        if u:
+            urls.append(u)
+
     recommendation = StoreRecommendation(
         user_id=user.id,
         store_name=store_name.strip(),
         category=category,
         menu_url=menu_url.strip() if menu_url else None,
-        menu_image_url=menu_image_url,
+        menu_image_url=urls[0] if urls else None,
+        menu_image_urls=json.dumps(urls) if urls else None,
         note=note.strip() if note else None,
     )
     db.add(recommendation)

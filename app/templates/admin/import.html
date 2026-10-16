@@ -17,16 +17,19 @@
             <div>
                 <div class="font-semibold text-sela-800">推薦資料</div>
                 <div class="text-xs text-sela-800/60 mt-0.5">
-                    {{ recommendation.user.show_name }} 於 {{ (recommendation.created_at|taipei).strftime('%Y-%m-%d') }} 推薦
+                    {{ recommendation.user.show_name }} 於 {{ (recommendation.created_at|taipei).strftime('%Y-%m-%d') }} 推薦{% if recommendation.menu_images %} · {{ recommendation.menu_images | length }} 張菜單照片{% endif %}
                 </div>
             </div>
             <a href="/admin/recommendations" class="text-xs text-sela-700 underline whitespace-nowrap">稍後再匯入</a>
         </div>
-        {% if recommendation.menu_image_url %}
-        <a href="{{ recommendation.menu_image_url }}" target="_blank" rel="noopener" class="block rounded-xl overflow-hidden border border-sela-100">
-            <img src="{{ recommendation.menu_image_url }}" alt="菜單照片" class="w-full object-contain max-h-96 bg-sela-50">
+        {# V2.16.2：多張照片縱向等寬排列，各自可放大 #}
+        {% for u in recommendation.menu_images %}
+        <a href="{{ u }}" target="_blank" rel="noopener" class="block rounded-xl overflow-hidden border border-sela-100">
+            <img src="{{ u }}" alt="菜單照片 {{ loop.index }}" loading="lazy" class="w-full object-contain max-h-96 bg-sela-50">
         </a>
-        <div class="text-xs text-sela-800/50">點照片可開新分頁放大</div>
+        {% endfor %}
+        {% if recommendation.menu_images %}
+        <div class="text-xs text-sela-800/50">點照片可開新分頁放大；把所有照片一起丟給 AI 轉成一份菜單資料再貼回來。</div>
         {% endif %}
         {% if recommendation.menu_url %}
         <div class="text-sm"><span class="text-sela-800/60">菜單網址：</span>

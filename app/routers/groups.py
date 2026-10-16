@@ -120,6 +120,19 @@ def _ensure_visible(group, user, db):
     ensure_group_visible(group, user, db)
 
 
+def sanitize_drink_defaults(store, default_sugar, default_ice, lock_sugar, lock_ice):
+    """V2.16.3 審核 P0-2：預設甜冰一定要在店家的 store_options 裡，否則不指定也不鎖——
+    不在清單裡的值鎖定後團員加任何品項都 400。開團與範本開團共用；店家還沒設選項時一律不指定。"""
+    from app.models.store import OptionType as _OT
+    if store is None or store.category != CategoryType.DRINK:
+        return None, None, False, False
+    sugars = {o.option_value for o in store.options if o.option_type == _OT.SUGAR}
+    ices = {o.option_value for o in store.options if o.option_type == _OT.ICE}
+    ds = default_sugar if default_sugar and default_sugar in sugars else None
+    di = default_ice if default_ice and default_ice in ices else None
+    return ds, di, bool(lock_sugar and ds), bool(lock_ice and di)
+
+
 def _new_group_context(db: Session, user, *, stores, departments,
                        preselect_store_id=None, copy_from=None) -> dict:
     """group_new.html 需要的完整 context（V2.11.1 P0-02）。
@@ -155,6 +168,10 @@ def _new_group_context(db: Session, user, *, stores, departments,
         .group_by(Group.store_id)
         .all()
     )
+    # V2.16.2：排序可選「最近開過」——每家店最後一次開團（UTC，前端只顯示月/日）
+    _last = db.query(Group.store_id, func.max(Group.created_at)).filter(Group.store_id.isnot(None)).group_by(Group.store_id).all()
+    last_group_at = {sid: (to_taipei_time(dt).strftime("%m/%d") if dt else "") for sid, dt in _last}
+    last_group_ts = {sid: (dt.timestamp() if dt else 0) for sid, dt in _last}
 
     return {
         "user": user,
@@ -164,6 +181,8 @@ def _new_group_context(db: Session, user, *, stores, departments,
         "preselect_store_id": preselect_store_id,
         "favorite_store_ids": favorite_store_ids,
         "group_counts": group_counts,
+        "last_group_at": last_group_at,
+        "last_group_ts": last_group_ts,
         "copy_from": copy_from,
     }
 
@@ -297,6 +316,7 @@ async def create_group(
     
     # 判斷是否公開
     is_public = visibility == "public"
+    _ds, _di, _ls, _li = sanitize_drink_defaults(store, default_sugar, default_ice, lock_sugar, lock_ice)
     
     # 建立團單
     group = Group(
@@ -314,10 +334,10 @@ async def create_group(
         allow_over_limit=allow_over_limit,
         enable_backup=enable_backup,
         backup_count=max(1, min(3, backup_count)),
-        default_sugar=default_sugar if store.category == CategoryType.DRINK else None,
-        default_ice=default_ice if store.category == CategoryType.DRINK else None,
-        lock_sugar=lock_sugar if store.category == CategoryType.DRINK else False,
-        lock_ice=lock_ice if store.category == CategoryType.DRINK else False,
+        default_sugar=_ds,
+        default_ice=_di,
+        lock_sugar=_ls,
+        lock_ice=_li,
         is_blind_mode=is_blind_mode,
         enable_lucky_draw=enable_lucky_draw,
         # V2.11.1 P1-02：負數會讓 random.sample 拋 ValueError，

@@ -9,7 +9,7 @@
             <div>
                 <span class="font-medium text-sela-800">{{ record.display_name or '匿名' }}</span>
                 <div class="text-xs text-sela-800/60 mt-1">
-                    上次請客：{{ record.last_treat.strftime('%m/%d') if record.last_treat else '無' }}
+                    上次請客：{{ (record.last_treat|taipei).strftime('%m/%d') if record.last_treat else '無' }}
                 </div>
             </div>
             <div class="text-right">

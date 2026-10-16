@@ -38,7 +38,8 @@
                         id="fav-btn"
                         class="flex items-center gap-0.5 active:scale-95 transition-transform"
                         title="{% if is_favorited %}取消收藏{% else %}收藏店家{% endif %}">
-                    <span class="text-base text-sela-800"><i class="ti ti-star"></i></span>
+                    {# V2.16.3 審核 P1-2b：收藏與否都是空心星，改實心＋主色 #}
+                    <span class="text-base {% if is_favorited %}text-sela-500{% else %}text-sela-800{% endif %}"><i class="ti {% if is_favorited %}ti-star-filled{% else %}ti-star{% endif %}"></i></span>
                     <span class="text-xs text-sela-800/45" id="fav-text">{% if is_favorited %}已收藏{% else %}收藏{% endif %}</span>
                 </button>
             </div>
@@ -430,7 +431,7 @@
                     <h4 class="font-medium text-red-800 mb-2">刪除團單</h4>
                     <p class="text-sm text-red-600 mb-3">
                         {% if group.orders|length > 0 %}
-                        <i class="ti ti-alert-triangle"></i>️ 此團已有 {{ group.orders|length }} 筆訂單，刪除後無法復原！
+                        <i class="ti ti-alert-triangle"></i> 此團已有 {{ group.orders|length }} 筆訂單，刪除後無法復原！
                         {% else %}
                         刪除後無法復原
                         {% endif %}
@@ -594,7 +595,7 @@
                 <button @click="quickTab = 'mine'"
                         :class="quickTab === 'mine' ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
                         class="text-xs px-3 py-1 rounded-full font-medium transition">
-                    <i class="ti ti-heart"></i>️ 我的最愛
+                    <i class="ti ti-heart"></i> 我的最愛
                 </button>
                 {% endif %}
             </div>
@@ -683,7 +684,7 @@
                     {% endfor %}
                 </div>
                 
-                <p class="text-xs text-sela-800/45 text-center mt-4">點 +1 直接加入購物車</p>
+                <p class="text-xs text-sela-800/45 text-center mt-4">點「跟單」直接加入購物車</p>
             </div>
         </div>
     </div>
@@ -697,7 +698,7 @@
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div class="p-4 border-b">
                 <h3 class="font-semibold text-sela-800"><i class="ti ti-clipboard-list"></i> 上次在 {{ store.name }} 的訂單</h3>
-                <p class="text-xs text-sela-800/45 mt-1">{{ last_order.created_at.strftime('%Y/%m/%d') }}</p>
+                <p class="text-xs text-sela-800/45 mt-1">{{ (last_order.created_at|taipei).strftime('%Y/%m/%d') }}</p>
             </div>
             
             <div class="p-4 max-h-60 overflow-y-auto">
@@ -992,10 +993,12 @@
             <p x-show="selectedItem?.description" class="text-sm text-sela-800/60 mt-1 mb-4" x-text="selectedItem?.description"></p>
             <div x-show="!selectedItem?.description" class="mb-4"></div>
             
+            {# V2.16.3 審核 P1-2e：店家有甜冰選項卻沒選就送，原本後端收 None、團主匯出看到空白；現在送出前先提示 #}
             <form hx-post="/groups/{{ group.id }}/orders/items" 
                   hx-target="#cart-content"
                   hx-swap="innerHTML"
-                  @htmx:after-request="afterAddItem()">
+                  @htmx:after-request="afterAddItem()"
+                  @htmx:config-request="if (!checkDrinkOptions($el)) $event.preventDefault()">
                 
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
@@ -1024,7 +1027,7 @@
                     <label class="block text-sm font-medium text-sela-800 mb-2">甜度</label>
                     {% if group.lock_sugar %}
                     <div class="text-sela-800/70">{{ group.default_sugar }} (已鎖定)</div>
-                    <input type="hidden" name="sugar" value="{{ group.default_sugar }}">
+                    <input type="hidden" name="sugar" value="{{ group.default_sugar or '' }}">
                     {% else %}
                     <div class="flex flex-wrap gap-2">
                         {% for opt in store.options if opt.option_type.value == 'sugar' %}
@@ -1045,7 +1048,7 @@
                     <label class="block text-sm font-medium text-sela-800 mb-2">冰塊</label>
                     {% if group.lock_ice %}
                     <div class="text-sela-800/70">{{ group.default_ice }} (已鎖定)</div>
-                    <input type="hidden" name="ice" value="{{ group.default_ice }}">
+                    <input type="hidden" name="ice" value="{{ group.default_ice or '' }}">
                     {% else %}
                     <div class="flex flex-wrap gap-2">
                         {% for opt in store.options if opt.option_type.value == 'ice' %}
@@ -1166,6 +1169,18 @@ function orderPage() {
     ];
     
     return {
+        // V2.16.3 審核 P1-2e：有甜度／冰塊可選但一個都沒選 → 提示並捲到那一區，不送出
+        checkDrinkOptions(form) {
+            for (const [name, label] of [['sugar', '甜度'], ['ice', '冰塊']]) {
+                const radios = form.querySelectorAll('input[type=radio][name=' + name + ']');
+                if (radios.length && ![...radios].some(r => r.checked)) {
+                    if (window.toast) window.toast('請選擇' + label, 'error');
+                    try { radios[0].closest('div.mb-4').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+                    return false;
+                }
+            }
+            return true;
+        },
         showQR: false,
         showAddItem: false,
         showCart: false,
@@ -1409,12 +1424,13 @@ async function toggleFavorite(storeId) {
         
         const btn = document.getElementById('fav-btn');
         const text = document.getElementById('fav-text');
+        const star = btn.querySelector('span:first-child');
         if (data.status === 'added') {
-            btn.querySelector('span:first-child').innerHTML = '<i class="ti ti-star"></i>';
+            star.innerHTML = '<i class="ti ti-star-filled"></i>'; star.className = 'text-base text-sela-500';
             btn.title = '取消收藏';
             if (text) text.textContent = '已收藏';
         } else {
-            btn.querySelector('span:first-child').innerHTML = '<i class="ti ti-star"></i>';
+            star.innerHTML = '<i class="ti ti-star"></i>'; star.className = 'text-base text-sela-800';
             btn.title = '收藏店家';
             if (text) text.textContent = '收藏';
         }

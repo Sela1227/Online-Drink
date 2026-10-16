@@ -147,6 +147,15 @@
                         <i class="ti ti-x"></i>
                     </button>
                 </div>
+                {# V2.16.2：排序可自訂，預設熱門；記在 localStorage #}
+                <div class="max-w-3xl mx-auto px-3 pb-2 flex items-center gap-1.5 text-xs">
+                    <span class="text-sela-800/50 mr-1">排序</span>
+                    <template x-for="o in sortOptions" :key="o[0]">
+                        <button type="button" @click="setSort(o[0])"
+                                :class="sortKey === o[0] ? 'bg-sela-800 text-white border-sela-800' : 'bg-white border-sela-300 text-sela-800'"
+                                class="px-2.5 py-1 rounded-full border"><i x-show="o[2]" :class="'ti ' + o[2]"></i> <span x-text="o[1]"></span></button>
+                    </template>
+                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto">
@@ -168,7 +177,7 @@
                                         </button>
                                     </div>
                                     <div class="text-xs font-medium truncate" x-text="st.name"></div>
-                                    <div class="text-[10px] text-sela-800/55" x-text="st.branches.length ? st.branches.length + ' 家分店' : '\u00a0'"></div>
+                                    <div class="text-[10px] text-sela-800/55 truncate" x-text="cardMeta(st)"></div>
                                 </div>
                             </template>
                         </div>
@@ -178,7 +187,7 @@
                     </div>
                 </template>
 
-                <!-- 未搜尋：我的最愛 → 熱門（扣掉重複後補滿三間）→ 全部（依名稱） -->
+                <!-- 未搜尋：我的最愛 → 全部（V2.16.2：兩區都照選的排序；原「熱門 3 家」區拿掉，全部預設就是熱門順序） -->
                 <template x-if="!pickerQuery.trim()">
                     <div class="space-y-4">
                         <template x-for="sec in pickerSections" :key="sec.title">
@@ -201,7 +210,7 @@
                                                 </button>
                                             </div>
                                             <div class="text-xs font-medium truncate" x-text="st.name"></div>
-                                            <div class="text-[10px] text-sela-800/55" x-text="st.branches.length ? st.branches.length + ' 家分店' : '\u00a0'"></div>
+                                            <div class="text-[10px] text-sela-800/55 truncate" x-text="cardMeta(st)"></div>
                                         </div>
                                     </template>
                                 </div>
@@ -345,13 +354,12 @@
                         class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
                     1小時後
                 </button>
+                {# V2.16.3 審核 P1-2c：過了中午按「今天 12:00」其實是明天，標籤要跟著算 #}
                 <button type="button" @click="setDeadline('12:00')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
-                    今天 12:00
+                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50" x-text="presetLabel('12:00')">
                 </button>
                 <button type="button" @click="setDeadline('17:00')"
-                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50">
-                    今天 17:00
+                        class="text-sm px-3 py-1 rounded border hover:bg-sela-50" x-text="presetLabel('17:00')">
                 </button>
             </div>
             <input type="datetime-local" name="deadline" x-ref="deadline" required
@@ -362,31 +370,26 @@
         <div x-show="selectedCategory === 'drink' && storeId" x-cloak class="space-y-4 p-4 bg-sela-50 rounded-lg">
             <h3 class="font-medium text-sela-800/80">飲料團設定</h3>
             
-            <!-- 預設甜度 -->
+            {# V2.16.3 審核 P0-2：原本寫死「正常糖…」，店家的選項是「全糖…」時選了＋鎖定整團沒人能點。改依所選店家的 store_options 產生；店家沒設就顯示提示 #}
+            <template x-if="selectedStore && selectedStore.sugar_options.length">
             <div>
                 <label class="block text-sm text-sela-800/70 mb-1">預設甜度</label>
                 <select name="default_sugar" class="w-full border rounded px-3 py-2">
                     <option value="">不指定</option>
-                    <option value="正常糖">正常糖</option>
-                    <option value="少糖">少糖</option>
-                    <option value="半糖">半糖</option>
-                    <option value="微糖">微糖</option>
-                    <option value="無糖">無糖</option>
+                    <template x-for="o in selectedStore.sugar_options" :key="o"><option :value="o" x-text="o"></option></template>
                 </select>
             </div>
-            
-            <!-- 預設冰塊 -->
+            </template>
+            <template x-if="selectedStore && selectedStore.ice_options.length">
             <div>
                 <label class="block text-sm text-sela-800/70 mb-1">預設冰塊</label>
                 <select name="default_ice" class="w-full border rounded px-3 py-2">
                     <option value="">不指定</option>
-                    <option value="正常冰">正常冰</option>
-                    <option value="少冰">少冰</option>
-                    <option value="微冰">微冰</option>
-                    <option value="去冰">去冰</option>
-                    <option value="熱">熱</option>
+                    <template x-for="o in selectedStore.ice_options" :key="o"><option :value="o" x-text="o"></option></template>
                 </select>
             </div>
+            </template>
+            <p x-show="selectedStore && !selectedStore.sugar_options.length && !selectedStore.ice_options.length" class="text-xs text-sela-800/55">這家店還沒設定甜度／冰塊選項，團員點餐時不會有甜冰可選；管理員可到店家工作台「營運設定」補。</p>
             
             <!-- 鎖定選項 -->
             <div class="flex gap-4">
@@ -450,12 +453,13 @@
                     <div x-show="enableMinMembers" x-cloak class="mt-3 space-y-2 pl-6">
                         <div class="flex items-center gap-2">
                             <span class="text-sm text-sela-800/70">最少</span>
-                            <input type="number" name="min_members" value="5" min="2" max="50"
+                            {# V2.16.3 審核 P0-1：被 x-show 藏起來的欄位照樣送出，每個團都被寫入湊團 5 人；disabled 才不送 #}
+                            <input type="number" name="min_members" value="5" min="2" max="50" :disabled="!enableMinMembers"
                                    class="w-16 border rounded px-2 py-1 text-center">
                             <span class="text-sm text-sela-800/70">人成團</span>
                         </div>
                         <label class="flex items-center gap-2 text-sm text-sela-800/70">
-                            <input type="checkbox" name="auto_extend" value="true">
+                            <input type="checkbox" name="auto_extend" value="true" :disabled="!enableMinMembers">
                             <span>未達人數自動延長 30 分鐘</span>
                         </label>
                     </div>
@@ -473,7 +477,7 @@
                     </div>
                     <div x-show="enableRemind" x-cloak class="mt-3 flex items-center gap-2 pl-6">
                         <span class="text-sm text-sela-800/70">截止前</span>
-                        <select name="auto_remind_minutes" class="border rounded px-2 py-1 text-sm">
+                        <select name="auto_remind_minutes" :disabled="!enableRemind" class="border rounded px-2 py-1 text-sm">
                             <option value="10">10 分鐘</option>
                             <option value="15" selected>15 分鐘</option>
                             <option value="30">30 分鐘</option>
@@ -518,9 +522,13 @@ function newGroupForm() {
             name: {{ store.name | tojson }},
             category: {{ (store.category.value if store.category else 'meal') | tojson }},
             branches: {{ store.branches | tojson if store.branches else "[]" }},
+            sugar_options: {{ (store.options | selectattr('option_type.value', 'equalto', 'sugar') | map(attribute='option_value') | list) | tojson }},
+            ice_options: {{ (store.options | selectattr('option_type.value', 'equalto', 'ice') | map(attribute='option_value') | list) | tojson }},
             has_toppings: {{ 'true' if store.toppings else 'false' }},
             logo_url: {{ store.logo_url | tojson if store.logo_url else 'null' }},
-            group_count: {{ group_counts.get(store.id, 0) }}
+            group_count: {{ group_counts.get(store.id, 0) }},
+            last_group: {{ last_group_at.get(store.id, '') | tojson }},
+            last_ts: {{ last_group_ts.get(store.id, 0) }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -566,39 +574,58 @@ function newGroupForm() {
         byName(list) {
             return [...list].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
         },
+        // V2.16.2：排序可自訂。熱門＝全體累計開團次數多→少（同次數依名稱）；最近開過＝上次開團新→舊；名稱＝注音序
+        sortKey: 'hot',
+        sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', '']],
+        setSort(k) {
+            this.sortKey = k;
+            try { localStorage.setItem('sela_store_sort', k); } catch (e) {}
+        },
+        sorted(list) {
+            const byName = (a, b) => a.name.localeCompare(b.name, 'zh-Hant');
+            if (this.sortKey === 'name') return [...list].sort(byName);
+            if (this.sortKey === 'recent') return [...list].sort((a, b) => (b.last_ts - a.last_ts) || byName(a, b));
+            return [...list].sort((a, b) => (b.group_count - a.group_count) || byName(a, b));
+        },
+        sortNote() {
+            return { hot: '依熱門', name: '依名稱', recent: '依最近開過' }[this.sortKey] || '';
+        },
+        cardMeta(st) {
+            const br = st.branches.length ? st.branches.length + ' 家分店' : '';
+            let m = '';
+            if (this.sortKey === 'hot') m = st.group_count ? '開過 ' + st.group_count + ' 次' : '還沒開過';
+            else if (this.sortKey === 'recent') m = st.last_group ? '上次 ' + st.last_group : '還沒開過';
+            return [m, br].filter(Boolean).join(' · ') || '\u00a0';
+        },
         
         isFavorite(store) {
             return this.favoriteIds.includes(store.id);
         },
         
-        // 分區：我的最愛優先 → 熱門扣掉重複後補滿三間 → 其餘依名稱。
+        // 分區：我的最愛優先 → 全部，兩區都照選的排序（V2.16.2；原本中間還有「熱門 3 家」，
+        // 全部預設就是熱門順序後那區是重複的）。
         // 用 favSnapshot（打開覆蓋層當下的收藏狀態）而非即時的 favoriteIds，
         // 否則點星號時卡片會當場從「全部」跳到「我的最愛」，手指下換成別家店很容易誤點。
         get pickerSections() {
             const pool = this.pool;
-            const favs = this.byName(pool.filter(s => this.favSnapshot.includes(s.id)));
+            const favs = this.sorted(pool.filter(s => this.favSnapshot.includes(s.id)));
             const favIds = favs.map(s => s.id);
-            const hot = [...pool]
-                .filter(s => !favIds.includes(s.id) && s.group_count > 0)
-                .sort((a, b) => b.group_count - a.group_count || a.name.localeCompare(b.name, 'zh-Hant'))
-                .slice(0, 3);
-            const used = favIds.concat(hot.map(s => s.id));
-            const rest = this.byName(pool.filter(s => !used.includes(s.id)));
+            const rest = this.sorted(pool.filter(s => !favIds.includes(s.id)));
             return [
                 { title: '我的最愛', icon: 'ti-star-filled', note: '', items: favs },
-                { title: '熱門', icon: 'ti-flame', note: '大家最常開的', items: hot },
-                { title: '全部', icon: 'ti-list', note: '依名稱', items: rest },
+                { title: '全部', icon: 'ti-list', note: this.sortNote(), items: rest },
             ];
         },
         
         get searchResults() {
             const kw = this.pickerQuery.trim().toLowerCase();
             if (!kw) return [];
-            return this.byName(this.pool.filter(s => s.name.toLowerCase().includes(kw)));
+            return this.sorted(this.pool.filter(s => s.name.toLowerCase().includes(kw)));
         },
         
         openPicker() {
             this.pickerQuery = '';
+            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent'].includes(k)) this.sortKey = k; } catch (e) {}
             this.favSnapshot = this.favoriteIds.slice();
             this.pickerOpen = true;
             // 讓手機返回鍵先關閉覆蓋層，而不是離開整個開團頁
@@ -679,6 +706,11 @@ function newGroupForm() {
             this.branchId = '';
         },
         
+        presetLabel(hm) {
+            const [h, m] = hm.split(':').map(Number);
+            const now = new Date(); const t = new Date(now); t.setHours(h, m, 0, 0);
+            return (t <= now ? '明天 ' : '今天 ') + hm;
+        },
         setDeadline(preset) {
             const now = new Date();
             let target;

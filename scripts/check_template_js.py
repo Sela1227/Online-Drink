@@ -145,6 +145,8 @@ def _ctx_group_new():
         "preselect_store_id": None,
         "favorite_store_ids": [2],
         "group_counts": {1: 47, 2: 39, 3: 52},
+        "last_group_at": {1: "10/12", 2: "09/30"},  # V2.16.2 排序
+        "last_group_ts": {1: 1760000000.0, 2: 1759000000.0},
         "copy_from": None,
     }
 
@@ -180,6 +182,7 @@ def _ctx_admin_stores():
         "stores": stores,
         "item_counts": {1: 32},
         "last_groups": {1: datetime(2026, 10, 12, 3, 0)},
+        "group_counts": {1: 47},  # V2.16.2 排序
     }
 
 

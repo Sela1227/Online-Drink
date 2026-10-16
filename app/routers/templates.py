@@ -129,6 +129,10 @@ async def use_template(template_id: int, request: Request, db: Session = Depends
     now = datetime.now(TAIPEI_TZ).replace(tzinfo=None)
     deadline = now + timedelta(minutes=tpl.default_duration_minutes)
     
+    # V2.16.3 審核 P0-2：範本存的甜冰預設可能已不在店家目前的選項裡
+    from app.routers.groups import sanitize_drink_defaults as _sdd
+    _ds, _di, _ls, _li = _sdd(store, tpl.default_sugar, tpl.default_ice, tpl.lock_sugar, tpl.lock_ice)
+    
     # 建立團單
     group = Group(
         store_id=tpl.store_id,
@@ -140,10 +144,10 @@ async def use_template(template_id: int, request: Request, db: Session = Depends
         category=store.category,
         deadline=deadline,
         is_public=tpl.is_public,
-        default_sugar=tpl.default_sugar,
-        default_ice=tpl.default_ice,
-        lock_sugar=tpl.lock_sugar,
-        lock_ice=tpl.lock_ice,
+        default_sugar=_ds,
+        default_ice=_di,
+        lock_sugar=_ls,
+        lock_ice=_li,
         is_blind_mode=tpl.is_blind_mode,
         enable_lucky_draw=tpl.enable_lucky_draw,
         lucky_draw_count=tpl.lucky_draw_count,

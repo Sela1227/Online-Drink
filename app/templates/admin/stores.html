@@ -39,6 +39,15 @@
                     class="px-2.5 py-1 rounded-full">含已停用</button>
             <span class="ml-auto text-sela-800/45" x-text="filtered.length + ' 家'"></span>
         </div>
+        {# V2.16.2：排序可自訂，預設熱門；跟搜尋／篩選一樣記在 sessionStorage #}
+        <div class="flex gap-1.5 text-xs items-center">
+            <span class="text-sela-800/50 mr-1">排序</span>
+            <template x-for="o in sorts" :key="o[0]">
+                <button type="button" @click="sort = o[0]"
+                        :class="sort === o[0] ? 'bg-sela-800 text-white' : 'bg-sela-100 text-sela-800/70'"
+                        class="px-2.5 py-1 rounded-full" x-text="o[1]"></button>
+            </template>
+        </div>
     </div>
 
     <div class="bg-white rounded-xl border border-sela-100 divide-y divide-sela-100">
@@ -58,7 +67,7 @@
                         <span x-text="catLabel(s.category)"></span>
                         <span x-show="s.items"> · <span x-text="s.items"></span> 品項</span>
                         <span x-show="s.branches"> · <span x-text="s.branches"></span> 家分店</span>
-                        <span> · </span><span x-text="s.lastGroup ? '上次開團 ' + s.lastGroup : '尚未開過團'"></span>
+                        <span> · </span><span x-text="s.groups ? '開過 ' + s.groups + ' 次 · 上次 ' + s.lastGroup : '還沒開過'"></span>
                     </div>
                 </div>
                 <div class="hidden sm:flex items-center gap-1 flex-shrink-0">
@@ -91,27 +100,32 @@ function storeList() {
             address: {{ (s.address or '') | tojson }},
             items: {{ item_counts.get(s.id, 0) }},
             branches: {{ (s.branches | selectattr('is_active') | list | length) if s.branches else 0 }},
-            lastGroup: {{ ((last_groups[s.id] | taipei).strftime('%m/%d') if last_groups.get(s.id) else '') | tojson }}
+            lastGroup: {{ ((last_groups[s.id] | taipei).strftime('%m/%d') if last_groups.get(s.id) else '') | tojson }},
+            lastTs: {{ (last_groups[s.id].timestamp() if last_groups.get(s.id) else 0) }},
+            groups: {{ group_counts.get(s.id, 0) }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
     const KEY = 'admin_store_list_state';
     return {
-        stores, q: '', cat: 'all', showInactive: false,
+        stores, q: '', cat: 'all', showInactive: false, sort: 'hot',
         cats: [['all', '全部'], ['drink', '飲料'], ['meal', '餐廳'], ['group_buy', '團購']],
+        sorts: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開團']],
         init() {
             try {
                 const st = JSON.parse(sessionStorage.getItem(KEY) || '{}');
                 if (st.q) this.q = st.q;
                 if (st.cat) this.cat = st.cat;
                 if (st.showInactive) this.showInactive = true;
+                if (['hot', 'name', 'recent'].includes(st.sort)) this.sort = st.sort;
             } catch (e) {}
             this.$watch('q', () => this.save());
             this.$watch('cat', () => this.save());
             this.$watch('showInactive', () => this.save());
+            this.$watch('sort', () => this.save());
         },
         save() {
-            try { sessionStorage.setItem(KEY, JSON.stringify({ q: this.q, cat: this.cat, showInactive: this.showInactive })); } catch (e) {}
+            try { sessionStorage.setItem(KEY, JSON.stringify({ q: this.q, cat: this.cat, showInactive: this.showInactive, sort: this.sort })); } catch (e) {}
         },
         icon(c) { return { drink: 'ti-cup', meal: 'ti-bowl', group_buy: 'ti-shopping-cart' }[c] || 'ti-building-store'; },
         catLabel(c) { return { drink: '飲料', meal: '餐廳', group_buy: '團購' }[c] || ''; },
@@ -121,7 +135,14 @@ function storeList() {
             return this.stores
                 .filter(s => (this.cat === 'all' || s.category === this.cat) && (this.showInactive || s.active)
                     && (!kw || s.name.toLowerCase().includes(kw) || s.phone.includes(kw) || s.address.toLowerCase().includes(kw)))
-                .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+                .sort((a, b) => this.cmp(a, b));
+        },
+        // V2.16.2：熱門＝開團次數多→少、同次數依名稱；最近開團＝新→舊；名稱＝注音序
+        cmp(a, b) {
+            const byName = a.name.localeCompare(b.name, 'zh-Hant');
+            if (this.sort === 'hot') return (b.groups - a.groups) || byName;
+            if (this.sort === 'recent') return (b.lastTs - a.lastTs) || byName;
+            return byName;
         },
     };
 }

@@ -46,13 +46,17 @@
                         </div>
                         {% endif %}
                         
-                        {% if rec.menu_image_url %}
-                        <div class="mb-2">
-                            <a href="{{ rec.menu_image_url }}" target="_blank">
-                                <img src="{{ rec.menu_image_url }}" alt="菜單圖片" 
-                                     class="max-w-full h-auto max-h-48 rounded-lg border shadow-sm">
+                        {% set imgs = rec.menu_images %}
+                        {% if imgs %}
+                        {# V2.16.2：多張縮圖橫列，點開新分頁 #}
+                        <div class="mb-1 flex gap-2 overflow-x-auto">
+                            {% for u in imgs %}
+                            <a href="{{ u }}" target="_blank" rel="noopener" class="flex-shrink-0">
+                                <img src="{{ u }}" alt="菜單照片 {{ loop.index }}" loading="lazy" class="w-24 h-24 object-cover rounded-lg border shadow-sm">
                             </a>
+                            {% endfor %}
                         </div>
+                        <div class="text-xs text-sela-800/45 mb-2">{{ imgs | length }} 張菜單照片，點縮圖開新分頁放大</div>
                         {% endif %}
                         
                         {% if rec.note %}
@@ -62,7 +66,7 @@
                         {% endif %}
                         
                         <div class="text-xs text-sela-800/45">
-                            推薦人：{{ rec.user.show_name }} · {{ rec.created_at.strftime('%Y/%m/%d %H:%M') }}
+                            推薦人：{{ rec.user.show_name }} · {{ (rec.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}
                         </div>
                     </div>
                     
@@ -120,7 +124,7 @@
                             {% endif %}
                         </div>
                         <div class="text-xs text-sela-800/45 mt-1">
-                            {{ rec.user.show_name }} · {{ rec.reviewed_at.strftime('%Y/%m/%d %H:%M') if rec.reviewed_at else '' }}
+                            {{ rec.user.show_name }} · {{ (rec.reviewed_at|taipei).strftime('%Y/%m/%d %H:%M') if rec.reviewed_at else '' }}
                             {% if rec.reject_reason %} · 原因：{{ rec.reject_reason }}{% endif %}
                         </div>
                     </div>

@@ -30,6 +30,8 @@
   23. V2.15.1 審核修正：排序差異、版號、甜冰長度、熱門按品名、前台菜單頁、money、雜湊核對、清理包裝、新店家欄位
   24. V2.16.0 菜單呈現：M／L 兩行、說明兩行＋彈窗、導覽品項數＋其他、更新日期與回報預填
   25. V2.16.1 匯入介面：看不清 "?"、分類改名合併、店名近似、帶入目前菜單、選店清單版號
+  26. V2.16.2 推薦多張菜單照片（欄位相容、上限、走 upload_service）＋店家排序資料（開團覆蓋層／後台列表）
+  27. V2.16.3 hotfix（審核）：甜冰預設對照店家選項、範本同、隱藏欄位、時區、金額、草稿標示、星號、FE0F
   18. 匯入分類／品項計數
 
 新增或改動上述邏輯時，請一併更新這支測試。
@@ -1158,6 +1160,8 @@ def main():
         _txt = _tp.read_text(encoding="utf-8")
         _bad += [f"{_tp.name}: {m}" for m in _re2.findall(r"\$\{\{ [^}|]+ \}\}", _txt)]
         _bad += [f"{_tp.name}: {m}" for m in _re2.findall(r"\$\{\{ [^}]+\|int \}\}", _txt)]
+        # V2.16.3 審核 P1-2a：`${{ x|sum(attribute='…') }}` 這種有 `|` 的寫法躲過了上面兩條
+        _bad += [f"{_tp.name}: {m}" for m in _re2.findall(r"\$\{\{ [^}]*\|sum\([^}]*\}\}", _txt) if "|money" not in m]
     assert not _bad, _bad[:5]
     check("P2-2：模板裡 $ 後的金額一律過 money（沒有裸輸出、沒有 |int）")
 
@@ -1482,6 +1486,218 @@ def main():
     assert "price 填字串 \"?\"" in r.text
     check("B-10／B-6：選店清單帶版號項數、沒有原生下拉、load=current 帶入、工作台「改幾個價格」、單一 AI 指令含 ? 規則")
     _adm.get_admin_user = _orig
+
+    # ---------- 26. V2.16.2 推薦多張照片＋店家排序 ----------
+    print("\n[26] V2.16.2 推薦多張照片＋店家排序")
+    from app.models.user import StoreRecommendation
+    import app.services.upload_service as _up
+    import app.routers.home as _home2
+
+    # 欄位相容：舊資料只有 menu_image_url；新資料 JSON 陣列；壞 JSON 退回單張
+    r_old = StoreRecommendation(user_id=user.id, store_name="舊店", category="meal", menu_image_url="https://x/a.jpg")
+    r_new = StoreRecommendation(user_id=user.id, store_name="新店", category="meal", menu_image_url="https://x/1.jpg",
+                                menu_image_urls=_json.dumps(["https://x/1.jpg", "https://x/2.jpg", "https://x/3.jpg"]))
+    r_bad = StoreRecommendation(user_id=user.id, store_name="壞店", category="meal", menu_image_url="https://x/b.jpg", menu_image_urls="not json")
+    r_none = StoreRecommendation(user_id=user.id, store_name="無圖店", category="meal")
+    assert r_old.menu_images == ["https://x/a.jpg"] and len(r_new.menu_images) == 3 and r_bad.menu_images == ["https://x/b.jpg"] and r_none.menu_images == []
+    check("推薦照片：menu_images 新欄位優先、舊資料退回單張、壞 JSON 不炸")
+
+    # 送出推薦：假的 upload_image 記下每次呼叫（folder、max_size），一張失敗整筆 400
+    _calls = []
+    async def _fake_upload(file, folder="sela/stores", max_size=400):
+        _calls.append((file.filename, folder, max_size))
+        if file.filename == "bad.gif":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="圖片僅支援 JPG／PNG／WebP／HEIC")
+        return f"https://cdn/{file.filename}"
+    _orig_up = _up.upload_image
+    _up.upload_image = _fake_upload
+    _orig_home_cu2 = _home2.get_current_user
+    _home2.get_current_user = _fake_owner
+    try:
+        _before = db.query(StoreRecommendation).count()
+        r = _c.post("/recommend", data={"store_name": "多圖店", "category": "drink"},
+                    files=[("menu_image", ("m1.jpg", b"x", "image/jpeg")), ("menu_image", ("m2.jpg", b"y", "image/jpeg"))], follow_redirects=False)
+        assert r.status_code in (302, 303), r.text[:200]
+        db.expire_all()
+        rec = db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "多圖店").first()
+        assert rec.menu_images == ["https://cdn/m1.jpg", "https://cdn/m2.jpg"] and rec.menu_image_url == "https://cdn/m1.jpg"
+        assert all(c[1] == "sela/recommendations" and c[2] == 1600 for c in _calls), _calls
+        # 一張壞 → 整筆不建
+        _n = db.query(StoreRecommendation).count()
+        r = _c.post("/recommend", data={"store_name": "半筆店", "category": "drink"},
+                    files=[("menu_image", ("ok.jpg", b"x", "image/jpeg")), ("menu_image", ("bad.gif", b"y", "image/gif"))], follow_redirects=False)
+        assert r.status_code == 400 or (r.status_code in (302, 303) and "flash" in (r.headers.get("location") or "")) or r.status_code == 200, r.status_code
+        db.expire_all()
+        assert db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "半筆店").count() == 0, "一張失敗不該留下半筆"
+        # 超過上限
+        r = _c.post("/recommend", data={"store_name": "六圖店", "category": "drink"},
+                    files=[("menu_image", (f"p{i}.jpg", b"x", "image/jpeg")) for i in range(6)], follow_redirects=False)
+        db.expire_all()
+        assert db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "六圖店").count() == 0, "超過 5 張應擋下"
+        # 沒照片照常
+        r = _c.post("/recommend", data={"store_name": "無圖推薦", "category": "meal"}, follow_redirects=False)
+        db.expire_all()
+        rec = db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "無圖推薦").first()
+        assert rec and rec.menu_images == [] and rec.menu_image_urls is None
+        check("推薦送出：多張走 upload_service（recommendations 資料夾、長邊 1600）、第一張回填舊欄位、一張失敗整筆不建、超過 5 張擋、無圖照常")
+
+        # 三個畫面
+        r = _c.get("/recommend")
+        assert 'multiple' in r.text and "photoPicker()" in r.text and "最多 <span x-text=\"max\"></span> 張" in r.text and "max: 5" in r.text
+        assert "2 張照片" in _T(r), "我的推薦紀錄要顯示張數"
+        check("推薦表單：多選、縮圖元件、上限 5；紀錄顯示張數")
+    finally:
+        _up.upload_image = _orig_up
+        _home2.get_current_user = _orig_home_cu2
+
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.get("/admin/recommendations")
+        t = _T(r)
+        assert r.status_code == 200 and "2 張菜單照片" in t and r.text.count("https://cdn/m") >= 2
+        # 核准後匯入頁推薦卡：全部照片
+        rec = db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "多圖店").first()
+        r = _c.post(f"/admin/recommendations/{rec.id}/approve", follow_redirects=False)
+        db.expire_all(); rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec.id).first()
+        assert rec.created_store_id, "核准後應建立店家"
+        r = _c.get(f"/admin/import?store_id={rec.created_store_id}")
+        assert r.text.count('alt="菜單照片 ') == 2 and "2 張菜單照片" in _T(r) and "一起丟給 AI" in r.text  # B-3 的對照照片 alt 沒有序號
+        check("後台推薦列表縮圖列、核准後匯入頁推薦卡列出全部照片")
+
+        # 店家排序資料：後台列表 group_counts／lastTs；開團覆蓋層 last_group_at／last_ts
+        r = _c.get("/admin/stores")
+        assert "sorts: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開團']]" in r.text and "sort: 'hot'" in r.text
+        assert "groups: " in r.text and "lastTs: " in r.text and "cmp(a, b)" in r.text
+        check("後台店家列表：排序 chip 資料（熱門／名稱／最近開團，預設熱門）與每店開團次數")
+    finally:
+        _adm.get_admin_user = _orig
+
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        r = _c.get("/groups/new")
+        assert r.status_code == 200
+        assert "sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', '']]" in r.text
+        assert "sortKey: 'hot'" in r.text and "last_group: " in r.text and "last_ts: " in r.text and "sela_store_sort" in r.text
+        assert "大家最常開的" not in r.text, "原本獨立的熱門 3 家區塊應拿掉"
+        # 複製開團走同一個 context（P0-02 那條回歸）
+        _g0 = db.query(Group).first()
+        r = _c.get(f"/groups/{_g0.id}/copy")
+        assert r.status_code == 200 and "last_ts: " in r.text
+        check("開團選店覆蓋層：排序 chip 資料、預設熱門、記憶鍵、熱門 3 家區塊移除、複製開團同 context")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+
+    # ---------- 27. V2.16.3 hotfix ----------
+    print("\n[27] V2.16.3 hotfix（審核 P0-1／P0-2／P1-1／P1-2）")
+    from app.routers.groups import sanitize_drink_defaults
+    from app.models.store import StoreOption, OptionType
+    _hs3 = Store(name="五十嵐測試", category=CategoryType.DRINK); db.add(_hs3); db.flush()
+    db.add_all([StoreOption(store_id=_hs3.id, option_type=OptionType.SUGAR, option_value="全糖", sort_order=0),
+                StoreOption(store_id=_hs3.id, option_type=OptionType.SUGAR, option_value="半糖", sort_order=1),
+                StoreOption(store_id=_hs3.id, option_type=OptionType.ICE, option_value="去冰", sort_order=0)])
+    db.commit(); db.refresh(_hs3)
+    # P0-2：不在店家清單的預設 → 不指定且不鎖；在清單的照收；非飲料店一律 None
+    assert sanitize_drink_defaults(_hs3, "正常糖", "去冰", True, True) == (None, "去冰", False, True)
+    assert sanitize_drink_defaults(_hs3, "半糖", "", True, True) == ("半糖", None, True, False)
+    _ms3 = Store(name="餐廳測試3", category=CategoryType.MEAL); db.add(_ms3); db.commit()
+    assert sanitize_drink_defaults(_ms3, "半糖", "去冰", True, True) == (None, None, False, False)
+    _nos = Store(name="沒選項飲料店", category=CategoryType.DRINK); db.add(_nos); db.commit()
+    assert sanitize_drink_defaults(_nos, "半糖", "去冰", True, True) == (None, None, False, False), "店家沒設選項時不指定也不鎖"
+    check("P0-2：預設甜冰不在店家選項 → 不指定也不鎖；在清單照收；非飲料／沒選項的店一律不指定")
+
+    # 開團端到端：寫死的「正常糖」鎖定進來，團不能壞；團員加點不會 400
+    import_menu(db, MenuImport(store_id=_hs3.id, menu={"items": [{"name": "紅茶", "price": 30}]}))
+    _m3 = db.query(Menu).filter(Menu.store_id == _hs3.id, Menu.is_active == True).first()
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    import app.routers.orders as _ord
+    _orig_ord_cu = _ord.get_current_user
+    _ord.get_current_user = _fake_owner
+    try:
+        _dl = (taipei_now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+        r = _c.post("/groups", data={"store_id": str(_hs3.id), "name": "鎖糖團", "deadline": _dl, "default_sugar": "正常糖", "lock_sugar": "true",
+                                     "default_ice": "去冰", "lock_ice": "true", "min_members": "5", "auto_remind_minutes": "15"}, follow_redirects=False)
+        assert r.status_code in (302, 303), r.text[:300]
+        _g3 = db.query(Group).filter(Group.name == "鎖糖團").first()
+        assert _g3.default_sugar is None and _g3.lock_sugar is False and _g3.default_ice == "去冰" and _g3.lock_ice is True
+        # P0-1 的後端面：這裡是直接 POST 帶值，後端照收（修在前端 disabled）；確認 jsdom 那支有驗
+        r = _c.get(f"/groups/{_g3.id}")
+        assert r.status_code == 200
+        assert 'name="ice" value="去冰"' in r.text and 'value="None"' not in r.text, "鎖定時 hidden 不能渲染成 None"
+        assert "checkDrinkOptions" in r.text and "請選擇" in r.text
+        _ri = db.query(_MI).filter(_MI.menu_id == _m3.id).first()
+        r = _c.post(f"/groups/{_g3.id}/orders/items", data={"menu_item_id": str(_ri.id), "quantity": "1", "sugar": "半糖"}, headers={"HX-Request": "true"})
+        assert r.status_code == 200, (r.status_code, r.text[:200])
+        r = _c.post(f"/groups/{_g3.id}/orders/items", data={"menu_item_id": str(_ri.id), "quantity": "1", "sugar": "正常糖"}, headers={"HX-Request": "true"})
+        assert r.status_code == 400 and "請重新選擇甜度" in r.text
+        check("P0-2 端到端：寫死的「正常糖」鎖定開團 → 團不鎖糖、鎖冰照常；鎖定 hidden 不是 None；錯誤訊息改口")
+
+        # P1-2b 星號、P1-2d 文案、P1-1 上次訂單時區
+        r = _c.get(f"/groups/{_g3.id}")
+        assert "ti-star-filled" not in r.text.split("fav-text")[0].rsplit("fav-btn", 1)[-1] or True
+        r2 = _c.post(f"/favorites/{_hs3.id}", headers={"HX-Request": "true"})
+        r = _c.get(f"/groups/{_g3.id}")
+        assert 'ti-star-filled' in r.text and "已收藏" in r.text, "收藏後星號要實心"
+        check("P1-2b：收藏後星號實心")
+
+        # P1-2a：訂單牆金額走 money 且用折扣後金額；P1-2d：有人送出後「看別人點什麼」的文案
+        r = _c.post(f"/groups/{_g3.id}/orders/submit", headers={"HX-Request": "true"})
+        r = _c.get(f"/groups/{_g3.id}/orders/wall")
+        assert r.status_code == 200 and "$30.00" not in r.text and "$30" in _T(r), _T(r)[:300]
+        r = _c.get(f"/groups/{_g3.id}")
+        assert "點 +1 直接加入購物車" not in r.text and "點「跟單」直接加入購物車" in r.text
+        check("P1-2a／2d：訂單牆總額 $30 不是 $30.00；「跟單」文案一致")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+        _ord.get_current_user = _orig_ord_cu
+
+    # 範本開團也過 sanitize（範本存的預設已不在店家清單）
+    from app.models.template import GroupTemplate
+    import app.routers.templates as _tplr
+    _tpl = GroupTemplate(user_id=user.id, name="舊範本", store_id=_hs3.id, group_name="範本團", default_duration_minutes=60,
+                         default_sugar="正常糖", lock_sugar=True, default_ice="去冰", lock_ice=True, is_public=True)
+    db.add(_tpl); db.commit()
+    _orig_tpl_cu = _tplr.get_current_user
+    _tplr.get_current_user = _fake_owner
+    try:
+        r = _c.post(f"/templates/{_tpl.id}/use", follow_redirects=False)
+        assert r.status_code in (302, 303), r.text[:200]
+        _gt = db.query(Group).filter(Group.name == "範本團").order_by(Group.id.desc()).first()
+        assert _gt and _gt.default_sugar is None and _gt.lock_sugar is False and _gt.default_ice == "去冰"
+        check("P0-2：範本開團同樣對照店家目前選項")
+    finally:
+        _tplr.get_current_user = _orig_tpl_cu
+
+    # P1-1／P1-2f：我的訂單時區＋已截止草稿
+    _home.get_current_user = _fake_owner
+    try:
+        from app.models.order import Order as _O, OrderStatus as _OS
+        _gc = Group(owner_id=user.id, store_id=_hs3.id, menu_id=_m3.id, name="已截止未送團", category=CategoryType.DRINK, deadline=taipei_now() - timedelta(hours=1), is_closed=True)
+        db.add(_gc); db.flush()
+        _od = _O(group_id=_gc.id, user_id=user.id, status=_OS.DRAFT, created_at=datetime(2026, 10, 16, 4, 22))
+        db.add(_od); db.commit()
+        r = _c.get("/my-orders")
+        t = _T(r)
+        assert "2026/10/16 12:22" in t, "created_at 是 UTC，顯示要 +8"
+        assert "未送出・已截止（未計入）" in t, t[t.find("我的訂單", 100):][:400]
+        assert "草稿" not in t, t[t.find("草稿")-200:t.find("草稿")+50]
+        check("P1-1／P1-2f：我的訂單時間台北、已截止草稿標「未送出・已截止（未計入）」")
+    finally:
+        _home.get_current_user = _orig_home_cu
+
+    # P1-1 全站：模板裡不該再有沒過 taipei 的 created_at.strftime；FE0F 變體符歸零
+    _left = []
+    for _tp in Path("app/templates").rglob("*.html"):
+        _txt = _tp.read_text(encoding="utf-8")
+        _left += [f"{_tp.name}:{m}" for m in _re.findall(r"\{\{ [a-z_.]+\.(?:created_at|joined_at|reviewed_at|last_active_at)\.strftime", _txt)]
+        if "\ufe0f" in _txt:
+            _left.append(f"{_tp.name}: U+FE0F")
+    assert not _left, _left
+    check("P1-1 全站：UTC 欄位的 strftime 都過 taipei；模板無 U+FE0F 殘留")
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

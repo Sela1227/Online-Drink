@@ -109,7 +109,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <div class="font-medium text-sela-800">{{ g.name }}</div>
-                        <div class="text-xs text-sela-800/60">{{ g.store.name }} · {{ g.created_at.strftime('%m/%d %H:%M') }}</div>
+                        <div class="text-xs text-sela-800/60">{{ g.store.name }} · {{ (g.created_at|taipei).strftime('%m/%d %H:%M') }}</div>
                     </div>
                     <div class="text-xs px-2 py-1 rounded
                         {% if g.is_open %}bg-green-100 text-green-700{% else %}bg-sela-100 text-sela-800/60{% endif %}">
@@ -132,7 +132,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <div class="font-medium text-sela-800">{{ order.group.name }}</div>
-                        <div class="text-xs text-sela-800/60">{{ order.created_at.strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount|money }}</div>
+                        <div class="text-xs text-sela-800/60">{{ (order.created_at|taipei).strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount|money }}</div>
                     </div>
                     <div class="text-xs px-2 py-1 rounded
                         {% if order.status.value == 'submitted' %}bg-green-100 text-green-700
@@ -152,7 +152,7 @@
     <!-- 管理操作 -->
     {% if target_user.id != user.id %}
     <div class="bg-white rounded-2xl shadow-sm p-4">
-        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-settings"></i>️ 管理操作</h2>
+        <h2 class="font-semibold text-sela-800 mb-3"><i class="ti ti-settings"></i> 管理操作</h2>
         <form action="/admin/users/{{ target_user.id }}/toggle-admin" method="post"
               onsubmit="return confirm('確定要{{ '移除' if target_user.is_admin else '設為' }}管理員嗎？')">
             <button type="submit" class="w-full py-2 rounded-lg text-sm font-medium transition

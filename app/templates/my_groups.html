@@ -30,7 +30,7 @@
                         <div class="font-medium text-sela-800 truncate">{{ group.name }}</div>
                         <div class="text-sm text-sela-800/60">{{ group.store_display_name }}</div>
                         <div class="text-xs text-sela-800/45 mt-1">
-                            {{ group.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            {{ (group.created_at|taipei).strftime('%Y-%m-%d %H:%M') }}
                             {% if group.owner_id == user.id %}
                             <span class="bg-sela-100 text-sela-800 px-1 rounded">我開的</span>
                             {% endif %}

@@ -38,7 +38,7 @@
                     <div class="font-medium text-sela-800 truncate">{{ order.group.name }}</div>
                     <div class="text-sm text-sela-800/60">{{ order.group.store_display_name }}</div>
                     <div class="text-xs text-sela-800/45 mt-1">
-                        {{ order.created_at.strftime('%Y/%m/%d %H:%M') }}
+                        {{ (order.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}
                     </div>
                     <!-- 訂單內容摘要 -->
                     <div class="text-sm text-sela-800/70 mt-2">
@@ -57,8 +57,11 @@
                 <div class="flex-shrink-0 text-right">
                     {% if order.status.value == 'submitted' %}
                     <span class="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">已送出</span>
+                    {% elif order.status.value == 'draft' and not order.group.is_open %}
+                    {# V2.16.3 審核 P1-2f：團已截止、沒送出的草稿不會被算進去，不能再黃色 #}
+                    <span class="text-xs bg-sela-100 text-sela-800/60 px-2 py-1 rounded">未送出・已截止（未計入）</span>
                     {% elif order.status.value == 'draft' %}
-                    <span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">草稿</span>
+                    <span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">未送出</span>
                     {% else %}
                     <span class="text-xs bg-sela-100 text-sela-800 px-2 py-1 rounded">編輯中</span>
                     {% endif %}

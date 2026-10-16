@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, JSON, ForeignKey, Integer
+from sqlalchemy import String, Boolean, DateTime, JSON, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -134,7 +134,8 @@ class StoreRecommendation(Base):
     store_name: Mapped[str] = mapped_column(String(100))
     category: Mapped[str] = mapped_column(String(20))  # drink, meal, group_buy
     menu_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 菜單連結
-    menu_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 菜單圖片
+    menu_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 菜單圖片（第一張，相容舊資料）
+    menu_image_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # V2.16.2：多張，JSON 陣列
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 備註
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, approved, rejected
     reject_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -145,3 +146,16 @@ class StoreRecommendation(Base):
     
     # Relationships
     user: Mapped["User"] = relationship()
+
+    @property
+    def menu_images(self) -> list[str]:
+        """V2.16.2：所有菜單照片。新欄位有就用新欄位，沒有退回單張（舊資料不用補）"""
+        import json
+        if self.menu_image_urls:
+            try:
+                urls = json.loads(self.menu_image_urls)
+                if isinstance(urls, list):
+                    return [u for u in urls if isinstance(u, str) and u]
+            except (TypeError, ValueError):
+                pass
+        return [self.menu_image_url] if self.menu_image_url else []

@@ -48,7 +48,7 @@
             <div class="flex items-start justify-between gap-2">
                 <div class="flex-1">
                     <p class="text-sm text-sela-800/80 whitespace-pre-line">{{ feedback.content[:200] }}{% if feedback.content|length > 200 %}...{% endif %}</p>
-                    <p class="text-xs text-sela-800/45 mt-2">{{ feedback.created_at.strftime('%Y/%m/%d %H:%M') }}</p>
+                    <p class="text-xs text-sela-800/45 mt-2">{{ (feedback.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</p>
                 </div>
                 <div class="flex-shrink-0">
                     {% if feedback.status == 'resolved' %}

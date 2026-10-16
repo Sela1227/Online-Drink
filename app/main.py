@@ -204,6 +204,7 @@ async def lifespan(app: FastAPI):
             created_store_id INTEGER
         )
     """, "store_recommendations")
+    add_column_if_not_exists("store_recommendations", "menu_image_urls", "TEXT")  # V2.16.2：多張菜單照片（JSON 陣列）
     
     # 店家-部門關聯表
     create_table_if_not_exists("""
