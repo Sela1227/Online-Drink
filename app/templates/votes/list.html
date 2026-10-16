@@ -64,7 +64,7 @@
                 <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                     <span class="text-xs text-sela-800 font-medium">{{ vote.total_votes }} 票</span>
                     <span class="text-xs text-sela-800"
-                          x-data="countdown('{{ vote.deadline.isoformat() }}')"
+                          x-data='countdown({{ vote.deadline.isoformat() | tojson }})'
                           x-text="display"></span>
                 </div>
             </a>

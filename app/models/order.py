@@ -208,6 +208,7 @@ class OrderItemBackup(Base):
     ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
     extras_text: Mapped[str | None] = mapped_column(String(300), nullable=True)  # 加料/加購摘要
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # 每份含加料總價（快照）
+    extras_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)  # 加購＋加料的部分（V2.14.1：時價回寫要保留它）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     order_item: Mapped["OrderItem"] = relationship(back_populates="backups")

@@ -62,6 +62,46 @@ def check_escaping():
         print("  OK  <script> 內的插值全部經過 tojson")
 
 
+# ---- 【三】屬性內的 JS（V2.14.1，審核 P0-1/P0-2/P1-2）----
+#
+# on*= / @*= / x-*= / :*= 這些屬性的值會被當 JS 執行。Jinja 的 autoescape 把 ' 變成
+# &#39;，但瀏覽器解析屬性時會先把 &#39; 還原成 '，再交給 JS——所以 '{{ name }}' 在
+# 屬性裡等於完全沒逸出：品名含撇號就壞，含程式碼就是 XSS（能提權）。
+# 另一半：tojson 逸出 <>&' 但不逸出 "，所以 tojson 只能放在**單引號屬性**裡，
+# x-data="{ tab: {{ tab|tojson }} }" 渲染出來是 x-data="{ tab: "menu" }"，屬性被截斷。
+#
+# 規則：
+#   (a) JS 屬性內被引號包住的插值 → 一律 tojson（同【一】）
+#   (b) JS 屬性內出現 tojson → 該屬性外層必須是單引號
+#   (c) 任何屬性（含 onsubmit）裡出現 '{{ ... }}' 且沒 tojson → 失敗；要用 data-* 再從 this.dataset 讀
+JS_ATTR = re.compile(r"""\s(?:on\w+|@[\w.:-]+|x-[\w.:-]+|:[\w.-]+|x-on:[\w.:-]+|x-bind:[\w.-]+)\s*=\s*(["'])(.*?)\1""", re.S)
+
+
+def check_attr_js():
+    hits = []
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        text = path.read_text(encoding="utf-8")
+        # 跳過 <script> 區塊（那是【一】的範圍）
+        stripped = SCRIPT_BLOCK.sub(lambda m: " " * len(m.group(0)), text)
+        for m in JS_ATTR.finditer(stripped):
+            quote, body = m.group(1), m.group(2)
+            if "{{" not in body:
+                continue
+            ln = stripped[: m.start()].count("\n") + 1
+            rel = path.relative_to(ROOT)
+            for q in QUOTED_INTERP.finditer(body):
+                if "tojson" not in q.group(1):
+                    hits.append(f"{rel}:{ln}: 屬性內 '{{{{ … }}}}' 未經 tojson → {body.strip()[:80]}")
+            if "tojson" in body and quote == '"':
+                hits.append(f"{rel}:{ln}: 屬性含 tojson 但外層是雙引號（tojson 不逸出 \"）→ {body.strip()[:80]}")
+    if hits:
+        failures.append("屬性內 JS 插值不安全（共 %d 處）" % len(hits))
+        for h in hits:
+            print("  !", h)
+    else:
+        print("  OK  屬性內的 JS 插值全部經 tojson 且外層單引號")
+
+
 # ---- 【二】渲染目標：模板 → (假 context, 要抽出來檢查的函式名) ----
 
 class Stub:
@@ -125,9 +165,28 @@ def _ctx_group_new_copy():
     return ctx
 
 
+def _ctx_admin_stores():
+    """店家列表（V2.13.0）：店名含引號與反斜線，驗 tojson 逸出"""
+    from datetime import datetime
+    stores = [
+        Stub(id=1, name='春水堂 "測試" \\ 分店', is_active=True, logo_url=None, phone="04-1", address="彰化",
+             category=type("C", (), {"value": "drink"})(), branches=[Stub(is_active=True)]),
+        Stub(id=2, name="八方雲集", is_active=False, logo_url="https://x/y.png", phone=None, address=None,
+             category=type("C", (), {"value": "meal"})(), branches=[]),
+    ]
+    return {
+        "request": Stub(url=Stub(path="/admin/stores"), scope={}),
+        "user": Stub(id=1, is_admin=True, show_name="管理員", display_name="管理員"),
+        "stores": stores,
+        "item_counts": {1: 32},
+        "last_groups": {1: datetime(2026, 10, 12, 3, 0)},
+    }
+
+
 RENDER_TARGETS = [
     ("group_new.html", _ctx_group_new, "newGroupForm"),
     ("group_new.html", _ctx_group_new_copy, "newGroupForm"),
+    ("admin/stores.html", _ctx_admin_stores, "storeList"),
 ]
 
 
@@ -176,6 +235,7 @@ def check_rendered_js():
 def main():
     print("[1] <script> 插值逸出")
     check_escaping()
+    check_attr_js()
     print("\n[2] 渲染後 JS 語法")
     check_rendered_js()
 

@@ -69,8 +69,9 @@
                     {% if others | length == 0 %}
                     <span class="text-[10px] bg-sela-100 text-sela-800/55 px-1.5 py-0.5 rounded">測試團</span>
                     {% endif %}
-                    <form action="/admin/groups/{{ group.id }}/delete" method="post"
-                          onsubmit="return confirm('確定刪除「{{ group.name }}」？\n此動作無法復原。')">
+                    {# V2.14.1 P0-1：名稱放 data-*，屬性內的 JS 字串不能直接插值（坑 #37） #}
+                    <form action="/admin/groups/{{ group.id }}/delete" method="post" data-name="{{ group.name }}"
+                          onsubmit="return confirm('確定刪除「' + this.dataset.name + '」？\n此動作無法復原。')">
                         <button type="submit" class="text-xs text-red-500 active:text-red-700 px-1 py-0.5"><i class="ti ti-trash"></i> 刪除</button>
                     </form>
                 </div>

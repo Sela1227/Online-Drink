@@ -20,6 +20,8 @@ def _ensure_vote_visible(vote, user, db):
     ensure_vote_visible(vote, user, db)
 
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 
 # 台北時區
 TAIPEI_TZ = timezone(timedelta(hours=8))

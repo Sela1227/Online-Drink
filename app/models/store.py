@@ -48,8 +48,13 @@ class Store(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    options: Mapped[list["StoreOption"]] = relationship(back_populates="store", cascade="all, delete-orphan")
-    toppings: Mapped[list["StoreTopping"]] = relationship(back_populates="store", cascade="all, delete-orphan")
+    # V2.15.1 審核 P2-1：甜冰與加料的顯示順序只靠 order_by（坑 #40）
+    options: Mapped[list["StoreOption"]] = relationship(
+        back_populates="store", cascade="all, delete-orphan",
+        order_by=lambda: (StoreOption.sort_order, StoreOption.id))
+    toppings: Mapped[list["StoreTopping"]] = relationship(
+        back_populates="store", cascade="all, delete-orphan",
+        order_by=lambda: (StoreTopping.sort_order, StoreTopping.id))
     menus: Mapped[list["Menu"]] = relationship(back_populates="store", cascade="all, delete-orphan")
     groups: Mapped[list["Group"]] = relationship(back_populates="store")
     branches: Mapped[list["StoreBranch"]] = relationship(back_populates="store", cascade="all, delete-orphan")

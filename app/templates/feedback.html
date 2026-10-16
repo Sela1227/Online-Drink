@@ -25,9 +25,9 @@
                 <label class="block text-sm font-medium text-sela-800/80 mb-2">
                     遇到什麼問題？
                 </label>
-                <textarea name="content" rows="5" required
+                <textarea name="content" rows="5" required {% if prefill %}autofocus{% endif %}
                           class="w-full border border-sela-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"
-                          placeholder="請描述您遇到的問題或建議..."></textarea>
+                          placeholder="請描述您遇到的問題或建議...">{{ prefill }}</textarea>
                 <p class="text-xs text-sela-800/45 mt-1">最多 1000 字</p>
             </div>
             

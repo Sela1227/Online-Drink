@@ -31,7 +31,7 @@
                     </div>
                     {% if item.note %}<div class="text-xs text-sela-700/70 mt-0.5"><i class="ti ti-pencil"></i> {{ item.note }}</div>{% endif %}
                 </div>
-                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">{% if item.menu_item and item.menu_item.price_tbd and item.unit_price == 0 %}<span class="text-xs text-sela-800/50">未訂</span>{% else %}${{ item.subtotal }}{% endif %}</div>
+                <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">{% if item.menu_item and item.menu_item.price_tbd and item.unit_price == 0 %}<span class="text-xs text-sela-800/50">未訂</span>{% else %}${{ item.subtotal|money }}{% endif %}</div>
             </div>
 
             {% if is_open and order.status.value != 'submitted' %}
@@ -55,8 +55,8 @@
                 <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/80 rounded-full pl-2 pr-1 py-1">
                     <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
                     {% if b.sugar or b.ice %}<span class="text-sela-800/50">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
-                    {% if diff > 0 %}<span class="text-amber-600 font-medium">+${{ diff|int }}</span>
-                    {% elif diff < 0 %}<span class="text-green-600 font-medium">-${{ (0 - diff)|int }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600 font-medium">+${{ diff|money }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600 font-medium">-${{ (0 - diff)|money }}</span>{% endif %}
                     <button hx-delete="/orders/backups/{{ b.id }}" hx-target="#cart-content" hx-swap="innerHTML"
                             @htmx:after-request="$dispatch('orderUpdated')"
                             class="w-5 h-5 rounded-full flex items-center justify-center text-sela-800/45 active:bg-sela-100" aria-label="刪除候補"><i class="ti ti-x" style="font-size:11px;"></i></button>
@@ -64,7 +64,7 @@
                 {% endfor %}
                 {% if item.backups|length < group.backup_count %}
                 <button type="button"
-                        @click="startBackup({{ item.id }}, '{{ item.item_name }}', {{ item.backups|length + 1 }})"
+                        @click='startBackup({{ item.id }}, {{ item.item_name | tojson }}, {{ item.backups|length + 1 }})'
                         class="inline-flex items-center gap-1 text-xs text-sela-700 border border-dashed border-sela-300 rounded-full px-2.5 py-1 active:bg-sela-50">
                     <i class="ti ti-plus" style="font-size:11px;"></i> 缺貨候補（{{ item.backups|length }}/{{ group.backup_count }}）
                 </button>
@@ -81,8 +81,8 @@
                 <span class="inline-flex items-center gap-1 text-xs bg-sela-50 border border-dashed border-sela-300 text-sela-800/70 rounded-full px-2 py-1">
                     <span class="font-bold">{{ b.priority }}</span> {{ b.item_name }}{% if b.size %}({{ b.size }}){% endif %}
                     {% if b.sugar or b.ice %}<span class="text-sela-800/45">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
-                    {% if diff > 0 %}<span class="text-amber-600">+${{ diff|int }}</span>
-                    {% elif diff < 0 %}<span class="text-green-600">-${{ (0 - diff)|int }}</span>{% endif %}
+                    {% if diff > 0 %}<span class="text-amber-600">+${{ diff|money }}</span>
+                    {% elif diff < 0 %}<span class="text-green-600">-${{ (0 - diff)|money }}</span>{% endif %}
                 </span>
                 {% endfor %}
             </div>
@@ -99,27 +99,27 @@
         {% if over > 0 %}
         {% if group.allow_over_limit %}
         <div class="mb-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-            <i class="ti ti-alert-triangle"></i> 超過每單上限 ${{ group.order_limit|int }}，<span class="font-bold">需自行貼補 ${{ over|int }}</span>
+            <i class="ti ti-alert-triangle"></i> 超過每單上限 ${{ group.order_limit|money }}，<span class="font-bold">需自行貼補 ${{ over|money }}</span>
         </div>
         {% else %}
         <div class="mb-2.5 p-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            <i class="ti ti-alert-circle"></i> 超過每單上限 ${{ group.order_limit|int }}（多 ${{ over|int }}），此團不可超過，請調整品項
+            <i class="ti ti-alert-circle"></i> 超過每單上限 ${{ group.order_limit|money }}（多 ${{ over|money }}），此團不可超過，請調整品項
         </div>
         {% endif %}
         {% endif %}
         <div class="flex items-center justify-between mb-2.5">
             <span class="text-sela-700/70">合計{% if has_discount %}<span class="text-xs">（全單 {{ group.discount_percent|int }}%）</span>{% endif %}</span>
             <span class="text-right">
-                {% if has_discount %}<span class="text-sm text-sela-800/40 line-through mr-1.5">${{ order.total_amount }}</span>{% endif %}
-                <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount }}</span>
+                {% if has_discount %}<span class="text-sm text-sela-800/40 line-through mr-1.5">${{ order.total_amount|money }}</span>{% endif %}
+                <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount|money }}</span>
             </span>
         </div>
         {% if order.has_fulfillment_changes %}
         {% set sd = order.settle_diff %}
         <div class="mb-2.5 p-2.5 bg-sela-50 border border-sela-100 rounded-xl text-sm text-sela-800">
-            <i class="ti ti-replace"></i> 換貨後實際金額 ${{ order.actual_final_amount }}
-            {% if sd > 0 %}・<span class="font-bold text-amber-700">需補 ${{ sd|int }}</span>
-            {% elif sd < 0 %}・<span class="font-bold text-green-700">需退 ${{ (0 - sd)|int }}</span>
+            <i class="ti ti-replace"></i> 換貨後實際金額 ${{ order.actual_final_amount|money }}
+            {% if sd > 0 %}・<span class="font-bold text-amber-700">需補 ${{ sd|money }}</span>
+            {% elif sd < 0 %}・<span class="font-bold text-green-700">需退 ${{ (0 - sd)|money }}</span>
             {% else %}・補退 $0{% endif %}
         </div>
         {% endif %}
@@ -131,7 +131,7 @@
             {% else %}
             {% set bkn = order.items | selectattr('backups') | list | length %}
             <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
-                    hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
+                    hx-confirm="送出訂單？共 {{ order.total_quantity }} 件、${{ order.final_amount|money }}{% if bkn > 0 %}、{{ bkn }} 件已填候補{% endif %}"
                     @htmx:after-request="$dispatch('orderUpdated'); orderStatus='submitted'; showCart=false; window.toast('已送出訂單')"
                     class="btn btn-primary flex-1">確定結單</button>
             {% endif %}

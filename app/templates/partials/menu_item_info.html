@@ -1,0 +1,36 @@
+{# V2.15.1 審核 P2-7：團頁與前台菜單頁共用的品項呈現（說明、加購、價格／時價）。
+   團頁 menu_item.html 另外疊庫存徽章與點擊；前台 store_menu.html 唯讀。 #}
+{% macro item_meta(item) -%}
+{% if item.description %}
+{# V2.16.0 A-2：兩行不截斷（「限午間」「需提前預訂」在手機上被 truncate 切掉） #}
+<div class="text-xs text-sela-700/60 line-clamp-2">{{ item.description }}</div>
+{% endif %}
+{% if item.options %}
+<div class="text-xs text-sela-700/60">
+    可加購：{% for opt in item.options %}{{ opt.name }}{% if opt.price_diff and opt.price_diff > 0 %} +${{ opt.price_diff|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro item_price(item, personal=False) -%}
+{% if item.price_tbd %}
+<span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">{% if personal %}價格未訂{% else %}時價{% endif %}</span>
+{% elif item.price_l %}
+{# V2.16.0 A-1：「$35/$40」第一次用的人不知道哪個是大杯，改兩行 M／L #}
+<div class="text-right leading-tight"><div>M ${{ item.price|money }}</div><div class="text-xs text-sela-800/60">L ${{ item.price_l|money }}</div></div>
+{% else %}
+${{ item.price|money }}
+{% endif %}
+{%- endmacro %}
+
+{% macro item_row_readonly(item) -%}
+<div class="px-4 py-3">
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+            <div class="font-medium text-sela-800">{{ item.name }}</div>
+            {{ item_meta(item) }}
+        </div>
+        <div class="text-right flex-shrink-0 text-sela-800 font-medium">{{ item_price(item) }}</div>
+    </div>
+</div>
+{%- endmacro %}

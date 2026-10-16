@@ -62,7 +62,7 @@
                     {% else %}
                     <span class="text-xs bg-sela-100 text-sela-800 px-2 py-1 rounded">編輯中</span>
                     {% endif %}
-                    <div class="text-sm font-medium text-sela-800 mt-1">${{ order.total_amount|int }}</div>
+                    <div class="text-sm font-medium text-sela-800 mt-1">${{ order.total_amount|money }}</div>
                 </div>
             </div>
         </a>

@@ -15,6 +15,8 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 
 # 加入台北時區過濾器
 def to_taipei_time(dt):
@@ -387,6 +389,7 @@ async def add_item(
             ice=ice,
             extras_text=" ".join(extras) if extras else None,
             unit_price=full_unit,
+            extras_price=full_unit - Decimal(str(unit_price)),  # V2.14.1
         ))
         db.commit()
         
@@ -765,6 +768,7 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
                         "ice": b.ice,
                         "extras_text": b.extras_text,
                         "unit_price": str(b.unit_price),
+                        "extras_price": str(b.extras_price or 0),
                     }
                     for b in item.backups
                 ],

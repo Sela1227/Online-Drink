@@ -16,8 +16,14 @@ class Menu(Base):
     
     # Relationships
     store: Mapped["Store"] = relationship(back_populates="menus")
-    categories: Mapped[list["MenuCategory"]] = relationship(back_populates="menu", cascade="all, delete-orphan")
-    items: Mapped[list["MenuItem"]] = relationship(back_populates="menu", cascade="all, delete-orphan")
+    # V2.15.1 審核 P2-1：模板直接迭代 relationship，順序只靠這裡的 order_by。
+    # 沒寫的話 PostgreSQL 回的是實體儲存順序——代購團主一改價，那個品項就跳到最後（坑 #40）
+    categories: Mapped[list["MenuCategory"]] = relationship(
+        back_populates="menu", cascade="all, delete-orphan",
+        order_by=lambda: (MenuCategory.sort_order, MenuCategory.id))
+    items: Mapped[list["MenuItem"]] = relationship(
+        back_populates="menu", cascade="all, delete-orphan",
+        order_by=lambda: (MenuItem.sort_order, MenuItem.id))
     groups: Mapped[list["Group"]] = relationship(back_populates="menu")
 
 
@@ -31,7 +37,8 @@ class MenuCategory(Base):
     
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="categories")
-    items: Mapped[list["MenuItem"]] = relationship(back_populates="category")
+    items: Mapped[list["MenuItem"]] = relationship(
+        back_populates="category", order_by=lambda: (MenuItem.sort_order, MenuItem.id))
 
 
 class MenuItem(Base):
@@ -53,7 +60,9 @@ class MenuItem(Base):
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="items")
     category: Mapped["MenuCategory | None"] = relationship(back_populates="items")
-    options: Mapped[list["ItemOption"]] = relationship(back_populates="menu_item", cascade="all, delete-orphan")
+    options: Mapped[list["ItemOption"]] = relationship(
+        back_populates="menu_item", cascade="all, delete-orphan",
+        order_by=lambda: (ItemOption.sort_order, ItemOption.id))
     order_items: Mapped[list["OrderItem"]] = relationship(back_populates="menu_item")
 
 

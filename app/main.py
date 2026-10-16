@@ -147,6 +147,8 @@ async def lifespan(app: FastAPI):
     add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
     add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")
     add_column_if_not_exists("order_items", "diff_settled", "BOOLEAN DEFAULT FALSE")
+    # V2.14.1 P1-3：候補的加購加料金額分開存，時價定價回寫才不會把它蓋掉
+    add_column_if_not_exists("order_item_backups", "extras_price", "NUMERIC(10,2) DEFAULT 0")
     
     # Phase 7: 投票可見性欄位
     add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
@@ -301,6 +303,23 @@ async def lifespan(app: FastAPI):
 
     add_v2111_unique_indexes()
     add_column_if_not_exists("group_templates", "department_ids", "VARCHAR(200)")
+
+    # V2.15.1 審核 P2-10：兩位管理員同時確認匯入，READ COMMITTED 下兩份新菜單都會是 is_active。
+    # do_import 已用 FOR UPDATE 鎖店家列，這條部分唯一索引是最後防線。建不起來代表線上已有重複，印出排查 SQL
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_menus_one_active "
+                "ON menus (store_id) WHERE is_active"
+            ))
+        print("Unique index uq_menus_one_active: OK")
+    except Exception as e:
+        print("=" * 70)
+        print("!! 無法建立 uq_menus_one_active，很可能有店家同時有兩份使用中菜單。排查：")
+        print("!!   SELECT store_id, COUNT(*) FROM menus WHERE is_active GROUP BY 1 HAVING COUNT(*) > 1;")
+        print("!!   保留最新的一份：UPDATE menus SET is_active = false WHERE id NOT IN (SELECT MAX(id) FROM menus WHERE is_active GROUP BY store_id) AND is_active;")
+        print(f"!! 原始錯誤：{e}")
+        print("=" * 70)
     
     # 添加新的 enum 值（團購類型）
     def add_enum_value_if_not_exists(enum_name: str, new_value: str):
@@ -398,8 +417,13 @@ async def auth_aware_exception_handler(request: Request, exc: StarletteHTTPExcep
     wants_html = "text/html" in request.headers.get("accept", "")
 
     if exc.status_code == 401 and not is_htmx and wants_html:
+        # V2.12.0：原本只帶 request.url.path，`/admin/import?store_id=25` 過期重登後
+        # 會落在沒有店家的 `/admin/import` —— 畫面像是從店家頁進來的，其實店家已經掉了，
+        # 接著就撞上「store_id 還是 0」的訊息。查詢字串一起帶（auth.py 有做站內路徑檢查）。
+        from urllib.parse import quote
+        target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
         return RedirectResponse(
-            url=f"/auth/login?next={request.url.path}",
+            url=f"/auth/login?next={quote(target, safe='/?=&%')}",
             status_code=302,
         )
 
@@ -459,6 +483,8 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 
 # 加入台北時區過濾器
 from datetime import timezone, timedelta

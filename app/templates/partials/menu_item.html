@@ -1,16 +1,19 @@
 {# 菜單品項（V2.7.0：圖片/說明/庫存徽章；stock_used 由 group 路由傳入）#}
+{% import "partials/menu_item_info.html" as mi %}
 {% if item.is_available is not false %}
 {% set rem = (item.stock_limit - stock_used.get(item.id, 0)) if item.stock_limit and stock_used is defined else None %}
 {% set sold_out = rem is not none and rem <= 0 %}
-<button {% if not sold_out %}@click="openAddItem({
+{# V2.14.1 P0-2：屬性內的 JS 字串一律 tojson、屬性外層單引號（坑 #37）。品名來自匯入與代購，任何人都能寫 #}
+<button {% if not sold_out %}@click='openAddItem({
             id: {{ item.id }},
-            name: '{{ item.name }}',
+            name: {{ item.name | tojson }},
+            description: {{ (item.description or "") | tojson }},
             price: {{ item.price }},
-            tbd: {{ 'true' if item.price_tbd else 'false' }},
-            price_l: {{ item.price_l if item.price_l else 'null' }},
-            remaining: {{ rem if rem is not none else 'null' }},
-            options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: '{{ opt.name }}', price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
-        })"{% else %}disabled{% endif %}
+            tbd: {{ "true" if item.price_tbd else "false" }},
+            price_l: {{ item.price_l if item.price_l else "null" }},
+            remaining: {{ rem if rem is not none else "null" }},
+            options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
+        })'{% else %}disabled{% endif %}
         data-menu-item-id="{{ item.id }}"
         class="w-full flex items-center justify-between gap-3 p-3.5 bg-sela-50 rounded-xl transition text-left {% if sold_out %}opacity-50{% else %}active:bg-sela-100 active:scale-[0.99]{% endif %}">
     <div class="flex items-center gap-3 min-w-0">
@@ -25,24 +28,12 @@
                 <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-normal">剩 {{ rem }}</span>
                 {% endif %}
             </div>
-            {% if item.description %}
-            <div class="text-xs text-sela-700/60 truncate">{{ item.description }}</div>
-            {% endif %}
-            {% if item.options %}
-            <div class="text-xs text-sela-700/60">
-                可加購：{% for opt in item.options %}{{ opt.name }}{% if not loop.last %}、{% endif %}{% endfor %}
-            </div>
-            {% endif %}
+            {{ mi.item_meta(item) }}
         </div>
     </div>
     <div class="text-sela-800 font-medium flex-shrink-0">
-        {% if item.price_tbd %}
-        <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">價格未訂</span>
-        {% elif item.price_l %}
-        ${{ item.price }}/${{ item.price_l }}
-        {% else %}
-        ${{ item.price }}
-        {% endif %}
+        {# V2.14.0：一般店家的時價品項顯示「時價」，代購團維持「價格未訂」；V2.15.1 抽成共用 macro #}
+        {{ mi.item_price(item, personal=(group is defined and group.store and group.store.is_personal)) }}
     </div>
 </button>
 {% endif %}

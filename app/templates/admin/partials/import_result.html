@@ -1,82 +1,305 @@
+{% if unclear_items %}
+{# V2.16.1 B-7：AI 指令要求看不清填 "?"，這裡集中列出、逼人對照照片手動填；沒有確認鈕 #}
+<div class="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div class="text-sm font-medium text-red-700 mb-2">
+        <i class="ti ti-eye-off"></i> {{ unclear_items | length }} 個品項的價格 AI 看不清（填了 "?"），請對照照片改成數字或 "時價" 再檢查
+    </div>
+    <ul class="text-xs text-red-600 space-y-0.5">
+        {% for loc in unclear_items %}<li>• {{ loc }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% if error_messages or unclear_items %}
 {% if error_messages %}
 <!-- 失敗：中文錯誤紅框 -->
 <div class="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
     <div class="text-sm font-medium text-red-700 mb-2">
-        <i class="ti ti-alert-triangle"></i> 匯入失敗，請修正以下問題：
+        <i class="ti ti-alert-triangle"></i> 菜單資料有問題，請修正：
     </div>
     <ul class="text-sm text-red-600 space-y-1">
         {% for msg in error_messages %}
         <li>• {{ msg }}</li>
         {% endfor %}
     </ul>
+    {% if error_context %}
+    <!-- V2.12.0：JSON 解析失敗時附出錯行前後原文，▶ 標記出錯行 -->
+    <pre class="mt-3 p-3 bg-white border border-red-200 rounded text-xs text-sela-800 overflow-x-auto leading-relaxed">{% for line in error_context %}{{ line }}
+{% endfor %}</pre>
+    {% endif %}
 </div>
+{% endif %}
 {% else %}
-<!-- 成功：預覽摘要 + 確認 -->
+<!-- 成功（V2.15.0：先給摘要，明細收合） -->
 {% set cat_count = (data.menu.categories | length) if data.menu.categories else 0 %}
 {% set item_count = namespace(n=0) %}
 {% if data.menu.categories %}{% for c in data.menu.categories %}{% set item_count.n = item_count.n + (c.items | length) %}{% endfor %}{% endif %}
 {% if data.menu.items %}{% set item_count.n = item_count.n + (data.menu.items | length) %}{% endif %}
+{% set identical = diff and diff.identical %}
+{% set has_blockers = analysis and analysis.blockers %}
 
-<div class="mt-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-    <div class="text-sm font-medium text-green-700 mb-1">
-        <i class="ti ti-circle-check"></i> 驗證通過
+{% if conflict %}
+<div class="mt-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-sm text-amber-800">
+    <div class="font-medium"><i class="ti ti-refresh-alert"></i> 使用中的菜單剛被更新成第 {{ existing_version }} 版</div>
+    <div class="text-xs mt-1">你剛才看到的差異是跟舊版比的。已重新檢查，請再看一次摘要後確認。</div>
+</div>
+{% endif %}
+{% if stale %}
+<div class="mt-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-sm text-amber-800">
+    <div class="font-medium"><i class="ti ti-refresh-alert"></i> 輸入框的內容在檢查後被改過，沒有寫入</div>
+    <div class="text-xs mt-1">已用目前的內容重新檢查，請再看一次摘要後確認。</div>
+</div>
+{% endif %}
+{% if cleaned_note %}
+<div class="mt-3 text-xs text-sela-800/60"><i class="ti ti-wand"></i> 已自動去掉前後的說明文字與 ``` 標記</div>
+{% endif %}
+{% if similar %}
+{# V2.16.1 B-8：新增一家店但店名跟既有店很像——只提醒不擋；按鈕把「匯入至」切到那家店並重新檢查（事件由 import.html 接） #}
+{% set s0 = similar[0] %}
+<div x-show="!ignoreSimilar" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+    <div class="font-medium"><i class="ti ti-building-store"></i> 已經有一家「{{ s0[0].name }}」{% if s0[2] %}（使用中第 {{ s0[2] }} 版 · {{ s0[3] }} 項）{% else %}（還沒有菜單）{% endif %}——是同一家嗎？</div>
+    <div class="text-xs mt-1 text-amber-800/80">如果是，改成更新它的菜單，舊版本會自動保留；確定是新店家就直接往下。</div>
+    <div class="flex gap-2 mt-2 flex-wrap">
+        {% for st, ratio, ver, n in similar %}
+        <button type="button" @click='$dispatch("switch-store", { id: {{ st.id }}, name: {{ st.name | tojson }} })'
+                class="px-3 py-1.5 rounded-lg {% if loop.first %}bg-sela-800 text-white{% else %}border border-amber-300 text-amber-800{% endif %} text-xs">改為更新「{{ st.name }}」</button>
+        {% endfor %}
+        <button type="button" @click="ignoreSimilar = true" class="px-3 py-1.5 rounded-lg border border-amber-300 text-xs">確定是新店家</button>
     </div>
-    <div class="text-sm text-green-600">
-        {% if is_full_import %}
-        新增店家「{{ data.store.name }}」（{{ '飲料' if data.store.category == 'drink' else ('團購' if data.store.category == 'group_buy' else '餐點') }}）
-        {% else %}
-        匯入到店家編號 {{ data.store_id }}（{{ '覆蓋現有菜單' if data.mode == 'replace' else '新增菜單版本' }}）
-        {% endif %}
-        · {{ cat_count }} 個分類 · {{ item_count.n }} 個品項
+</div>
+{% endif %}
+
+{% if identical %}
+<div class="mt-3 p-3 bg-sela-50 border border-sela-200 rounded-xl">
+    <div class="text-sm font-medium text-sela-800"><i class="ti ti-equal"></i> 跟使用中的第 {{ existing_version }} 版完全相同</div>
+    <div class="text-xs text-sela-800/60 mt-0.5">{{ diff.existing_count }} 項都沒變，不需要更新。</div>
+</div>
+{% elif not has_blockers %}
+<div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="text-sm font-medium text-green-800"><i class="ti ti-circle-check"></i> 檢查完成</div>
+        <div class="text-xs text-green-800/70">
+            {% if is_full_import and not duplicate_store %}
+            將新增店家「{{ data.store.name }}」（{{ '飲料' if data.store.category == 'drink' else ('團購' if data.store.category == 'group_buy' else '餐點') }}）· {{ item_count.n }} 項
+            {% elif existing_version %}
+            更新「{{ (target_store.name if target_store else duplicate_store.name) }}」· {{ item_count.n }} 項 · 將建立第 {{ next_version }} 版，使用中的第 {{ existing_version }} 版自動保留
+            {% else %}
+            「{{ (target_store.name if target_store else (duplicate_store.name if duplicate_store else '')) }}」的第一份菜單 · {{ item_count.n }} 項
+            {% endif %}
+        </div>
     </div>
+    {% if diff and diff.order_changed and not diff.added and not diff.changed and not diff.removed and not diff.renamed_categories %}
+    <div class="mt-2 text-sm text-sela-800"><i class="ti ti-arrows-sort"></i> 只調整了排序（分類或品項順序），內容沒變</div>
+    {% elif diff and diff.order_changed %}
+    <div class="mt-2 text-xs text-sela-800/60"><i class="ti ti-arrows-sort"></i> 另外有調整排序</div>
+    {% endif %}
+    {% if diff and diff.renamed_categories %}
+    {# V2.16.1 B-9：分類改名合併成一行，不再列 N 行「分類改了」 #}
+    {% for rc in diff.renamed_categories %}
+    <div class="mt-2 text-xs text-sela-800"><i class="ti ti-tag"></i> 分類改名：「{{ rc.old }}」→「{{ rc.new }}」（{{ rc.count }} 項{% if rc.unchanged == rc.count %}，內容都一樣{% elif rc.unchanged %}，{{ rc.unchanged }} 項不變{% endif %}）</div>
+    {% endfor %}
+    {% endif %}
+    {% if diff %}
+    <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div class="bg-white rounded-lg py-2"><div class="text-xl font-bold text-green-700">{{ diff.added | length }}</div><div class="text-xs text-sela-800/60">新增</div></div>
+        <div class="bg-white rounded-lg py-2"><div class="text-xl font-bold text-amber-700">{{ diff.changed | length }}</div><div class="text-xs text-sela-800/60">變更</div></div>
+        <div class="bg-white rounded-lg py-2"><div class="text-xl font-bold text-red-700">{{ diff.removed | length }}</div><div class="text-xs text-sela-800/60">移除</div></div>
+    </div>
+    {% endif %}
+    {% if existing_version and next_version and existing_version < next_version - 1 %}
+    <div class="mt-2 pt-2 border-t border-green-200 text-xs text-amber-700">
+        <i class="ti ti-info-circle"></i> 目前使用的是第 {{ existing_version }} 版（較舊）；最新的第 {{ next_version - 1 }} 版不是使用中。差異是跟第 {{ existing_version }} 版比的
+    </div>
+    {% endif %}
     {% if duplicate_store %}
-    <div class="mt-2 pt-2 border-t border-green-200 text-sm text-amber-700">
-        <i class="ti ti-info-circle"></i> 偵測到同名店家「{{ duplicate_store.name }}」已存在 — 將匯入菜單到既有店家（保留原菜單為舊版本，不新增重複店家）
+    <div class="mt-2 pt-2 border-t border-green-200 text-xs text-amber-700">
+        <i class="ti ti-info-circle"></i> 已有同名店家「{{ duplicate_store.name }}」，菜單會更新到那家店，不會新增重複店家
+    </div>
+    {% endif %}
+    {% if ignored_store_block %}
+    <div class="mt-2 pt-2 border-t border-green-200 text-xs text-amber-700">
+        <i class="ti ti-info-circle"></i> 資料裡的店家資訊已忽略，以上方選的店家為準；若是要新增一家店，請把「匯入至」改成「新增一家店」
     </div>
     {% endif %}
 </div>
+{% endif %}
+
+{% if analysis and (analysis.blockers or analysis.warnings) %}
+<!-- V2.12.0：匯入品質分析。blockers 擋下確認；warnings 提醒但放行 -->
+{% if analysis.blockers %}
+<div class="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div class="text-sm font-medium text-red-700 mb-2"><i class="ti ti-ban"></i> 這些問題必須修正才能匯入：</div>
+    <ul class="text-sm text-red-600 space-y-1">
+        {% for msg in analysis.blockers %}<li>• {{ msg }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% if analysis.warnings %}
+<div class="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+    <div class="text-sm font-medium text-amber-700 mb-2"><i class="ti ti-alert-triangle"></i> 請確認以下 {{ analysis.warnings | length }} 項（可能是刻意的，確認無誤即可匯入）：</div>
+    <ul class="text-sm text-amber-700 space-y-1">
+        {% for msg in analysis.warnings %}<li>• {{ msg }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endif %}
+
+{% if diff and not identical %}
+{# V2.13.1：與使用中版本的差異。只在「匯到既有店家且已有使用中菜單」時出現；V2.15.0 改為收合 #}
+{% if diff.partial_suspect %}
+<div class="mt-3 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+    <div class="text-sm font-medium text-amber-800 mb-1"><i class="ti ti-alert-triangle"></i> 看起來只貼了部分菜單</div>
+    <div class="text-sm text-amber-800/90">
+        使用中版本有 {{ diff.existing_count }} 個品項，這份 JSON 會<strong>移除其中 {{ diff.removed | length }} 個</strong>、只留 {{ diff.new_count }} 個。匯入是整份取代，不是只更新貼上的那幾項。
+        若店家真的大改菜單，照樣可以匯入；若只是想改幾樣價格，請把完整菜單貼上來。
+    </div>
+</div>
+{% endif %}
+<details class="mt-3 bg-white border border-sela-200 rounded-xl" {% if diff.partial_suspect %}open{% endif %}>
+    <summary class="px-3 py-2.5 cursor-pointer text-sm text-sela-800">
+        <i class="ti ti-git-compare"></i> 查看變更明細
+        <span class="text-xs text-sela-800/50">與第 {{ existing_version }} 版比：新增 {{ diff.added | length }}・變更 {{ diff.changed | length }}・移除 {{ diff.removed | length }}・不變 {{ diff.unchanged_count }}{% if diff.renamed_categories %}・分類改名 {{ diff.renamed_categories | length }}{% endif %}</span>
+    </summary>
+    <div class="px-3 pb-3">
+    <div class="space-y-3 text-sm">
+        {% if diff.renamed_categories %}
+        <div>
+            <div class="text-xs font-medium text-sela-800/70 mb-1">分類改名（{{ diff.renamed_categories | length }}）</div>
+            <div class="divide-y divide-sela-100 border border-sela-200 rounded-lg overflow-hidden">
+                {% for rc in diff.renamed_categories %}
+                <div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-sela-50/50">
+                    <span>{{ rc.old }} → {{ rc.new }}</span>
+                    <span class="text-xs text-sela-800/55 whitespace-nowrap">{{ rc.count }} 項{% if rc.unchanged == rc.count %}不變{% else %}・{{ rc.unchanged }} 項不變{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if diff.added %}
+        <div>
+            <div class="text-xs font-medium text-green-700 mb-1">新增（{{ diff.added | length }}）</div>
+            <div class="divide-y divide-sela-100 border border-green-100 rounded-lg overflow-hidden">
+                {% for it in diff.added %}
+                <div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-green-50/40">
+                    <span>{{ it.name }}{% if it.category %} <span class="text-xs text-sela-800/45">{{ it.category }}</span>{% endif %}{% if it.unavailable %} <span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full">停售</span>{% endif %}</span>
+                    <span class="text-green-700 whitespace-nowrap">{{ it.price_text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if diff.changed %}
+        <div>
+            <div class="text-xs font-medium text-amber-700 mb-1">變更（{{ diff.changed | length }}）</div>
+            <div class="divide-y divide-sela-100 border border-amber-100 rounded-lg overflow-hidden">
+                {% for it in diff.changed %}
+                <div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-50/40 flex-wrap">
+                    <span>{{ it.name }}
+                        <span class="text-xs text-sela-800/45">{% if it.category_changed %}{{ it.old_category or '無分類' }} → {{ it.category or '無分類' }}{% else %}{{ it.category }}{% endif %}</span>
+                    </span>
+                    <span class="whitespace-nowrap">
+                        {% if it.price_changed %}
+                        <span class="line-through text-sela-800/45">{{ it.old_price_text }}</span> → <span class="text-amber-700 font-medium">{{ it.new_price_text }}</span>
+                        {% endif %}
+                        {% if it.note %}<span class="text-xs text-sela-800/55">{{ it.note }}</span>{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if diff.removed %}
+        <div>
+            <div class="text-xs font-medium text-red-700 mb-1">移除（{{ diff.removed | length }}）</div>
+            {% if diff.removed | length > 8 %}
+            <details class="border border-red-100 rounded-lg">
+                <summary class="px-3 py-1.5 cursor-pointer bg-red-50/40">
+                    {% for it in diff.removed[:8] %}{{ it.name }}{% if not loop.last %}、{% endif %}{% endfor %} …還有 {{ diff.removed | length - 8 }} 項
+                    <span class="text-xs text-sela-800/50">（點開看全部）</span>
+                </summary>
+                <div class="divide-y divide-sela-100">
+                    {% for it in diff.removed %}
+                    <div class="flex items-center justify-between gap-2 px-3 py-1.5">
+                        <span class="line-through">{{ it.name }}</span>{% if it.category %}<span class="text-xs text-sela-800/45 flex-1">{{ it.category }}</span>{% endif %}
+                        <span class="text-sela-800/45 whitespace-nowrap">{{ it.price_text }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
+            <div class="divide-y divide-sela-100 border border-red-100 rounded-lg overflow-hidden">
+                {% for it in diff.removed %}
+                <div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-red-50/40">
+                    <span><span class="line-through">{{ it.name }}</span>{% if it.category %} <span class="text-xs text-sela-800/45">{{ it.category }}</span>{% endif %}</span>
+                    <span class="text-sela-800/45 whitespace-nowrap">{{ it.price_text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% if diff.removed %}
+    <p class="mt-3 text-xs text-sela-800/50"><i class="ti ti-info-circle"></i> 移除的品項仍留在舊版本裡，歷史訂單與進行中的團不受影響；之後也能在工作台切回舊版。</p>
+    {% endif %}
+    </div>
+</details>
+{% endif %}
 
 <!-- 菜單明細 -->
-<div class="mt-3 bg-white border rounded-lg p-4">
-    <h3 class="font-medium text-sela-800 mb-2 text-sm">菜單明細</h3>
+{# V2.14.0：時價／停售／說明標示 #}
+{% macro item_row(item) -%}
+<div class="flex items-center gap-2 py-1 flex-wrap">
+    <span{% if item.is_available is false %} class="line-through text-sela-800/45"{% endif %}>{{ item.name }}</span>
+    {% if item.price_tbd %}
+    <span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">時價</span>
+    {% else %}
+    <span class="{% if item.is_available is false %}text-sela-800/45{% else %}text-sela-800{% endif %}">${{ item.price|money }}{% if item.price_l %}/${{ item.price_l|money }}{% endif %}</span>
+    {% endif %}
+    {% if item.is_available is false %}<span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full">停售</span>{% endif %}
+    {% if item.options %}
+    <span class="text-xs text-sela-800/45">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>
+    {% endif %}
+    {% if item.note %}<span class="text-xs text-sela-800/45"><i class="ti ti-note"></i> {{ item.note }}</span>{% endif %}
+</div>
+{%- endmacro %}
+<details class="mt-3 bg-white border border-sela-200 rounded-xl" {% if not diff %}open{% endif %}>
+    <summary class="px-3 py-2.5 cursor-pointer text-sm text-sela-800"><i class="ti ti-list"></i> 查看完整菜單 <span class="text-xs text-sela-800/50">{{ cat_count }} 個分類・{{ item_count.n }} 項</span></summary>
+    <div class="px-4 pb-4">
     {% if data.menu.categories %}
     {% for category in data.menu.categories %}
     <div class="mb-3">
         <div class="text-sm font-medium text-sela-800/80">{{ category.name }}</div>
         <div class="ml-4 text-sm text-sela-800/70">
-            {% for item in category.items %}
-            <div class="flex items-center gap-2 py-1 flex-wrap">
-                <span>{{ item.name }}</span>
-                <span class="text-sela-800">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
-                {% if item.options %}
-                <span class="text-xs text-sela-800/45">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>
-                {% endif %}
-            </div>
-            {% endfor %}
+            {% for item in category.items %}{{ item_row(item) }}{% endfor %}
         </div>
     </div>
     {% endfor %}
     {% endif %}
     {% if data.menu.items %}
     <div class="text-sm text-sela-800/70">
-        {% for item in data.menu.items %}
-        <div class="flex items-center gap-2 py-1 flex-wrap">
-            <span>{{ item.name }}</span>
-            <span class="text-sela-800">${{ item.price }}{% if item.price_l %}/${{ item.price_l }}{% endif %}</span>
-            {% if item.options %}
-            <span class="text-xs text-sela-800/45">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>
-            {% endif %}
-        </div>
-        {% endfor %}
+        {% for item in data.menu.items %}{{ item_row(item) }}{% endfor %}
     </div>
     {% endif %}
-</div>
+    </div>
+</details>
 
-<!-- 確認匯入（一般 POST，成功後 redirect /admin）-->
-<form action="/admin/import" method="post" class="mt-3">
+{% if has_blockers %}
+<div class="mt-3 py-3 text-center text-sm text-sela-800/60">修正上方標示的問題後再貼一次</div>
+{% elif identical %}
+<button type="button" disabled class="mt-3 w-full py-3 rounded-lg bg-sela-200 text-sela-800/50 font-medium">菜單沒有變更</button>
+{% else %}
+<!-- 確認（V2.15.0：htmx 送出；成功 → HX-Redirect 到工作台；版本被別人更新 → 回傳重新比對的片段）-->
+<form hx-post="/admin/import" hx-target="#import-result" hx-swap="innerHTML" hx-disabled-elt="find button"
+      hx-include="[name=json_text],[name=store_id],[name=new_store_name],[name=new_store_category]:checked" class="mt-3">
     <input type="hidden" name="json_str" value="{{ json_str | e }}">
-    <button type="submit" class="w-full py-3 rounded-lg bg-sela-500 hover:bg-sela-600 text-sela-800 font-medium">
-        確認匯入
+    <input type="hidden" name="base_menu_id" value="{{ existing_menu.id if existing_menu else 0 }}">
+    <input type="hidden" name="src_digest" value="{{ src_digest or '' }}">
+    <button type="submit" class="w-full py-3 rounded-lg bg-sela-800 text-white font-medium disabled:opacity-50">
+        {% if diff and diff.partial_suspect %}仍要更新（移除 {{ diff.removed | length }} 個品項）{% elif is_full_import and not duplicate_store %}確認建立店家{% else %}確認更新菜單{% endif %}
     </button>
+    {% if not is_full_import or duplicate_store %}
+    <p class="mt-2 text-xs text-center text-sela-800/50">進行中的團仍用它開團時的版本，不受影響。</p>
+    {% endif %}
 </form>
+{% endif %}
 {% endif %}

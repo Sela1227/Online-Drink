@@ -14,6 +14,8 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 
 # 加入台北時區過濾器
 def to_taipei_time(dt):
@@ -546,6 +548,7 @@ async def feedback_page(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "user": user,
         "feedbacks": feedbacks,
+        "prefill": (request.query_params.get("prefill") or "")[:300],  # V2.16.0 A-8：從團頁「回報價格不符」帶入
     })
 
 

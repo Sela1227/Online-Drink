@@ -13,6 +13,8 @@ from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
 

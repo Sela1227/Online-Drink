@@ -132,7 +132,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <div class="font-medium text-sela-800">{{ order.group.name }}</div>
-                        <div class="text-xs text-sela-800/60">{{ order.created_at.strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount }}</div>
+                        <div class="text-xs text-sela-800/60">{{ order.created_at.strftime('%m/%d %H:%M') }} · {{ order.items|length }} 品項 · ${{ order.total_amount|money }}</div>
                     </div>
                     <div class="text-xs px-2 py-1 rounded
                         {% if order.status.value == 'submitted' %}bg-green-100 text-green-700

@@ -44,7 +44,7 @@
                 <div class="text-sm font-medium text-sela-800 truncate text-center">{{ vote.title }}</div>
                 <div class="flex justify-between items-center mt-2 text-xs">
                     <span class="text-sela-800">{{ vote.total_votes }}票</span>
-                    <span class="text-sela-800" x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display"></span>
+                    <span class="text-sela-800" x-data='countdown({{ vote.deadline.isoformat() | tojson }})' x-text="display"></span>
                 </div>
             </a>
             {% endfor %}
@@ -85,7 +85,7 @@
                 {% for store in stores %}
                 <a href="/stores/{{ store.id }}"
                    class="bg-white rounded-xl p-2 text-center hover:shadow-md transition-shadow"
-                   x-show="filter === 'all' || filter === '{{ store.category.value if store.category else 'meal' }}'">
+                   x-show='filter === "all" || filter === {{ (store.category.value if store.category else "meal") | tojson }}'>
                     <div class="w-12 h-12 mx-auto bg-sela-50 rounded-xl flex items-center justify-center overflow-hidden mb-1">
                         {% if store.logo_url %}
                         <img src="{{ store.logo_url }}" class="w-10 h-10 object-contain">

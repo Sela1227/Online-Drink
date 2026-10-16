@@ -23,7 +23,7 @@
                 <div class="flex items-center gap-2 mt-1 text-xs">
                     <span class="text-green-600 font-medium">已送出 {{ a.group.submitted_count }}</span>
                     {% if a.group.pending_count > 0 %}<span class="text-amber-600">{{ a.group.pending_count }} 未送出</span>{% endif %}
-                    {% if a.group.submitted_count > 0 %}<span class="text-sela-800/45">${{ a.group.total_amount|int }}</span>{% endif %}
+                    {% if a.group.submitted_count > 0 %}<span class="text-sela-800/45">${{ a.group.total_amount|money }}</span>{% endif %}
                     <button type="button"
                             class="ml-auto text-sela-800 bg-sela-100 px-2 py-0.5 rounded-full active:bg-sela-200"
                             onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard.writeText('【{{ a.group.name }}】{{ a.group.deadline.strftime('%m/%d %H:%M') }} 結單，還沒點的快來點餐：' + window.location.origin + '/groups/{{ a.group.id }}{% if a.group.pending_count > 0 %}' + '（還有 {{ a.group.pending_count }} 位點了還沒送出）{% endif %}').then(function(){ window.toast('催單文字已複製，貼到 LINE 群組吧') })">

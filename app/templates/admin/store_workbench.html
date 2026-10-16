@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
+
+{% block title %}{{ store.name }} - 店家管理{% endblock %}
+
+{% block content %}
+{{ nav.back('/admin/stores', '店家管理') }}
+{# V2.13.0 店家工作台：一頁取代 store_detail + store_edit + menus。
+   分頁用 Alpine x-show 切換不跳頁，填到一半切去看別的分頁不會丟；
+   各區保留自己的儲存鈕（後端是獨立的 POST，一顆全域儲存鈕不可能原子保存）。 #}
+{# V2.14.1 P1-2：tojson 不逸出雙引號，放進屬性時外層一律單引號（坑 #37） #}
+<div class="space-y-4" x-data='{ tab: {{ tab | tojson }}, menuOpen: false, histOpen: false, confirmName: "" }'
+     x-init="$watch('tab', t => { try { history.replaceState({}, '', '?tab=' + t); } catch (e) {} })">
+
+    {% if created %}
+    <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+        <i class="ti ti-circle-check"></i> 店家已建立。現在可以按「更新菜單」匯入菜單，或稍後再說。
+    </div>
+    {% endif %}
+    {% if imported %}
+    {# V2.15.0：完成提示縮成一行 #}
+    <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+        <i class="ti ti-circle-check"></i> 菜單已更新{% if imported_ver %}為第 {{ imported_ver }} 版{% endif %}（{{ imported_items }} 項）
+    </div>
+    {% endif %}
+
+    <!-- 固定頂部 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+        <div class="flex items-start gap-3">
+            <div class="w-14 h-14 rounded-xl bg-sela-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {% if store.logo_url %}
+                <img src="{{ store.logo_url }}" alt="" class="w-full h-full object-contain">
+                {% else %}
+                <i class="ti {% if store.category and store.category.value == 'drink' %}ti-cup{% elif store.category and store.category.value == 'group_buy' %}ti-shopping-cart{% else %}ti-bowl{% endif %} text-2xl text-sela-700"></i>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h1 class="text-lg font-bold text-sela-800 truncate">{{ store.name }}</h1>
+                    {% if store.is_active %}
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700"><i class="ti ti-circle-check"></i> 啟用中</span>
+                    {% else %}
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-sela-100 text-sela-800/60"><i class="ti ti-player-pause"></i> 已停用</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-sela-800/55 mt-0.5">
+                    {% if store.category and store.category.value == 'drink' %}飲料{% elif store.category and store.category.value == 'group_buy' %}團購{% else %}餐廳{% endif %}
+                    · 現行菜單 {{ active_item_count }} 品項
+                    · {% if last_group %}上次開團 {{ (last_group|taipei).strftime('%m/%d') }}{% else %}尚未開過團{% endif %}
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-1.5">
+                <a href="/admin/import?store_id={{ store.id }}"
+                   class="bg-sela-700 text-white px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+                    <i class="ti ti-inbox"></i> 更新菜單
+                </a>
+                {% if active_item_count %}
+                {# V2.16.1 B-5：小幅改價——到匯入頁並直接帶入使用中菜單 #}
+                <a href="/admin/import?store_id={{ store.id }}&load=current" class="text-xs text-sela-700 underline whitespace-nowrap">改幾個價格</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex gap-1 mt-4 border-b border-sela-100 -mb-4 overflow-x-auto">
+            {% for key, label, icon in [('menu','菜單','ti-clipboard-list'), ('info','基本資料','ti-pencil'), ('ops','營運設定','ti-settings'), ('more','更多','ti-dots')] %}
+            <button type="button" @click='tab = {{ key | tojson }}'
+                    :class='tab === {{ key | tojson }} ? "border-sela-700 text-sela-800 font-medium" : "border-transparent text-sela-800/55"'
+                    class="px-3 py-2 text-sm border-b-2 whitespace-nowrap -mb-px">
+                <i class="ti {{ icon }}"></i> {{ label }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ════ 菜單 ════ -->
+    <div x-show="tab === 'menu'" class="space-y-3">
+        {% if active_menu %}
+{# V2.15.1 審核 P3-8：工作台品項一行——時價標籤、停售、選項、說明 #}
+{% macro wb_item(item) -%}
+<div>{{ item.name }}
+    {% if item.price_tbd %}<span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">時價</span>{% else %}${{ item.price|money }}{% if item.price_l %} / L ${{ item.price_l|money }}{% endif %}{% endif %}
+    {% if item.is_available is sameas false %}<span class="text-xs text-sela-800/45">（停售）</span>{% endif %}
+    {% if item.options %}<span class="text-xs text-sela-800/45">（{% for o in item.options %}{{ o.name }}{% if o.price_diff and o.price_diff > 0 %} +${{ o.price_diff|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}）</span>{% endif %}
+    {% if item.description %}<span class="text-xs text-sela-800/45"><i class="ti ti-note"></i> {{ item.description }}</span>{% endif %}
+</div>
+{%- endmacro %}
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <div class="font-medium text-sela-800"><i class="ti ti-circle-check text-green-600"></i> 使用中：第 {{ active_version }} 版</div>
+                    <div class="text-xs text-sela-800/55">{{ (active_menu.created_at|taipei).strftime('%Y-%m-%d') }} 匯入 · {{ active_menu.categories | length }} 個分類 · {{ active_item_count }} 品項</div>
+                </div>
+                <button type="button" @click="menuOpen = !menuOpen" class="text-xs text-sela-700 underline" x-text="menuOpen ? '收起明細' : '展開明細'"></button>
+            </div>
+            <div x-show="menuOpen" class="text-sm space-y-3 pt-2">
+                {% for category in active_menu.categories %}
+                <div>
+                    <div class="font-medium text-sela-800/80 mb-1">{{ category.name }}</div>
+                    <div class="ml-3 text-sela-800/70 space-y-0.5">
+                        {% for item in category.items %}{{ wb_item(item) }}{% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% set loose = active_menu.items | selectattr('category_id', 'none') | list %}
+                {% if loose %}
+                <div>
+                    <div class="font-medium text-sela-800/80 mb-1">其他</div>
+                    <div class="ml-3 text-sela-800/70 space-y-0.5">
+                        {% for item in loose %}{{ wb_item(item) }}{% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+            <i class="ti ti-alert-triangle"></i> 這家店還沒有菜單，團員無法點餐。按右上「更新菜單」匯入。
+        </div>
+        {% endif %}
+
+        {% set history = menu_versions | rejectattr('0.is_active') | list %}
+        {% if history %}
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <button type="button" @click="histOpen = !histOpen" class="w-full flex items-center justify-between text-sm">
+                <span class="font-medium text-sela-800/80"><i class="ti ti-history"></i> 歷史版本（{{ history | length }}）</span>
+                <i :class="histOpen ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" class="text-sela-800/40"></i>
+            </button>
+            <div x-show="histOpen" class="mt-3 divide-y divide-sela-100">
+                {% for menu, ver in history %}
+                <div class="py-2.5 text-sm" x-data="{ open: false }">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1">
+                            <span class="font-medium text-sela-800">第 {{ ver }} 版</span>
+                            <span class="text-xs text-sela-800/55 ml-2">{{ (menu.created_at|taipei).strftime('%Y-%m-%d') }} · {{ menu.items | length }} 品項</span>
+                        </div>
+                        <button type="button" @click="open = !open" class="text-xs text-sela-700 underline" x-text="open ? '收起' : '查看'"></button>
+                        <form action="/admin/stores/{{ store.id }}/menus/{{ menu.id }}/activate" method="post" class="inline"
+                              onsubmit="return confirm('切回第 {{ ver }} 版後，新開的團會用這份菜單；進行中的團不受影響。\n\n確定切換？')">
+                            <button type="submit" class="text-xs px-2 py-1 rounded border border-sela-300 text-sela-700">切回此版</button>
+                        </form>
+                    </div>
+                    <div x-show="open" class="mt-2 ml-2 text-xs text-sela-800/70 space-y-2">
+                        {% for category in menu.categories %}
+                        <div><span class="font-medium">{{ category.name }}</span>：
+                            {% for item in category.items %}{{ item.name }} {% if item.price_tbd %}時價{% else %}${{ item.price|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}</div>
+                        {% endfor %}
+                        {% set hloose = menu.items | selectattr('category_id', 'none') | list %}
+                        {% if hloose %}<div><span class="font-medium">其他</span>：{% for item in hloose %}{{ item.name }} {% if item.price_tbd %}時價{% else %}${{ item.price|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        <p class="text-xs text-sela-800/45 px-1">更新菜單會新增一個版本，舊版本保留。進行中的團用的是它開團當時的版本，不會被影響。</p>
+    </div>
+
+    <!-- ════ 基本資料 ════ -->
+    <div x-show="tab === 'info'" x-cloak class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+        <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
+            <div class="grid sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-sela-800/60 mb-1">店名 <span class="text-red-500">*</span></label>
+                    <input type="text" name="name" value="{{ store.name }}" required maxlength="100"
+                           class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-sela-800/60 mb-2">類別</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        {% for val, label, icon in [('drink','飲料','ti-cup'), ('meal','餐廳','ti-bowl'), ('group_buy','團購','ti-shopping-cart')] %}
+                        <label class="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 cursor-pointer has-[:checked]:bg-sela-800 has-[:checked]:border-sela-800 has-[:checked]:text-white bg-sela-50 border-sela-200 text-sm">
+                            <input type="radio" name="category" value="{{ val }}" class="sr-only"
+                                   {% if store.category and store.category.value == val %}checked{% endif %}>
+                            <i class="ti {{ icon }}"></i> {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-sela-800/60 mb-1">電話</label>
+                    <input type="text" name="phone" value="{{ store.phone or '' }}" maxlength="50" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+                </div>
+                <div>
+                    <label class="block text-xs text-sela-800/60 mb-1">Logo</label>
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-lg bg-sela-100 overflow-hidden flex-shrink-0">
+                            {% if store.logo_url %}<img src="{{ store.logo_url }}" alt="" class="w-full h-full object-contain">{% endif %}
+                        </div>
+                        <input type="file" name="logo_file" accept="image/*" class="text-xs min-w-0">
+                    </div>
+                    {# V2.15.0：Logo 的 AI 指令從匯入頁搬過來（它跟匯入菜單無關） #}
+                    <details class="mt-2 text-xs" x-data='{ copied: "" }'>
+                        <summary class="cursor-pointer text-sela-800/60">沒有 Logo？用 AI 做一個</summary>
+                        <div class="mt-2 flex flex-col gap-1.5">
+                            <button type="button" @click='navigator.clipboard.writeText(LOGO_PROMPT_RESTORE); copied = "r"; setTimeout(() => copied = "", 2000)'
+                                    class="text-left px-3 py-2 rounded-lg bg-sela-50 border border-sela-200 text-sela-800">
+                                <span x-text='copied === "r" ? "已複製" : "複製「還原網路 Logo」指令"'></span> <span class="text-sela-800/50">— 有原始圖，修成正方形高解析</span>
+                            </button>
+                            <button type="button" @click='navigator.clipboard.writeText(LOGO_PROMPT_TEXT); copied = "t"; setTimeout(() => copied = "", 2000)'
+                                    class="text-left px-3 py-2 rounded-lg bg-sela-50 border border-sela-200 text-sela-800">
+                                <span x-text='copied === "t" ? "已複製" : "複製「文字 Logo」指令"'></span> <span class="text-sela-800/50">— 沒有圖，用店名生成</span>
+                            </button>
+                            <div class="text-sela-800/50">把指令連同原圖（或店名）貼給 ChatGPT／Claude，生成後下載圖片，在上面選擇檔案上傳。</div>
+                        </div>
+                    </details>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-sela-800/60 mb-1">地址</label>
+                    <input type="text" name="address" value="{{ store.address or '' }}" maxlength="300" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
+                </div>
+            </div>
+
+            <details class="text-sm" {% if store.website_url or store.google_maps_url or store.ubereats_url or store.foodpanda_url %}open{% endif %}>
+                <summary class="cursor-pointer text-sela-800/70">進階（外送平台、網址、單據）</summary>
+                <div class="grid sm:grid-cols-2 gap-3 mt-3">
+                    {# type="text" 而非 "url"：V2.11.2 後端會自動補 https://，但瀏覽器的 url 型別會在送出前就擋掉沒協定的值 #}
+                    <div><label class="block text-xs text-sela-800/60 mb-1"><i class="ti ti-world"></i> 官網</label>
+                        <input type="text" name="website_url" value="{{ store.website_url or '' }}" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base"></div>
+                    <div><label class="block text-xs text-sela-800/60 mb-1"><i class="ti ti-map"></i> Google 地圖</label>
+                        <input type="text" name="google_maps_url" value="{{ store.google_maps_url or '' }}" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base"></div>
+                    <div><label class="block text-xs text-sela-800/60 mb-1">Uber Eats</label>
+                        <input type="text" name="ubereats_url" value="{{ store.ubereats_url or '' }}" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base"></div>
+                    <div><label class="block text-xs text-sela-800/60 mb-1">foodpanda</label>
+                        <input type="text" name="foodpanda_url" value="{{ store.foodpanda_url or '' }}" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base"></div>
+                    <div class="sm:col-span-2 flex gap-4 text-sm">
+                        <label class="flex items-center gap-2"><input type="checkbox" name="provides_invoice" value="true" {% if store.provides_invoice %}checked{% endif %}> 可開發票</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="provides_receipt" value="true" {% if store.provides_receipt %}checked{% endif %}> 可開收據</label>
+                    </div>
+                </div>
+            </details>
+
+            <div class="flex items-center justify-between pt-3 border-t border-sela-100">
+                <span class="text-xs text-sela-800/45">各分頁各自儲存，互不影響</span>
+                <button type="submit" class="bg-sela-700 text-white px-4 py-2 rounded-lg text-sm font-medium"><i class="ti ti-device-floppy"></i> 儲存基本資料</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ════ 營運設定 ════ -->
+    <div x-show="tab === 'ops'" x-cloak class="space-y-3">
+        {% if store.category and store.category.value == 'drink' %}
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <h2 class="font-medium text-sela-800 mb-1"><i class="ti ti-cup"></i> 甜度／冰塊</h2>
+            <p class="text-xs text-sela-800/55 mb-3">以逗號分隔，順序即顯示順序。留空代表不提供。</p>
+            <form action="/admin/stores/{{ store.id }}/options" method="post" class="space-y-2">
+                <div class="flex gap-2">
+                    <input type="text" id="sugar-input" name="sugar_options" value="{{ sugar_options }}" placeholder="無糖,微糖,半糖,少糖,全糖" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                    <button type="button" onclick="document.getElementById('sugar-input').value='無糖,微糖,半糖,少糖,全糖'" class="text-xs px-2 rounded-lg border border-sela-300 text-sela-700 whitespace-nowrap">標準五段</button>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="ice-input" name="ice_options" value="{{ ice_options }}" placeholder="正常冰,少冰,微冰,去冰" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                    <button type="button" onclick="document.getElementById('ice-input').value='正常冰,少冰,微冰,去冰'" class="text-xs px-2 rounded-lg border border-sela-300 text-sela-700 whitespace-nowrap">標準四段</button>
+                </div>
+                {% if active_group_count %}
+                <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-sela-800/80">
+                    <i class="ti ti-alert-triangle text-amber-600 mt-0.5"></i>
+                    <div>有 <span class="font-semibold">{{ active_group_count }} 個進行中的團</span>。已送出的訂單不受影響；還在點餐的人會看到新選項。</div>
+                </div>
+                {% endif %}
+                <div class="flex justify-end"><button type="submit" class="bg-sela-700 text-white px-4 py-2 rounded-lg text-sm">儲存選項</button></div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if store.category and store.category.value in ['drink', 'meal'] %}
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 加料</h2>
+            {% if store.toppings %}
+            <div class="flex flex-wrap gap-2 mb-3">
+                {% for t in store.toppings %}
+                <span class="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full bg-sela-100 {% if not t.is_active %}line-through opacity-50{% endif %}">
+                    {{ t.name }} +{{ t.price | int }}
+                    <form action="/admin/stores/{{ store.id }}/toppings/{{ t.id }}/toggle" method="post" class="inline"><button type="submit" class="text-sela-800/50 text-xs ml-1" title="{{ '啟用' if not t.is_active else '停用' }}"><i class="ti {{ 'ti-player-play' if not t.is_active else 'ti-player-pause' }}"></i></button></form>
+                    <form action="/admin/stores/{{ store.id }}/toppings/{{ t.id }}/delete" method="post" class="inline" data-name="{{ t.name }}" onsubmit="return confirm('刪除加料「' + this.dataset.name + '」？')"><button type="submit" class="text-sela-800/50 text-xs"><i class="ti ti-x"></i></button></form>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form action="/admin/stores/{{ store.id }}/toppings" method="post" class="flex gap-2">
+                <input type="text" name="topping_name" placeholder="名稱" required maxlength="50" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <input type="number" name="topping_price" placeholder="加價" value="0" min="0" class="w-20 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <button type="submit" class="bg-sela-700 text-white px-3 rounded-lg text-sm whitespace-nowrap">新增</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-building-store"></i> 分店（{{ store.branches | length if store.branches else 0 }}）</h2>
+            {% if store.branches %}
+            <div class="divide-y divide-sela-100 text-sm mb-3">
+                {% for b in store.branches %}
+                <div class="py-2 flex items-center gap-2 {% if not b.is_active %}opacity-50{% endif %}">
+                    <span class="flex-1 min-w-0 truncate">{{ b.name }}{% if b.phone %} · {{ b.phone }}{% endif %}{% if b.address %} · {{ b.address }}{% endif %}</span>
+                    <form action="/admin/stores/{{ store.id }}/branches/{{ b.id }}/toggle" method="post" class="inline"><button type="submit" class="text-xs text-sela-800/60">{{ '啟用' if not b.is_active else '停用' }}</button></form>
+                    <form action="/admin/stores/{{ store.id }}/branches/{{ b.id }}/delete" method="post" class="inline" data-name="{{ b.name }}" onsubmit="return confirm('刪除分店「' + this.dataset.name + '」？')"><button type="submit" class="text-xs text-red-600">刪除</button></form>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form action="/admin/stores/{{ store.id }}/branches" method="POST" class="flex gap-2">
+                <input type="text" name="name" placeholder="分店名" required maxlength="100" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <input type="text" name="phone" placeholder="電話" class="w-28 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <button type="submit" class="bg-sela-700 text-white px-3 rounded-lg text-sm whitespace-nowrap">新增</button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4" x-data="{ pub: {{ 'true' if store.is_public else 'false' }} }">
+            <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-users"></i> 可見範圍</h2>
+            <form action="/admin/stores/{{ store.id }}/visibility" method="POST" class="space-y-2 text-sm">
+                <label class="flex items-center gap-2"><input type="radio" name="visibility" value="public" {% if store.is_public %}checked{% endif %} @change="pub = true"> 公開 — 所有人看得到</label>
+                <label class="flex items-center gap-2"><input type="radio" name="visibility" value="departments" {% if not store.is_public %}checked{% endif %} @change="pub = false"> 限定部門</label>
+                <div x-show="!pub" class="ml-6 pt-1">
+                    {% if departments %}
+                    <div class="grid grid-cols-2 gap-1.5">
+                        {% for dept in departments %}
+                        <label class="flex items-center gap-2 p-1.5 rounded bg-sela-50 text-sm"><input type="checkbox" name="department_ids" value="{{ dept.id }}" {% if dept.id in store_dept_ids %}checked{% endif %}> {{ dept.name }}</label>
+                        {% endfor %}
+                    </div>
+                    {% else %}<p class="text-xs text-sela-800/55">尚未建立任何部門</p>{% endif %}
+                </div>
+                <div class="flex justify-end pt-1"><button type="submit" class="bg-sela-700 text-white px-4 py-2 rounded-lg text-sm">儲存可見範圍</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ════ 更多 ════ -->
+    <div x-show="tab === 'more'" x-cloak class="bg-white rounded-2xl shadow-sm border border-red-200 p-4 space-y-4">
+        <div>
+            <h2 class="font-medium text-red-700 mb-1"><i class="ti ti-alert-triangle"></i> 危險操作</h2>
+            <p class="text-xs text-sela-800/55">停用後團員看不到這家店，但資料都在；刪除則不可復原。</p>
+        </div>
+        <form action="/admin/stores/{{ store.id }}/toggle" method="post" class="flex items-center justify-between gap-3">
+            <div class="text-sm text-sela-800/80">{% if store.is_active %}停用店家{% else %}啟用店家{% endif %}</div>
+            <button type="submit" class="px-4 py-2 rounded-lg border border-sela-300 text-sm">{% if store.is_active %}停用{% else %}啟用{% endif %}</button>
+        </form>
+        <div class="border-t border-red-100 pt-4">
+            <div class="text-sm text-sela-800/80 mb-1">刪除店家</div>
+            <p class="text-xs text-sela-800/55 mb-2">
+                會刪除 {{ menu_count }} 個菜單版本；{{ group_count }} 個歷史團的店家連結會被清除（團單與訂單本身保留，顯示為「店家已移除」）。
+                {% if active_group_count %}<span class="text-red-600 font-medium">目前還有 {{ active_group_count }} 個進行中的團。</span>{% endif %}
+            </p>
+            <form action="/admin/stores/{{ store.id }}/delete" method="post" class="flex gap-2">
+                <input type="text" name="confirm_name" x-model="confirmName" placeholder="輸入店名「{{ store.name }}」以確認" autocomplete="off"
+                       class="flex-1 min-w-0 border border-red-200 rounded-lg px-3 py-2 text-base">
+                <button type="submit" :disabled='confirmName.trim() !== {{ store.name | tojson }}'
+                        class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">刪除</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// V2.15.0：店家 Logo 的 AI 指令（原在匯入頁）
+const LOGO_PROMPT_RESTORE = [
+            '請幫我把這張店家 Logo 處理成可以正式使用的版本，規則如下：',
+            '',
+            '1. 盡量忠實還原原圖：文字、圖案、配色、排版都要和原圖一致，不要重新設計、不要改字、不要加減元素。',
+            '2. 去除雜訊、模糊、壓縮痕跡與背景雜點，讓線條乾淨、邊緣銳利。',
+            '3. 提升到高解析度、清晰的向量風格（乾淨色塊與線條）。',
+            '4. 輸出成正方形（1:1）。原圖若不是正方形，請取原圖邊緣的底色往外延伸填滿到正方形，讓補出來的區域顏色和原圖自然融合，不要留白、不要裁切到任何文字或圖案。',
+            '5. 背景保持原圖原本的底色。',
+            '',
+            '原始 Logo 圖片如下：'
+        ].join('\n');
+const LOGO_PROMPT_TEXT = [
+            '請幫我設計一個店家文字 Logo，規格固定如下，請嚴格遵守：',
+            '',
+            '1. 正方形（1:1）。',
+            '2. 背景：實心奶茶色 #C9A977 填滿整個正方形。',
+            '3. 在背景內側留一圈細的深咖啡色 #5B4733 外框（簡潔線框，留適當邊距）。',
+            '4. 框內置中放店名文字，白色字。',
+            '5. 字體：無襯線、細體、北歐極簡風格，乾淨俐落，不要花俏裝飾、不要陰影、不要漸層。',
+            '6. 只有外框和文字，不要其他圖案或裝飾。',
+            '7. 文字若較長請自動換行並維持置中平衡。',
+            '',
+            '店名：'
+        ].join('\n');
+</script>
+{% endblock %}

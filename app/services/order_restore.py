@@ -40,6 +40,14 @@ def restore_snapshot(db: Session, order: Order) -> bool:
 
     snapshot = order.snapshot
 
+    # V2.14.1 P1-6：快照裡的外鍵指向的東西可能已被刪（店家刪除會砍整棵菜單樹），
+    # 存在才帶，否則 IntegrityError 讓這個團每次開啟都 500、所有匯出永久失效
+    from app.models.menu import MenuItem, ItemOption
+    from app.models.store import StoreTopping
+
+    def _fk(model, v):
+        return v if v and db.get(model, v) is not None else None
+
     for item in list(order.items):
         db.delete(item)
     db.flush()
@@ -47,7 +55,7 @@ def restore_snapshot(db: Session, order: Order) -> bool:
     for item_data in snapshot.get("items", []):
         order_item = OrderItem(
             order_id=order.id,
-            menu_item_id=item_data["menu_item_id"],
+            menu_item_id=_fk(MenuItem, item_data.get("menu_item_id")),
             item_name=item_data["item_name"],
             size=item_data.get("size"),
             sugar=item_data["sugar"],
@@ -62,7 +70,7 @@ def restore_snapshot(db: Session, order: Order) -> bool:
         for opt_data in item_data.get("options", []):
             db.add(OrderItemOption(
                 order_item_id=order_item.id,
-                item_option_id=opt_data["item_option_id"],
+                item_option_id=_fk(ItemOption, opt_data.get("item_option_id")),
                 option_name=opt_data["option_name"],
                 price_diff=Decimal(opt_data["price_diff"]),
             ))
@@ -70,7 +78,7 @@ def restore_snapshot(db: Session, order: Order) -> bool:
         for t_data in item_data.get("toppings", []):
             db.add(OrderItemTopping(
                 order_item_id=order_item.id,
-                store_topping_id=t_data["store_topping_id"],
+                store_topping_id=_fk(StoreTopping, t_data.get("store_topping_id")),
                 topping_name=t_data["topping_name"],
                 price=Decimal(t_data["price"]),
             ))
@@ -81,13 +89,14 @@ def restore_snapshot(db: Session, order: Order) -> bool:
             nb = OrderItemBackup(
                 order_item_id=order_item.id,
                 priority=b_data["priority"],
-                menu_item_id=b_data.get("menu_item_id"),
+                menu_item_id=_fk(MenuItem, b_data.get("menu_item_id")),
                 item_name=b_data["item_name"],
                 size=b_data.get("size"),
                 sugar=b_data.get("sugar"),
                 ice=b_data.get("ice"),
                 extras_text=b_data.get("extras_text"),
                 unit_price=Decimal(b_data["unit_price"]),
+                extras_price=Decimal(str(b_data.get("extras_price", "0") or "0")),
             )
             db.add(nb)
             new_backups[b_data["priority"]] = nb

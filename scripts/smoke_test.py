@@ -20,7 +20,17 @@
   12. 庫存佔用的自有量與可用量（R-01：修改中複製上次曾超賣）
   13. 部門編號驗證與網址補協定的邊界（R-02/R-07/R-08）
   14. 投票店家編號驗證與表單錯誤回應機制（S-05/S-02）
-  15. 匯入分類／品項計數
+  15. 匯入品質分析（重複/價格/空分類）與錯誤定位（V2.12.0）
+  16. 既有店家匯入：店家只由 UI 決定，JSON 的 store_id 忽略（V2.12.1）
+  17. 店家工作台：列表、分頁、舊網址轉址、刪除確認、新增店家（V2.13.0）
+  19. 菜單差異預覽：新增／變更／移除／不變、部分菜單提醒、同名品項（V2.13.1）
+  20. 匯入時價／停售／說明、價格容錯、截止後團主定價回寫本團（V2.14.0）
+  21. V2.14.1 審核修正：屬性內 JS 跳脫、func 匯入、候補 extras_price、blocker 順序、刪店家快照、P2 容錯
+  22. V2.15.0 匯入頁簡化：自動檢查、摘要優先、相同內容停用、確認時核對版本、Logo 指令搬家
+  23. V2.15.1 審核修正：排序差異、版號、甜冰長度、熱門按品名、前台菜單頁、money、雜湊核對、清理包裝、新店家欄位
+  24. V2.16.0 菜單呈現：M／L 兩行、說明兩行＋彈窗、導覽品項數＋其他、更新日期與回報預填
+  25. V2.16.1 匯入介面：看不清 "?"、分類改名合併、店名近似、帶入目前菜單、選店清單版號
+  18. 匯入分類／品項計數
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -61,6 +71,7 @@ def check(label):
 
 
 def main():
+    Base.metadata.drop_all(bind=engine)  # V2.16.0：重跑時舊 _smoke.db 的菜單版本會殘留，先清空
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     for model in (Group, Announcement, Store, User):
@@ -539,8 +550,116 @@ def main():
     assert "Location" not in resp.headers and "flash=" not in body.split("sessionStorage")[0]
     check("不再用轉址與網址參數（消除開放轉址與訊息偽造）")
 
-    # ---------- 15. 匯入計數 ----------
-    print("\n[15] 匯入計數")
+    # ---------- 15. 匯入品質分析與錯誤定位（V2.12.0） ----------
+    print("\n[15] 匯入品質分析")
+    from app.services.import_analysis import analyze_menu_content, describe_loc, json_error_context
+
+    mc = MenuContent(categories=[
+        {"name": "小菜", "items": [{"name": "蘭花干", "price": 30}, {"name": "米血", "price": 25}, {"name": "蘭花干", "price": 30}]},
+        {"name": "大份", "items": [{"name": "米血", "price": 45}, {"name": "時價魚", "price": 0}, {"name": "大杯茶", "price": 40, "price_l": 35}]},
+        {"name": "空的", "items": []},
+    ])
+    a = analyze_menu_content(mc)
+    assert any("蘭花干」重複出現 2 次" in m for m in a["blockers"]), a["blockers"]
+    check("同分類同名品項 → 擋下")
+    assert not any("米血" in m for m in a["blockers"]) and any("米血」同時出現在" in m for m in a["warnings"])
+    check("跨分類同名 → 只警告（魯味的米血確實會在不同價格區）")
+    assert any("時價魚」價格是 0" in m for m in a["warnings"])
+    assert any("L 尺寸價（35）低於" in m for m in a["warnings"])
+    assert any("分類「空的」" in m for m in a["warnings"])
+    check("價格 0、L 低於 M、空分類 → 警告")
+    assert analyze_menu_content(MenuContent(categories=[{"name": "a", "items": [{"name": "x", "price": 1}]}])) == {"blockers": [], "warnings": []}
+    check("乾淨的菜單沒有任何提示")
+
+    raw = {"menu": {"categories": [{"name": "小菜", "items": [{"name": "黃金泡菜", "price": "時價"}]}]}}
+    assert describe_loc(("menu", "categories", 0, "items", 0, "price"), raw) == "菜單 → 分類[1]「小菜」 → 品項[1]「黃金泡菜」 → 價格"
+    check("驗證錯誤路徑帶分類與品項名稱")
+    ctx = json_error_context("a\nb\nc\nd\ne\nf\ng", 4, radius=1)
+    assert ctx == ["     3 | c", "▶    4 | d", "     5 | e"], ctx
+    check("JSON 解析錯誤附前後行並標記出錯行")
+
+    # ---------- 16. 既有店家匯入：店家只由 UI 決定（V2.12.1） ----------
+    print("\n[16] 既有店家匯入不看 JSON 的 store_id")
+    import json as _json, re as _re
+    import app.routers.admin as _adm
+    from fastapi.testclient import TestClient as _TC
+    import app.main as _main
+
+    _admin = User(line_user_id="smoke_admin", display_name="管理員", is_admin=True)
+    db.add(_admin)
+    db.commit()
+    _uid = _admin.id
+
+    async def _fake_admin(request, db_):
+        return db_.query(User).filter(User.id == _uid).first()
+    _orig = _adm.get_admin_user
+    _adm.get_admin_user = _fake_admin
+    try:
+        _c = _TC(_main.app)
+        _H = {"HX-Request": "true"}
+        _menu = {"categories": [{"name": "小菜", "items": [{"name": "蘭花干", "price": 30}]}]}
+        _T = lambda r: _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", r.text))
+        _J = lambda d: _json.dumps(d, ensure_ascii=False)
+
+        for label, payload in (("只有 menu", {"menu": _menu}),
+                               ("舊格式 store_id:0 + mode", {"store_id": 0, "mode": "replace", "menu": _menu}),
+                               ("錯誤的 store_id:999", {"store_id": 999, "menu": _menu}),
+                               ("直接貼 categories", _menu)):
+            r = _c.post("/admin/import/preview", data={"store_id": str(store.id), "json_text": _J(payload)}, headers=_H)
+            assert f"「{store.name}」" in _T(r) and "檢查完成" in _T(r), f"{label}：應以 UI 選的店家為準"
+        check("選了店家時，JSON 的 store_id / mode 一律忽略（四種形狀）")
+
+        r = _c.post("/admin/import/preview", data={"store_id": str(store.id),
+                    "json_text": _J({"store": {"name": "別家", "category": "meal"}, "menu": _menu})}, headers=_H)
+        assert f"「{store.name}」" in _T(r) and "已忽略" in _T(r)
+        check("選了店家卻貼新增店家格式 → 以 UI 為準並提示")
+
+        r = _c.post("/admin/import/preview", data={"store_id": "",
+                    "json_text": _J({"store_id": store.id, "mode": "new", "menu": _menu})}, headers=_H)
+        assert "沒有選定店家" in _T(r) and "編號" not in _T(r), "沒選店家時不該從 JSON 撈 store_id"
+        check("沒選店家時不再從 JSON 讀 store_id，要求在畫面上選")
+
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": 999, "mode": "new", "menu": _menu})})
+        assert r.status_code == 400 and "不存在" in r.text
+        check("直接打確認端、店家不存在 → 400 而非外鍵 500")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 17. 店家工作台（V2.13.0） ----------
+    print("\n[17] 店家工作台")
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.get("/admin/stores")
+        assert r.status_code == 200 and "/admin/stores/new" in r.text and "lastGroup" in r.text
+        check("列表 200，含新增店家入口與上次開團欄")
+
+        r = _c.get(f"/admin/stores/{store.id}")
+        assert r.status_code == 200 and "基本資料" in r.text and "營運設定" in r.text
+        check("工作台 200，四個分頁")
+
+        r = _c.get(f"/admin/stores/{store.id}/edit", follow_redirects=False)
+        assert r.status_code == 301 and r.headers["location"].endswith("?tab=info")
+        r = _c.get(f"/admin/stores/{store.id}/menus", follow_redirects=False)
+        assert r.status_code == 301 and "tab=menu" in r.headers["location"]
+        check("舊網址 /edit、/menus 轉址到工作台對應分頁")
+
+        r = _c.post(f"/admin/stores/{store.id}/delete", data={"confirm_name": "錯的"})
+        assert r.status_code == 400
+        assert db.query(Store).filter(Store.id == store.id).first() is not None
+        check("刪除店家：店名不符回 400，店家仍在")
+
+        r = _c.post("/admin/stores/new", data={"name": "煙霧新店", "category": "meal"}, follow_redirects=False)
+        assert r.status_code == 302 and "created=1" in r.headers["location"]
+        check("手動新增店家 → 導向工作台並帶 created")
+
+        r = _c.get("/admin/stores/new")
+        assert r.status_code == 200, "/stores/new 必須排在 /stores/{id} 之前，否則 'new' 進 int 路由 422"
+        check("/stores/new 路由順序正確")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 18. 匯入計數 ----------
+    print("\n[18] 匯入計數")
     content = MenuContent(
         categories=[{"name": "甜點", "items": [{"name": "a", "price": 1}, {"name": "b", "price": 2}]}],
         items=[{"name": "c", "price": 3}],
@@ -549,6 +668,820 @@ def main():
     check("分類內品項與無分類品項都算進去")
     assert _count_import(MenuContent()) == (0, 0)
     check("空菜單")
+
+    # ---------- 19. 菜單差異預覽（V2.13.1） ----------
+    print("\n[19] 菜單差異預覽")
+    from app.services.menu_diff import diff_menu
+    from app.services.import_service import import_store_and_menu, import_menu
+    from app.schemas.menu import FullImport, MenuImport
+
+    _base = {"categories": [
+        {"name": "滷味", "items": [{"name": "滷蛋", "price": 10}, {"name": "鴨血", "price": 30},
+                                  {"name": "豆干", "price": 15}, {"name": "海帶", "price": 15}]},
+        {"name": "小菜", "items": [{"name": "黃金泡菜", "price": 40},
+                                  {"name": "紅茶", "price": 20, "options": [{"name": "去冰", "price_diff": 0}]}]},
+        {"name": "飲料", "items": [{"name": "紅茶", "price": 25, "price_l": 30}]},
+    ]}
+    _ds = import_store_and_menu(db, FullImport(store={"name": "差異測試店", "category": "meal"}, menu=_base))
+    _active = db.query(Menu).filter(Menu.store_id == _ds.id, Menu.is_active == True).first()
+    assert _active is not None
+
+    _new = MenuContent(**{"categories": [
+        {"name": "滷味", "items": [{"name": "滷蛋", "price": "15.00"}, {"name": "豆干", "price": "15.00"},
+                                  {"name": "海帶", "price": 15}, {"name": "滷大腸", "price": 80}]},
+        {"name": "招牌", "items": [{"name": "黃金泡菜", "price": 40}]},
+        {"name": "小菜", "items": [{"name": "紅茶", "price": 20, "options": [{"name": "去冰", "price_diff": 0}, {"name": "溫", "price_diff": 0}]}]},
+        {"name": "飲料", "items": [{"name": "紅茶", "price": 25, "price_l": 30}]},
+    ]})
+    d = diff_menu(_active, _new)
+    assert [a["name"] for a in d["added"]] == ["滷大腸"], d["added"]
+    assert [r["name"] for r in d["removed"]] == ["鴨血"], d["removed"]
+    _chg = {c["name"]: c for c in d["changed"]}
+    assert set(_chg) == {"滷蛋", "黃金泡菜", "紅茶"}, set(_chg)
+    assert _chg["滷蛋"]["price_changed"] and _chg["滷蛋"]["old_price_text"] == "$10" and _chg["滷蛋"]["new_price_text"] == "$15"
+    assert _chg["黃金泡菜"]["category_changed"] and not _chg["黃金泡菜"]["price_changed"] and "分類改了" in _chg["黃金泡菜"]["note"]
+    assert _chg["紅茶"]["options_changed"] and _chg["紅茶"]["category"] == "小菜", "同名品項（小菜／飲料各一）要依分類配對，飲料的紅茶不變"
+    assert "選項：新增 溫 +0" in _chg["紅茶"]["note"], _chg["紅茶"]["note"]
+    assert d["unchanged_count"] == 3 and not d["partial_suspect"], d
+    check("新增／變價／分類改／選項改／移除／不變各自歸類；10 與 15.00 正規化比價；同名品項依分類配對")
+
+    d2 = diff_menu(_active, MenuContent(**{"categories": [{"name": "滷味", "items": [{"name": "滷蛋", "price": 15}, {"name": "豆干", "price": 15}]}]}))
+    assert d2["partial_suspect"] and len(d2["removed"]) == 5 and d2["existing_count"] == 7, d2
+    check("移除 5/7 → 疑似只貼了部分菜單")
+
+    _small = import_store_and_menu(db, FullImport(store={"name": "小菜單店", "category": "meal"},
+                                                  menu={"items": [{"name": "a", "price": 1}, {"name": "b", "price": 2}, {"name": "c", "price": 3}]}))
+    _sm = db.query(Menu).filter(Menu.store_id == _small.id, Menu.is_active == True).first()
+    d3 = diff_menu(_sm, MenuContent(**{"items": [{"name": "a", "price": 1}]}))
+    assert len(d3["removed"]) == 2 and not d3["partial_suspect"]
+    check("小菜單（<6 項）大改不當成部分菜單")
+
+    d4 = diff_menu(_active, MenuContent(**_base))
+    assert not d4["added"] and not d4["changed"] and not d4["removed"] and d4["unchanged_count"] == 7
+    check("貼回同一份 → 全部不變")
+
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ds.id), "json_text": _J({"menu": _new.model_dump(mode="json")})}, headers=_H)
+        t = _T(r)
+        assert "與第 1 版比：新增 1・變更 3・移除 1・不變 3" in t and "將建立第 2 版" in t, t
+        assert "確認更新菜單" in t and "base_menu_id" in r.text
+        assert "只貼了部分菜單" not in t
+        check("預覽片段顯示差異卡與帶數字的確認鈕")
+
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ds.id),
+                    "json_text": _J({"menu": {"categories": [{"name": "滷味", "items": [{"name": "滷蛋", "price": 15}]}]}})}, headers=_H)
+        t = _T(r)
+        assert "看起來只貼了部分菜單" in t and "仍要更新（移除 6 個品項）" in t, t
+        check("部分菜單 → 醒目提醒，按鈕改「仍要匯入」但不擋")
+
+        r = _c.post("/admin/import/preview", data={"store_id": "",
+                    "json_text": _J({"store": {"name": "差異測試店", "category": "meal"}, "menu": _new.model_dump(mode="json")})}, headers=_H)
+        t = _T(r)
+        assert "同名店家" in t and "查看變更明細" in t, t
+        check("同名店家匯入也跟它的使用中版本比")
+
+        r = _c.post("/admin/import/preview", data={"store_id": "",
+                    "json_text": _J({"store": {"name": "全新的店", "category": "meal"}, "menu": _new.model_dump(mode="json")})}, headers=_H)
+        t = _T(r)
+        assert "查看變更明細" not in t and "確認建立店家" in t and "將新增店家" in t
+        check("新店家沒有差異卡，按鈕維持「確認匯入」")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 20. 時價／停售／說明 ＋ 價格容錯 ＋ 截止後定價（V2.14.0） ----------
+    print("\n[20] 匯入時價／停售／說明與截止後定價")
+    from app.schemas.menu import MenuItemImport, parse_price_input, TBD
+    from pydantic import ValidationError as _VE
+    from app.routers.admin import humanize_validation_error
+    from app.models.menu import MenuItem as _MI
+
+    for raw, want in (("$30", 30), ("30元", 30), ("NT$30", 30), ("３０", 30), ("1,200", 1200), (30, 30), ("30.5", Decimal("30.5"))):
+        assert parse_price_input(raw) == Decimal(str(want)), raw
+    for raw in ("時價", " 市價 ", "依時價", "TBD", "未定"):
+        assert parse_price_input(raw) is TBD, raw
+    check("價格容錯：$30／30元／NT$30／全形／千分位 → 數字；時價／市價／TBD → 時價")
+
+    _it = MenuItemImport(name="清蒸魚", price="時價", price_l="400")
+    assert _it.price_tbd and _it.price == 0 and _it.price_l is None
+    _it = MenuItemImport(name="滷肉飯", price="$40", description="限午間", is_available=False)
+    assert _it.price == 40 and _it.note == "限午間" and _it.is_available is False
+    check("時價 → price_tbd（price_l 一併清掉）；description 當 note 別名；is_available 收進來")
+
+    try:
+        MenuContent(categories=[{"name": "海鮮", "items": [{"name": "炒蛤蜊", "price": "看不清"}]}])
+        assert False, "看不懂的價格應該報錯"
+    except _VE as e:
+        msgs = humanize_validation_error(e, {"categories": [{"name": "海鮮", "items": [{"name": "炒蛤蜊", "price": "看不清"}]}]})
+        assert any("炒蛤蜊" in m and "看不懂的價格" in m for m in msgs), msgs
+    check("解析不了的價格 → 中文錯誤並指出是哪個品項")
+
+    _tbd_menu = {"categories": [{"name": "海鮮", "items": [
+        {"name": "清蒸魚", "price": "時價"},
+        {"name": "炒蛤蜊", "price": 180},
+        {"name": "炸蝦捲", "price": 80, "is_available": False},
+        {"name": "泡菜", "price": 0},
+        {"name": "滷肉飯", "price": 40, "note": "限午間"},
+        {"name": "蚵仔酥", "price": 120},
+    ]}]}
+    a = analyze_menu_content(MenuContent(**_tbd_menu))
+    assert not a["blockers"]
+    assert not any("清蒸魚" in w for w in a["warnings"]), "時價品項不該有價格 0 警告"
+    assert any("泡菜" in w and "免費" in w for w in a["warnings"])
+    assert any("停售" in w and "炸蝦捲" in w for w in a["warnings"])
+    check("分析：時價不警告、價格 0 提示免費、停售品項彙整一條")
+
+    _ts = import_store_and_menu(db, FullImport(store={"name": "時價店", "category": "meal"}, menu=_tbd_menu))
+    _tm = db.query(Menu).filter(Menu.store_id == _ts.id, Menu.is_active == True).first()
+    _fish = db.query(_MI).filter(_MI.menu_id == _tm.id, _MI.name == "清蒸魚").first()
+    _roll = db.query(_MI).filter(_MI.menu_id == _tm.id, _MI.name == "炸蝦捲").first()
+    _rice = db.query(_MI).filter(_MI.menu_id == _tm.id, _MI.name == "滷肉飯").first()
+    assert _fish.price_tbd and _fish.price == 0 and not _roll.is_available and _rice.description == "限午間"
+    check("匯入寫進 price_tbd／is_available／description 三欄")
+
+    d = diff_menu(_tm, MenuContent(**{"categories": [{"name": "海鮮", "items": [
+        {"name": "清蒸魚", "price": 380},
+        {"name": "炒蛤蜊", "price": 180},
+        {"name": "炸蝦捲", "price": 80},
+        {"name": "泡菜", "price": 0},
+        {"name": "滷肉飯", "price": 40, "note": "限午間，需預訂"},
+        {"name": "蚵仔酥", "price": "時價"},
+    ]}]}))
+    _chg = {c["name"]: c for c in d["changed"]}
+    assert _chg["清蒸魚"]["old_price_text"] == "時價" and _chg["清蒸魚"]["new_price_text"] == "$380" and _chg["清蒸魚"]["price_changed"]
+    assert _chg["蚵仔酥"]["new_price_text"] == "時價" and _chg["蚵仔酥"]["price_changed"]
+    assert _chg["炸蝦捲"]["availability_changed"] and "恢復供應" in _chg["炸蝦捲"]["note"]
+    assert _chg["滷肉飯"]["note_changed"] and "說明：「限午間」→「限午間，需預訂」" in _chg["滷肉飯"]["note"], _chg["滷肉飯"]["note"]
+    assert d["unchanged_count"] == 2, d
+    check("差異：時價↔固定價、停售↔供應、說明改了都算變更")
+
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ts.id), "json_text": _J({"menu": _tbd_menu})}, headers=_H)
+        t = _T(r)
+        assert "時價" in t and "停售" in t and "限午間" in t, t
+        check("預覽明細顯示時價／停售／說明")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # 截止後定價回寫本團
+    import app.routers.groups as _grp
+    _g = Group(owner_id=user.id, store_id=_ts.id, menu_id=_tm.id, name="時價團",
+               category=CategoryType.MEAL, deadline=tpe - timedelta(hours=1))
+    db.add(_g); db.flush()
+    _o1 = Order(group_id=_g.id, user_id=user.id, status=OrderStatus.SUBMITTED)
+    _o2 = Order(group_id=_g.id, user_id=_admin.id, status=OrderStatus.SUBMITTED)
+    db.add_all([_o1, _o2]); db.flush()
+    db.add(OrderItem(order_id=_o1.id, menu_item_id=_fish.id, item_name="清蒸魚", quantity=1, unit_price=Decimal("0")))
+    db.add(OrderItem(order_id=_o2.id, menu_item_id=_fish.id, item_name="清蒸魚", quantity=2, unit_price=Decimal("0")))
+    db.add(OrderItem(order_id=_o2.id, menu_item_id=_rice.id, item_name="滷肉飯", quantity=1, unit_price=Decimal("40")))
+    db.commit()
+
+    _tl = _grp._tbd_items_for_group(db, _g)
+    assert len(_tl) == 1 and _tl[0]["item"].id == _fish.id and _tl[0]["people"] == 2 and _tl[0]["qty"] == 3 and _tl[0]["pending"]
+    check("定價清單：只列有人點的時價品項，含人數與份數")
+
+    async def _fake_owner(request, db_):
+        return db_.query(User).filter(User.id == user.id).first()
+    _orig_cu = _grp.get_current_user
+    _grp.get_current_user = _fake_owner
+    try:
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "380"}, headers=_H)
+        assert r.status_code == 200, r.text[:200]
+        db.expire_all()
+        prices = sorted(Decimal(str(i.unit_price)) for i in db.query(OrderItem).filter(OrderItem.menu_item_id == _fish.id, OrderItem.order_id.in_([_o1.id, _o2.id])))
+        assert prices == [Decimal("380"), Decimal("380")], prices
+        assert db.get(_MI, _fish.id).price_tbd and db.get(_MI, _fish.id).price == 0, "菜單品項必須維持時價"
+        assert "已定 $380" in _T(r)
+        check("截止後定價 → 本團兩筆訂單回寫 $380，菜單品項仍是時價，面板顯示已定")
+
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "350"}, headers=_H)
+        db.expire_all()
+        assert all(Decimal(str(i.unit_price)) == 350 for i in db.query(OrderItem).filter(OrderItem.menu_item_id == _fish.id))
+        check("可重複改價（店家報錯了）")
+
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_rice.id}", data={"price": "50"}, headers=_H)
+        assert r.status_code == 404
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "0"}, headers=_H)
+        assert r.status_code == 400
+        _g.deadline = tpe + timedelta(hours=1); db.commit()
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "380"}, headers=_H)
+        assert r.status_code == 400 and "截止" in r.text
+        check("非時價品項 404、價格 0 → 400、團還開著 → 400")
+    finally:
+        _grp.get_current_user = _orig_cu
+
+    # ---------- 21. V2.14.1 審核修正 ----------
+    print("\n[21] V2.14.1 審核修正")
+    from html.parser import HTMLParser
+    from app.models.menu import MenuCategory as _MC
+    from app.models.order import OrderItemBackup as _OIB
+
+    class _Attrs(HTMLParser):
+        """把所有標籤的屬性收起來（屬性值已由瀏覽器規則解碼），檢查屬性內 JS 用"""
+        def __init__(self):
+            super().__init__(); self.found = []
+        def handle_starttag(self, tag, attrs):
+            self.found.extend(attrs)
+        def handle_startendtag(self, tag, attrs):
+            self.found.extend(attrs)
+
+    def _attrs(html):
+        h = _Attrs(); h.feed(html); return h.found
+
+    # P0-1：團名含撇號與引號，後台團單列表的 onsubmit 不能把名稱直接拼進 JS
+    _evil = """Tom's "x");fetch('/x');('"""
+    _ge = Group(owner_id=user.id, store_id=store.id, name=_evil, category=CategoryType.MEAL, deadline=tpe - timedelta(hours=1))
+    db.add(_ge); db.commit()
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.get("/admin/groups")
+        assert r.status_code == 200
+        at = _attrs(r.text)
+        onsub = [v for k, v in at if k == "onsubmit" and v and "刪除" in v]
+        assert onsub and all("this.dataset.name" in v and "Tom" not in v for v in onsub), onsub[:2]
+        assert any(k == "data-name" and v == _evil for k, v in at), "data-name 應為原字串（瀏覽器解碼後）"
+        check("P0-1：團名不進 confirm() 的 JS 字串，改走 data-name")
+
+        # P1-2：工作台 x-data 經 tojson 的值要放在單引號屬性，解析後屬性值必須完整
+        r = _c.get(f"/admin/stores/{store.id}?tab=info")
+        xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "tab:" in v]
+        assert xd and 'tab: "info"' in xd[0] and "confirmName" in xd[0], xd
+        r = _c.get("/admin/stores/new")
+        xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "existing" in v]
+        assert xd and "existing: [" in xd[0] and xd[0].rstrip().endswith("}"), xd
+        check("P1-2：tojson 放單引號屬性，x-data 不再被雙引號截斷（V2.13.0 的工作台分頁因此失效）")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # P0-2：品名含撇號與引號，點餐頁的 @click 要是 JSON 字串
+    _xs = import_store_and_menu(db, FullImport(store={"name": "跳脫店", "category": "meal"}, menu={"categories": [
+        {"name": "主食", "items": [{"name": """McDonald's "big" <b>""", "price": 50,
+                                   "options": [{"name": "加蛋'x", "price_diff": 10}]}]}]}))
+    _xm = db.query(Menu).filter(Menu.store_id == _xs.id, Menu.is_active == True).first()
+    _xg = Group(owner_id=user.id, store_id=_xs.id, menu_id=_xm.id, name="跳脫團", category=CategoryType.MEAL, deadline=tpe + timedelta(hours=1))
+    db.add(_xg); db.commit()
+    _grp.get_current_user = _fake_owner
+
+    async def _fake_owner_opt(request, db_):
+        return (db_.query(User).filter(User.id == user.id).first(), None)
+    _orig_cuo = _grp.get_current_user_optional
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        r = _c.get(f"/groups/{_xg.id}")
+        assert r.status_code == 200, r.status_code
+        clicks = [v for k, v in _attrs(r.text) if k == "@click" and v and "openAddItem" in v]
+        assert clicks, "找不到 openAddItem 按鈕"
+        assert all('"McDonald' in v and "'McDonald" not in v for v in clicks), clicks[0][:200]
+        assert all("\\u003cb\\u003e" in v or "<b>" not in v for v in clicks), "名稱裡的 <b> 應被 tojson 逸出"
+        assert "renderOptions" not in r.text
+        check("P0-2：品名／選項名進 @click 一律 tojson，<b> 與引號都不會變成程式碼")
+
+        # P1-1：代購品項帶 stock_limit 修改不能 500（func 未匯入）
+        _ps = Store(name="我的代購店", category=CategoryType.GROUP_BUY, is_personal=True, owner_user_id=user.id)
+        db.add(_ps); db.flush()
+        _pm = Menu(store_id=_ps.id, is_active=False); db.add(_pm); db.flush()
+        _pc = _MC(menu_id=_pm.id, name="代購", sort_order=0); db.add(_pc); db.flush()
+        _pi = _MI(menu_id=_pm.id, category_id=_pc.id, name="代購品", price=Decimal("100"), sort_order=0); db.add(_pi); db.flush()
+        _pg = Group(owner_id=user.id, store_id=_ps.id, menu_id=_pm.id, name="代購團", category=CategoryType.GROUP_BUY, deadline=tpe + timedelta(hours=1))
+        db.add(_pg); db.commit()
+        r = _c.post(f"/groups/{_pg.id}/items/{_pi.id}/update", data={"item_name": "代購品", "price": "120", "stock_limit": "5"}, headers=_H)
+        assert r.status_code == 200, (r.status_code, r.text[:200])
+        db.expire_all()
+        assert db.get(_MI, _pi.id).stock_limit == 5 and db.get(_MI, _pi.id).price == 120
+        check("P1-1：代購品項帶上限修改 → 200（原本 NameError: func）")
+
+        # P2-9：代購團不走 tbd-price
+        _pi.price_tbd = True; _pg.deadline = tpe - timedelta(hours=1); db.commit()
+        r = _c.post(f"/groups/{_pg.id}/tbd-price/{_pi.id}", data={"price": "100"}, headers=_H)
+        assert r.status_code == 400 and "代購" in r.text
+        check("P2-9：代購團的時價定價走代購面板，tbd-price 回 400")
+
+        # P1-3：候補的加購加料不被回寫蓋掉；P2-10：$380 與 NaN
+        _g.deadline = tpe - timedelta(hours=1); db.commit()
+        _oi1 = db.query(OrderItem).filter(OrderItem.order_id == _o1.id, OrderItem.menu_item_id == _fish.id).first()
+        db.add(_OIB(order_item_id=_oi1.id, priority=1, menu_item_id=_fish.id, item_name="清蒸魚", extras_text="加飯",
+                    unit_price=Decimal("10"), extras_price=Decimal("10")))
+        db.commit()
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "$380"}, headers=_H)
+        assert r.status_code == 200, r.text[:200]
+        db.expire_all()
+        _b = db.query(_OIB).filter(_OIB.order_item_id == _oi1.id).first()
+        assert Decimal(str(_b.unit_price)) == 390 and Decimal(str(_b.extras_price)) == 10, (_b.unit_price, _b.extras_price)
+        check("P1-3：定價 380 後候補 = 380 + 加購 10 = 390（原本被蓋成 380）；P2-10：$380 也收")
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "NaN"}, headers=_H)
+        assert r.status_code == 400
+        r = _c.post(f"/groups/{_g.id}/tbd-price/{_fish.id}", data={"price": "Infinity"}, headers=_H)
+        assert r.status_code == 400
+        check("P2-10：NaN／Infinity → 400 而非 500")
+        # only_zero=True（代購路徑）：基本價仍為 0 的候補才回寫
+        _b.unit_price = Decimal("10"); db.commit()
+        _grp._writeback_tbd_price(db, _g, _fish.id, Decimal("200"), only_zero=True); db.commit(); db.expire_all()
+        assert Decimal(str(db.get(_OIB, _b.id).unit_price)) == 210
+        _grp._writeback_tbd_price(db, _g, _fish.id, Decimal("300"), only_zero=True); db.commit(); db.expire_all()
+        assert Decimal(str(db.get(_OIB, _b.id).unit_price)) == 210, "only_zero 不該再動已定價的候補"
+        check("P1-3：only_zero 的判斷改為「基本價仍為 0」（unit_price == extras_price）")
+
+        # P2-12：店家已刪、團有分店 → 團頁不 500
+        _dg = Group(owner_id=user.id, store_id=None, menu_id=None, store_name="已刪店", branch_id=1, name="無店團",
+                    category=CategoryType.MEAL, deadline=tpe - timedelta(hours=1))
+        db.add(_dg); db.commit()
+        r = _c.get(f"/groups/{_dg.id}")
+        assert r.status_code == 200, r.status_code
+        check("P2-12：店家已刪但 branch_id 殘留 → 團頁 200")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+
+    # P1-4：blocker 要在寫入前擋——直接打確認端，版本數不能變、使用中版本不能換
+    _adm.get_admin_user = _fake_admin
+    try:
+        _before = db.query(Menu).filter(Menu.store_id == _ts.id).count()
+        _act = db.query(Menu.id).filter(Menu.store_id == _ts.id, Menu.is_active == True).scalar()
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ts.id, "mode": "new", "menu": {"categories": [
+            {"name": "a", "items": [{"name": "重複", "price": 1}, {"name": "重複", "price": 2}]}]}})})
+        assert r.status_code == 400
+        db.expire_all()
+        assert db.query(Menu).filter(Menu.store_id == _ts.id).count() == _before
+        assert db.query(Menu.id).filter(Menu.store_id == _ts.id, Menu.is_active == True).scalar() == _act
+        check("P1-4：blocker 在 commit 之前擋，沒有多出版本、使用中版本不變")
+        r = _c.post("/admin/import", data={"json_str": "[1,2]"})
+        assert r.status_code == 400
+        check("P3：JSON 最外層是陣列 → 400 而非 500")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # P1-5 / P2-1 / P2-2 / P2-4 / P2-3
+    assert MenuItemImport(name="x", price=50, price_tbd="false").price == 50
+    assert MenuItemImport(name="x", price=50, price_tbd="true").price_tbd
+    check("P1-5：price_tbd 字串 \"false\" 不再把價格清成 0")
+    for bad in ("30,50", "3,0"):
+        try:
+            parse_price_input(bad); assert False, bad
+        except ValueError as e:
+            assert "M/L" in str(e)
+    assert parse_price_input("1,200,000") == 1200000
+    check("P2-1：逗號只接受千分位，\"30,50\" 報錯並提示分填 price/price_l")
+    try:
+        MenuItemImport(name="x", price=30, price_l="時價"); assert False
+    except _VE as e:
+        assert "L 尺寸不支援單獨時價" in str(e)
+    check("P2-2：只有 price_l 是時價 → 報錯，不把整項變時價")
+    assert analyze_menu_content(MenuContent(categories=[]))["blockers"] == ["菜單沒有任何品項"]
+    check("P2-4：空菜單是 blocker")
+    for kw, key in ((dict(name="a" * 101, price=1), "100 字"), (dict(name="x", price=-30), "負數"), (dict(name="x", price=10 ** 9), "上限")):
+        try:
+            MenuItemImport(**kw); assert False, kw
+        except _VE as e:
+            assert key in str(e), (key, str(e)[:120])
+    try:
+        FullImport(store={"name": "", "category": "meal"}, menu={"items": [{"name": "x", "price": 1}]}); assert False
+    except _VE as e:
+        assert "店名" in str(e)
+    check("P2-3：名稱長度、負價、超大價、空店名都在 schema 擋下（原本到 PostgreSQL 才 500）")
+
+    # P1-6：刪店家時有修改中的單 → 先還原，之後結算不會撞外鍵
+    _ds2 = import_store_and_menu(db, FullImport(store={"name": "要刪的店", "category": "meal"}, menu={"items": [{"name": "品", "price": 10}]}))
+    _dm2 = db.query(Menu).filter(Menu.store_id == _ds2.id, Menu.is_active == True).first()
+    _di2 = db.query(_MI).filter(_MI.menu_id == _dm2.id).first()
+    _dg2 = Group(owner_id=user.id, store_id=_ds2.id, menu_id=_dm2.id, name="刪店團", category=CategoryType.MEAL, deadline=tpe + timedelta(hours=1))
+    db.add(_dg2); db.flush()
+    _do2 = Order(group_id=_dg2.id, user_id=user.id, status=OrderStatus.EDITING, snapshot={"items": [{
+        "menu_item_id": _di2.id, "item_name": "品", "size": None, "sugar": None, "ice": None, "quantity": 1,
+        "unit_price": "10.00", "note": None, "options": [], "toppings": [],
+        "backups": [{"priority": 1, "menu_item_id": _di2.id, "item_name": "品", "size": None, "sugar": None, "ice": None,
+                     "extras_text": None, "unit_price": "10.00"}]}]})
+    db.add(_do2); db.commit()
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.post(f"/admin/stores/{_ds2.id}/delete", data={"confirm_name": "要刪的店"}, follow_redirects=False)
+        assert r.status_code == 302, (r.status_code, r.text[:200])
+    finally:
+        _adm.get_admin_user = _orig
+    db.expire_all()  # SQLite 會重用被刪店家的 id，identity map 裡的舊物件要清掉（PG 用序列不會）
+    _do2 = db.get(Order, _do2.id)
+    assert _do2.status == OrderStatus.SUBMITTED and _do2.snapshot is None
+    assert [i.item_name for i in _do2.items] == ["品"] and _do2.items[0].menu_item_id is None
+    check("P1-6：刪店家前先把修改中的單還原，外鍵已清、歷史保留")
+    # 還原函式本身也要容忍快照裡的死外鍵
+    _dg3 = Group(owner_id=user.id, store_id=None, menu_id=None, store_name="x", name="死外鍵團", category=CategoryType.MEAL, deadline=tpe - timedelta(hours=1))
+    db.add(_dg3); db.flush()
+    _do3 = Order(group_id=_dg3.id, user_id=user.id, status=OrderStatus.EDITING, snapshot={"items": [{
+        "menu_item_id": 999999, "item_name": "幽靈", "size": None, "sugar": None, "ice": None, "quantity": 1,
+        "unit_price": "5.00", "note": None, "options": [{"item_option_id": 999999, "option_name": "o", "price_diff": "0"}], "toppings": [], "backups": []}]})
+    db.add(_do3); db.commit()
+    assert settle_editing_orders(db, _dg3) == 1
+    db.expire_all()
+    assert db.get(Order, _do3.id).items[0].menu_item_id is None
+    check("P1-6：快照裡的外鍵已不存在 → 還原時改填 NULL，不再 IntegrityError")
+
+    # ---------- 22. V2.15.0 匯入頁簡化 ----------
+    print("\n[22] 匯入頁簡化")
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.get(f"/admin/import?store_id={_ts.id}")
+        assert r.status_code == 200
+        visible = _re.sub(r"<script\b.*?</script>", " ", r.text, flags=_re.S)
+        visible = _re.sub(r"<details\b.*?</details>", " ", visible, flags=_re.S)  # 進階格式說明刻意保留範例
+        vt = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", visible))
+        for bad in ("prompt", "JSON", "schema", "store_id", "預覽匯入內容", "上傳檔案"):
+            assert bad not in vt, f"畫面不該出現「{bad}」"
+        assert "匯入至" in vt and "菜單資料" in vt and "更新菜單" in vt and "複製 AI 轉換指令" in r.text
+        assert "使用中第 1 版" in vt
+        assert 'hx-trigger="input[' in r.text and "delay:700ms" in r.text, "貼上要自動檢查"
+        assert "文字 Logo" not in r.text, "Logo 指令已搬到工作台"
+        check("匯入頁：無技術語、匯入至顯示使用中版本、貼上自動檢查、Logo 指令不在此頁")
+
+        r = _c.get("/admin/import")
+        assert "新增一家店" in r.text and 'name="store_id"' in r.text and "輸入店名找店" in r.text
+        check("沒選店家時「匯入至」是搜尋選店（V2.16.1），預設新增一家店")
+
+        r = _c.get(f"/admin/stores/{_ts.id}?tab=info")
+        assert "LOGO_PROMPT_TEXT" in r.text and "沒有 Logo？用 AI 做一個" in r.text
+        check("工作台基本資料分頁有 Logo 的 AI 指令")
+
+        # 相同內容 → 停用確認
+        _cur = db.query(Menu).filter(Menu.store_id == _ts.id, Menu.is_active == True).first()
+        from app.services.menu_diff import _flatten_existing
+        same = {"categories": [{"name": "海鮮", "items": [
+            {"name": "清蒸魚", "price": "時價"}, {"name": "炒蛤蜊", "price": 180},
+            {"name": "炸蝦捲", "price": 80, "is_available": False}, {"name": "泡菜", "price": 0},
+            {"name": "滷肉飯", "price": 40, "note": "限午間"}, {"name": "蚵仔酥", "price": 120}]}]}
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ts.id), "json_text": _J({"menu": same})}, headers=_H)
+        t = _T(r)
+        assert "完全相同" in t and "菜單沒有變更" in t and "確認更新菜單" not in t, t
+        check("貼回同一份 → 顯示完全相同、確認鈕停用")
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ts.id, "mode": "new", "menu": same}), "base_menu_id": str(_cur.id)}, headers=_H)
+        assert r.status_code == 400 and "沒有變更" in r.text
+        check("後端也擋相同內容（直接打確認端 400）")
+
+        # 摘要優先：明細收合、版本衝突、HX-Redirect
+        changed = {"categories": [{"name": "海鮮", "items": [{"name": "清蒸魚", "price": 380}, {"name": "炒蛤蜊", "price": 180}]}]}
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ts.id), "json_text": _J({"menu": changed})}, headers=_H)
+        assert "<details" in r.text and "查看完整菜單" in r.text and "查看變更明細" in r.text
+        assert f'name="base_menu_id" value="{_cur.id}"' in r.text
+        check("摘要先出、變更明細與完整菜單收合、片段帶 base_menu_id")
+
+        _before = db.query(Menu).filter(Menu.store_id == _ts.id).count()
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ts.id, "mode": "new", "menu": changed}), "base_menu_id": "999999"}, headers=_H)
+        assert r.status_code == 200 and "剛被更新" in _T(r) and "base_menu_id" in r.text, r.text[:300]
+        db.expire_all()
+        assert db.query(Menu).filter(Menu.store_id == _ts.id).count() == _before, "版本不符時不能寫入"
+        check("確認時版本不符 → 不寫入，回傳重新比對的片段（含提醒）")
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ts.id, "mode": "new", "menu": changed}), "base_menu_id": "999999"})
+        assert r.status_code == 409
+        check("非 htmx 的版本不符 → 409")
+
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ts.id, "mode": "new", "menu": changed}), "base_menu_id": str(_cur.id)}, headers=_H)
+        assert r.status_code == 200 and r.headers.get("HX-Redirect", "").startswith(f"/admin/stores/{_ts.id}?tab=menu") and "ver=" in r.headers["HX-Redirect"]
+        db.expire_all()
+        assert db.query(Menu).filter(Menu.store_id == _ts.id).count() == _before + 1
+        check("版本相符 → 寫入並 HX-Redirect 到工作台（帶新版號）")
+        r = _c.get(r.headers["HX-Redirect"])
+        assert "菜單已更新為第" in r.text
+        check("工作台完成提示縮成一行")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 23. V2.15.1 審核修正 ----------
+    print("\n[23] V2.15.1 審核修正")
+    from app.templating import money
+    from app.routers.admin import clean_pasted_json, _src_digest
+    assert money(Decimal("55.00")) == "55" and money(Decimal("32.50")) == "32.5" and money(1200) == "1,200" and money(None) == ""
+    check("P2-2：money filter — 55.00→55、32.50→32.5、千分位、None→空")
+    for f in ("app/routers/admin.py", "app/routers/groups.py", "app/routers/home.py", "app/routers/orders.py", "app/main.py"):
+        assert "register_filters" in open(f, encoding="utf-8").read(), f
+    import re as _re2
+    from pathlib import Path
+    _bad = []
+    for _tp in Path("app/templates").rglob("*.html"):
+        _txt = _tp.read_text(encoding="utf-8")
+        _bad += [f"{_tp.name}: {m}" for m in _re2.findall(r"\$\{\{ [^}|]+ \}\}", _txt)]
+        _bad += [f"{_tp.name}: {m}" for m in _re2.findall(r"\$\{\{ [^}]+\|int \}\}", _txt)]
+    assert not _bad, _bad[:5]
+    check("P2-2：模板裡 $ 後的金額一律過 money（沒有裸輸出、沒有 |int）")
+
+    # P2-1：relationship 有 order_by
+    from app.models.menu import Menu as _MenuM, MenuCategory as _MCM, MenuItem as _MIM
+    from app.models.store import Store as _StM
+    for rel in (_MenuM.categories, _MenuM.items, _MCM.items, _MIM.options, _StM.options, _StM.toppings):
+        assert rel.property.order_by, f"{rel} 沒有 order_by"
+    check("P2-1：菜單／分類／品項／選項／甜冰／加料的 relationship 都有 order_by")
+
+    # P2-3：只調整順序 → 不是「沒有變更」
+    _ord_store = import_store_and_menu(db, FullImport(store={"name": "排序店", "category": "meal"}, menu={"categories": [
+        {"name": "A", "items": [{"name": "雞腿飯", "price": 100, "options": [{"name": "加蛋", "price_diff": 10}, {"name": "加飯", "price_diff": 10}]}, {"name": "排骨飯", "price": 90}]},
+        {"name": "B", "items": [{"name": "湯", "price": 20}]}]}))
+    _om = db.query(Menu).filter(Menu.store_id == _ord_store.id, Menu.is_active == True).first()
+    d_same = diff_menu(_om, MenuContent(**{"categories": [
+        {"name": "A", "items": [{"name": "雞腿飯", "price": 100, "options": [{"name": "加蛋", "price_diff": 10}, {"name": "加飯", "price_diff": 10}]}, {"name": "排骨飯", "price": 90}]},
+        {"name": "B", "items": [{"name": "湯", "price": 20}]}]}))
+    assert d_same["identical"] and not d_same["order_changed"]
+    d_items = diff_menu(_om, MenuContent(**{"categories": [
+        {"name": "A", "items": [{"name": "排骨飯", "price": 90}, {"name": "雞腿飯", "price": 100, "options": [{"name": "加蛋", "price_diff": 10}, {"name": "加飯", "price_diff": 10}]}]},
+        {"name": "B", "items": [{"name": "湯", "price": 20}]}]}))
+    assert d_items["order_changed"] and not d_items["identical"] and not d_items["changed"], d_items
+    d_cats = diff_menu(_om, MenuContent(**{"categories": [
+        {"name": "B", "items": [{"name": "湯", "price": 20}]},
+        {"name": "A", "items": [{"name": "雞腿飯", "price": 100, "options": [{"name": "加蛋", "price_diff": 10}, {"name": "加飯", "price_diff": 10}]}, {"name": "排骨飯", "price": 90}]}]}))
+    assert d_cats["order_changed"] and not d_cats["identical"]
+    d_opts = diff_menu(_om, MenuContent(**{"categories": [
+        {"name": "A", "items": [{"name": "雞腿飯", "price": 100, "options": [{"name": "加飯", "price_diff": 10}, {"name": "加蛋", "price_diff": 10}]}, {"name": "排骨飯", "price": 90}]},
+        {"name": "B", "items": [{"name": "湯", "price": 20}]}]}))
+    assert d_opts["order_changed"] and not d_opts["changed"]
+    check("P2-3：品項順序／分類順序／選項順序改了 → order_changed，不再被當成沒有變更")
+    _adm.get_admin_user = _fake_admin
+    try:
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ord_store.id), "json_text": _J({"menu": {"categories": [
+            {"name": "A", "items": [{"name": "排骨飯", "price": 90}, {"name": "雞腿飯", "price": 100, "options": [{"name": "加蛋", "price_diff": 10}, {"name": "加飯", "price_diff": 10}]}]},
+            {"name": "B", "items": [{"name": "湯", "price": 20}]}]}})}, headers=_H)
+        t = _T(r)
+        assert "只調整了排序" in t and "確認更新菜單" in t and "菜單沒有變更" not in t, t
+        check("P2-3：只調整排序 → 摘要說「只調整了排序」且可確認")
+
+        # P2-4：切回舊版後的版號
+        import_menu(db, MenuImport(store_id=_ord_store.id, menu={"categories": [{"name": "A", "items": [{"name": "雞腿飯", "price": 110}]}]}))
+        _v1 = db.query(Menu).filter(Menu.store_id == _ord_store.id).order_by(Menu.created_at).first()
+        r = _c.post(f"/admin/stores/{_ord_store.id}/menus/{_v1.id}/activate", follow_redirects=False)
+        assert r.status_code in (302, 303)
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ord_store.id), "json_text": _J({"menu": {"items": [{"name": "新", "price": 1}]}})}, headers=_H)
+        t = _T(r)
+        assert "將建立第 3 版" in t and "使用中的第 1 版" in t and "最新的第 2 版不是使用中" in t, t
+        check("P2-4：切回第 1 版再匯入 → 「將建立第 3 版」並提醒最新第 2 版不是使用中")
+
+        # P2-5：甜冰 51 字預覽就擋；去空白去重
+        r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "長選項店", "new_store_category": "drink",
+                    "json_text": _J({"store": {"name": "", "category": "drink", "sugar_options": ["a" * 51]}, "menu": {"items": [{"name": "x", "price": 1}]}})}, headers=_H)
+        assert "超過 50 字" in _T(r)
+        from app.schemas.store import StoreImport
+        assert StoreImport(name="x", category="drink", sugar_options=[" 正常糖 ", "", "正常糖", "少糖"], logo_url="無").sugar_options == ["正常糖", "少糖"]
+        check("P2-5：甜冰選項 51 字預覽即擋；去空白、去重；logo_url 非網址當 None")
+
+        # P2-9：新增一家店，店名與類別由畫面欄位決定（JSON 的 name 留空也行）
+        r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "畫面填的店", "new_store_category": "meal",
+                    "json_text": _J({"store": {"name": "", "category": "drink"}, "menu": {"items": [{"name": "x", "price": 1}]}})}, headers=_H)
+        t = _T(r)
+        assert "將新增店家「畫面填的店」" in t and "餐點" in t, t
+        r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "只有菜單的新店", "new_store_category": "meal",
+                    "json_text": _J({"menu": {"items": [{"name": "x", "price": 1}]}})}, headers=_H)
+        assert "將新增店家「只有菜單的新店」" in _T(r)
+        check("P2-9：新店家的店名／類別以畫面欄位為準；只有 menu 的資料也能新增店家")
+
+        # B-1：```json 圍欄與前後說明文字自動去掉
+        wrapped = "以下是轉換結果：\n```json\n" + _J({"menu": {"items": [{"name": "圍欄", "price": 5}]}}) + "\n```\n如需調整請告訴我。"
+        assert clean_pasted_json(wrapped)[1]
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ord_store.id), "json_text": wrapped}, headers=_H)
+        t = _T(r)
+        assert "檢查完成" in t and "已自動去掉" in t, t
+        check("B-1：AI 回覆的 ```json 包裝與說明文字自動去掉並提示")
+
+        # P1-1：確認時雜湊不符 → 不寫入、重新預覽
+        _cur = db.query(Menu).filter(Menu.store_id == _ord_store.id, Menu.is_active == True).first()
+        raw_a = _J({"menu": {"items": [{"name": "A版", "price": 1}]}})
+        raw_b = _J({"menu": {"items": [{"name": "B版", "price": 2}]}})
+        r = _c.post("/admin/import/preview", data={"store_id": str(_ord_store.id), "json_text": raw_a}, headers=_H)
+        assert f'name="src_digest" value="{_src_digest(raw_a)}"' in r.text
+        _n0 = db.query(Menu).filter(Menu.store_id == _ord_store.id).count()
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ord_store.id, "mode": "new", "menu": {"items": [{"name": "A版", "price": 1}]}}),
+                    "base_menu_id": str(_cur.id), "src_digest": _src_digest(raw_a), "json_text": raw_b, "store_id": str(_ord_store.id)}, headers=_H)
+        t = _T(r)
+        assert r.status_code == 200 and "被改過，沒有寫入" in t and "B版" in t, t
+        assert db.query(Menu).filter(Menu.store_id == _ord_store.id).count() == _n0
+        check("P1-1：確認時輸入框內容與預覽不同 → 不寫入，用目前內容重新預覽並提醒")
+        r = _c.post("/admin/import", data={"json_str": _J({"store_id": _ord_store.id, "mode": "new", "menu": {"items": [{"name": "A版", "price": 1}]}}),
+                    "base_menu_id": str(_cur.id), "src_digest": _src_digest(raw_a), "json_text": raw_a, "store_id": str(_ord_store.id)}, headers=_H)
+        assert r.status_code == 200 and "HX-Redirect" in r.headers
+        check("P1-1：內容沒變 → 正常寫入")
+
+        # P3-6：下拉不含代購個人店
+        r = _c.get("/admin/import")
+        assert "我的代購店" not in r.text
+        check("P3-6：匯入頁店家下拉排除代購個人店")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # P2-6：匯入新版本後，熱門／最愛／常點仍對得到（按品名）
+    import app.routers.home as _home
+    _hs = import_store_and_menu(db, FullImport(store={"name": "熱門店", "category": "meal"}, menu={"items": [{"name": "牛肉麵", "price": 150}, {"name": "滷蛋", "price": 15, "is_available": False}]}))
+    _hm1 = db.query(Menu).filter(Menu.store_id == _hs.id, Menu.is_active == True).first()
+    _niu1 = db.query(_MI).filter(_MI.menu_id == _hm1.id, _MI.name == "牛肉麵").first()
+    _hg_old = Group(owner_id=user.id, store_id=_hs.id, menu_id=_hm1.id, name="舊團", category=CategoryType.MEAL, deadline=tpe - timedelta(hours=1))
+    db.add(_hg_old); db.flush()
+    _ho = Order(group_id=_hg_old.id, user_id=user.id, status=OrderStatus.SUBMITTED); db.add(_ho); db.flush()
+    db.add(OrderItem(order_id=_ho.id, menu_item_id=_niu1.id, item_name="牛肉麵", quantity=3, unit_price=Decimal("150")))
+    db.add(OrderItem(order_id=_ho.id, menu_item_id=db.query(_MI).filter(_MI.menu_id == _hm1.id, _MI.name == "滷蛋").first().id, item_name="滷蛋", quantity=9, unit_price=Decimal("15")))
+    db.commit()
+    import_menu(db, MenuImport(store_id=_hs.id, menu={"items": [{"name": "牛肉麵", "price": 160}, {"name": "滷蛋", "price": 15, "is_available": False}]}))
+    _hm2 = db.query(Menu).filter(Menu.store_id == _hs.id, Menu.is_active == True).first()
+    _niu2 = db.query(_MI).filter(_MI.menu_id == _hm2.id, _MI.name == "牛肉麵").first()
+    _hg_new = Group(owner_id=user.id, store_id=_hs.id, menu_id=_hm2.id, name="新團", category=CategoryType.MEAL, deadline=tpe + timedelta(hours=1))
+    db.add(_hg_new); db.commit()
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        r = _c.get(f"/groups/{_hg_new.id}")
+        assert r.status_code == 200
+        assert f"scrollToItem({_niu2.id})" in r.text, "熱門／最愛要指向新版本的品項 id"
+        assert f"scrollToItem({_niu1.id})" not in r.text
+        assert "你的常點" in r.text and "滷蛋" not in r.text.split("你的常點")[1][:600], "停售的不列入常點"
+        check("P2-6：匯入新版本後熱門／最愛／常點按品名對到新 id，停售不列")
+
+        # P2-8：隨機池排除停售、時價帶旗標
+        _js = r.text[r.text.index("const menuItems = ["):r.text.index("];", r.text.index("const menuItems = ["))]
+        _esc = lambda w: _json.dumps(w)[1:-1]  # tojson 預設 ensure_ascii，中文是 \uXXXX
+        assert _esc("牛肉麵") in _js and _esc("滷蛋") not in _js, _js[:300]
+        check("P2-8：隨機池不含停售品項")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+
+    # P2-7：前台店家菜單頁——時價、停售隱藏、無分類品項
+    _orig_home_cu = _home.get_current_user
+    _home.get_current_user = _fake_owner
+    try:
+        _fs = import_store_and_menu(db, FullImport(store={"name": "前台菜單店", "category": "meal"}, menu={
+            "categories": [{"name": "海鮮", "items": [{"name": "清蒸魚", "price": "時價"}, {"name": "炸蝦捲", "price": 80, "is_available": False},
+                                                     {"name": "滷肉飯", "price": 40, "note": "限午間", "options": [{"name": "加蛋", "price_diff": 10}]}]}],
+            "items": [{"name": "滷蛋", "price": 15}]}))
+        r = _c.get(f"/stores/{_fs.id}/menu")
+        assert r.status_code == 200
+        t = _T(r)
+        assert "清蒸魚 時價" in t and "$0" not in t, t
+        assert "炸蝦捲" not in t, "停售品項不該顯示"
+        assert "限午間" in t and "加蛋 +$10" in t
+        assert "其他" in t and "滷蛋" in t, "無分類品項要顯示在「其他」"
+        check("P2-7：前台菜單頁時價不顯示 $0、停售隱藏、無分類品項顯示、說明顯示")
+    finally:
+        _home.get_current_user = _orig_home_cu
+
+    # ---------- 24. V2.16.0 菜單呈現 ----------
+    print("\n[24] V2.16.0 菜單呈現")
+    _ms = import_store_and_menu(db, FullImport(store={"name": "呈現測試店", "category": "drink"}, menu={
+        "categories": [
+            {"name": "熟成紅茶", "items": [{"name": "熟成紅茶", "price": 35, "price_l": 40, "note": "本店招牌，冷泡 12 小時"}, {"name": "熟成冷露", "price": 45}]},
+            {"name": "全停售", "items": [{"name": "下架品", "price": 10, "is_available": False}]},
+            {"name": "鮮奶茶", "items": [{"name": "紅茶拿鐵", "price": 55, "price_l": 65}, {"name": "烏龍拿鐵", "price": 55}, {"name": "停售拿鐵", "price": 55, "is_available": False}]},
+        ],
+        "items": [{"name": "滷蛋", "price": 15}, {"name": "停售滷蛋", "price": 15, "is_available": False}]}))
+    _mm = db.query(Menu).filter(Menu.store_id == _ms.id, Menu.is_active == True).first()
+    _mg = Group(owner_id=user.id, store_id=_ms.id, menu_id=_mm.id, name="呈現團", category=CategoryType.DRINK, deadline=tpe + timedelta(hours=1))
+    db.add(_mg); db.commit()
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    try:
+        r = _c.get(f"/groups/{_mg.id}")
+        assert r.status_code == 200
+        t = _T(r)
+        # A-1：有大杯價 → 兩行 M／L；沒有的維持單一價
+        assert "M $35" in t and "L $40" in t and "$35/$40" not in t, t[:2000]
+        assert "M $55" in t and "L $65" in t
+        assert "熟成冷露 $45" in t and "M $45" not in t
+        check("A-1：大杯價顯示為 M／L 兩行，單一價不加 M")
+        # A-2：列表說明改兩行（line-clamp-2，不 truncate）；彈窗帶 description
+        assert 'line-clamp-2">本店招牌' in r.text and 'truncate">本店招牌' not in r.text
+        assert "description: " + _json.dumps("本店招牌，冷泡 12 小時") in r.text, "openAddItem 要帶 description"
+        assert 'x-text="selectedItem?.description"' in r.text
+        check("A-2：說明列表兩行不截斷、彈窗顯示說明")
+        # A-5：導覽 chip 帶品項數（只算會顯示的），全停售分類不出現，無分類品項有「其他」並進導覽
+        assert "熟成紅茶 2" in t and "鮮奶茶 2" in t and "其他 1" in t, t[:1500]
+        assert "全停售" not in t, "整個分類都停售時不該出現標題與 chip"
+        assert 'id="category-other"' in r.text and 'scrollToCategory("category-other")' in r.text
+        assert "停售滷蛋" not in t
+        check("A-5：導覽 chip 帶可見品項數、全停售分類隱藏、其他有標題並進導覽")
+        # A-8：更新日期＋回報連結預填
+        _d = (_mm.created_at.replace(tzinfo=None) + timedelta(hours=8)).strftime("%Y/%m/%d")
+        assert f"更新於 {_d}" in t and "價格跟店裡不一樣？回報" in t
+        assert "/feedback?prefill=" in r.text
+        check("A-8：菜單標題顯示更新日期與回報連結")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+
+    # A-8：回報頁 prefill 進 textarea，過長截斷、跳脫
+    _home.get_current_user = _fake_owner
+    try:
+        r = _c.get("/feedback", params={"prefill": "【呈現測試店】菜單價格與店內不符（系統菜單更新於 2026/10/01）：<b>"})
+        assert r.status_code == 200
+        assert ">【呈現測試店】菜單價格與店內不符（系統菜單更新於 2026/10/01）：&lt;b&gt;</textarea>" in r.text, "prefill 要進 textarea 且跳脫"
+        assert "autofocus" in r.text
+        r = _c.get("/feedback", params={"prefill": "x" * 500})
+        assert "x" * 300 + "</textarea>" in r.text and "x" * 301 not in r.text, "prefill 上限 300 字"
+        r = _c.get("/feedback")
+        assert "></textarea>" in r.text and "autofocus" not in r.text
+        check("A-8：回報頁 prefill 預填、跳脫、300 字上限、無 prefill 不 autofocus")
+    finally:
+        _home.get_current_user = _orig_home_cu
+
+    # ---------- 25. V2.16.1 匯入介面 ----------
+    print("\n[25] V2.16.1 匯入介面")
+    _adm.get_admin_user = _fake_admin  # 這節有後台請求
+    from app.schemas.menu import parse_price_input, UNCLEAR_PRICE_MSG, TBD
+    from app.services.menu_diff import diff_menu
+    from app.services.store_match import normalize_store_name, similar_stores
+    from app.routers.admin import _menu_to_import_json, _stores_for_picker
+
+    # B-7：價格 "?"（半形／全形／多個）→ 專屬錯誤；其他文字維持原錯誤；時價不受影響
+    for bad in ("?", "？", " ?? ", "???"):
+        try:
+            parse_price_input(bad); raise AssertionError(f"{bad!r} 應報錯")
+        except ValueError as e:
+            assert UNCLEAR_PRICE_MSG in str(e), str(e)
+    try:
+        parse_price_input("abc"); raise AssertionError
+    except ValueError as e:
+        assert UNCLEAR_PRICE_MSG not in str(e) and "看不懂" in str(e)
+    assert parse_price_input("時價") is TBD and parse_price_input("$30") == Decimal("30")
+    check("B-7：價格 \"?\"（半形／全形）報專屬錯誤，其他文字與時價不受影響")
+
+    # B-9：分類改名合併成一行
+    _r9 = import_store_and_menu(db, FullImport(store={"name": "改名測試店", "category": "meal"}, menu={
+        "categories": [{"name": "小菜", "items": [{"name": f"小菜{i}", "price": 10 + i} for i in range(5)] + [{"name": "滷蛋", "price": 10}]},
+                       {"name": "主食", "items": [{"name": "滷肉飯", "price": 40}]}]}))
+    _m9 = db.query(Menu).filter(Menu.store_id == _r9.id, Menu.is_active == True).first()
+    _new9 = MenuContent(**{"categories": [{"name": "招牌小菜", "items": [{"name": f"小菜{i}", "price": 10 + i} for i in range(5)] + [{"name": "滷蛋", "price": 15}]},
+                                          {"name": "主食", "items": [{"name": "滷肉飯", "price": 40}]}]})
+    d9 = diff_menu(_m9, _new9)
+    assert d9["renamed_categories"] == [{"old": "小菜", "new": "招牌小菜", "count": 6, "unchanged": 5}], d9["renamed_categories"]
+    assert len(d9["changed"]) == 1 and d9["changed"][0]["name"] == "滷蛋" and d9["changed"][0]["price_changed"] and not d9["changed"][0]["category_changed"], d9["changed"]
+    assert "分類改了" not in d9["changed"][0]["note"]
+    assert d9["unchanged_count"] == 6 and not d9["added"] and not d9["removed"] and not d9["identical"]
+    # 重疊不足 80%（6 項只留 3 項）→ 不算改名，照舊是分類改了＋移除
+    _new9b = MenuContent(**{"categories": [{"name": "招牌小菜", "items": [{"name": f"小菜{i}", "price": 10 + i} for i in range(3)]},
+                                           {"name": "主食", "items": [{"name": "滷肉飯", "price": 40}]}]})
+    d9b = diff_menu(_m9, _new9b)
+    assert d9b["renamed_categories"] == [] and len(d9b["removed"]) == 3 and len(d9b["changed"]) == 3
+    # 片段文案
+    r = _c.post("/admin/import/preview", data={"store_id": str(_r9.id), "json_text": _J({"menu": _new9.model_dump(mode="json")})}, headers=_H)
+    t = _T(r)
+    assert "分類改名：「小菜」→「招牌小菜」（6 項，5 項不變）" in t, t[:1200]
+    assert "分類改名 1" in t and "變更 1" in t
+    check("B-9：分類改名（重疊 ≥ 80%）合併成一行，只改分類的品項算不變；重疊不足照舊")
+
+    # B-8：店名近似
+    assert normalize_store_name("可不可 熟成紅茶（彰化店）") == "可不可熟成紅茶"
+    assert normalize_store_name("ＫＥＢＵＫＥ 員林門市") == "kebuke員林"
+    class _S:  # 只要有 .name
+        def __init__(self, n): self.name = n
+    hits = similar_stores("可不可 熟成紅茶（彰化店）", [_S("可不可熟成紅茶"), _S("五十嵐"), _S("可不可熟成紅茶 員林店"), _S("可不可")])
+    assert [h[0].name for h in hits][:1] == ["可不可熟成紅茶"] and len(hits) == 3, [h[0].name for h in hits]
+    assert similar_stores("麥當勞", [_S("麥味登")]) == []
+    assert similar_stores("可不可熟成紅茶", [_S("可不可熟成紅茶")]) == [], "完全同名交給既有的同名合併，不重複提醒"
+    r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "改名 測試店（員林店）", "new_store_category": "meal",
+                                               "json_text": _J({"menu": {"items": [{"name": "x", "price": 1}]}})}, headers=_H)
+    t = _T(r)
+    assert "已經有一家「改名測試店」（使用中第 1 版 · 7 項）——是同一家嗎？" in t, t[:800]
+    assert 'switch-store' in r.text and "確定是新店家" in t and "將新增店家「改名 測試店（員林店）」" in t
+    check("B-8：新增一家店時店名近似 → 提醒＋一鍵切換按鈕，仍允許建立")
+
+    # B-7 片段：集中成一張卡、沒有確認鈕
+    r = _c.post("/admin/import/preview", data={"store_id": str(_r9.id), "json_text": _J({"menu": {"categories": [{"name": "鮮奶茶", "items": [{"name": "黑糖鮮奶", "price": "?"}, {"name": "正常", "price": 50}]}],
+                                                                                              "items": [{"name": "滷蛋", "price": "？"}, {"name": "怪", "price": "abc"}]}})}, headers=_H)
+    t = _T(r)
+    assert "2 個品項的價格 AI 看不清" in t and "分類[1]「鮮奶茶」 → 品項[1]「黑糖鮮奶」" in t and "品項[1]「滷蛋」" in t, t[:800]
+    assert "看不懂的價格「abc」" in t and "確認更新菜單" not in t and "base_menu_id" not in r.text
+    check("B-7：預覽把 \"?\" 的品項集中成一張卡、其他錯誤照列、沒有確認鈕")
+
+    # B-5：帶入目前菜單（使用中版本 → 匯入格式；時價／停售／說明／選項／無分類都回得來，貼回去是「相同」）
+    _r5 = import_store_and_menu(db, FullImport(store={"name": "帶入測試店", "category": "drink"}, menu={
+        "categories": [{"name": "茶", "items": [{"name": "紅茶", "price": 30, "price_l": 35, "options": [{"name": "加珍珠", "price_diff": 10}], "note": "招牌"},
+                                               {"name": "清蒸魚", "price": "時價"}, {"name": "下架", "price": 20.5, "is_available": False}]}],
+        "items": [{"name": "滷蛋", "price": 15}]}))
+    r = _c.get(f"/admin/stores/{_r5.id}/menu-json")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
+    body = r.json()
+    assert body["version"] == 1 and body["items"] == 4
+    got = _json.loads(body["text"])
+    assert got == {"menu": {"categories": [{"name": "茶", "items": [
+        {"name": "紅茶", "price": 30, "price_l": 35, "options": [{"name": "加珍珠", "price_diff": 10}], "note": "招牌"},
+        {"name": "清蒸魚", "price": "時價"},
+        {"name": "下架", "price": 20.5, "is_available": False}]}], "items": [{"name": "滷蛋", "price": 15}]}}, got
+    r = _c.post("/admin/import/preview", data={"store_id": str(_r5.id), "json_text": body["text"]}, headers=_H)
+    assert "菜單沒有變更" in _T(r), "帶入後原樣貼回應判定相同"
+    _ns = Store(name="沒菜單店", category=CategoryType.MEAL); db.add(_ns); db.commit()
+    assert _c.get(f"/admin/stores/{_ns.id}/menu-json").status_code == 404
+    assert _c.get("/admin/stores/999999/menu-json").status_code == 404
+    check("B-5：menu-json 回使用中版本的匯入格式（時價／停售／說明／選項／無分類），貼回去判定相同；沒菜單 404")
+
+    # B-10：選店清單帶版號與項數；load=current 旗標
+    pk = {d["name"]: d for d in _stores_for_picker(db, db.query(Store).filter(Store.is_personal != True).all())}
+    assert pk["帶入測試店"] == {"id": _r5.id, "name": "帶入測試店", "version": 1, "items": 4}
+    assert pk["沒菜單店"]["version"] == 0 and pk["沒菜單店"]["items"] == 0
+    r = _c.get("/admin/import")
+    assert 'id="import-stores"' in r.text and "<select" not in r.text
+    assert _json.dumps("帶入測試店")[1:-1] in r.text, "店家清單應在 JSON script 裡（tojson 預設 \\uXXXX）"
+    r = _c.get(f"/admin/import?store_id={_r5.id}&load=current")
+    assert "loadCurrentMenu(false" in r.text
+    r = _c.get(f"/admin/import?store_id={_r5.id}")
+    assert "loadCurrentMenu(false" not in r.text
+    r = _c.get(f"/admin/stores/{_r5.id}")
+    assert f"/admin/import?store_id={_r5.id}&amp;load=current" in r.text or f"/admin/import?store_id={_r5.id}&load=current" in r.text, "工作台應有「改幾個價格」"
+    assert "改幾個價格" in r.text
+    # B-6：只剩一份指令，且含 "?" 規則
+    r = _c.get("/admin/import")
+    assert r.text.count("AI 轉換指令") == 1 and "promptMenuForStore" not in r.text and "promptNewStore" not in r.text
+    assert "price 填字串 \"?\"" in r.text
+    check("B-10／B-6：選店清單帶版號項數、沒有原生下拉、load=current 帶入、工作台「改幾個價格」、單一 AI 指令含 ? 規則")
+    _adm.get_admin_user = _orig
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.11.5（**V2.11.4 已上線**；桌機版選店覆蓋層寬度修正）
+- **版本：** V2.16.1（匯入介面：搜尋選店、店名近似提醒、帶入目前菜單、對照照片、單一 AI 指令、看不清填 ?、分類改名一行）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -354,6 +354,63 @@
       模擬 defer、讀 toast 文字。實測用 V2.11.3 的舊 base.html 跑會抓到（`text` 為空、退出碼 1）。沒有 node/jsdom 時自動跳過
     - 通用原則：**只要一個修正的價值在「使用者會看到什麼」，就不能只靠後端測試說它修好了**
 
+36. **編輯工具會修掉錨點裡的尾隨空白，原檔的「空白行」常帶縮排**（V2.13.0 踩到，坑 #30 的鏡像）
+    - 症狀：`assert s.count(old) == 1` 失敗，但肉眼比對兩段完全一樣
+    - 根因：原檔的空行是 `"    \n"`（4 個空格），寫腳本時工具（或編輯器的 trim trailing whitespace）把它修成 `"\n"`。
+      坑 #30 是錨點太寬（子字串假匹配），這次是錨點太窄（空白行對不上）——同一個「錨點與實文不一致」的家族
+    - 做法：錨點中跨越空白行時，用 `re.escape` 後把 `\n\n` 換成 `\n[ \t]*\n` 再 `re.search`（`_loose()` helper）。
+      注意 Python 3.12 的 `re.escape` 會把換行逸出成 `\\\n`，替換要兩種寫法都處理
+    - 更根本的：先 grep 實文再寫錨點（交班文件早就寫了），這次就是沒照做
+
+37. **屬性裡的 JS 字串：autoescape 完全沒用、tojson 只能放單引號屬性**（V2.14.1，內部審核 P0-1/P0-2/P1-2，兩條可提權的儲存型 XSS）
+    - 症狀一：`onsubmit="return confirm('刪除「{{ group.name }}」')"`、`@click="openAddItem({ name: '{{ item.name }}' })"`。
+      Jinja 把 `'` 轉成 `&#39;`，但**瀏覽器解析屬性時會先把 `&#39;` 還原成 `'`，再把屬性值交給 JS**，
+      所以 autoescape 在 `on*`、`@*`、`x-*`、`:*` 屬性裡等於沒有。品名含撇號（`McDonald's`）按鈕沒反應；
+      品名是 `a',b:fetch('/admin/users/42/toggle-admin',{method:'POST'}),c:'` 就是以點擊者身分執行——代購團任何人都能寫品名，管理員點到就被提權
+    - 症狀二（V2.13.0 自己造成的）：`x-data="{ tab: {{ tab | tojson }} }"` 渲染成 `x-data="{ tab: "menu" }"`。
+      **`tojson` 逸出 `<>&'` 但不逸出 `"`**，雙引號屬性在 `{ tab: ` 就被截斷，工作台分頁切換、歷史收合、刪店家 `:disabled` 全部失效。
+      五項檢查全綠（`check_template_js` 只掃 `<script>`，煙霧測試只看文字），還好還沒部署
+    - 做法：**屬性裡的 JS 插值一律 `{{ x | tojson }}`，而且該屬性外層必須是單引號**，屬性內的 JS 字串字面值改用雙引號；
+      `onsubmit` 這類要拼使用者文字的，改放 `data-name="{{ name }}"` 再用 `this.dataset.name` 讀（data-* 只是字串，autoescape 在那裡才有效）。
+      `x-html` 拼 `${opt.name}` 改 `x-for` + `x-text`
+    - 守護：`check_template_js.py` 第三道檢查掃所有 `on*=` / `@*=` / `x-*=` / `:*=` 屬性——
+      有 `'{{ … }}'` 沒 tojson → 紅；有 tojson 但外層雙引號 → 紅。實測改壞一處會退出碼 1。
+      煙霧測試用 `HTMLParser` 解析渲染結果，驗 `@click` 屬性值裡的品名是 JSON 字串、`x-data` 屬性值完整
+    - 與坑 #29 的關係：#29 是 `<script>` 內的插值，這條是屬性內的。兩條合起來的規則是**「Jinja 值進 JS 語境，只有 tojson 一條路；在屬性裡還要加上單引號」**
+
+38. **「每份總價」快照回寫時要保留它的組成**（V2.14.1，審核 P1-3）
+    - 症狀：候補的 `unit_price` 是「基本價＋加購＋加料」。時價定價回寫用基本價整個蓋掉：候補「時價魚＋加飯 10」定價 380 後變 380 而不是 390；
+      代購路徑（只改 0 元的）則因為 10 ≠ 0 永遠不回寫
+    - 做法：`order_item_backups` 加 `extras_price` 分開存，回寫 = 新基本價 + extras_price；「基本價仍為 0」的判斷改成 `unit_price == extras_price`。
+      快照與還原都要帶這個欄位（坑 #18/#24 那句「快照要涵蓋品項的所有子結構」的延伸：也要涵蓋金額的組成）
+    - 通用原則：任何「合計快照」在部分重算時，都要能拆回組成；拆不回就得先把組成存下來
+
+39. **htmx 的 `changed` 修飾掛在 `<form>` 上永遠不觸發；`from:find <選擇器>` 找不到元素會直接拋錯**（V2.15.0，jsdom 實測抓到）
+    - 症狀一：`<form hx-trigger="input changed delay:700ms">` 貼上文字後什麼都沒發生。`changed` 比對的是**掛 hx-trigger 那個元素**的 `value`——form 沒有 value，`undefined !== undefined` 永遠 false
+    - 症狀二：`hx-trigger="…, change from:find select"` 在沒有 `<select>` 的頁面（選定店家時）htmx 初始化就 `Cannot read properties of null (reading 'addEventListener')`，而且是 uncaught，後面的 trigger 不會掛
+    - 做法：debounce 只靠 `delay:`，不用 `changed`（重送一次無害）；條件性的觸發器用 Jinja 分開寫，元素不存在就不要寫進 hx-trigger
+    - 守護：`scripts/check_frontend_import.py` + `jsdom_import_check.js`——渲染匯入頁、載入 htmx 與 Alpine、攔 XHR，驗貼上會發、清空不發、拖檔去 BOM、換店家重查，**頁面初始化有 uncaught 錯誤也算失敗**。兩種改壞都實測會紅
+    - 同族：坑 #35（頁面載入後的行為後端測試看不見）。**凡是靠 htmx 觸發器或 Alpine 事件串起來的互動，都要有 jsdom 那一層**
+    - jsdom 注意：(a) htmx 掃 `hx-on` 用 `document.evaluate`，jsdom 的實作不合，載入前設 `document.evaluate = undefined` 讓它走 fallback；
+      (b) 整份文件直接餵 jsdom 時 Alpine 的 `$el`/`$refs` 魔法變數會失效（原因未查明），只重組 body 就正常；
+      (c) FileReader 回呼裡 `this.$refs` 拿不到，要用的元素由呼叫端用 `$el`/`$refs.x` 傳進方法
+
+40. **relationship 的列表一律寫 `order_by`——模板直接迭代 relationship 時，順序只靠它**（V2.15.1，審核 P2-1）
+    - 症狀：匯入時明明寫了 `sort_order`，團頁、工作台、差異比對的分類卻都直接迭代 `menu.categories` / `category.items`，**從來沒用到**。
+      PostgreSQL 沒有 `ORDER BY` 時回的是實體儲存順序——代購團主一改價（UPDATE 寫新 tuple），那個品項就跳到最後；VACUUM 後分類順序也可能被打亂。
+      SQLite 碰巧照插入順序回，所以本地測試永遠看不到
+    - 做法：`relationship(..., order_by=lambda: (Model.sort_order, Model.id))`，六個列表關聯全部補上；有了之後呼叫端的手動 `sort()` 可以拿掉
+    - 連帶：差異比對也要看順序（P2-3）——「把招牌移到最前面」原本被判成「沒有變更」擋下來
+
+41. **兩段式表單（預覽→確認）的確認請求，要帶「預覽時的輸入原文雜湊」**（V2.15.1，審核 P1-1，jsdom 實測）
+    - 症狀：貼上→自動檢查→出現確認鈕；使用者改了輸入框，在 0.7 秒的 debounce 加一次往返之間按確認，送出的是**改之前**的 `json_str`，
+      伺服器照樣寫入並顯示「菜單已更新」。重新檢查若失敗（斷網、500），舊鈕更是一直留在畫面上
+    - 做法（兩邊都做）：前端 `@input` 立刻把結果區變灰、按鈕停用（`markStale`）；後端預覽時算原文 `sha256[:16]` 放進片段，
+      確認用 `hx-include` 把輸入框原文一起送，雜湊不符就不寫入、改用目前內容重新預覽
+    - 守護：`jsdom_import_check.js` 的 XHR 假回應改用 TestClient 產生的**真實片段**——上一版回的是 `<div>ok</div>`，根本測不到確認鈕。
+      這條與坑 #28 同族：測試的假資料太假，就測不到真東西
+    - 順帶：`#import-result` 原本在外層 `<form>` 裡面，片段再放一個 `<form>` 是巢狀表單（htmx 用 DOM API 插入所以能動，但不合法）。移到外層表單之外，值用 `hx-include` 帶
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -392,6 +449,16 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.16.1 | **審稿《菜單管理優化》B 系列七項（Sela 選 B-3/5/6/7/8/9/10）**，資料表不動、匯入語意不變。**B-10**：匯入頁「匯入至」的原生 `<select>` 改搜尋選店（Alpine 過濾，NFKC＋去空白，最多 8 家，顯示「第 N 版 · M 項」），店家清單放 `<script type="application/json" id="import-stores">`；hidden `store_id` 用 `:value` 綁定，所以選完要 `$nextTick` 後再 `htmx.trigger(form, 'store-changed')`（hx-trigger 從 `change from:find select` 改成自訂事件）。`_stores_for_picker()` 兩次聚合查詢算版號與項數。**B-8**：新增 `app/services/store_match.py`（NFKC、去括號內容、去空白、去「總店／分店／門市／店」字尾；相同／包含／`SequenceMatcher` ≥ 0.8），`_preview_from_data` 在「新增一家店且沒有完全同名」時帶 `similar`；片段的「改為更新「X」」`$dispatch('switch-store')`，根 `x-data` 接住呼叫 `pickStore()`；「確定是新店家」用根層 `ignoreSimilar` 收起（片段每次重新檢查都會再渲染，狀態要放在片段外）。**B-5**：`GET /admin/stores/{id}/menu-json` 把使用中版本轉回匯入格式（`_menu_to_import_json`：時價寫 "時價"、停售／說明有才帶、整數價不帶 .0），匯入頁「帶入目前菜單」用 XHR 拿來填輸入框並觸發自動檢查，貼回去判定「相同」；工作台菜單分頁多「改幾個價格」連到 `?load=current` 進頁就帶入。**B-3**：「對照照片」`URL.createObjectURL` 本機顯示不上傳，可收合／放大／移除；拖圖片進輸入框也當對照照片。**B-6**：三份 AI 指令合成 `promptBody`＋`buildPrompt()`（既有店家時結尾帶「店名：X」），畫面只剩一顆「複製 AI 轉換指令」。**B-7**：`parse_price_input` 對 `?`／`？` 拋 `UNCLEAR_PRICE_MSG`，`_preview_from_data` 把這類驗證錯誤分流成 `unclear_items`，片段集中成「N 個品項的價格 AI 看不清」紅卡（沒有確認鈕）；AI 指令加「看不清填 "?"，不要猜、不要填 0」。**B-9**：`menu_diff._detect_renamed_categories()`（舊分類消失＋新分類出現＋品名重疊 ≥ 80%）回 `renamed_categories`，只因分類改了的品項抽回不變、其他變更拿掉「分類改了」註記；摘要一行「分類改名：「小菜」→「招牌小菜」（6 項，5 項不變）」，明細多「分類改名」段；`identical` 把改名也算變更。jsdom 檢查改測搜尋選店、帶入目前菜單、近似店名切換與收起、拖圖片；改壞三處實測會紅。煙霧測試 138 → **144 項**，B-7/B-8/B-9/B-5 都做過改壞驗證。路由 136 → 137。順修：V2.16.0 漏改 `base.html` 的 `app_version`（標題列仍顯示 V2.15.1），這版補上——升版 SOP 第 1 步，打包前 grep 一次。 |
+| V2.16.0 | **審稿《菜單管理優化》A 系列四項（Sela 選 A-1/A-2/A-5/A-8，不做 A-4 搜尋／A-6 停售灰字／A-7 時價提示文）**。**A-1**：有大杯價的品項「$35/$40」改兩行「M $35」「L $40」（共用 macro `item_price`，團頁、常點、前台店家菜單頁一起變；單一價不加 M）。**A-2**：列表說明 `truncate` → `line-clamp-2`（「限午間」「需提前預訂」在手機上被切掉）；點餐彈窗標題下顯示完整說明（`openAddItem` payload 帶 `description`，兩處按鈕）。**A-5**：分類導覽 chip 帶**可見**品項數（停售不算）、整個分類都停售時標題與 chip 都不出現、無分類品項有「其他」標題（`id="category-other"`）並進導覽；導覽條件改為「可見分類＋其他 ≥ 2」。**A-8**：菜單標題列顯示「更新於 YYYY/MM/DD · 價格跟店裡不一樣？回報」，連到 `/feedback?prefill=【店名】菜單價格與店內不符（系統菜單更新於 …）：`；`feedback_page` 讀 `prefill`（300 字上限）預填 textarea 並 autofocus。煙霧測試改為啟動先 `drop_all`（重跑殘留舊 _smoke.db 會誤報「第 3 版」），新增第 24 節，133 → **138 項**；三處改壞實測會紅。 |
+| V2.15.1 | **內部審核 V2.15.0 修正：P1-1＋P2×10＋P3×9＋審稿 B-1/B-4**（Sela 選此範圍；審稿 A 系列菜單呈現 8 項、B 其餘另包）。這輪審核 11 條 P1/P2 全部查證屬實。**P1-1**：改了輸入框舊確認鈕仍可按、送出舊內容——前端 `markStale()` 立刻停用、後端 `src_digest` 核對，不符就用目前內容重新預覽（坑 #41）。**P2-1**：六個 relationship 補 `order_by`（坑 #40）。**P2-3**：`diff_menu` 加 `order_changed`／`identical`（分類順序、品項順序、選項順序），摘要顯示「只調整了排序」。**P2-2**：新增 `app/templating.py::money`（55.00→55、32.5 不截斷、千分位）＋ `register_filters()` 掛到七個 templates 實例；模板 `${{ x }}`／`${{ x|int }}` 全改 `|money`（煙霧測試掃殘留）。**P2-4**：「將建立第 N 版」改用 `next_version`（最大版號＋1），使用中不是最新時提醒。**P2-5**：甜冰選項去空白去重、50 字上限、加料名 50 字、`logo_url` 非網址當 None。**P2-6**：熱門／最愛／常點改用 `OrderItem.item_name` 對應目前菜單（V2.11.1 一律新版本後，用 id 對應每匯一次就斷一次），停售不列。**P2-7**：前台 `store_menu.html` 改用共用 macro `partials/menu_item_info.html`（時價、停售隱藏、加購價、無分類「其他」）。**P2-8**：隨機池排停售與完售，時價顯示「時價」。**P2-9**：「新增一家店」時店名／類別在畫面填（AI 指令要求店名留空，原本只能改 JSON），只有 `menu` 的資料也能新增店家。**P2-10**：`do_import` 對店家列 `with_for_update()`、新店家用店名 advisory lock（PG 限定）、啟動建部分唯一索引 `uq_menus_one_active`（建不起來印排查 SQL）。**P3**：文案、結果區移出外層表單（`hx-include`）、trigger 只認 textarea 避免換店家雙發、拖文字也收、剪貼簿失敗退回手動複製框、下拉排代購店＋注音序、`do_import` 驗證錯誤中文化、工作台時價／品項數含無分類／選項說明、差異明細寫出「加蛋 +10 → +15」「說明：「A」→「B」」。**B-1**：`clean_pasted_json()` 原文解析失敗才去 ```json 圍欄與前後說明文字並提示。**B-4**：第一份菜單預設展開完整明細。jsdom 檢查改用真實片段，加確認鈕會送、改內容後舊鈕失效、拖文字三項，實測改壞 `markStale` 會紅。煙霧測試 118 → **133 項**。 |
+| V2.15.0 | **匯入頁簡化**（外部審稿《菜單管理優化》第一階段，Sela 選這一包；第二階段工作台分頁重組／甜冰點選／加料批次另開）。**查證**：審稿說「匯入選項時應保留既有設定」——`import_store_and_menu` 同名店家只建新菜單、不碰甜冰加料，既有店家匯入根本不收 `store`，已經是「沒提供＝不動」；「甜冰整批重建立即影響點餐者」是 V2.10.0 刻意設計（字串快照，已點的不受影響）。**不照做**：「只更新有變動的品項」局部更新——V2.13.1 已決定不改匯入語意（版本是整份快照、開團釘版本）；「單品快速編輯」不能原地改 `MenuItem`（進行中的團釘的就是那一列），要做得是「改一項＝新版本」，第三階段再議。(1) **匯入頁重寫** `import.html`：「匯入至」（選定店家顯示使用中第 N 版・M 項；沒選時下拉預設「新增一家店」）＋「菜單資料」單一輸入區（貼上／拖檔／選檔合一，FileReader 讀入去 BOM）＋「複製 AI 轉換指令」小鈕；**貼上 0.7 秒後自動檢查**（htmx `input[filter] delay:700ms`，清空不發）；預覽鈕拿掉；Logo 指令搬到工作台基本資料分頁（`LOGO_PROMPT_*` 常數）；格式範例收成「進階：資料格式說明」。畫面不再出現 prompt／JSON／schema／store_id（煙霧測試掃可見文字）。(2) **結果片段**：先「檢查完成」摘要卡（三個數字或「將新增店家」）、警示才展開、「查看變更明細」與「查看完整菜單」收合、部分菜單警告仍展開；**相同內容 → 停用鈕「菜單沒有變更」**（審稿 6.1），後端 `do_import` 也擋 400。(3) **確認時核對版本**（審稿 6.3＝內部審核 P2-5）：片段帶 `base_menu_id`，確認改 htmx 送出；`do_import` 比對使用中版本不符 → 不寫入、用抽出的 `_preview_from_data(conflict=True)` 回傳重新比對的片段（非 htmx 回 409）；成功回 `HX-Redirect` 到工作台（帶 `ver`），`hx-disabled-elt` 防連點。工作台完成提示縮成「菜單已更新為第 N 版（M 項）」。(4) **第六支檢查** `check_frontend_import.py`（jsdom + htmx + Alpine 攔 XHR）：開發時抓到兩個真 bug（坑 #39）。煙霧測試 108 → **118 項**。 |
+| V2.14.1 | **內部審核 V2.14.0 修正：P0×2＋P1-1～P1-6＋本版相關 P2×8**（Sela 選此範圍；P1-7 套件升級、P1-8 遷移 pre-deploy 各自另開一包）。**P0-1/P0-2（真的可提權）**：團名進 `confirm()`、品名／選項名進 `@click`——屬性內 JS 字串 autoescape 無效。改 `data-name` + `this.dataset`、`@click='…{{ name | tojson }}…'` 單引號屬性、`x-html` 拼字串改 `x-for`；連帶把 7 處「現在安全」的 `'{{ deadline.isoformat() }}'` 也改掉（零容忍）。`check_template_js` 加第三道掃屬性。**P1-2（V2.13.0 自己弄壞的）**：`x-data="{ tab: {{ tab|tojson }} }"` 被雙引號截斷，工作台分頁從 V2.13.0 起根本不能切——沒部署所以沒人發現。工作台與新增店家頁 6 處改單引號屬性。**P1-1**：`proxy_item_update` 用 `func` 卻只有別的函式有區域匯入，代購品項填上限就 500 → 頂層匯入、刪三處區域匯入。**P1-3**：候補 `extras_price` 欄位（`ADD COLUMN IF NOT EXISTS`），回寫＝基本價＋extras；建候補、快照、還原三處都帶。**P1-4**：`do_import` 的 blocker 檢查原本在 `import_*`（內部 commit）之後——抽 `_reject_blockers()` 移到寫入前。**P1-5**：`price_tbd: "false"` 字串為真把價格清成 0 → `_to_bool()` 容錯，`is_available` 同。**P1-6**：刪店家前先把該店所有「修改中」訂單依快照還原（外鍵還在時）；`restore_snapshot` 的四個外鍵改「存在才帶」，否則店家刪除後那個團永久 500。**P2**：逗號只接受千分位（`"30,50"` 原本變 3050）、`price_l` 單獨時價報錯、名稱 100 字／價格 0~999,999 在 schema 擋、空菜單 blocker、改價重設 `diff_settled`、`tbd-price` 排除代購團、團主輸入金額統一走 `parse_price_input`（`$380` 也收、NaN 擋）、店家已刪時 `branch` 防 None。順手兩條 P3：JSON 最外層非物件 400、`note` 空字串時仍收 `description`。煙霧測試 90 → **108 項**，P1-3/P1-4/P1-6 都做過「改壞會紅」。教訓見坑 #37、#38。**審核其餘項目**：P1-7（python-multipart/starlette CVE，未登入可 DoS）＝坑 #10 長期方案，排下一包；P1-8 遷移無互斥 → 之後一包；P2-5/7/8/11/13～17、P2-F1～F7、P3 留清單。 |
+| V2.14.0 | **匯入時價／停售／說明＋價格容錯＋截止後定價**（匯入 P2 的前半，**不動資料表**——`price_tbd`／`is_available`／`description` 三欄 V2.7/V2.9 就有，只是匯入格式沒開）。(1) **schema**：`MenuItemImport` 加 `price_tbd`／`is_available`／`note`（`description` 當別名），`model_validator(mode="before")` 做價格容錯（backlog #1 一併做掉）：`$30`／`30元`／`NT$30`／全形／千分位自動轉，`時價`／`市價`／`依時價`／`未定`／`TBD` → `price_tbd=True` 且 price=0、price_l 清掉；其他文字 `ValueError` 中文訊息，`_translate_error_type` 對 `value_error` 直接透傳（去掉 Pydantic 的「Value error, 」前綴）。(2) **分析器**：時價品項跳過價格檢查；價格 0 改說「會當成免費；若是時價請改填 "時價"」；停售品項彙整一條提醒。差異比較加時價／停售／說明三個維度（`_fmt_price` 時價顯示「時價」）。預覽明細加時價／停售／說明標示（抽成 Jinja macro `item_row`）。(3) **截止後定價**（Sela 選「截止後團主定價」而非隨時可定——隨時可定要把本團價格存起來才能讓定價後新點的也吃到，得動資料表）：`groups.py` 把 V2.9.0 的回寫區塊抽成 `_writeback_tbd_price(db, group, menu_item_id, price, only_zero)`，代購沿用 `only_zero=True`（未訂→定價一次性）；新路由 `POST /groups/{id}/tbd-price/{item_id}` 限團主／管理員、**團必須已截止**、品項須為本團菜單的時價品項、1~100 萬，`only_zero=False` 回寫本團全部（可重複改價），**不碰 MenuItem**（一般店家時價每天不同，品項要維持時價；這是跟代購的根本差別）。`_tbd_items_for_group()` 列出有人點的時價品項（人數／份數／目前價／待定）。面板放在缺貨處理頂部（同一個「截止後」時機）；團頁資訊卡團主看到「N 個時價品項待定價」。團員端菜單標籤一般店家顯示「時價」、代購維持「價格未訂」。(4) AI 提示詞三處改「時價填字串 "時價"（不要填 0——0 代表免費）」並加停售／說明規則；Project《菜單匯入格式規範》同步。煙霧測試 79 → **90 項**，含「把 only_zero 改壞會紅」驗證。 |
+| V2.13.1 | **菜單差異預覽**（V2.13.0 延後的項目）。匯入預覽在「匯到既有店家且已有使用中菜單」時（含同名店家自動併入的情況），把新 JSON 跟使用中版本比對，顯示新增／變更／移除／不變四個數字與清單，確認鈕帶數字「確認匯入（新增 2・變更 3・移除 1）」。新增 `app/services/menu_diff.py::diff_menu()`，純比較不碰資料庫。**比對規則**：以品名為鍵、全菜單範圍；同名品項在任一邊重複（跨分類同名）就退回「分類＋品名」配對，所以「同名又換分類」會顯示成一移一增，這是刻意的（無法分辨是搬家還是另一個品項）；price 與 price_l 用 Decimal normalize 比（10 與 10.00 相等）；options 有變也算變更。**部分菜單提醒**（Sela 選「只提醒，不改匯入語意」）：移除數 ≥ 使用中品項一半且使用中 ≥ 6 項 → 醒目琥珀框「看起來只貼了部分菜單」，按鈕改「仍要匯入（移除 N 個品項）」，不擋。移除清單 > 8 項收合。版本序號用店內序號（坑 #17）。煙霧測試 71 → **79 項**，含「改壞門檻會紅」驗證（坑 #28）。 |
+| V2.13.0 | **店家工作台**（外部審核《UI 與店家管理流程優化》，Sela 選「列表＋工作台合併＋歷史收合＋新增店家表單」一包）。**查證屬實的**：`store_detail` 與 `store_edit` **都有**分店新增／刪除與停用／刪除（detail 的分店有啟用切換、edit 沒有——已不同步）；列表無搜尋、無直達按鈕、按建立時間倒序。**不照做的**：P0-3「不要讓管理員決定新增還是匯入」V2.12.1 已是如此；P0-4「更新菜單前警告對進行中團的影響」方向反了——`menu_id` 開團時釘死，更新**不會**影響進行中的團，該做的是把事實寫在畫面上讓人安心。(1) **列表**：搜尋店名／電話／地址、分類＋含已停用篩選、店名注音序、每列品項數／分店數／**上次開團**（判斷哪家店有人在用）、無菜單標示、桌機直達菜單／編輯。狀態記 sessionStorage。聚合查詢兩次不逐店（N+1）。(2) **工作台** `/admin/stores/{id}?tab=`：一頁取代三頁，Alpine `x-show` 分頁不跳頁（表單不丟），各區保留自己的儲存鈕（後端六支獨立 POST）。`/edit`、`/menus` 301 轉過去，所有 POST 導回對應分頁。菜單分頁預設只展開使用中版本，歷史收合成一行、切回二次確認。(3) **新增店家** `/stores/new`（上一輪審稿提案 2）：只填店名與類別，即時比對同名提示但允許繼續，建好落在工作台。**路由必須排在 `/stores/{id}` 之前**（`new` 進 int 路由會 422，煙霧測試守這條）。(4) **刪店家輸入店名確認**（V2.11 危險操作包延到現在）：後端比對 `confirm_name`，畫面顯示影響範圍（N 個菜單版本、N 個歷史團、進行中團數）。順修：網址欄位 `type="url"` 改 `text`——瀏覽器會在送出前擋掉無協定值，V2.11.2 後端的自動補 https 根本到不了。煙霧測試 65 → **71 項**，`check_template_js` 登記 `stores.html`。教訓見坑 #36。 |
+| V2.12.1 | **既有店家匯入拿掉「店家編號」概念**（Sela 提：不該再有店家代號，JSON 有也要能用）。原本三條分支：UI 選店家 / JSON 有 `store` / JSON 有 `store_id`。第三條砍掉——它讓使用者必須知道內部編號，AI 提示詞還得教「先填 0 我再改」，結果就是 0 原樣貼進來、各種「store_id 還是 0」訊息與對照表。現在：**選了店家 → JSON 只要 `menu`，`store_id`/`mode`/`store` 有也直接丟掉**（貼新增店家格式會提示已忽略）；沒選店家 → 只接受新增店家格式，否則要求在畫面上選，不再從 JSON 撈編號。`do_import` 補店家存在檢查（原本不存在會外鍵 500）。AI 提示詞與範例改為最外層只有 `menu`。Project 的《菜單匯入格式規範》從 2025-01 重寫到現行（它還在教 `replace` 與「不支援 group_buy」）。煙霧測試 61 → **65 項**，用 TestClient 驗四種 JSON 形狀都以 UI 為準。**環境注意**：沙盒升到 Python 3.13，鎖版的 SQLAlchemy 2.0.23 不相容，本地驗證改用 python3.12 venv（見交班文件）。 |
+| V2.12.0 | **匯入流程第一包**（Sela 用了幾天的匯入後整理的六項，全部不動資料表）。**先查證再動手**：分析裡的 P0-1「UI 選好店家後端仍擋 store_id=0」在現行程式碼**重現不了**（TestClient 與 jsdom 都確認 hidden store_id 正確覆寫 JSON）；P0-2「放行 group_buy」V1.10.2 就已修（坑 #9）；P1-3 dry-run 與 P1-4 中文錯誤本來就有一半。真正的缺口是：(1) **401 轉址只帶 `request.url.path`**，`?store_id=25` 過期重登後掉了——畫面像從店家頁進來，店家其實沒帶到，接著撞上 store_id=0 的訊息；改帶完整網址。(2) **菜單管理頁的「+ 匯入」沒帶 `store_id`**（只有 store_detail 有），改帶；「繼續匯入其他店家」刻意不帶。(3) 預覽與錯誤訊息**明確顯示匯入對象**（店名，不只編號；沒選就說「系統目前沒有選定任何店家」讓人能分辨是店家沒帶到）。(4) 新增 `app/services/import_analysis.py::analyze_menu_content()`：同分類同名／分類重複／空白名稱／負價 → **blockers 擋下**（預覽不出確認鈕，`do_import` 後端也擋）；跨分類同名／價格 0／L 低於 M／空分類／負價差 → warnings 放行。(5) `describe_loc()` 讓驗證錯誤帶名稱（「分類[1]「小菜」→ 品項[1]「黃金泡菜」→ 價格」），JSON 解析失敗附前後三行原文並 ▶ 標記。(6) **上傳檔案優先**——原本貼上優先，textarea 有殘留時上傳會被無聲忽略。順修：預覽在「同時有 store 與 store_id:0」時當新增店家，但 `do_import` 先看 store_id → 確認時用 0 去更新；預覽產出的 json_str 改為正規化形狀。煙霧測試 55 → **61 項**，六項功能全部以 TestClient 端對端驗過。**教訓**：外部整理的問題清單要逐條對程式碼查證，這次四條裡有兩條不成立、兩條已有一半，真正的根因（登入轉址丟查詢字串）反而不在清單上。 |
 | V2.11.5 | **V2.9.1～V2.11.4 十版於 2026-09-16 一次上線，手機版實測正常。** 本版修桌機上的選店覆蓋層：它是 `fixed inset-0`，脫離主內容區的 `max-w-lg`，而網格寫死 `grid-cols-2`，桌機上兩張卡片撐滿整個螢幕。頂部列／搜尋列／清單三段各加 `max-w-3xl mx-auto`，網格改 `grid-cols-2 sm:3 md:4 lg:5`。教訓：**fixed 定位的元件不繼承父層的寬度約束**，做全螢幕覆蓋層時要自己給最大寬度，且要在桌機寬度看過一次——V2.11.0 的預覽只在手機視窗檢查。 |
 | V2.11.4 | **第四輪複審 S-01～S-07**（上輪 9 項：6 項確認修正、1 項部分、**2 項修法本身失效**——R-03/R-04 後端對了但前端完全看不到）。**S-01（P1，本專案自己改壞的）**：toast 永遠不顯示，三個根因（載入順序、Alpine x-init 先於 x-on、x-init 結果是函式會被呼叫）見坑 #35。`window.toast` 移到 head、元件改 `x-data.init()` 提供 `_toastShow`。**新增第五支檢查** `check_frontend_toast.py`（jsdom + Alpine 模擬 defer），實測舊版會紅。**S-02**：表單錯誤改回極小 HTML「寫 sessionStorage 後 `history.back()`」——V2.11.3 的 303 轉址讓使用者填的表單全部遺失（開團頁選完店家填完欄位因截止時間被擋就整頁重填，與 V2.11.0「換店不丟表單」的設計目標衝突）。同時消除 **S-03**（`?flash=` 可由外部連結偽造紅色系統提示）與 **S-04**（Referer 路徑 `//` 開頭導向外站）。base.html 在載入與 `pageshow`（bfcache 返回）兩個時機讀 sessionStorage。**S-05**：`parse_store_ids()` 讓投票的店家編號負數／不存在／個人店／停用一律 400（原本外鍵 500），`create_vote` 與 `add_option` 共用。**S-06**：範本錯誤訊息改成系統做得到的指示（原本叫使用者「在團單設定部門」，但 edit_group 沒有這功能）。**S-07**：`RequestValidationError`（422）也走 `_form_error_response`。煙霧測試 51 → **55 項**。 |
 | V2.11.3 | **第三輪複審 R-01～R-09 修正**（上輪 16 項：10 項確認修正、4 項修法有缺口、3 項依計畫延後）。**R-01（P1，本專案自己的修法錯誤）**：修改中的「複製上次」仍會超賣 —— V2.11.2 用 try/except 做流程控制，except 分支重算剩餘量時排除了自己，把剛擋下的量又放回去；而 `_reserve_stock` 的自有量讀記憶體 collection，新建的 OrderItem 不在裡面、已刪的還留在裡面。改用 `_own_qty()` / `_available_for()` 以資料庫為準（坑 #34）。**R-02（P1）**：開團選「限定部門」卻一個都沒勾，會建出「非公開且零部門」的團；存成範本後 department_ids 是 NULL，與舊版範本無法區分 → 使用時 400 提示重存，重存結果一樣，**死循環**。從 `create_group` 源頭擋下，`save_template_from_group` 再擋一次。**R-03**：`main.py` 例外處理器改為「非 htmx 的 POST 4xx 導回來源頁並帶 flash」。這條原本排 V2.12，但 N-03 與 N-05 的修正都依賴「讓使用者看到訊息」，而訊息實際上是一整頁 JSON —— 不提前處理等於那兩項沒修。**R-04**：`window.toast` 在 Alpine 尚未初始化時改為排隊（LINE 內建瀏覽器慢網路下訊息會無聲消失）；新增 `kind` 參數，錯誤改用紅底與警示圖示（原本「只剩 N 份」也帶打勾）。**R-05**：清空購物車前先做庫存預檢、新版本無 price_l 時清掉殘留的 L 尺寸、排除已停用加料、甜冰不在現行選項時改為不指定。**R-06**：`department_ids[:200]` 會切在數字中間（`…,74,75,800` → `…,74,75,80`，部門 800 消失、部門 80 憑空取得可見權）→ 改為超長就擋下。**權限清單不截斷。****R-07**：抽出 `parse_department_ids()`，一次處理格式、存在性、啟用狀態（`lstrip("-")` 讓 -3 通過、外鍵 500）。**R-08**：補 `https://` 的判斷收窄成「看起來像網域開頭」，`tel:`／`mailto:` 不再被補成壞掉的連結。**R-09**：店家的店名／電話／地址套 `clean_text`。煙霧測試 43 → **51 項**，R-01 的測試已依審核要求驗過「拿掉 `_own_qty` 會紅」。**未處理**：N-14 多 worker 索引日誌（改以交班文件的人工確認步驟涵蓋）、N-15 匯入 schema、P2-01/03/04/05/12 → V2.12。 |
@@ -479,15 +546,21 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 > **與 Sela 議定的三包規劃**（依序做，審稿 md 各自對應）：
 > - **V2.10.0 管理後台流程第一包 — 已完成**（公告二合一＋提案 1/3/7＋清除測試團安全性）
-> - **V2.11 管理後台流程第二包＋危險操作**：提案 2（手動新增店家表單）、提案 4（部門成員批次加入）、提案 5（使用者列表顯部門＋指派入口）、提案 6（店家列表快捷操作與搜尋）、儀表板重整（修 `/admin/users` 重複連結、分「今天要處理的／管理入口」兩區）、危險操作三項（清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響）、下架兩處訪客清理工具
+> - **V2.11 管理後台流程第二包＋危險操作**（V2.13.0 做了提案 2／6／刪店家確認，V2.13.1 做了菜單差異預覽；剩提案 4／5、儀表板分區、清除測試團兩段式、全體登出影響說明）：提案 2（手動新增店家表單）、提案 4（部門成員批次加入）、提案 5（使用者列表顯部門＋指派入口）、提案 6（店家列表快捷操作與搜尋）、儀表板重整（修 `/admin/users` 重複連結、分「今天要處理的／管理入口」兩區）、危險操作三項（清除測試團兩段式預覽、刪店家改輸入店名確認、全體登出顯示在線人數影響）、下架兩處訪客清理工具
 > - **V2.12 防再犯基礎設施**：Alembic 評估（注意坑 #1，本專案刻意不用）、授權 dependency 取代 handler 各自檢查、時間單一真相（坑 #24 那類時區問題的根治）、表單輸入 schema — 見「程式碼優化與維護建議」md 的 H/A/G/J 節
 > - **獨立長工 大重構**：巨型 router 拆分（`admin.py` 已 1700+ 行）、`group.html` 1359 行拆 JS、Jinja 環境統一（解坑 #6）、函式內 import 清理 — 功能穩定期再動，需全站回歸
+>
+> **V2.14.0 審核未做清單（依優先）**：P1-7 套件升級鏈（TemplateResponse 新 API → fastapi 0.115/starlette 0.46/python-multipart 0.0.20/jinja2 3.1.6 → pip-audit）；P1-8 啟動遷移改 `railway.toml` preDeployCommand + advisory lock + 先查 information_schema；P2-5 匯入預覽→確認的版本檢查（409）；P2-7/8/11 時價生命週期配套（未定價時送出提示上限、禁折扣、禁重開團）；P2-13 收款文字沒讀 `lucky_winner_ids`（待確認是否刻意）；P2-14 刪加料硬刪 FK；P2-15 清除訪客子表與 aborted 交易；P2-16 清除測試團加 7 天條件；P2-17 Excel 公式注入；P2-F1 倒數計時器不清除；P2-F2 點餐彈窗不重設；P2-F3 async 路由含同步 IO；P2-F4 開團不檢查店家可用；P2-F5 推薦上傳不走 upload_service；P2-F6 CDN 鎖版＋SRI；P2-F7 LINE 取消授權 422；P3 ×13（`quote` safe、GET logout、安全標頭、last_active 節流、QR 端點未登入、README 變數名、close_group 抽獎無鎖、中獎 contains、投票雙送、複製上次排序不一致、`int()` 截斷、範本邊界、死碼）。
+>
+> **審稿《菜單管理優化》＋內部審核 V2.15.0 — Sela 已排定順序**：✅ V2.16.0 A-1/A-2/A-5/A-8 菜單呈現 → ✅ V2.16.1 匯入介面 B-3/5/6/7/8/9/10 → **V2.17.0 第二階段工作台分頁重組**（菜單／共用選項／店家設定／更多；甜冰點選標籤＋預設組；加料批次編輯一次儲存）→ **V2.18.0 P1-7 套件升級鏈**。每包先出畫面稿。**不做**（Sela 決定）：A-4 菜單搜尋、A-6 停售灰字列出、A-7 時價提示文。
+>
+> **匯入 P2 後半（仍要動資料表）**：`item.variants` 取代 price/price_l、店家層級加料匯入、後台上傳照片直接轉 JSON、`store.currency`。
 >
 > **零星待辦**：核對單 PDF/Excel 改用 actual 出貨鏈（兩輪審稿點名，現以「原始品項」標示過渡）；候補列進核對單 PDF（分頁高度計算是已知重疊坑，見坑 #23）
 
 > **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為更早的功能性 backlog。
 
-1. **匯入價格容錯**（V1.7.0 預告的下一步）— `schemas/menu.py` + `import_service.py` 處理「時價」「$30」「30元」「全形數字」等非純數字輸入：能解析的自動轉（$30→30），不能解析的（時價）給明確提示或存為 0 + 標記。單獨做、單獨測，不跟其他混
+1. ~~匯入價格容錯~~（✅ V2.14.0 做掉：`parse_price_input()`，時價轉 `price_tbd`）
 2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
 2. 訂單匯出 Excel — 原本 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
 3. 外送費分攤功能 — `scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
@@ -514,6 +587,9 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
   7. **跑 `scripts/smoke_test.py`**（V2.10.1 起）：`pip install -q --break-system-packages -r requirements.txt` 後
      `SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py`，
      跑完 `rm -f _smoke.db` 並清 `__pycache__` 再打包。改到公告／飲料選項／匯入／deadline 邏輯時要一併更新這支測試
+  8. **跑 `scripts/check_frontend_import.py`**（V2.15.0 起）：`PYTHONPATH=. python scripts/check_frontend_import.py`。
+     需要 node_modules 有 jsdom、alpinejs、htmx.org（`npm i jsdom@24 alpinejs@3 htmx.org@1.9.10` 或設 NODE_PATH），沒有就跳過。
+     改到匯入頁的 htmx 觸發器或拖檔邏輯時必跑
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作

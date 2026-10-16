@@ -30,7 +30,7 @@
         {% if vote.is_open %}
         <div class="mt-3 p-3 bg-sela-50 rounded-lg text-sm text-sela-800 flex items-center justify-between">
             <span><i class="ti ti-alarm"></i> 投票進行中</span>
-            <span x-data="countdown('{{ vote.deadline.isoformat() }}')" x-text="display" class="font-medium"></span>
+            <span x-data='countdown({{ vote.deadline.isoformat() | tojson }})' x-text="display" class="font-medium"></span>
         </div>
         {% else %}
         <div class="mt-3 p-3 bg-sela-100 rounded-lg text-sm text-sela-800/70">

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -21,6 +22,8 @@ from app.services.export_service import generate_order_text, generate_payment_te
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+from app.templating import register_filters as _register_filters  # V2.15.1：money/taipei 共用
+_register_filters(templates.env)
 settings = get_settings()
 
 # 台北時區
@@ -126,7 +129,6 @@ def _new_group_context(db: Session, user, *, stores, departments,
     `GET /groups/{id}/copy` 直接 UndefinedError 500 —— 複製開團完全失效。
     抽成共用函式，之後任何一方加欄位都不會再漏掉另一方。
     """
-    from sqlalchemy import func
     from app.models.template import GroupTemplate
     from app.models.user import UserFavorite
 
@@ -432,53 +434,10 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         last_order = previous_order
         last_order_items = previous_order.items
     
-    # 取得用戶在同店家的常點品項（統計前 5 名）
-    from sqlalchemy import func
-    favorite_items = db.query(
-        OrderItem.item_name,
-        OrderItem.menu_item_id,
-        func.count(OrderItem.id).label('count')
-    ).join(Order).join(Group).filter(
-        Group.store_id == group.store_id,
-        Order.user_id == user.id,
-        Order.status == OrderStatus.SUBMITTED
-    ).group_by(OrderItem.item_name, OrderItem.menu_item_id).order_by(
-        func.count(OrderItem.id).desc()
-    ).limit(5).all()
-    
-    # 取得該店家熱門品項（全站統計，最近 30 天）
-    from datetime import timedelta
-    # V2.10.2：Order.created_at 是 UTC，門檻若從台北時間算，窗口會變成 29 天 16 小時
-    # （坑 #25 的反向案例）。滾動窗直接從 utcnow() 起算，寫法同 home.py::get_hot_items
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    hot_items = db.query(
-        OrderItem.item_name,
-        OrderItem.menu_item_id,
-        func.sum(OrderItem.quantity).label('total_qty')
-    ).join(Order).join(Group).filter(
-        Group.store_id == group.store_id,
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= thirty_days_ago
-    ).group_by(OrderItem.item_name, OrderItem.menu_item_id).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(5).all()
-    
     # 限定部門/私人團可見性（V2.8.0 審稿：後端真正阻擋）
     # 取得菜單品項（含分類）
     menu = group.menu
 
-    # 個人常點（此使用者在此店家點過最多的品項，對應到目前菜單中可點的）
-    my_freq_rows = db.query(
-        OrderItem.menu_item_id,
-        func.sum(OrderItem.quantity).label('cnt')
-    ).join(Order).join(Group).filter(
-        Order.user_id == user.id,
-        Group.store_id == group.store_id,
-        OrderItem.menu_item_id.isnot(None)
-    ).group_by(OrderItem.menu_item_id).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(8).all()
-    _freq_ids = [r[0] for r in my_freq_rows]
     # V2.11.1 P0-03：刪店家會把 groups.menu_id / store_id 設為 NULL，
     # 之後打開這些舊團會 AttributeError 500。菜單可能不存在，全部走 None 防護。
     _menu_items_by_id = {}
@@ -488,7 +447,58 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     # 無分類品項也要算進去，與模板一致
     for _it in (menu.items if menu is not None else []):
         _menu_items_by_id.setdefault(_it.id, _it)
-    my_frequent = [_menu_items_by_id[i] for i in _freq_ids if i in _menu_items_by_id][:4]
+
+    # V2.15.1 審核 P2-6：熱門／我的最愛／常點改用**品名**對應目前菜單。
+    # 每次匯入都是全新的 MenuItem id（版本是整份快照），用 id 對應的話，菜單一更新三個功能就失效：
+    # 熱門與最愛的按鈕 scrollToItem(舊 id) 找不到元素沒反應、同名拆成兩顆；常點整區消失。
+    # OrderItem.item_name 是下單當下的品名快照，正好拿來對應；停售的不列（點了會被擋）。
+    _by_name = {}
+    for _it in _menu_items_by_id.values():
+        if _it.is_available is not False:
+            _by_name.setdefault((_it.name or "").strip(), _it)
+
+    def _map_rows(rows, limit):
+        out, seen = [], set()
+        for name, qty in rows:
+            key = (name or "").strip()
+            it = _by_name.get(key)
+            if it is None or it.id in seen:
+                continue
+            seen.add(it.id)
+            out.append({"item_name": it.name, "menu_item_id": it.id, "total_qty": qty, "count": qty})
+            if len(out) >= limit:
+                break
+        return out
+
+    # 使用者在同店家的常點品項（前 5）
+    favorite_items = _map_rows(db.query(
+        OrderItem.item_name, func.sum(OrderItem.quantity)
+    ).join(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.user_id == user.id,
+        Order.status == OrderStatus.SUBMITTED
+    ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.quantity).desc()).limit(20).all(), 5)
+
+    # 該店家熱門品項（全站統計，最近 30 天）
+    from datetime import timedelta
+    # V2.10.2：Order.created_at 是 UTC，門檻若從台北時間算，窗口會變成 29 天 16 小時
+    # （坑 #25 的反向案例）。滾動窗直接從 utcnow() 起算，寫法同 home.py::get_hot_items
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    hot_items = _map_rows(db.query(
+        OrderItem.item_name, func.sum(OrderItem.quantity)
+    ).join(Order).join(Group).filter(
+        Group.store_id == group.store_id,
+        Order.status == OrderStatus.SUBMITTED,
+        Order.created_at >= thirty_days_ago
+    ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.quantity).desc()).limit(20).all(), 5)
+
+    # 個人常點（此使用者在此店家點過最多的品項，對應到目前菜單中可點的）
+    my_frequent = [_by_name[r["item_name"].strip()] for r in _map_rows(db.query(
+        OrderItem.item_name, func.sum(OrderItem.quantity)
+    ).join(Order).join(Group).filter(
+        Order.user_id == user.id,
+        Group.store_id == group.store_id,
+    ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.quantity).desc()).limit(20).all(), 4)]
     
     # 庫存已用量（V2.7.0：已送出佔用；有設上限的品項才需要）
     stock_used = {}
@@ -525,11 +535,12 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
         "user": user,
         "group": group,
         "store": store,
-        "branch": next((b for b in store.branches if b.id == group.branch_id), None) if group.branch_id else None,
+        "branch": next((b for b in store.branches if b.id == group.branch_id), None) if (group.branch_id and store) else None,  # V2.14.1 P2-12
         "menu": menu,
         "submitted_orders": submitted_orders,
         "my_order": my_order,
         "pending_count": pending_count,
+        "tbd_pending_count": (sum(1 for t in _tbd_items_for_group(db, group) if t["pending"]) if (group.owner_id == user.id or user.is_admin) and not group.is_open else 0),  # V2.14.0
         "pending_orders": pending_orders,
         "last_order": last_order,
         "last_order_items": last_order_items,
@@ -592,12 +603,7 @@ async def proxy_item_create(
     if price_tbd:
         price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
     else:
-        try:
-            price_dec = Decimal(str(price).strip())
-        except Exception:
-            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
-        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
-            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+        price_dec = _parse_money(price)  # V2.14.1 P2-10
     if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
         raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
@@ -657,12 +663,7 @@ async def proxy_item_update(
     if price_tbd:
         price_dec = Decimal("0")  # 未訂：先以 0 佔位，定價後回寫
     else:
-        try:
-            price_dec = Decimal(str(price).strip())
-        except Exception:
-            raise HTTPException(status_code=400, detail="價格格式錯誤（或勾選「未訂」）")
-        if not (Decimal("1") <= price_dec <= Decimal("1000000")):
-            raise HTTPException(status_code=400, detail="價格需為 1 ~ 1,000,000")
+        price_dec = _parse_money(price)  # V2.14.1 P2-10
     if stock_limit is not None and stock_limit != 0 and not (1 <= stock_limit <= 99999):
         raise HTTPException(status_code=400, detail="數量上限需為 1 ~ 99999")
     
@@ -676,47 +677,9 @@ async def proxy_item_update(
         if stock_limit < int(_used):
             raise HTTPException(status_code=400, detail=f"已有 {int(_used)} 份被訂走，上限不可低於 {int(_used)}")
     # 未訂 → 定價：回寫此團所有引用此品項且仍為 0 元的訂單（未訂快照本為暫定，唯一允許回寫的情境）
+    # V2.14.0：回寫邏輯抽成 _writeback_tbd_price，與一般店家的「時價定價」共用
     if item.price_tbd and not price_tbd and price_dec > 0:
-        # (1) 訂單列
-        db.query(OrderItem).filter(
-            OrderItem.menu_item_id == item.id,
-            OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
-            OrderItem.unit_price == 0,
-        ).update({OrderItem.unit_price: price_dec}, synchronize_session=False)
-        
-        # (2) V2.11.1 P0-07：修改中訂單的快照。
-        # 團員按「修改訂單」時系統會存快照（裡面 unit_price 是 "0.00"），
-        # 團主定價後只更新了訂單列；團員再按「取消修改」，快照還原回去，
-        # 單價就變回 0 —— 這份餐等於免費。
-        # 注意：JSON 欄位就地修改不會被 SQLAlchemy 偵測到，必須重新指派。
-        import copy as _copy
-        _editing = db.query(Order).filter(
-            Order.group_id == group.id,
-            Order.status == OrderStatus.EDITING,
-        ).all()
-        for _o in _editing:
-            _snap = _copy.deepcopy(_o.snapshot or {})
-            _changed = False
-            for _it in _snap.get("items", []):
-                if _it.get("menu_item_id") == item.id and Decimal(str(_it.get("unit_price", "0"))) == 0:
-                    _it["unit_price"] = str(price_dec)
-                    _changed = True
-                for _b in _it.get("backups", []):
-                    if _b.get("menu_item_id") == item.id and Decimal(str(_b.get("unit_price", "0"))) == 0:
-                        _b["unit_price"] = str(price_dec)
-                        _changed = True
-            if _changed:
-                _o.snapshot = _snap  # 重新指派才會寫入
-        
-        # (3) 候補列的 unit_price 也是快照，原本完全沒有回寫
-        from app.models.order import OrderItemBackup
-        db.query(OrderItemBackup).filter(
-            OrderItemBackup.menu_item_id == item.id,
-            OrderItemBackup.unit_price == 0,
-            OrderItemBackup.order_item_id.in_(
-                db.query(OrderItem.id).join(Order).filter(Order.group_id == group.id)
-            ),
-        ).update({OrderItemBackup.unit_price: price_dec}, synchronize_session=False)
+        _writeback_tbd_price(db, group, item.id, price_dec, only_zero=True)
     item.price_tbd = price_tbd
     item.name = item_name.strip()
     item.price = price_dec
@@ -770,6 +733,150 @@ async def proxy_store_icon(
     return await proxy_items_panel(group_id, request, db)
 
 
+def _parse_money(raw, *, lo="1", hi="1000000", what="價格") -> Decimal:
+    """V2.14.1 P2-10：團主輸入的金額統一走 parse_price_input（跟匯入端一樣容錯，$380 也收），
+    並擋 NaN／Infinity（Decimal("NaN") 建得起來，比大小時才 InvalidOperation → 500）與範圍。"""
+    from app.schemas.menu import parse_price_input, TBD
+    try:
+        v = parse_price_input(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if v is None or v is TBD:
+        raise HTTPException(status_code=400, detail=f"{what}格式錯誤")
+    if not v.is_finite():
+        raise HTTPException(status_code=400, detail=f"{what}格式錯誤")
+    if not (Decimal(lo) <= v <= Decimal(hi)):
+        raise HTTPException(status_code=400, detail=f"{what}需為 {lo} ~ {int(Decimal(hi)):,}")
+    return v
+
+
+def _writeback_tbd_price(db: Session, group: Group, menu_item_id: int, price_dec: Decimal, only_zero: bool):
+    """把未訂／時價品項的單價回寫到本團訂單（V2.9.0 起的機制，V2.14.0 抽成共用）。
+
+    涵蓋三處：訂單列、修改中訂單的快照（V2.11.1 P0-07）、候補列。
+    only_zero=True：只改仍為 0 的（代購「未訂→定價」一次性）；
+    only_zero=False：本團該品項全部改成這個價（一般店家時價，店家報錯了可以再改）。
+    不碰 MenuItem 本身——一般店家的時價每天不同，品項要維持時價。
+    """
+    import copy as _copy
+    from app.models.order import OrderItemBackup
+
+    q = db.query(OrderItem).filter(
+        OrderItem.menu_item_id == menu_item_id,
+        OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
+    )
+    if only_zero:
+        q = q.filter(OrderItem.unit_price == 0)
+    q.update({OrderItem.unit_price: price_dec}, synchronize_session=False)
+
+    _editing = db.query(Order).filter(
+        Order.group_id == group.id,
+        Order.status == OrderStatus.EDITING,
+    ).all()
+    for _o in _editing:
+        _snap = _copy.deepcopy(_o.snapshot or {})
+        _changed = False
+        for _it in _snap.get("items", []):
+            if _it.get("menu_item_id") == menu_item_id and (not only_zero or Decimal(str(_it.get("unit_price", "0"))) == 0):
+                _it["unit_price"] = str(price_dec)
+                _changed = True
+            for _b in _it.get("backups", []):
+                # V2.14.1 P1-3：候補的 unit_price 是「基本價＋加購加料」，回寫要保留 extras_price；
+                # only_zero 的判斷也改成「基本價仍為 0」= unit_price == extras_price
+                _ex = Decimal(str(_b.get("extras_price", "0") or "0"))
+                if _b.get("menu_item_id") == menu_item_id and (not only_zero or Decimal(str(_b.get("unit_price", "0"))) == _ex):
+                    _b["unit_price"] = str(price_dec + _ex)
+                    _changed = True
+        if _changed:
+            _o.snapshot = _snap  # JSON 欄位就地修改不會被偵測，必須重新指派
+
+    bq = db.query(OrderItemBackup).filter(
+        OrderItemBackup.menu_item_id == menu_item_id,
+        OrderItemBackup.order_item_id.in_(
+            db.query(OrderItem.id).join(Order).filter(Order.group_id == group.id)
+        ),
+    )
+    for b in bq.all():
+        ex = Decimal(str(b.extras_price or 0))
+        if only_zero and Decimal(str(b.unit_price)) != ex:
+            continue
+        b.unit_price = price_dec + ex
+    db.flush()
+
+    # V2.14.1 P2-6：改價後，已結清的換貨補退差額要重新收，否則收款文字仍顯示「已結清」
+    db.query(OrderItem).filter(
+        OrderItem.menu_item_id == menu_item_id,
+        OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
+        OrderItem.fulfillment.isnot(None),
+    ).update({OrderItem.diff_settled: False}, synchronize_session=False)
+    db.query(OrderItem).filter(
+        OrderItem.order_id.in_(db.query(Order.id).filter(Order.group_id == group.id)),
+        OrderItem.fulfillment == "substituted",
+        OrderItem.fulfilled_backup_id.in_(
+            db.query(OrderItemBackup.id).filter(OrderItemBackup.menu_item_id == menu_item_id)
+        ),
+    ).update({OrderItem.diff_settled: False}, synchronize_session=False)
+
+
+def _tbd_items_for_group(db: Session, group: Group) -> list[dict]:
+    """本團時價品項（menu_item.price_tbd）與已送出／修改中訂單的點購情況，給定價面板用。"""
+    if not group.menu_id:
+        return []
+    tbd_menu_items = db.query(MenuItem).filter(
+        MenuItem.menu_id == group.menu_id, MenuItem.price_tbd == True
+    ).order_by(MenuItem.sort_order).all()
+    if not tbd_menu_items:
+        return []
+    rows = db.query(OrderItem, Order).join(Order, OrderItem.order_id == Order.id).filter(
+        Order.group_id == group.id,
+        Order.status.in_((OrderStatus.SUBMITTED, OrderStatus.EDITING)),
+        OrderItem.menu_item_id.in_([m.id for m in tbd_menu_items]),
+    ).options(joinedload(Order.user)).all()
+    by_item: dict[int, list] = {}
+    for oi, o in rows:
+        by_item.setdefault(oi.menu_item_id, []).append((oi, o))
+    out = []
+    for m in tbd_menu_items:
+        entries = by_item.get(m.id, [])
+        if not entries:
+            continue  # 沒人點就不用定價
+        prices = {oi.unit_price for oi, _ in entries}
+        current = max(prices) if prices else Decimal("0")
+        out.append({
+            "item": m,
+            "people": len({o.id for _, o in entries}),
+            "qty": sum(oi.quantity for oi, _ in entries),
+            "names": [f"{o.user.show_name} x{oi.quantity}" for oi, o in entries],
+            "current_price": current,          # 0 = 還沒定價
+            "pending": any(p == 0 for p in prices),
+        })
+    return out
+
+
+@router.post("/{group_id}/tbd-price/{item_id}")
+async def set_tbd_price(group_id: int, item_id: int, request: Request, price: str = Form(...), db: Session = Depends(get_db)):
+    """V2.14.0：一般店家時價品項，截止後團主定價，回寫本團訂單（不改菜單品項）"""
+    user = await get_current_user(request, db)
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
+    if group.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="僅團主可定價")
+    if group.is_open:
+        raise HTTPException(status_code=400, detail="請先截止團單再定價，截止後才不會有人再點")
+    if group.store and group.store.is_personal:
+        # V2.14.1 P2-9：代購團的定價走代購面板（會把品項改成固定價），兩條路徑同時用會出現兩種價
+        raise HTTPException(status_code=400, detail="代購團請到「管理品項」定價")
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.menu_id == group.menu_id).first()
+    if not item or not item.price_tbd:
+        raise HTTPException(status_code=404, detail="這不是本團的時價品項")
+    price_dec = _parse_money(price)  # V2.14.1 P2-10
+    _settle_editing(db, group)
+    _writeback_tbd_price(db, group, item.id, price_dec, only_zero=False)
+    db.commit()
+    return await fulfillment_panel(group_id, request, db)
+
+
 @router.get("/{group_id}/fulfillment")
 async def fulfillment_panel(group_id: int, request: Request, db: Session = Depends(get_db)):
     """缺貨處理面板（團主/管理員）"""
@@ -802,6 +909,7 @@ async def fulfillment_panel(group_id: int, request: Request, db: Session = Depen
         "request": request,
         "group": group,
         "item_groups": item_groups,
+        "tbd_items": _tbd_items_for_group(db, group),  # V2.14.0
     })
 
 
@@ -1031,7 +1139,6 @@ async def treat_history(group_id: int, request: Request, db: Session = Depends(g
     
     # 取得此店家的所有請客記錄
     from app.models.treat import TreatRecord
-    from sqlalchemy import func
     
     records = db.query(
         TreatRecord.treat_user_id,
@@ -1105,12 +1212,7 @@ async def set_order_discount(
     # 解析折扣金額（空字串或 0 = 取消折扣）
     amt = Decimal("0")
     if discount_amount and discount_amount.strip():
-        try:
-            amt = Decimal(discount_amount.strip())
-        except (InvalidOperation, ValueError):
-            raise HTTPException(status_code=400, detail="折扣金額必須是數字")
-    if amt < 0:
-        amt = Decimal("0")
+        amt = _parse_money(discount_amount, lo="0", what="折扣金額")  # V2.14.1 P2-10：擋 NaN、負數、超大
     # 折扣不可超過原價
     if amt > order.items_subtotal:
         amt = order.items_subtotal

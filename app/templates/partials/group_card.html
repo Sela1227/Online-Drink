@@ -26,7 +26,7 @@
             <span class="text-sela-800/35">尚無訂單</span>
             {% endif %}
             {% if group.is_open %}
-            <span x-data="countdown('{{ group.deadline.isoformat() }}')"
+            <span x-data='countdown({{ group.deadline.isoformat() | tojson }})'
                   class="font-medium px-2 py-0.5 rounded-full inline-flex items-center gap-1 transition-colors"
                   :class="urgent ? 'bg-red-100 text-red-700 animate-pulse' : 'text-sela-800 bg-sela-100'">
                 <i class="ti ti-clock" x-show="!urgent"></i><i class="ti ti-flame" x-show="urgent" x-cloak></i><span x-text="display"></span>

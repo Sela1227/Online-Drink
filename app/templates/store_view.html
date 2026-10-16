@@ -152,7 +152,7 @@
         <div class="flex flex-wrap gap-2">
             {% for topping in store.toppings|sort(attribute='sort_order') if topping.is_active %}
             <span class="px-2.5 py-1 bg-sela-50 text-sela-800 rounded-lg text-sm">
-                {{ topping.name }} +${{ topping.price|int }}
+                {{ topping.name }} +${{ topping.price|money }}
             </span>
             {% endfor %}
         </div>

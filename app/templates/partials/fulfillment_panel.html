@@ -4,7 +4,40 @@
     <i class="ti ti-lock"></i> 請先截止團單，再進行缺貨與換貨處理<br>
     <span class="text-xs text-sela-800/45">（開放中處理會與團員改單互相覆蓋）</span>
 </div>
-{% elif not item_groups %}
+{% else %}
+{% if tbd_items %}
+{# V2.14.0：一般店家時價品項，截止後定價回寫本團 #}
+<div class="mb-4 bg-white border border-sela-200 rounded-2xl p-3">
+    {% set tbd_pending = tbd_items | selectattr('pending') | list | length %}
+    <div class="text-sm font-semibold text-sela-800 mb-1"><i class="ti ti-tag"></i> 時價品項定價
+        <span class="text-xs font-normal {% if tbd_pending %}text-amber-700{% else %}text-sela-800/50{% endif %}">{% if tbd_pending %}{{ tbd_pending }} 項待定價{% else %}全部已定價{% endif %}</span>
+    </div>
+    <p class="text-xs text-sela-800/55 mb-3">店家報價後填單價，本團所有點了這項的訂單一起更新，收款明細自動正確。菜單上的品項維持「時價」，不影響其他團。</p>
+    <div class="border border-sela-100 rounded-xl divide-y divide-sela-100">
+        {% for t in tbd_items %}
+        <div class="px-3 py-2.5">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="text-sm">
+                    <span class="font-medium text-sela-800">{{ t.item.name }}</span>
+                    <span class="text-xs text-sela-800/50">{{ t.people }} 人・共 {{ t.qty }} 份</span>
+                    {% if not t.pending %}<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">已定 ${{ t.current_price|money }}</span>{% endif %}
+                </div>
+                <form hx-post="/groups/{{ group.id }}/tbd-price/{{ t.item.id }}" hx-target="#fulfillment-content" hx-swap="innerHTML"
+                      @htmx:after-request="$dispatch('orderUpdated')" class="flex items-center gap-1.5">
+                    <span class="text-sm text-sela-800/60">$</span>
+                    <input type="number" name="price" min="1" max="1000000" step="1" required placeholder="單價"
+                           value="{% if not t.pending %}{{ t.current_price|int }}{% endif %}"
+                           class="w-24 border border-sela-200 rounded-lg px-2 py-1.5 text-base">
+                    <button type="submit" class="px-3 py-1.5 rounded-lg text-sm {% if t.pending %}bg-sela-800 text-white{% else %}border border-sela-200 text-sela-800{% endif %}">{% if t.pending %}定價{% else %}改價{% endif %}</button>
+                </form>
+            </div>
+            <div class="text-xs text-sela-800/50 mt-1">{{ t.names | join('・') }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% if not item_groups %}
 <div class="text-center py-8 text-sela-800/45 text-sm">尚無已結單品項</div>
 {% else %}
 <p class="text-xs text-sela-800/55 mb-3">店家說什麼缺貨，就展開那個品項，逐人選用候補或標記缺貨不出。補退金額已含折扣與補助效果。</p>
@@ -23,7 +56,7 @@
             <div class="py-2.5">
                 <div class="flex items-center gap-2 text-sm">
                     <span class="font-medium text-sela-800">{{ order.user.show_name }}</span>
-                    <span class="text-sela-800/50 text-xs">x{{ item.quantity }}・${{ item.subtotal|int }}</span>
+                    <span class="text-sela-800/50 text-xs">x{{ item.quantity }}・${{ item.subtotal|money }}</span>
                     {% if item.sugar or item.ice %}<span class="text-sela-800/45 text-xs">{{ item.sugar or '' }}{% if item.sugar and item.ice %}/{% endif %}{{ item.ice or '' }}</span>{% endif %}
                 </div>
 
@@ -36,7 +69,7 @@
                             hx-target="#fulfillment-content" hx-swap="innerHTML"
                             class="text-xs bg-sela-50 border border-sela-200 text-sela-800 rounded-full px-2.5 py-1.5 active:bg-sela-100">
                         換候補{{ b.priority }} {{ b.item_name }}
-                        {% if bdiff > 0 %}<span class="text-amber-600">+${{ bdiff|int }}</span>{% elif bdiff < 0 %}<span class="text-green-600">-${{ (0 - bdiff)|int }}</span>{% endif %}
+                        {% if bdiff > 0 %}<span class="text-amber-600">+${{ bdiff|money }}</span>{% elif bdiff < 0 %}<span class="text-green-600">-${{ (0 - bdiff)|money }}</span>{% endif %}
                     </button>
                     {% endfor %}
                     {% if not item.backups %}<span class="text-xs text-sela-800/40 py-1.5">（未填候補）</span>{% endif %}
@@ -53,8 +86,8 @@
                     <span class="text-xs bg-sela-100 text-sela-800/70 rounded-full px-2.5 py-1"><i class="ti ti-x"></i> 缺貨不出</span>
                     {% endif %}
                     {% set d = order.settle_diff %}
-                    {% if d > 0 %}<span class="text-xs text-amber-700 font-medium">此人需補 ${{ d|int }}</span>
-                    {% elif d < 0 %}<span class="text-xs text-green-700 font-medium">此人需退 ${{ (0 - d)|int }}</span>
+                    {% if d > 0 %}<span class="text-xs text-amber-700 font-medium">此人需補 ${{ d|money }}</span>
+                    {% elif d < 0 %}<span class="text-xs text-green-700 font-medium">此人需退 ${{ (0 - d)|money }}</span>
                     {% else %}<span class="text-xs text-sela-800/45">補退 $0</span>{% endif %}
                     <button hx-post="/groups/{{ group.id }}/fulfillment/{{ item.id }}"
                             hx-vals='{"action": "toggle_settled"}'
@@ -74,4 +107,5 @@
     </details>
     {% endfor %}
 </div>
+{% endif %}
 {% endif %}
