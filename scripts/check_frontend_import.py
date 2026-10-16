@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 NODE_SCRIPT = ROOT / "scripts" / "jsdom_import_check.js"
 SORT_SCRIPT = ROOT / "scripts" / "jsdom_store_sort_check.js"  # V2.16.2 店家排序
 GROUP_SCRIPT = ROOT / "scripts" / "jsdom_group_check.js"  # V2.18.0 團頁
+WORKBENCH_SCRIPT = ROOT / "scripts" / "jsdom_workbench_check.js"  # V2.21.0 工作台共用選項
 
 os.environ["DATABASE_URL"] = "sqlite:///./_importcheck.db"
 os.environ["SECRET_KEY"] = "template_check_only"
@@ -123,6 +124,13 @@ def _render_pages() -> dict:
     pages["__group_owner_mine__"] = c.get(f"/groups/{g_owner.id}/orders/mine").text
     pages["__group_owner_wall__"] = c.get(f"/groups/{g_owner.id}/orders/wall").text
     assert 'data-cart-count="1"' in pages["__group_member_mine__"], "member 購物車片段應有 1 件"
+    # V2.21.0 工作台共用選項：丁店（飲料，甜度 全糖／半糖）加兩項加料，第二項停用
+    from app.models.store import StoreTopping
+    db.add_all([StoreTopping(store_id=ding.id, name="珍珠", price=10, sort_order=0, is_active=True),
+                StoreTopping(store_id=ding.id, name="椰果", price=10, sort_order=1, is_active=False)]); db.commit()
+    adm.get_admin_user = fake_admin
+    pages["__workbench__"] = c.get(f"/admin/stores/{ding.id}?tab=options").text
+    assert 'id="toppings-form"' in pages["__workbench__"], "工作台應有加料表單"
     db.close()
     return pages
 
@@ -148,6 +156,7 @@ def main():
         sim_path.write_text(pages.pop("__similar__"), encoding="utf-8")
         sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__"), "catalog": pages.pop("__catalog__")}
         group_pages = {k: (pages.pop(f"__group_{k}__"), pages.pop(f"__group_{k}_mine__"), pages.pop(f"__group_{k}_wall__")) for k in ("member", "owner")}
+        workbench_page = pages.pop("__workbench__")
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -195,6 +204,20 @@ def main():
             else:
                 problems.append(f"group/{mode}：{res.get('msg')}")
                 print(f"  !   group/{mode}：{res.get('msg')}")
+        # V2.21.0：店家工作台共用選項（甜冰標籤、加料批次編輯、分頁切換）
+        print("[前端] 店家工作台（jsdom）")
+        p = Path(td) / "workbench.html"; p.write_text(workbench_page, encoding="utf-8")
+        r = subprocess.run(["node", str(WORKBENCH_SCRIPT), str(p)], env=env, capture_output=True, text=True, timeout=60)
+        line = (r.stdout.strip().splitlines() or [""])[-1]
+        try:
+            res = json.loads(line)
+        except Exception:
+            res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
+        if res.get("ok"):
+            print("  OK  甜冰標籤新增／排序／移除／預設組 → 送出值；加料改名／空白與重複擋下／新增／刪除可復原／排序 → toppings_json；刪除要確認；分頁切換與網址")
+        else:
+            problems.append(f"workbench：{res.get('msg')}")
+            print(f"  !   workbench：{res.get('msg')}")
     for f in (ROOT / "_importcheck.db",):
         if f.exists():
             f.unlink()

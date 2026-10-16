@@ -62,7 +62,9 @@
         </div>
 
         <div class="flex gap-1 mt-4 border-b border-sela-100 -mb-4 overflow-x-auto">
-            {% for key, label, icon in [('menu','菜單','ti-clipboard-list'), ('info','基本資料','ti-pencil'), ('ops','營運設定','ti-settings'), ('more','更多','ti-dots')] %}
+            {# V2.21.0 分頁重組：菜單／共用選項（甜冰、加料）／店家設定（基本資料、分店、可見範圍）／更多。團購店沒有共用選項分頁 #}
+            {% set wb_tabs = [('menu','菜單','ti-clipboard-list')] + ([('options','共用選項','ti-adjustments')] if has_options else []) + [('settings','店家設定','ti-building-store'), ('more','更多','ti-dots')] %}
+            {% for key, label, icon in wb_tabs %}
             <button type="button" @click='tab = {{ key | tojson }}'
                     :class='tab === {{ key | tojson }} ? "border-sela-700 text-sela-800 font-medium" : "border-transparent text-sela-800/55"'
                     class="px-3 py-2 text-sm border-b-2 whitespace-nowrap -mb-px">
@@ -155,8 +157,122 @@
         <p class="text-xs text-sela-800/45 px-1">更新菜單會新增一個版本，舊版本保留。進行中的團用的是它開團當時的版本，不會被影響。</p>
     </div>
 
-    <!-- ════ 基本資料 ════ -->
-    <div x-show="tab === 'info'" x-cloak class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+    {% if has_options %}
+    <!-- ════ 共用選項（V2.21.0：甜冰點選標籤＋預設組、加料一次儲存） ════ -->
+    <div x-show="tab === 'options'" x-cloak class="space-y-3" id="tab-options">
+        {% if saved == 'options' %}<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"><i class="ti ti-circle-check"></i> 甜度／冰塊已儲存</div>{% endif %}
+        {% if saved == 'toppings' %}<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"><i class="ti ti-circle-check"></i> 加料已儲存</div>{% endif %}
+        <p class="text-xs text-sela-800/55 px-1">這家店所有品項共用。菜單匯入不會動到這裡。</p>
+
+        {% if store.category and store.category.value == 'drink' %}
+        <form action="/admin/stores/{{ store.id }}/options" method="post" id="options-form"
+              class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4 space-y-4"
+              x-data='{ dirty: false }' @tags-changed="dirty = true">
+            <h2 class="font-medium text-sela-800"><i class="ti ti-cup"></i> 甜度／冰塊</h2>
+            {% for field, label, values, presets, ph in [
+                ('sugar_options', '甜度', sugar_list, [('無糖 → 全糖', ['無糖','微糖','半糖','少糖','全糖']), ('正常糖 → 無糖', ['正常糖','少糖','半糖','微糖','無糖'])], '例：二分糖'),
+                ('ice_options', '冰塊', ice_list, [('正常冰 → 去冰', ['正常冰','少冰','微冰','去冰']), ('含常溫／熱', ['正常冰','少冰','微冰','去冰','常溫','熱'])], '例：溫')] %}
+            <div x-data='tagEditor({{ values | tojson }})' data-field="{{ field }}" class="tag-editor">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm font-medium text-sela-800/80">{{ label }}</span>
+                    <span class="text-xs text-sela-800/45" x-text="tags.length ? tags.length + ' 個・左到右就是點餐時的順序' : '不提供（點餐時不會問）'"></span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mb-2 min-h-[2.25rem]">
+                    <template x-for="(t, i) in tags" :key="t">
+                        <span class="inline-flex items-center gap-0.5 pl-1 pr-1 py-1 rounded-full bg-sela-800 text-white text-sm tag-chip">
+                            <button type="button" x-show="i > 0" @click="move(i, -1)" class="w-6 h-6 rounded-full flex items-center justify-center text-white/70 active:bg-white/20" aria-label="往前"><i class="ti ti-chevron-left"></i></button>
+                            <span class="px-1" x-text="t"></span>
+                            <button type="button" @click="remove(i)" class="w-6 h-6 rounded-full flex items-center justify-center text-white/70 active:bg-white/20" aria-label="移除"><i class="ti ti-x"></i></button>
+                        </span>
+                    </template>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" x-model="draft" @keydown.enter.prevent="add()" maxlength="50" placeholder="{{ ph }}"
+                           class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                    <button type="button" @click="add()" :disabled="!draft.trim()" class="px-3 rounded-lg border border-sela-300 text-sela-700 text-sm whitespace-nowrap disabled:opacity-40">新增</button>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
+                    <span class="text-sela-800/45">預設組：</span>
+                    {% for plabel, pvals in presets %}
+                    <button type="button" @click='usePreset({{ pvals | tojson }})' class="px-2.5 py-1 rounded-full border border-sela-200 bg-sela-50 text-sela-800/80 preset-btn">{{ plabel }}</button>
+                    {% endfor %}
+                    <button type="button" x-show="tags.length" @click="tags = []; changed()" class="px-2.5 py-1 rounded-full text-sela-800/50 underline">全部清除</button>
+                </div>
+                <input type="hidden" name="{{ field }}" :value="tags.join(',')">
+            </div>
+            {% endfor %}
+            {% if active_group_count %}
+            <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-sela-800/80">
+                <i class="ti ti-alert-triangle text-amber-600 mt-0.5"></i>
+                <div>有 <span class="font-semibold">{{ active_group_count }} 個進行中的團</span>。已送出的訂單不受影響；還在點餐的人會看到新選項。</div>
+            </div>
+            {% endif %}
+            <div class="flex items-center justify-end gap-3">
+                <span x-show="dirty" x-cloak class="text-xs text-amber-700">有未儲存的變更</span>
+                <button type="submit" class="btn btn-primary px-4 py-2 text-sm">儲存甜度／冰塊</button>
+            </div>
+        </form>
+        {% endif %}
+
+        <form action="/admin/stores/{{ store.id }}/toppings/batch" method="post" id="toppings-form"
+              class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4"
+              x-data='toppingEditor({{ topping_rows | tojson }})'
+              @submit="if (!canSave()) { $event.preventDefault(); return; } if (removed.length && !confirm('刪除 ' + removed.length + ' 項加料？已點過的訂單保留原本的名稱和價格。')) $event.preventDefault()">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-medium text-sela-800"><i class="ti ti-plus"></i> 加料</h2>
+                <span class="text-xs text-sela-800/45" x-text="rows.length + ' 項'"></span>
+            </div>
+            <p class="text-xs text-sela-800/55 mb-3">直接改名稱與加價、關掉就是停用；改完按一次儲存。</p>
+            <div class="divide-y divide-sela-100">
+                <template x-for="(r, i) in rows" :key="r.key">
+                    <div class="py-2 flex items-center gap-2 topping-row" :class="r.active ? '' : 'opacity-60'">
+                        <button type="button" @click="move(i, -1)" :disabled="i === 0" class="w-7 h-9 flex items-center justify-center text-sela-800/40 disabled:opacity-20" aria-label="往上"><i class="ti ti-arrow-up"></i></button>
+                        <input type="text" x-model="r.name" maxlength="50" placeholder="名稱" aria-label="加料名稱"
+                               :class="r.name.trim() ? 'border-sela-200' : 'border-red-300'"
+                               class="flex-1 min-w-0 border rounded-lg px-2.5 py-2 text-base">
+                        <div class="flex items-center border border-sela-200 rounded-lg pl-2 w-20 flex-shrink-0">
+                            <span class="text-sela-800/45 text-sm">+$</span>
+                            <input type="number" x-model="r.price" min="0" max="9999" step="1" inputmode="numeric" aria-label="加價" class="w-full min-w-0 px-1 py-2 text-base outline-none bg-transparent">
+                        </div>
+                        <label class="flex items-center flex-shrink-0 cursor-pointer" :title="r.active ? '供應中' : '已停用'">
+                            <input type="checkbox" x-model="r.active" class="sr-only peer" aria-label="供應中">
+                            <span class="w-10 h-6 rounded-full bg-sela-200 peer-checked:bg-sela-800 relative transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-4"></span>
+                        </label>
+                        <button type="button" @click="remove(i)" class="w-8 h-9 flex items-center justify-center text-red-400 flex-shrink-0" aria-label="刪除加料"><i class="ti ti-trash"></i></button>
+                    </div>
+                </template>
+                <div x-show="!rows.length" class="py-3 text-sm text-sela-800/50">還沒有加料。</div>
+            </div>
+            <button type="button" @click="addRow()" class="mt-2 w-full py-2 rounded-lg border border-dashed border-sela-300 text-sm text-sela-700"><i class="ti ti-plus"></i> 新增一項</button>
+            <div x-show="removed.length" x-cloak class="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-sela-800/60">
+                <span>儲存後刪除：</span>
+                <template x-for="(r, i) in removed" :key="r.key">
+                    <button type="button" @click="undo(i)" class="px-2 py-0.5 rounded-full bg-red-50 text-red-600 line-through" x-text="r.name || '（未命名）'" title="按一下復原"></button>
+                </template>
+                <span class="text-sela-800/40">（按一下復原）</span>
+            </div>
+            <input type="hidden" name="toppings_json" :value="payload()">
+            <div class="mt-3 space-y-2">
+                {% if active_group_count %}
+            <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-sela-800/80">
+                <i class="ti ti-alert-triangle text-amber-600 mt-0.5"></i>
+                <div>有 <span class="font-semibold">{{ active_group_count }} 個進行中的團</span>。已送出的訂單不受影響；還在點餐的人會看到新選項。</div>
+            </div>
+            {% endif %}
+                <div class="flex items-center justify-end gap-3">
+                    <span x-show="error()" x-cloak class="text-xs text-red-600" x-text="error()"></span>
+                    <span x-show="!error() && dirty()" x-cloak class="text-xs text-amber-700">有未儲存的變更</span>
+                    <button type="submit" :disabled="!canSave()" class="btn btn-primary px-4 py-2 text-sm disabled:opacity-40" id="toppings-save">儲存加料</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- ════ 店家設定（基本資料＋分店＋可見範圍） ════ -->
+    <div x-show="tab === 'settings'" x-cloak class="space-y-3" id="tab-settings">
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+            <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-pencil"></i> 基本資料</h2>
         <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
             <div class="grid sm:grid-cols-2 gap-3">
                 <div class="sm:col-span-2">
@@ -230,59 +346,11 @@
             </details>
 
             <div class="flex items-center justify-between pt-3 border-t border-sela-100">
-                <span class="text-xs text-sela-800/45">各分頁各自儲存，互不影響</span>
+                <span class="text-xs text-sela-800/45">每張卡片各自儲存</span>
                 <button type="submit" class="bg-sela-700 text-white px-4 py-2 rounded-lg text-sm font-medium"><i class="ti ti-device-floppy"></i> 儲存基本資料</button>
             </div>
         </form>
-    </div>
-
-    <!-- ════ 營運設定 ════ -->
-    <div x-show="tab === 'ops'" x-cloak class="space-y-3">
-        {% if store.category and store.category.value == 'drink' %}
-        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
-            <h2 class="font-medium text-sela-800 mb-1"><i class="ti ti-cup"></i> 甜度／冰塊</h2>
-            <p class="text-xs text-sela-800/55 mb-3">以逗號分隔，順序即顯示順序。留空代表不提供。</p>
-            <form action="/admin/stores/{{ store.id }}/options" method="post" class="space-y-2">
-                <div class="flex gap-2">
-                    <input type="text" id="sugar-input" name="sugar_options" value="{{ sugar_options }}" placeholder="無糖,微糖,半糖,少糖,全糖" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
-                    <button type="button" onclick="document.getElementById('sugar-input').value='無糖,微糖,半糖,少糖,全糖'" class="text-xs px-2 rounded-lg border border-sela-300 text-sela-700 whitespace-nowrap">標準五段</button>
-                </div>
-                <div class="flex gap-2">
-                    <input type="text" id="ice-input" name="ice_options" value="{{ ice_options }}" placeholder="正常冰,少冰,微冰,去冰" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
-                    <button type="button" onclick="document.getElementById('ice-input').value='正常冰,少冰,微冰,去冰'" class="text-xs px-2 rounded-lg border border-sela-300 text-sela-700 whitespace-nowrap">標準四段</button>
-                </div>
-                {% if active_group_count %}
-                <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-sela-800/80">
-                    <i class="ti ti-alert-triangle text-amber-600 mt-0.5"></i>
-                    <div>有 <span class="font-semibold">{{ active_group_count }} 個進行中的團</span>。已送出的訂單不受影響；還在點餐的人會看到新選項。</div>
-                </div>
-                {% endif %}
-                <div class="flex justify-end"><button type="submit" class="bg-sela-700 text-white px-4 py-2 rounded-lg text-sm">儲存選項</button></div>
-            </form>
         </div>
-        {% endif %}
-
-        {% if store.category and store.category.value in ['drink', 'meal'] %}
-        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
-            <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 加料</h2>
-            {% if store.toppings %}
-            <div class="flex flex-wrap gap-2 mb-3">
-                {% for t in store.toppings %}
-                <span class="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full bg-sela-100 {% if not t.is_active %}line-through opacity-50{% endif %}">
-                    {{ t.name }} +{{ t.price | int }}
-                    <form action="/admin/stores/{{ store.id }}/toppings/{{ t.id }}/toggle" method="post" class="inline"><button type="submit" class="text-sela-800/50 text-xs ml-1" title="{{ '啟用' if not t.is_active else '停用' }}"><i class="ti {{ 'ti-player-play' if not t.is_active else 'ti-player-pause' }}"></i></button></form>
-                    <form action="/admin/stores/{{ store.id }}/toppings/{{ t.id }}/delete" method="post" class="inline" data-name="{{ t.name }}" onsubmit="return confirm('刪除加料「' + this.dataset.name + '」？')"><button type="submit" class="text-sela-800/50 text-xs"><i class="ti ti-x"></i></button></form>
-                </span>
-                {% endfor %}
-            </div>
-            {% endif %}
-            <form action="/admin/stores/{{ store.id }}/toppings" method="post" class="flex gap-2">
-                <input type="text" name="topping_name" placeholder="名稱" required maxlength="50" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
-                <input type="number" name="topping_price" placeholder="加價" value="0" min="0" class="w-20 border border-sela-200 rounded-lg px-3 py-2 text-base">
-                <button type="submit" class="bg-sela-700 text-white px-3 rounded-lg text-sm whitespace-nowrap">新增</button>
-            </form>
-        </div>
-        {% endif %}
 
         <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
             <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-building-store"></i> 分店（{{ store.branches | length if store.branches else 0 }}）</h2>
@@ -352,6 +420,62 @@
 
 {% block scripts %}
 <script>
+// V2.21.0：甜冰點選標籤（順序＝點餐時的順序；送出時 join 成逗號字串，後端不變）
+function tagEditor(initial) {
+    return {
+        tags: Array.isArray(initial) ? initial.slice() : [],
+        draft: '',
+        changed() { this.$dispatch('tags-changed'); },
+        add() {
+            let added = false;
+            for (const part of this.draft.replace(/，/g, ',').split(',')) {
+                const v = part.trim().slice(0, 50);
+                if (v && !this.tags.includes(v) && this.tags.length < 20) { this.tags.push(v); added = true; }
+            }
+            this.draft = '';
+            if (added) this.changed();
+        },
+        remove(i) { this.tags.splice(i, 1); this.changed(); },
+        move(i, d) {
+            const j = i + d; if (j < 0 || j >= this.tags.length) return;
+            const t = this.tags[i]; this.tags.splice(i, 1); this.tags.splice(j, 0, t); this.changed();
+        },
+        usePreset(vals) { this.tags = vals.slice(); this.changed(); },
+    };
+}
+
+// V2.21.0：加料批次編輯（整份清單一次送出；不在清單裡的既有加料＝刪除）
+function toppingEditor(initial) {
+    let seq = 0;
+    const norm = (r) => ({ key: 'k' + (seq++), id: r.id ?? null, name: r.name || '', price: (r.price === null || r.price === undefined) ? '' : String(Math.round(Number(r.price) * 100) / 100), active: r.active !== false });
+    const rows = (initial || []).map(norm);
+    const snap = (list) => JSON.stringify(list.map(r => [r.id, r.name.trim(), Number(r.price || 0), !!r.active]));
+    return {
+        rows,
+        removed: [],
+        original: snap(rows),
+        addRow() {
+            this.rows.push(norm({ id: null, name: '', price: 0, active: true }));
+            this.$nextTick(() => { const ins = this.$el.querySelectorAll('.topping-row input[type=text]'); if (ins.length) ins[ins.length - 1].focus(); });
+        },
+        remove(i) { const r = this.rows.splice(i, 1)[0]; if (r.id !== null || r.name.trim()) this.removed.push(r); },
+        undo(i) { this.rows.push(this.removed.splice(i, 1)[0]); },
+        move(i, d) { const j = i + d; if (j < 0 || j >= this.rows.length) return; const r = this.rows.splice(i, 1)[0]; this.rows.splice(j, 0, r); },
+        dirty() { return snap(this.rows) !== this.original || this.removed.some(r => r.id !== null); },
+        error() {
+            const names = this.rows.map(r => r.name.trim());
+            if (names.some(n => !n)) return '有加料沒填名稱';
+            const dup = names.find((n, i) => names.indexOf(n) !== i);
+            if (dup) return '「' + dup + '」重複了';
+            const bad = this.rows.find(r => r.price !== '' && (isNaN(Number(r.price)) || Number(r.price) < 0 || Number(r.price) > 9999));
+            if (bad) return '「' + bad.name.trim() + '」的加價要在 0～9999';
+            return '';
+        },
+        canSave() { return this.dirty() && !this.error(); },
+        payload() { return JSON.stringify(this.rows.map(r => ({ id: r.id, name: r.name.trim(), price: r.price === '' ? 0 : Number(r.price), active: !!r.active }))); },
+    };
+}
+
 // V2.15.0：店家 Logo 的 AI 指令（原在匯入頁）
 const LOGO_PROMPT_RESTORE = [
             '請幫我把這張店家 Logo 處理成可以正式使用的版本，規則如下：',

@@ -637,11 +637,11 @@ def main():
         check("列表 200，含新增店家入口與上次開團欄")
 
         r = _c.get(f"/admin/stores/{store.id}")
-        assert r.status_code == 200 and "基本資料" in r.text and "營運設定" in r.text
-        check("工作台 200，四個分頁")
+        assert r.status_code == 200 and "店家設定" in r.text and "營運設定" not in r.text and "基本資料" in r.text
+        check("工作台 200，分頁（V2.21.0 起：菜單／共用選項／店家設定／更多）")
 
         r = _c.get(f"/admin/stores/{store.id}/edit", follow_redirects=False)
-        assert r.status_code == 301 and r.headers["location"].endswith("?tab=info")
+        assert r.status_code == 301 and r.headers["location"].endswith("?tab=settings")
         r = _c.get(f"/admin/stores/{store.id}/menus", follow_redirects=False)
         assert r.status_code == 301 and "tab=menu" in r.headers["location"]
         check("舊網址 /edit、/menus 轉址到工作台對應分頁")
@@ -907,9 +907,9 @@ def main():
         check("P0-1：團名不進 confirm() 的 JS 字串，改走 data-name")
 
         # P1-2：工作台 x-data 經 tojson 的值要放在單引號屬性，解析後屬性值必須完整
-        r = _c.get(f"/admin/stores/{store.id}?tab=info")
+        r = _c.get(f"/admin/stores/{store.id}?tab=info")  # 舊分頁名 → 店家設定（V2.21.0）
         xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "tab:" in v]
-        assert xd and 'tab: "info"' in xd[0] and "confirmName" in xd[0], xd
+        assert xd and 'tab: "settings"' in xd[0] and "confirmName" in xd[0], xd
         r = _c.get("/admin/stores/new")
         xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "existing" in v]
         assert xd and "existing: [" in xd[0] and xd[0].rstrip().endswith("}"), xd
@@ -2017,6 +2017,99 @@ def main():
         _grp.get_current_user = _orig_cu
         _grp.get_current_user_optional = _orig_cuo
         _ordm31.get_current_user = _orig_ordm_cu
+
+    # ---------- 32. V2.21.0 工作台分頁重組 ----------
+    print("\n[32] V2.21.0 工作台分頁重組（共用選項／店家設定、甜冰標籤、加料一次儲存）")
+    from app.models.store import StoreTopping as _ST32
+    from app.models.order import OrderItem as _OI32, OrderItemTopping as _OIT32
+    _adm.get_admin_user = _fake_admin
+    try:
+        _ds = Store(name="分頁測試茶飲", category=CategoryType.DRINK, is_active=True); db.add(_ds); db.flush()
+        db.add_all([StoreOption(store_id=_ds.id, option_type=OptionType.SUGAR, option_value=v, sort_order=i) for i, v in enumerate(["全糖", "半糖"])])
+        _ta = _ST32(store_id=_ds.id, name="珍珠", price=10, sort_order=0, is_active=True)
+        _tb = _ST32(store_id=_ds.id, name="椰果", price=10, sort_order=1, is_active=True)
+        _tc = _ST32(store_id=_ds.id, name="布丁", price=15, sort_order=2, is_active=True)
+        db.add_all([_ta, _tb, _tc]); db.commit()
+        _gb = Store(name="分頁測試團購", category=CategoryType.GROUP_BUY, is_active=True); db.add(_gb); db.commit()
+
+        r = _c.get(f"/admin/stores/{_ds.id}"); t = r.text
+        assert r.status_code == 200 and "共用選項" in t and "店家設定" in t and 'id="tab-options"' in t and 'id="tab-settings"' in t
+        assert "營運設定" not in t and "基本資料" in t and "分店" in t and "可見範圍" in t
+        # 甜冰：標籤元件帶目前清單（順序保留）、預設組、送出欄位名不變
+        assert ("tagEditor(" + json.dumps(["全糖", "半糖"]) + ")") in t and 'name="sugar_options"' in t and 'name="ice_options"' in t
+        assert "無糖 → 全糖" in t and "正常冰 → 去冰" in t and 'id="sugar-input"' not in t
+        # 加料：一張表單一次送，舊的逐筆表單沒了
+        assert 'action="/admin/stores/%d/toppings/batch"' % _ds.id in t and 'name="toppings_json"' in t
+        assert "/toppings/%d/toggle" % _ta.id not in t and "/toppings/%d/delete" % _ta.id not in t
+        assert ('"name": "珍珠"' in t or json.dumps("珍珠") in t)
+        check("飲料店工作台：菜單／共用選項／店家設定／更多；甜冰是標籤＋預設組（欄位名不變）；加料一張表單")
+
+        r = _c.get(f"/admin/stores/{_gb.id}?tab=options")
+        assert r.status_code == 200 and "共用選項" not in r.text and 'id="tab-options"' not in r.text and 'tab: "settings"' in r.text
+        r = _c.get(f"/admin/stores/{_ds.id}?tab=ops")
+        assert 'tab: "options"' in r.text
+        check("團購店沒有共用選項分頁（?tab=options → 店家設定）；舊 ?tab=ops → 共用選項")
+
+        # 導回：甜冰 → 共用選項＋已儲存；分店／可見範圍／基本資料 → 店家設定
+        r = _c.post(f"/admin/stores/{_ds.id}/options", data={"sugar_options": "無糖,半糖,全糖", "ice_options": "去冰"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=options&saved=options")
+        r = _c.get(r.headers["location"]); assert "甜度／冰塊已儲存" in r.text and ("tagEditor(" + json.dumps(["無糖", "半糖", "全糖"]) + ")") in r.text
+        r = _c.post(f"/admin/stores/{_ds.id}/branches", data={"name": "中山店"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
+        r = _c.post(f"/admin/stores/{_ds.id}/visibility", data={"visibility": "public"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
+        check("儲存甜冰回共用選項並提示、順序照標籤；分店／可見範圍回店家設定")
+
+        # 舊的逐筆加料路由已移除
+        for _u in (f"/admin/stores/{_ds.id}/toppings", f"/admin/stores/{_ds.id}/toppings/{_ta.id}/toggle", f"/admin/stores/{_ds.id}/toppings/{_ta.id}/delete"):
+            assert _c.post(_u, data={"topping_name": "x"}).status_code in (404, 405), _u
+        check("舊的逐筆加料路由（新增／停用／刪除）已由批次儲存取代")
+
+        # 批次：改名改價、停用、排序、新增、刪除（被點過的那項）一次完成
+        _oi = db.query(_OI32).first(); assert _oi is not None
+        _oit = _OIT32(order_item_id=_oi.id, store_topping_id=_tc.id, topping_name="布丁", price=15); db.add(_oit); db.commit()
+        _rows = [{"id": _tb.id, "name": "椰果", "price": 12, "active": False},
+                 {"id": None, "name": "仙草", "price": "5", "active": True},
+                 {"id": _ta.id, "name": "黑糖珍珠", "price": 15, "active": True}]
+        r = _c.post(f"/admin/stores/{_ds.id}/toppings/batch", data={"toppings_json": json.dumps(_rows)}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=options&saved=toppings"), r.text[:200]
+        db.expire_all()
+        _now = db.query(_ST32).filter(_ST32.store_id == _ds.id).order_by(_ST32.sort_order).all()
+        assert [(x.name, int(x.price), x.is_active) for x in _now] == [("椰果", 12, False), ("仙草", 5, True), ("黑糖珍珠", 15, True)], [(x.name, x.price, x.is_active) for x in _now]
+        assert _now[0].id == _tb.id and _now[2].id == _ta.id, "既有加料要原地更新（id 不變）"
+        _oit = db.query(_OIT32).filter(_OIT32.id == _oit.id).first()
+        assert _oit.store_topping_id is None and _oit.topping_name == "布丁" and int(_oit.price) == 15
+        check("加料批次：改名改價／停用／排序／新增／刪除一次完成；被點過的加料刪掉後訂單保留名稱價格（先斷外鍵）")
+
+        # 驗證：任一列不合法整批不寫
+        _before = [(x.id, x.name, int(x.price), x.is_active, x.sort_order) for x in _now]
+        _bad_cases = [
+            ([{"id": None, "name": "  ", "price": 1}], "沒有名稱"),
+            ([{"id": None, "name": "冰淇淋", "price": 1}, {"id": None, "name": "冰淇淋", "price": 2}], "重複"),
+            ([{"id": None, "name": "冰淇淋", "price": "abc"}], "不是數字"),
+            ([{"id": None, "name": "冰淇淋", "price": 10000}], "0～9999"),
+            ([{"id": None, "name": "冰淇淋", "price": -1}], "0～9999"),
+            ([{"id": _ta.id, "name": "黑糖珍珠", "price": 15}, {"id": 999999, "name": "別家的", "price": 1}], "重新整理"),
+            ("not json", "格式錯誤"),
+        ]
+        for _payload, _msg in _bad_cases:
+            r = _c.post(f"/admin/stores/{_ds.id}/toppings/batch", data={"toppings_json": _payload if isinstance(_payload, str) else json.dumps(_payload)})
+            assert r.status_code == 400 and _msg in r.text, (_payload, r.status_code, r.text[:200])
+        db.expire_all()
+        assert [(x.id, x.name, int(x.price), x.is_active, x.sort_order) for x in db.query(_ST32).filter(_ST32.store_id == _ds.id).order_by(_ST32.sort_order).all()] == _before
+        _other_t = _ST32(store_id=_gb.id, name="別店加料", price=1); db.add(_other_t); db.commit()
+        r = _c.post(f"/admin/stores/{_ds.id}/toppings/batch", data={"toppings_json": json.dumps([{"id": _other_t.id, "name": "偷改", "price": 0}])})
+        db.expire_all()
+        assert r.status_code == 400 and db.query(_ST32).filter(_ST32.id == _other_t.id).first().name == "別店加料"
+        check("加料批次驗證：空名稱／重複／非數字／超出範圍／別家店的 id／壞 JSON → 400 且完全不寫入")
+
+        # 清空：送空清單＝全部刪除
+        r = _c.post(f"/admin/stores/{_ds.id}/toppings/batch", data={"toppings_json": "[]"}, follow_redirects=False)
+        db.expire_all()
+        assert r.status_code == 302 and db.query(_ST32).filter(_ST32.store_id == _ds.id).count() == 0
+        check("送空清單＝刪光這家店的加料")
+    finally:
+        _adm.get_admin_user = _orig
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

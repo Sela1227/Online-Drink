@@ -939,7 +939,7 @@ async def update_store_visibility(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
 @router.get("/stores/new")
@@ -989,6 +989,7 @@ async def store_workbench(
     request: Request,
     tab: str = "menu",
     created: int = 0,
+    saved: str = "",
     imported: int = 0,
     cats: int = 0,
     items: int = 0,
@@ -1036,8 +1037,17 @@ async def store_workbench(
         vals = sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)
         return ",".join(o.option_value for o in vals)
 
-    if tab not in ("menu", "info", "ops", "more"):
+    # V2.21.0 分頁重組：菜單／共用選項（甜冰、加料）／店家設定（基本資料、分店、可見範圍）／更多。
+    # 舊網址的 info／ops 對到新分頁（書籤與 V2.20.0 以前的導回網址）
+    tab = {"info": "settings", "ops": "options"}.get(tab, tab)
+    has_options = bool(store.category and store.category.value in ("drink", "meal"))
+    if tab == "options" and not has_options:
+        tab = "settings"
+    if tab not in ("menu", "options", "settings", "more"):
         tab = "menu"
+
+    def _values(opt_type):
+        return [o.option_value for o in sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)]
 
     return templates.TemplateResponse("admin/store_workbench.html", {
         "tab": tab,
@@ -1053,6 +1063,12 @@ async def store_workbench(
         "active_group_count": active_group_count,
         "sugar_options": _joined(OptionType.SUGAR),
         "ice_options": _joined(OptionType.ICE),
+        "sugar_list": _values(OptionType.SUGAR),
+        "ice_list": _values(OptionType.ICE),
+        "has_options": has_options,
+        "saved": saved,
+        "topping_rows": [{"id": t.id, "name": t.name, "price": float(t.price or 0), "active": bool(t.is_active)}
+                         for t in sorted(store.toppings, key=lambda t: (t.sort_order or 0, t.id))],
         "request": request,
         "user": user,
         "store": store,
@@ -1064,7 +1080,7 @@ async def store_workbench(
 @router.get("/stores/{store_id}/edit")
 async def edit_store_page(store_id: int):
     """V2.13.0：編輯頁併入工作台，舊連結與書籤轉過去"""
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=info", status_code=301)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=301)
 
 
 def _parse_option_values(raw: str) -> list[str]:
@@ -1123,7 +1139,7 @@ async def update_store_options(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=options&saved=options", status_code=302)
 
 
 @router.post("/stores/{store_id}/edit")
@@ -1187,7 +1203,7 @@ async def update_store(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=info", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
 @router.get("/users")
@@ -1434,7 +1450,7 @@ async def add_branch(
     db.add(branch)
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/delete")
@@ -1457,7 +1473,7 @@ async def delete_branch(
         db.delete(branch)
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}")
@@ -1485,7 +1501,7 @@ async def update_branch(
         branch.address = address.strip() if address else None
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/toggle")
@@ -1508,87 +1524,100 @@ async def toggle_branch(
         branch.is_active = not branch.is_active
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
-@router.post("/stores/{store_id}/toppings")
-async def add_topping(
+def _parse_topping_rows(raw: str) -> list[dict]:
+    """V2.21.0：加料批次編輯的 JSON → 驗證過的列（依畫面順序）。
+
+    畫面把整份清單（含新增的列）序列化成 [{id, name, price, active}]；
+    不在清單裡的既有加料＝要刪除。任何一列不合法就整批 400、不寫入。
+    """
+    from decimal import Decimal, InvalidOperation
+    try:
+        rows = json.loads(raw or "[]")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="加料資料格式錯誤，請重新整理後再試")
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="加料資料格式錯誤，請重新整理後再試")
+    if len(rows) > 50:
+        raise HTTPException(status_code=400, detail="加料最多 50 項")
+    result, seen = [], set()
+    for idx, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise HTTPException(status_code=400, detail="加料資料格式錯誤，請重新整理後再試")
+        name = str(row.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail=f"第 {idx} 項加料沒有名稱")
+        if len(name) > 50:
+            raise HTTPException(status_code=400, detail=f"加料「{name[:10]}…」名稱超過 50 字")
+        if name in seen:
+            raise HTTPException(status_code=400, detail=f"加料「{name}」重複了")
+        seen.add(name)
+        try:
+            price = Decimal(str(row.get("price") if row.get("price") not in (None, "") else 0).strip())
+        except (InvalidOperation, ValueError):
+            raise HTTPException(status_code=400, detail=f"加料「{name}」的加價不是數字")
+        if not price.is_finite() or price < 0 or price > 9999:
+            raise HTTPException(status_code=400, detail=f"加料「{name}」的加價要在 0～9999 之間")
+        tid = row.get("id")
+        if tid in (None, ""):
+            tid = None
+        else:
+            try:
+                tid = int(tid)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="加料資料格式錯誤，請重新整理後再試")
+        active = row.get("active", True)
+        active = not (active is False or str(active).lower() in ("false", "0", ""))
+        result.append({"id": tid, "name": name, "price": price, "active": active})
+    return result
+
+
+@router.post("/stores/{store_id}/toppings/batch")
+async def save_toppings_batch(
     store_id: int,
     request: Request,
-    topping_name: str = Form(...),
-    topping_price: float = Form(0),
+    toppings_json: str = Form("[]"),
     db: Session = Depends(get_db),
 ):
-    """新增加料"""
+    """V2.21.0：加料一次儲存（取代原本逐筆新增／停用／刪除三支路由）。
+
+    改名、改價、停用、排序、新增、刪除全部一次送出；依畫面順序重寫 sort_order。
+    刪除前先把 order_item_toppings.store_topping_id 斷開（訂單存的是名稱與價格快照）——
+    原本的逐筆刪除直接 db.delete，加料被點過就撞外鍵（審核 P2-14）。
+    """
     from app.models.store import StoreTopping
+    from app.models.order import OrderItemTopping
     user = await get_admin_user(request, db)
-    
+
     store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
-    
-    # 取得目前最大 sort_order
-    max_sort = db.query(StoreTopping).filter(
-        StoreTopping.store_id == store_id
-    ).count()
-    
-    topping = StoreTopping(
-        store_id=store_id,
-        name=topping_name.strip(),
-        price=topping_price,
-        sort_order=max_sort,
-        is_active=True,
-    )
-    db.add(topping)
+
+    rows = _parse_topping_rows(toppings_json)
+    existing = {t.id: t for t in db.query(StoreTopping).filter(StoreTopping.store_id == store_id).all()}
+    for r in rows:
+        if r["id"] is not None and r["id"] not in existing:
+            raise HTTPException(status_code=400, detail="加料清單已被別人改過，請重新整理後再試")
+
+    keep = {r["id"] for r in rows if r["id"] is not None}
+    gone = [tid for tid in existing if tid not in keep]
+    if gone:
+        db.query(OrderItemTopping).filter(OrderItemTopping.store_topping_id.in_(gone)).update(
+            {OrderItemTopping.store_topping_id: None}, synchronize_session=False)
+        for tid in gone:
+            db.delete(existing[tid])
+        db.flush()
+    for idx, r in enumerate(rows):
+        if r["id"] is None:
+            db.add(StoreTopping(store_id=store_id, name=r["name"], price=r["price"], sort_order=idx, is_active=r["active"]))
+        else:
+            t = existing[r["id"]]
+            t.name, t.price, t.sort_order, t.is_active = r["name"], r["price"], idx, r["active"]
     db.commit()
-    
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
 
-
-@router.post("/stores/{store_id}/toppings/{topping_id}/delete")
-async def delete_topping(
-    store_id: int,
-    topping_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """刪除加料"""
-    from app.models.store import StoreTopping
-    user = await get_admin_user(request, db)
-    
-    topping = db.query(StoreTopping).filter(
-        StoreTopping.id == topping_id,
-        StoreTopping.store_id == store_id
-    ).first()
-    
-    if topping:
-        db.delete(topping)
-        db.commit()
-    
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
-
-
-@router.post("/stores/{store_id}/toppings/{topping_id}/toggle")
-async def toggle_topping(
-    store_id: int,
-    topping_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """切換加料啟用狀態"""
-    from app.models.store import StoreTopping
-    user = await get_admin_user(request, db)
-    
-    topping = db.query(StoreTopping).filter(
-        StoreTopping.id == topping_id,
-        StoreTopping.store_id == store_id
-    ).first()
-    
-    if topping:
-        topping.is_active = not topping.is_active
-        db.commit()
-    
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=ops", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=options&saved=toppings", status_code=302)
 
 
 @router.get("/feedbacks")
