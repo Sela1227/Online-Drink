@@ -82,6 +82,12 @@ def _render_pages() -> dict:
     grp.get_current_user = fake_user
     pages["__picker__"] = c.get("/groups/new").text
     pages["__admin_stores__"] = c.get("/admin/stores").text
+    # V2.17.0 店家分頁：乙店已收藏
+    import app.routers.home as home_r
+    from app.models.user import UserFavorite
+    db.add(UserFavorite(user_id=u.id, store_id=yi.id)); db.commit()
+    home_r.get_current_user = fake_user
+    pages["__catalog__"] = c.get("/stores").text
     db.close()
     return pages
 
@@ -105,7 +111,7 @@ def main():
         frag_path.write_text(pages.pop("__fragment__"), encoding="utf-8")
         sim_path = Path(td) / "similar.html"
         sim_path.write_text(pages.pop("__similar__"), encoding="utf-8")
-        sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__")}
+        sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__"), "catalog": pages.pop("__catalog__")}
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -132,7 +138,7 @@ def main():
             except Exception:
                 res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
             if res.get("ok"):
-                print(f"  OK  {mode}：預設熱門、三種排序順序正確、卡片小字、選擇有記住{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}")
+                print(f"  OK  {mode}：預設熱門、三種排序順序正確、卡片小字、選擇有記住{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")
                 print(f"  !   sort/{mode}：{res.get('msg')}")

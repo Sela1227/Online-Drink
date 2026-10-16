@@ -126,7 +126,7 @@
     </script>
 </head>
 <body class="bg-sela-50 min-h-screen antialiased">
-{% set app_version = 'V2.16.3' %}
+{% set app_version = 'V2.17.0' %}
     <!-- HTMX 全局錯誤處理 -->
     <script>
     // V2.11.1 P1-08：htmx 預設不會把 4xx 換進頁面，所以「只剩 N 份」「超過每單
@@ -150,40 +150,13 @@
     });
     </script>
     
-    <!-- Header - 簡潔北歐風 -->
+    <!-- Header（V2.17.0 IA：只留 logo。管理後台／個人資料／版本號搬到底部導航「我的」） -->
     <header class="bg-sela-200 sticky top-0 z-40 shadow-sm border-b border-sela-300" style="padding-top: env(safe-area-inset-top);">
-        <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-            <!-- Logo -->
+        <div class="max-w-lg mx-auto px-4 h-14 flex items-center">
             <a href="/home" class="flex items-center gap-2">
                 <img src="/static/images/sela-logo.jpg" alt="SELA" class="h-9 w-9 rounded-lg">
-                <span class="flex flex-col leading-none">
-                    <span class="font-bold text-sela-800 text-lg tracking-tight">快點來點餐</span>
-                    <span class="text-[10px] text-sela-800/40 font-mono mt-0.5">{{ app_version }}</span>
-                </span>
+                <span class="font-bold text-sela-800 text-lg tracking-tight">快點來點餐</span>
             </a>
-            
-            <!-- 右側操作 -->
-            <div class="flex items-center gap-2">
-                {% if user %}
-                <!-- 管理（管理員限定） -->
-                {% if user.is_admin %}
-                <a href="/admin" class="w-9 h-9 flex items-center justify-center rounded-full text-sela-700 hover:bg-sela-900/10 transition-colors">
-                    <i class="ti ti-settings" style="font-size: 20px;" aria-hidden="true"></i>
-                </a>
-                {% endif %}
-                
-                <!-- 個人頭像 -->
-                <a href="/profile" class="w-9 h-9 rounded-full overflow-hidden border-2 border-sela-400/60 hover:border-sela-500 transition-colors">
-                    {% if user.picture_url %}
-                    <img src="{{ user.picture_url }}" class="w-full h-full object-cover">
-                    {% else %}
-                    <div class="w-full h-full bg-white flex items-center justify-center text-sela-800 text-sm font-bold">
-                        {{ user.show_name[:1] }}
-                    </div>
-                    {% endif %}
-                </a>
-                {% endif %}
-            </div>
         </div>
     </header>
 
@@ -192,44 +165,40 @@
         {% block content %}{% endblock %}
     </main>
     
-    <!-- 底部導航（手機友善・V1.1.0 換 Tabler 北歐風・V1.5.0 動態 active） -->
+    <!-- 底部導航（V2.17.0 IA 重整：今天｜店家｜＋｜紀錄｜我的，五格對稱）
+         規則：物件的所有動作都在物件自己的頁面——店家的事在店家頁、團的事在團頁、我的事在我的頁。
+         投票沒有自己的格子：有進行中的投票才出現在首頁卡片，發起入口在開團頁。 -->
     {% if user %}
     {% set path = request.url.path %}
-    {% set nav_home = path == '/home' or path == '/' %}
-    {% set nav_votes = path.startswith('/votes') %}
-    {% set nav_feedback = path.startswith('/feedback') %}
-    {% set nav_profile = path.startswith('/profile') %}
+    {% set nav_stores = path.startswith('/stores') or path.startswith('/recommend') %}
+    {% set nav_records = path.startswith('/records') or path.startswith('/history') or path.startswith('/my-orders') or path.startswith('/stats') or path.startswith('/my/groups') %}
+    {% set nav_profile = path.startswith('/profile') or path.startswith('/feedback') or path.startswith('/my-departments') %}
+    {% set nav_home = path == '/home' or path == '/' or path.startswith('/groups') or path.startswith('/votes') %}
+    {% set nav_items = [
+        ('/home', 'ti-home', '今天', nav_home),
+        ('/stores', 'ti-building-store', '店家', nav_stores),
+        None,
+        ('/records', 'ti-history', '紀錄', nav_records),
+        ('/profile', 'ti-user', '我的', nav_profile),
+    ] %}
     <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-sela-100 z-40 safe-area-pb">
-        <div class="max-w-lg mx-auto px-6 h-14 flex items-center justify-around">
-            <a href="/home" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_home else 'text-sela-400' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_home else '' }} rounded-xl flex items-center justify-center">
-                    <i class="ti ti-home" style="font-size: 22px;" aria-hidden="true"></i>
-                </div>
-                <span class="text-[10px] {{ 'font-medium' if nav_home else '' }}">首頁</span>
-            </a>
-            <a href="/votes" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_votes else 'text-sela-400' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_votes else '' }} rounded-xl flex items-center justify-center">
-                    <i class="ti ti-checkbox" style="font-size: 22px;" aria-hidden="true"></i>
-                </div>
-                <span class="text-[10px] {{ 'font-medium' if nav_votes else '' }}">投票</span>
-            </a>
-            <a href="/groups/new" class="flex flex-col items-center">
+        <div class="max-w-lg mx-auto px-4 h-14 grid grid-cols-5 items-center">
+            {% for it in nav_items %}
+            {% if it is none %}
+            <a href="/groups/new" class="flex flex-col items-center" aria-label="開團">
                 <div class="w-12 h-12 -mt-6 bg-sela-700 rounded-full flex items-center justify-center shadow-lg">
                     <i class="ti ti-plus text-white" style="font-size: 24px;" aria-hidden="true"></i>
                 </div>
             </a>
-            <a href="/feedback" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_feedback else 'text-sela-400' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_feedback else '' }} rounded-xl flex items-center justify-center">
-                    <i class="ti ti-mailbox" style="font-size: 22px;" aria-hidden="true"></i>
+            {% else %}
+            <a href="{{ it[0] }}" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if it[3] else 'text-sela-400' }}">
+                <div class="w-9 h-9 {{ 'bg-sela-100' if it[3] else '' }} rounded-xl flex items-center justify-center">
+                    <i class="ti {{ it[1] }}" style="font-size: 22px;" aria-hidden="true"></i>
                 </div>
-                <span class="text-[10px] {{ 'font-medium' if nav_feedback else '' }}">回報</span>
+                <span class="text-[10px] {{ 'font-medium' if it[3] else '' }}">{{ it[2] }}</span>
             </a>
-            <a href="/profile" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if nav_profile else 'text-sela-400' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-100' if nav_profile else '' }} rounded-xl flex items-center justify-center">
-                    <i class="ti ti-user" style="font-size: 22px;" aria-hidden="true"></i>
-                </div>
-                <span class="text-[10px] {{ 'font-medium' if nav_profile else '' }}">我的</span>
-            </a>
+            {% endif %}
+            {% endfor %}
         </div>
     </nav>
     <div style="height: calc(3.5rem + env(safe-area-inset-bottom));"></div> <!-- 底部導航佔位 -->

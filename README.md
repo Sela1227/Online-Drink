@@ -86,17 +86,17 @@ CLOUDINARY_API_SECRET=xxx
 │   ├── schemas/             Pydantic Schema
 │   ├── templates/           Jinja2 模板（含 partials、admin、votes）
 │   └── static/              CSS / JS / images / sela.svg / favicon/
-├── docs/                    歷史開發文件（架構、踩坑、部署、匯入規範）
+├── docs/                    預設 Logo 功能說明（架構／部署／匯入規範等背景文件在 Claude Project「快點來點餐」，V2.16.1 起不再放 zip）
 ├── examples/                範例 JSON
 ├── menu/                    各店家菜單 JSON 範本
-├── scripts/                 種子資料、SQL 工具
+├── scripts/                 煙霧測試與七支檢查（smoke_test／check_*／jsdom_*）、種子資料、專案匯整
 ├── requirements.txt         依賴（== 鎖版本，坑 #10）
 ├── railway.toml             Railway 部署設定（Dockerfile 模式）
 ├── Dockerfile
 ├── start.sh
 ├── .gitignore
 ├── CLAUDE.md                ← 給 AI 看的工作上下文（最重要）
-├── SELA-handoff.md          ← Kit 回流交接
+├── SELA-handoff-快點來點餐.md ← 交班文件（新對話先讀）
 └── README.md                ← 本檔
 ```
 
@@ -109,15 +109,15 @@ CLOUDINARY_API_SECRET=xxx
 - **團單**：開團、設截止時間、QR Code 分享、盲訂模式、抽幸運獎
 - **訂單**：草稿／已送出／編輯中三狀態、複製功能、即時訂單牆
 - **部門系統**：使用者可歸屬部門
+- **前台導覽（V2.17.0）**：底部五格 今天｜店家｜＋開團｜紀錄｜我的——首頁只放公告、投票卡（有才出現）、要你處理的、開放中；店家分頁搜尋／分類／只看收藏／排序；紀錄分頁合併我點的／我開的／統計；投票入口在首頁卡與開團頁
 - **公告／投票／回報**
-- **個人消費統計**
-- **JSON 匯入**：店家 + 菜單批次建立（見 `docs/SELA-菜單匯入格式規範.md`）
+- **JSON 匯入**：店家 + 菜單批次建立（匯入格式規範在 Claude Project「快點來點餐」的《SELA-菜單匯入格式規範》）
 
 ---
 
 ## 部署
 
-走 Railway Dockerfile 模式。詳細部署檢查清單見 `docs/SELA-部署檢查清單.md`。
+走 Railway Dockerfile 模式。詳細部署檢查清單見 Claude Project「快點來點餐」的《SELA-部署檢查清單》。
 
 ```toml
 # railway.toml
@@ -142,13 +142,10 @@ restartPolicyMaxRetries = 3
 
 更詳細的踩坑與規範見：
 
-- `CLAUDE.md` — 給 AI 看的工作上下文（含 10 條已驗證踩坑紀錄）
-- `docs/SELA-開發指導手冊.md` — 完整開發規範
-- `docs/SELA-常見錯誤與解決方案.md` — 錯誤對應表
-- `docs/SELA-部署檢查清單.md` — 部署前必跑檢查
-- `docs/SELA-菜單匯入格式規範.md` — JSON 匯入格式
-- `docs/SELA-專案架構精簡.md` — 資料模型快速查閱
+- `CLAUDE.md` — 給 AI 看的工作上下文（42 條踩坑紀錄、版本歷程、升版 SOP）
+- `SELA-handoff-快點來點餐.md` — 交班文件（部署注意、實測點）
+- Claude Project「快點來點餐」背景文件（V2.16.1 起隨版本同步，不再放 zip）：《SELA-開發指導手冊》《SELA-常見錯誤與解決方案》《SELA-部署檢查清單》《SELA-菜單匯入格式規範》《SELA-專案架構精簡》＋程式碼快照 `線上訂餐_bundle_VX.Y.Z.txt`
 
 ---
 
-> Made by **SELA** · V1.0.0 · 對齊 SELA-Starter-Kit V1.9.0
+> Made by **SELA** · V2.17.0 · 對齊 SELA-Starter-Kit V1.36.0

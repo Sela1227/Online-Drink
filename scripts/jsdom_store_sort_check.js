@@ -5,7 +5,8 @@
  * 煙霧測試只看得到「資料有傳到模板」，看不到 Alpine 排出來的順序對不對。
  * 這支把 Python 渲染好的頁面載進 jsdom + Alpine，切換排序 chip 後讀卡片／列的順序。
  *
- * 用法：node scripts/jsdom_store_sort_check.js <html檔> <picker|admin>
+ * 用法：node scripts/jsdom_store_sort_check.js <html檔> <picker|admin|catalog>
+ *   catalog：店家分頁 /stores（V2.17.0；乙店已收藏，驗收藏區／只看收藏／排序下拉／分類／搜尋攤平）
  *   picker：開團頁選店覆蓋層（先按「選擇店家」打開覆蓋層，再切排序）
  *   admin ：後台店家列表
  * 店家資料固定三家（由 check_frontend_import.py 建）：
@@ -116,6 +117,56 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     const exp12 = h >= 12 ? "明天 12:00" : "今天 12:00";
     if (!lbl.some(b => b.textContent.trim() === exp12)) fail("12:00 快捷標籤應為「" + exp12 + "」");
 
+    console.log(JSON.stringify({ ok: true, mode }));
+    process.exit(0);
+  }
+
+  if (mode === "catalog") {
+    // V2.17.0 店家分頁：乙店已收藏。預設熱門：收藏區 乙店；全部 甲店→丙店（其餘店家不看）
+    const cards = () => [...d.querySelectorAll("a[href^='/stores/']")].filter(a => a.offsetParent !== undefined);
+    const readSection = (title) => {
+      const sec = [...d.querySelectorAll("section")].find(s => s.textContent.includes(title) && s.style.display !== "none");
+      return sec ? [...sec.querySelectorAll("a[href^='/stores/'] .text-xs.font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n)) : null;
+    };
+    let fav = readSection("我的收藏"), all = readSection("全部");
+    if (!fav || fav.join() !== "乙店") fail("收藏區應只有乙店（" + JSON.stringify(fav) + "）");
+    if (!all || all.join() !== "甲店,丙店") fail("預設熱門：全部區應為 甲店/丙店（" + JSON.stringify(all) + "）");
+    const card = cards().find(a => a.textContent.includes("甲店"));
+    if (!card || !card.textContent.includes("開過 5 次")) fail("熱門時卡片應顯示「開過 N 次」");
+    // 只看收藏
+    const favBtn = [...d.querySelectorAll("button")].find(b => b.textContent.includes("只看收藏"));
+    if (!favBtn) fail("找不到「只看收藏」");
+    favBtn.click(); await sleep(80);
+    if (readSection("全部") !== null) fail("只看收藏時不該有「全部」區");
+    if ((readSection("我的收藏") || []).join() !== "乙店") fail("只看收藏時應只剩乙店");
+    favBtn.click(); await sleep(80);
+    // 排序下拉：名稱／最近開過
+    const sel = d.querySelector("select[aria-label=排序]");
+    if (!sel) fail("找不到排序下拉");
+    sel.value = "name"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(80);
+    all = readSection("全部");
+    if (all.join() !== ["甲店", "丙店"].sort(zh).join()) fail("名稱排序：期望注音序（" + all.join("/") + "）");
+    sel.value = "recent"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(80);
+    all = readSection("全部");
+    if (all.join() !== "甲店,丙店") fail("最近開過：甲店（30 天前）應排在沒開過的丙店前面（" + all.join("/") + "）");
+    const c2 = cards().find(a => a.textContent.includes("乙店"));
+    if (!c2 || !c2.textContent.includes("上次 ")) fail("最近開過時卡片應顯示「上次 月/日」");
+    let stored = "";
+    try { stored = w.localStorage.getItem("sela_store_sort"); } catch (e) {}
+    if (stored !== "recent") fail("排序選擇應記在 localStorage（" + stored + "）");
+    // 分類 chip：飲料 → 只剩丁店
+    [...d.querySelectorAll("button")].find(b => b.textContent.trim() === "飲料").click(); await sleep(80);
+    const drinkNames = [...d.querySelectorAll("a[href^='/stores/'] .text-xs.font-medium")].map(e => e.textContent.trim());
+    if (!drinkNames.includes("丁店") || drinkNames.some(n => names.includes(n))) fail("飲料分類應只剩丁店（" + drinkNames.join("/") + "）");
+    [...d.querySelectorAll("button")].find(b => b.textContent.trim() === "全部").click(); await sleep(80);
+    // 搜尋：攤平成一列
+    const q = d.querySelector("input[type=search]");
+    q.value = "甲"; q.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    if (readSection("全部") !== null) fail("搜尋時不該再分區");
+    const hits = [...d.querySelectorAll("a[href^='/stores/'] .text-xs.font-medium")].map(e => e.textContent.trim());
+    if (hits.join() !== "甲店") fail("搜尋「甲」應只剩甲店（" + hits.join("/") + "）");
+    q.value = "沒這家"; q.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    if (!d.body.textContent.includes("找不到「沒這家」")) fail("搜尋無結果應有提示");
     console.log(JSON.stringify({ ok: true, mode }));
     process.exit(0);
   }

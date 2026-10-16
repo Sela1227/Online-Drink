@@ -186,10 +186,54 @@ def _ctx_admin_stores():
     }
 
 
+def _ctx_stores_page():
+    """店家分頁（V2.17.0）：資料走 JSON script，店名含引號與反斜線"""
+    return {
+        "request": Stub(url=Stub(path="/stores"), scope={}, query_params={}),
+        "user": Stub(id=1, is_admin=False, show_name="測試", display_name="測試"),
+        "stores_json": [
+            {"id": 1, "name": '春水堂 "測試" \\ 分店', "category": "drink", "logo_url": "", "group_count": 3, "last_group": "10/12", "last_ts": 1.0},
+            {"id": 2, "name": "迷客夏", "category": "drink", "logo_url": "https://x/y.png", "group_count": 9, "last_group": "", "last_ts": 0},
+        ],
+        "favorite_ids": [2],
+        "store_total": 2,
+        "fav_only": True,
+    }
+
+
+def _ctx_home():
+    """首頁（V2.17.0 IA）：公告兩則、投票一則、要處理的一團、開放中一團"""
+    from datetime import datetime
+    cat = type("C", (), {"value": "drink"})()
+    store = Stub(id=1, name='春水堂 "測試"', logo_url=None)
+    owner = Stub(id=1, show_name="測試")
+    g1 = Stub(id=10, name='週五 "下午茶"', store=store, store_display_name=store.name, owner=owner, owner_id=1,
+              category=cat, deadline=datetime(2026, 10, 16, 15, 0), is_public=True, submitted_count=2, pending_count=1,
+              total_amount=120)
+    g2 = Stub(id=11, name="午餐", store=store, store_display_name=store.name, owner=owner, owner_id=2,
+              category=cat, deadline=datetime(2026, 10, 16, 12, 0), is_public=False, submitted_count=0, pending_count=0,
+              total_amount=0)
+    opt = Stub(store=store, vote_count=3)
+    vote = Stub(id=5, title='吃哪家 "呢"', deadline=datetime(2026, 10, 16, 11, 0), options=[opt], total_votes=3)
+    ann = Stub(title="公告", content="內容", is_pinned=True, expires_at=None)
+    return {
+        "request": Stub(url=Stub(path="/home"), scope={}, query_params={}),
+        "user": Stub(id=1, is_admin=False, show_name="測試", display_name="測試"),
+        "announcements": [ann, Stub(title="二", content="二", is_pinned=False, expires_at=None)],
+        "active_votes": [vote],
+        "voted_ids": set(),
+        "attention": [{"group": g1, "status": "none", "is_owner": True}],
+        "open_groups": [{"group": g2, "status": "submitted", "is_owner": False}],
+        "now": datetime(2026, 10, 16, 10, 0),
+    }
+
+
 RENDER_TARGETS = [
     ("group_new.html", _ctx_group_new, "newGroupForm"),
     ("group_new.html", _ctx_group_new_copy, "newGroupForm"),
     ("admin/stores.html", _ctx_admin_stores, "storeList"),
+    ("stores.html", _ctx_stores_page, "storePage"),   # V2.17.0
+    ("home.html", _ctx_home, "countdown"),            # V2.17.0
 ]
 
 
@@ -205,6 +249,7 @@ def check_rendered_js():
     from jinja2 import StrictUndefined
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), undefined=StrictUndefined)
     env.filters["taipei"] = lambda d: d
+    env.filters["money"] = lambda v: v
 
     for name, ctx_fn, func_name in RENDER_TARGETS:
         try:
@@ -214,7 +259,7 @@ def check_rendered_js():
             print(f"  !  {name} 渲染失敗：{type(e).__name__}: {e}")
             continue
 
-        m = re.search(r"function %s\(\)\s*\{.*?\n\}" % re.escape(func_name), html, re.S)
+        m = re.search(r"function %s\([^)]*\)\s*\{.*?\n\}" % re.escape(func_name), html, re.S)
         if not m:
             failures.append(f"{name} 找不到 {func_name}()")
             print(f"  !  {name} 找不到 {func_name}()（改名了就更新 RENDER_TARGETS）")

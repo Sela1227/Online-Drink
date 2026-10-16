@@ -216,10 +216,11 @@ async def delete_template(template_id: int, request: Request, db: Session = Depe
 async def save_template_from_group(
     group_id: int,
     template_name: str = Form(...),
+    next: str = Form(None),
     request: Request = None,
     db: Session = Depends(get_db),
 ):
-    """從現有團單儲存為模板"""
+    """從現有團單儲存為模板。V2.17.0：紀錄頁「我開的」也能存，`next` 指定存完回哪（只收站內路徑）"""
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -289,4 +290,8 @@ async def save_template_from_group(
     db.add(tpl)
     db.commit()
     
+    # 只接受站內路徑（`//evil` 會被瀏覽器當成外站，V2.11.4 S-04 同一條規則）
+    if next and next.startswith("/") and not next.startswith("//"):
+        sep = "&" if "?" in next else "?"
+        return RedirectResponse(url=f"{next}{sep}saved_template=1", status_code=302)
     return RedirectResponse(url=f"/groups/{group_id}", status_code=302)

@@ -1,125 +1,65 @@
 {% extends "base.html" %}
-{% import "partials/nav.html" as nav %}
 
-{% block title %}個人資料 - SELA 快點來點餐{% endblock %}
+{% block title %}我的 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/home', '首頁') }}
-<div class="space-y-4">
-    <!-- 標題列 -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800">個人資料</h1>
-        
-    </div>
-    
+{# 「我的」（V2.17.0 IA 瘦身）：個人卡（名稱就地改、部門 ✎）、管理後台（管理員）、問題回報、登出、版本號。
+   訂單／開團／統計搬到底部導航「紀錄」，收藏搬到「店家」，範本搬到開團頁。 #}
+<div class="space-y-3" x-data="{ editing: {{ 'true' if request.query_params.get('edit') else 'false' }} }">
+    <h1 class="text-xl font-bold text-sela-800">我的</h1>
+
     {% if request.query_params.get('success') %}
-    <div class="bg-green-50 text-green-700 px-4 py-3 rounded-lg">
-        <i class="ti ti-check"></i> 資料已更新
-    </div>
+    <script>window.toast('資料已更新');</script>
     {% endif %}
-    
-    <!-- 個人資訊卡片 -->
-    <div class="bg-white rounded-2xl shadow-sm p-4">
-        <div class="flex items-center gap-4 mb-6">
+
+    <!-- 個人卡 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+        <div class="flex items-center gap-3">
             {% if user.picture_url %}
-            <img src="{{ user.picture_url }}" alt="{{ user.display_name }}" 
-                 class="w-20 h-20 rounded-full">
+            <img src="{{ user.picture_url }}" alt="" class="w-12 h-12 rounded-full flex-shrink-0 object-cover">
             {% else %}
-            <div class="w-20 h-20 rounded-full bg-sela-100 flex items-center justify-center text-2xl">
-                <i class="ti ti-user"></i>
-            </div>
+            <div class="w-12 h-12 rounded-full bg-sela-100 flex items-center justify-center text-xl text-sela-800 flex-shrink-0"><i class="ti ti-user"></i></div>
             {% endif %}
-            <div>
-                <div class="text-lg font-bold text-sela-800">{{ user.show_name }}</div>
-                {% if user.nickname %}
-                <div class="text-sm text-sela-800/60">LINE: {{ user.display_name }}</div>
-                {% endif %}
-                {% if user.is_admin %}
-                <span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded mt-1 inline-block">管理員</span>
-                {% endif %}
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5" x-show="!editing">
+                    <span class="font-semibold text-sela-800 truncate">{{ user.show_name }}</span>
+                    {% if user.is_admin %}<span class="text-[10px] bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded">管理員</span>{% endif %}
+                    <button type="button" @click="editing = true; $nextTick(() => $refs.nick.focus())" class="text-sela-800/40 text-sm" aria-label="修改名稱"><i class="ti ti-pencil"></i></button>
+                </div>
+                <div class="text-xs text-sela-800/55 mt-0.5 truncate">
+                    <a href="/my-departments" class="inline-flex items-center gap-1">{% if dept_names %}{{ dept_names|join('、') }}{% else %}還沒加入部門{% endif %} <i class="ti ti-pencil text-sela-800/35"></i></a>
+                    · 送出 {{ order_count }} 單 · 開過 {{ group_count }} 團
+                </div>
             </div>
         </div>
-        
-        <!-- 統計 -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="bg-sela-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-sela-800">{{ order_count }}</div>
-                <div class="text-xs text-sela-800/60">參與訂單</div>
-            </div>
-            <div class="bg-sela-50 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-sela-800">{{ group_count }}</div>
-                <div class="text-xs text-sela-800/60">開過的團</div>
-            </div>
-        </div>
-        
-        <!-- 編輯表單 -->
-        <form action="/profile" method="post" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-sela-800/80 mb-2">
-                    系統顯示名稱
-                    <span class="text-sela-800/45 font-normal">（留空則使用 LINE 名稱）</span>
-                </label>
-                <input type="text" name="nickname" 
-                       value="{{ user.nickname or '' }}"
-                       placeholder="{{ user.display_name }}"
-                       class="w-full border border-sela-300 rounded-xl px-4 py-2.5 text-sela-800">
-                <p class="text-xs text-sela-800/45 mt-1">此名稱會顯示在訂單牆和團單中</p>
-            </div>
-            
-            <button type="submit" 
-                    class="btn btn-primary w-full">
-                儲存變更
-            </button>
+        <!-- 名稱就地改：原本是半個螢幕的表單 -->
+        <form x-show="editing" x-cloak action="/profile" method="post" class="mt-3 flex gap-2 items-center">
+            <input type="text" name="nickname" x-ref="nick" maxlength="50"
+                   value="{{ user.nickname or '' }}" placeholder="{{ user.display_name }}"
+                   class="flex-1 min-w-0 border border-sela-300 rounded-xl px-3 py-2 text-sm text-sela-800 bg-white">
+            <button type="submit" class="btn btn-primary text-sm px-3">儲存</button>
+            <button type="button" @click="editing = false" class="text-sm text-sela-800/50 px-1">取消</button>
         </form>
+        <p x-show="editing" x-cloak class="text-[11px] text-sela-800/45 mt-1.5">留空就用 LINE 名稱（{{ user.display_name }}）；這個名稱會出現在訂單牆與團單</p>
     </div>
-    
-    <!-- 帳號資訊 -->
-    <div class="bg-white rounded-2xl shadow-sm p-4">
-        <h2 class="font-semibold text-sela-800 mb-3">帳號資訊</h2>
-        <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-                <span class="text-sela-800/60">註冊時間</span>
-                <span class="text-sela-800/80">{{ (user.created_at|taipei).strftime('%Y-%m-%d %H:%M') }}</span>
-            </div>
-            {% if user.last_login_at %}
-            <div class="flex justify-between">
-                <span class="text-sela-800/60">上次登入</span>
-                <span class="text-sela-800/80">{{ (user.last_login_at|taipei).strftime('%Y-%m-%d %H:%M') }}</span>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- 快捷連結 -->
-    <div class="bg-white rounded-2xl shadow-sm divide-y">
-        <a href="/stats" class="flex items-center justify-between p-4 active:bg-sela-100 bg-sela-50">
-            <span class="font-medium"><i class="ti ti-chart-bar"></i> 消費統計</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/my-orders" class="flex items-center justify-between p-4 active:bg-sela-50">
-            <span class="font-medium"><i class="ti ti-clipboard-list"></i> 我的訂單</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/my/groups" class="flex items-center justify-between p-4 active:bg-sela-50">
-            <span class="font-medium"><i class="ti ti-folder-open"></i> 我參與過的團</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/templates" class="flex items-center justify-between p-4 active:bg-sela-50">
-            <span class="font-medium"><i class="ti ti-bolt"></i> 開團模板</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/my-departments" class="flex items-center justify-between p-4 active:bg-sela-50">
-            <span class="font-medium"><i class="ti ti-users"></i> 我的部門</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/favorites" class="flex items-center justify-between p-4 active:bg-sela-50">
-            <span class="font-medium"><i class="ti ti-star"></i> 收藏店家</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-        <a href="/auth/logout" class="flex items-center justify-between p-4 active:bg-sela-50 text-red-500">
-            <span class="font-medium">登出</span>
-            <i class="ti ti-chevron-right text-sela-800/35"></i>
-        </a>
-    </div>
+
+    {% if user.is_admin %}
+    <a href="/admin" class="flex items-center justify-between bg-sela-50 rounded-2xl px-4 py-3.5 border border-sela-200 text-sm text-sela-800 active:bg-sela-100">
+        <span class="font-medium"><i class="ti ti-shield"></i> 管理後台</span>
+        <i class="ti ti-chevron-right text-sela-800/35"></i>
+    </a>
+    {% endif %}
+
+    <a href="/feedback" class="flex items-center justify-between bg-white rounded-2xl px-4 py-3.5 border border-sela-100 text-sm text-sela-800 active:bg-sela-50">
+        <span class="font-medium"><i class="ti ti-mailbox"></i> 問題回報</span>
+        <i class="ti ti-chevron-right text-sela-800/35"></i>
+    </a>
+
+    <a href="/auth/logout" class="flex items-center justify-between bg-white rounded-2xl px-4 py-3.5 border border-sela-100 text-sm text-red-600 active:bg-sela-50">
+        <span class="font-medium"><i class="ti ti-logout"></i> 登出</span>
+        <i class="ti ti-chevron-right text-sela-800/35"></i>
+    </a>
+
+    <div class="text-center text-[11px] text-sela-800/35 pt-3 font-mono">{{ app_version }} · {{ (user.created_at|taipei).strftime('%Y/%m/%d') }} 加入</div>
 </div>
 {% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}店家 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+{# 店家分頁（V2.17.0 IA）：根頁、無返回鍵。店家資料整包交給前端篩選／排序（規模門檻同開團選店：約五百家以內） #}
+<script type="application/json" id="stores-data">{{ stores_json | tojson }}</script>
+<script type="application/json" id="favorite-ids">{{ favorite_ids | tojson }}</script>
+<div x-data="storePage()" class="space-y-4">
+    <div class="flex items-baseline gap-2">
+        <h1 class="text-xl font-bold text-sela-800">店家</h1>
+        <span class="text-xs text-sela-800/45">{{ store_total }} 家</span>
+    </div>
+
+    <input type="search" x-model="q" placeholder="搜尋店名" autocomplete="off"
+           class="w-full border border-sela-200 rounded-xl px-4 py-2.5 text-sm bg-white text-sela-800">
+
+    <div class="flex items-center gap-1.5 flex-wrap text-xs">
+        <template x-for="c in cats" :key="c[0]">
+            <button type="button" @click="cat = c[0]" class="px-2.5 py-1 rounded-full border"
+                    :class="cat === c[0] ? 'bg-sela-800 text-white border-sela-800' : 'bg-white border-sela-300 text-sela-800/70'" x-text="c[1]"></button>
+        </template>
+        <button type="button" @click="favOnly = !favOnly" class="px-2.5 py-1 rounded-full border"
+                :class="favOnly ? 'bg-sela-800 text-white border-sela-800' : 'bg-white border-sela-300 text-sela-800/70'"><i class="ti ti-star"></i> 只看收藏</button>
+        <select x-model="sortKey" @change="setSort(sortKey)" class="ml-auto bg-transparent text-sela-800/60 text-xs py-1 pr-1" aria-label="排序">
+            <template x-for="o in sortOptions" :key="o[0]"><option :value="o[0]" :selected="o[0] === sortKey" x-text="o[1]"></option></template>
+        </select>
+    </div>
+
+    {# 搜尋有字：攤平成一列；沒字：我的收藏 → 全部 #}
+    <template x-if="q.trim()">
+        <div>
+            <template x-if="searchResults.length === 0"><p class="text-center text-sm text-sela-800/50 py-8">找不到「<span x-text="q.trim()"></span>」</p></template>
+            <div class="grid grid-cols-3 gap-2">
+                <template x-for="st in searchResults" :key="st.id">
+                    <a :href="'/stores/' + st.id" class="bg-white rounded-xl p-2 text-center border border-sela-100 active:bg-sela-50">
+                        <div class="aspect-square rounded-lg bg-sela-50 flex items-center justify-center overflow-hidden mb-1">
+                            <template x-if="st.logo_url"><img :src="st.logo_url" alt="" class="w-full h-full object-contain p-1"></template>
+                            <template x-if="!st.logo_url"><i class="ti text-2xl text-sela-800/40" :class="catIcon(st.category)"></i></template>
+                        </div>
+                        <div class="text-xs font-medium text-sela-800 truncate" x-text="st.name"></div>
+                        <div class="text-[10px] text-sela-800/45 truncate" x-text="cardMeta(st)"></div>
+                    </a>
+                </template>
+            </div>
+        </div>
+    </template>
+    <template x-if="!q.trim()">
+        <div class="space-y-4">
+            <template x-for="sec in sections" :key="sec.title">
+                <section x-show="sec.items.length > 0 || sec.always">
+                    <div class="text-xs font-medium text-sela-800/60 mb-2"><i class="ti" :class="sec.icon"></i> <span x-text="sec.title"></span> <span class="font-normal text-sela-800/40" x-text="sec.note"></span></div>
+                    <p x-show="sec.items.length === 0" class="text-sm text-sela-800/50 py-6 text-center" x-text="sec.empty"></p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <template x-for="st in sec.items" :key="st.id">
+                            <a :href="'/stores/' + st.id" class="bg-white rounded-xl p-2 text-center border border-sela-100 active:bg-sela-50">
+                                <div class="aspect-square rounded-lg bg-sela-50 flex items-center justify-center overflow-hidden mb-1">
+                                    <template x-if="st.logo_url"><img :src="st.logo_url" alt="" class="w-full h-full object-contain p-1"></template>
+                                    <template x-if="!st.logo_url"><i class="ti text-2xl text-sela-800/40" :class="catIcon(st.category)"></i></template>
+                                </div>
+                                <div class="text-xs font-medium text-sela-800 truncate" x-text="st.name"></div>
+                                <div class="text-[10px] text-sela-800/45 truncate" x-text="cardMeta(st)"></div>
+                            </a>
+                        </template>
+                    </div>
+                </section>
+            </template>
+        </div>
+    </template>
+
+    <a href="/recommend" class="flex items-center justify-between bg-white rounded-2xl px-4 py-3 border border-sela-100 text-sm text-sela-800 active:bg-sela-50">
+        <span><i class="ti ti-bulb"></i> 想推薦新店家？</span>
+        <span class="underline">推薦 ›</span>
+    </a>
+</div>
+
+<script>
+function storePage() {
+    const all = JSON.parse(document.getElementById('stores-data').textContent);
+    const favoriteIds = JSON.parse(document.getElementById('favorite-ids').textContent);
+    return {
+        q: '',
+        cat: 'all',
+        favOnly: {{ fav_only | tojson }},
+        cats: [['all', '全部'], ['drink', '飲料'], ['meal', '餐廳'], ['group_buy', '團購']],
+        // 與開團選店覆蓋層同一把鍵（V2.16.2），兩邊記同一個偏好
+        sortKey: 'hot',
+        sortOptions: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開過']],
+        init() {
+            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent'].includes(k)) this.sortKey = k; } catch (e) {}
+        },
+        setSort(k) {
+            this.sortKey = k;
+            try { localStorage.setItem('sela_store_sort', k); } catch (e) {}
+        },
+        catIcon(c) {
+            return { drink: 'ti-cup', meal: 'ti-bowl', group_buy: 'ti-shopping-cart' }[c] || 'ti-building-store';
+        },
+        sorted(list) {
+            const byName = (a, b) => a.name.localeCompare(b.name, 'zh-Hant');
+            if (this.sortKey === 'name') return [...list].sort(byName);
+            if (this.sortKey === 'recent') return [...list].sort((a, b) => (b.last_ts - a.last_ts) || byName(a, b));
+            return [...list].sort((a, b) => (b.group_count - a.group_count) || byName(a, b));
+        },
+        sortNote() {
+            return { hot: '· 依熱門', name: '· 依名稱', recent: '· 依最近開過' }[this.sortKey] || '';
+        },
+        cardMeta(st) {
+            if (this.sortKey === 'hot') return st.group_count ? '開過 ' + st.group_count + ' 次' : '還沒開過';
+            if (this.sortKey === 'recent') return st.last_group ? '上次 ' + st.last_group : '還沒開過';
+            return ' ';
+        },
+        get pool() {
+            let list = all;
+            if (this.cat !== 'all') list = list.filter(s => s.category === this.cat);
+            if (this.favOnly) list = list.filter(s => favoriteIds.includes(s.id));
+            return list;
+        },
+        get searchResults() {
+            const kw = this.q.trim().toLowerCase();
+            if (!kw) return [];
+            return this.sorted(this.pool.filter(s => s.name.toLowerCase().includes(kw)));
+        },
+        get sections() {
+            const favs = this.sorted(this.pool.filter(s => favoriteIds.includes(s.id)));
+            if (this.favOnly) {
+                return [{ title: '我的收藏', icon: 'ti-star-filled', note: this.sortNote(), items: favs, always: true, empty: '還沒有收藏的店家。進店家頁點星號就會出現在這裡' }];
+            }
+            const rest = this.sorted(this.pool.filter(s => !favoriteIds.includes(s.id)));
+            return [
+                { title: '我的收藏', icon: 'ti-star-filled', note: '', items: favs, always: false, empty: '' },
+                { title: '全部', icon: 'ti-list', note: this.sortNote(), items: rest, always: true, empty: '這個分類還沒有店家' },
+            ];
+        },
+    };
+}
+</script>
+{% endblock %}

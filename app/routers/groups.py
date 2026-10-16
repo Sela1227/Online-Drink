@@ -149,7 +149,7 @@ def _new_group_context(db: Session, user, *, stores, departments,
         GroupTemplate.user_id == user.id
     ).options(joinedload(GroupTemplate.store)).order_by(
         GroupTemplate.use_count.desc()
-    ).limit(5).all()
+    ).limit(4).all()  # V2.17.0：開團頁頂列最多 4 顆，其餘到「管理範本」
 
     # 選店覆蓋層的分區資料：我的最愛優先 → 熱門扣掉重複後補滿三間 → 其餘依名稱。
     # 名稱排序在前端做：PostgreSQL 的 ORDER BY name 對中文是碼位序（近似部首序），

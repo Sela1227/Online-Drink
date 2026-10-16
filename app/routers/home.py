@@ -7,7 +7,7 @@ from sqlalchemy import or_, func
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models.group import Group
+from app.models.group import Group, taipei_now
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.store import CategoryType, Store
 from app.models.user import Announcement
@@ -80,22 +80,6 @@ def visible_active_votes(db: Session, user, now, limit: int = 4):
     ).order_by(Vote.deadline.asc()).limit(limit).all()
 
 
-def visible_closed_groups(db: Session, user, now, limit: int = 10):
-    """已截止且該使用者看得到的團（V2.11.2 N-02）。
-
-    /home 有過濾、/home/groups 沒有 —— 而首頁在團截止時會自動 htmx 刷新片段，
-    私密的已截止團就從那裡冒出來。
-    """
-    from app.services.visibility import visible_group_clause
-    return db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner)
-    ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now),
-        visible_group_clause(user),
-    ).order_by(Group.deadline.desc()).limit(limit).all()
-
-
 def get_active_announcements(db: Session, limit: int = 2):
     """首頁公告（V2.10.0）：啟用中且未到期，置頂優先、其次建立時間新到舊。
 
@@ -111,281 +95,123 @@ def get_active_announcements(db: Session, limit: int = 2):
     ).limit(limit).all()
 
 
-def get_hot_items(db: Session, limit: int = 10):
-    """取得全站熱門品項（最近 30 天）"""
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    
-    hot_items = db.query(
-        OrderItem.item_name,
-        Store.name.label('store_name'),
-        Store.logo_url.label('store_logo'),
-        func.sum(OrderItem.quantity).label('total_qty'),
-    ).join(Order).join(Group).join(Store).filter(
-        Order.status == OrderStatus.SUBMITTED,
-        Order.created_at >= thirty_days_ago,
-    ).group_by(
-        OrderItem.item_name,
-        Store.name,
-        Store.logo_url,
-    ).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(limit).all()
-    
-    return hot_items
+HOME_ANNOUNCEMENT_LIMIT = 5   # V2.17.0：首頁只展開第一則，其餘「還有 N 則」點開
+HOME_VOTE_LIMIT = 4
+
+
+def visible_stores_for(db: Session, user):
+    """使用者看得到的店家（啟用中、非個人代購店；公開或部門交集；管理員全看）。
+
+    V2.17.0：原本 /home 與 /home/groups 各複製一份逐店查部門（N+1），店家分頁再要
+    第三份。抽成共用，部門關係一次撈完。
+    """
+    from app.models.department import UserDepartment, StoreDepartment
+    all_stores = db.query(Store).options(joinedload(Store.branches)).filter(
+        Store.is_personal != True,
+        Store.is_active == True,
+    ).order_by(Store.name).all()
+    if user.is_admin:
+        return all_stores
+    user_dept_ids = {ud.department_id for ud in db.query(UserDepartment).filter(
+        UserDepartment.user_id == user.id
+    ).all()}
+    store_depts: dict[int, set[int]] = {}
+    for sd in db.query(StoreDepartment).all():
+        store_depts.setdefault(sd.store_id, set()).add(sd.department_id)
+    return [s for s in all_stores if s.is_public or (store_depts.get(s.id, set()) & user_dept_ids)]
+
+
+def _open_groups(db: Session, user, now):
+    """開放中且看得到的團，依截止時間近→遠（不分類）。"""
+    from app.services.visibility import visible_group_clause
+    return db.query(Group).options(
+        joinedload(Group.store),
+        joinedload(Group.owner),
+        joinedload(Group.orders).joinedload(Order.items),
+    ).filter(
+        Group.is_closed == False,
+        Group.deadline > now,
+        visible_group_clause(user),
+    ).order_by(Group.deadline.asc()).all()
+
+
+def my_status_in(group, user) -> str:
+    """我在這個團的狀態：submitted／unsent（購物車有東西沒送出）／none（還沒點）。"""
+    from app.models.order import OrderStatus
+    mo = next((o for o in group.orders if o.user_id == user.id), None)
+    if mo is None:
+        return "none"
+    if mo.status == OrderStatus.SUBMITTED:
+        return "submitted"
+    return "unsent" if len(mo.items) > 0 else "none"
+
+
+def split_home_groups(groups, user):
+    """首頁分區（V2.17.0 IA）：
+
+    「要你處理的」只放真的需要你動手的團——
+      (a) 你是團主、而且（你自己還沒送出，或有人點了還沒送出要催）
+      (b) 你購物車有東西但還沒送出
+    其餘開放中的團一律放「開放中」，依截止排序，一個團只出現一次（不再分飲料／餐廳／團購）。
+    「還沒點」的團不算要處理——每個開放的團都會是「還沒點」，全放進去就等於沒分。
+    """
+    attention, others = [], []
+    for g in groups:
+        st = my_status_in(g, user)
+        is_owner = g.owner_id == user.id
+        entry = {"group": g, "status": st, "is_owner": is_owner}
+        if is_owner and (st != "submitted" or g.pending_count > 0):
+            attention.append(entry)
+        elif st == "unsent":
+            attention.append(entry)
+        else:
+            others.append(entry)
+    return attention, others
+
+
+def _home_context(request: Request, db: Session, user):
+    now = taipei_now()
+    groups = _open_groups(db, user, now)
+    attention, open_groups = split_home_groups(groups, user)
+    announcements = get_active_announcements(db, limit=HOME_ANNOUNCEMENT_LIMIT)
+    active_votes = visible_active_votes(db, user, now, limit=HOME_VOTE_LIMIT)
+    # 投票卡要顯示「我投過了沒」
+    from app.models.vote import VoteRecord, VoteOption
+    voted_ids = {
+        vid for (vid,) in db.query(VoteOption.vote_id).join(VoteRecord, VoteRecord.option_id == VoteOption.id)
+        .filter(VoteRecord.user_id == user.id, VoteOption.vote_id.in_([v.id for v in active_votes]))
+        .distinct().all()
+    } if active_votes else set()
+    return {
+        "request": request,
+        "user": user,
+        "attention": attention,
+        "open_groups": open_groups,
+        "announcements": announcements,
+        "active_votes": active_votes,
+        "voted_ids": voted_ids,
+        "now": now,
+    }
 
 
 @router.get("/home")
 async def home(request: Request, db: Session = Depends(get_db)):
-    """首頁 - 團列表"""
+    """首頁「今天」（V2.17.0 IA）：公告一則＋投票卡（有才出現）＋要你處理的＋開放中"""
     user = await get_current_user(request, db)
-    
-    # 使用台北時間（因為 deadline 存的是台北時間）
-    taipei_tz = timezone(timedelta(hours=8))
-    now = datetime.now(taipei_tz).replace(tzinfo=None)
-    
-    # 取得用戶的部門 IDs
-    from app.models.department import UserDepartment, GroupDepartment
-    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
-        UserDepartment.user_id == user.id
-    ).all()]
-    
-    # V2.11.1 P0-05：原本是迴圈內逐筆查部門（N+1），而且只有這支路由有過濾，
-    # /home/groups 與 /history 都沒有。改用 app/services/visibility.py 的共用 SQL 條件。
-    from app.services.visibility import visible_group_clause
-    _visible = visible_group_clause(user)
-    
-    # 開放中的飲料團（eager load orders 和 store）
-    drink_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        Group.category == CategoryType.DRINK,
-        Group.is_closed == False,
-        Group.deadline > now,
-        _visible,
-    ).order_by(Group.deadline.asc()).all()
-    
-    # 開放中的訂餐團
-    meal_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        Group.category == CategoryType.MEAL,
-        Group.is_closed == False,
-        Group.deadline > now,
-        _visible,
-    ).order_by(Group.deadline.asc()).all()
-    
-    # 開放中的團購團（新類型，可能不存在）
-    try:
-        groupbuy_groups = db.query(Group).options(
-            joinedload(Group.store),
-            joinedload(Group.owner),
-            joinedload(Group.orders)
-        ).filter(
-            Group.category == CategoryType.GROUP_BUY,
-            Group.is_closed == False,
-            Group.deadline > now,
-            _visible,
-        ).order_by(Group.deadline.asc()).all()
-    except Exception:
-        db.rollback()
-        groupbuy_groups = []
-    
-    # 我的進行中（開放團中，我是團主或已下單）
-    my_active = []
-    for g in (drink_groups + meal_groups + groupbuy_groups):
-        mo = next((o for o in g.orders if o.user_id == user.id), None)
-        if mo:
-            my_active.append({"group": g, "status": mo.status.value})
-        elif g.owner_id == user.id:
-            my_active.append({"group": g, "status": "owner"})
-    my_active.sort(key=lambda x: x["group"].deadline)
-
-    # 已截止的團（最近 10 個）
-    closed_groups = visible_closed_groups(db, user, now)
-    
-    # 超夯清單（全站熱門）
-    hot_items = get_hot_items(db, limit=10)
-    
-    # 公告（V2.10.0：改讀 announcements 表）
-    announcements = get_active_announcements(db)
-    
-    # 進行中的投票（V2.11.2 N-02：共用查詢，含可見性過濾）
-    active_votes = visible_active_votes(db, user, now)
-    
-    # 店家列表（啟用中，根據部門過濾）
-    from app.models.department import StoreDepartment
-    all_stores = db.query(Store).filter(Store.is_personal != True).options(
-        joinedload(Store.branches)
-    ).filter(Store.is_active == True).order_by(Store.name).all()
-    
-    # 過濾用戶可見的店家
-    def filter_visible_stores(stores_list):
-        visible = []
-        for s in stores_list:
-            # 公開店家：所有人可見
-            if s.is_public:
-                visible.append(s)
-                continue
-            # 管理員可見所有
-            if user.is_admin:
-                visible.append(s)
-                continue
-            # 部門交集
-            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
-                StoreDepartment.store_id == s.id
-            ).all()}
-            if store_dept_ids & set(user_dept_ids):
-                visible.append(s)
-        return visible
-    
-    stores = filter_visible_stores(all_stores)
-    
-    return templates.TemplateResponse("home.html", {
-        "request": request,
-        "user": user,
-        "drink_groups": drink_groups,
-        "meal_groups": meal_groups,
-        "groupbuy_groups": groupbuy_groups,
-        "closed_groups": closed_groups,
-        "hot_items": hot_items,
-        "announcements": announcements,
-        "active_votes": active_votes,
-        "stores": stores,
-        "my_active": my_active,
-        "now": now,
-    })
+    return templates.TemplateResponse("home.html", _home_context(request, db, user))
 
 
 @router.get("/home/groups")
 async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
-    """首頁團單列表（HTMX partial）"""
+    """首頁片段（倒數歸零時 htmx 自動刷新）。與 /home 共用同一個 context，不再各寫一份查詢。"""
     user = await get_current_user(request, db)
-    
-    # 使用台北時間（因為 deadline 存的是台北時間）
-    taipei_tz = timezone(timedelta(hours=8))
-    now = datetime.now(taipei_tz).replace(tzinfo=None)
-    
-    # V2.11.1 P0-05：這支是首頁在團截止時 htmx 自動刷新的片段，原本**完全沒有**
-    # 可見性過濾，私密團與部門團會直接出現在所有人的首頁上。
-    from app.services.visibility import visible_group_clause
-    _visible = visible_group_clause(user)
-
-    # 開放中的飲料團
-    drink_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        Group.category == CategoryType.DRINK,
-        Group.is_closed == False,
-        Group.deadline > now,
-        _visible,
-    ).order_by(Group.deadline.asc()).all()
-    
-    # 開放中的訂餐團
-    meal_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        Group.category == CategoryType.MEAL,
-        Group.is_closed == False,
-        Group.deadline > now,
-        _visible,
-    ).order_by(Group.deadline.asc()).all()
-    
-    # 開放中的團購團
-    try:
-        groupbuy_groups = db.query(Group).options(
-            joinedload(Group.store),
-            joinedload(Group.owner),
-            joinedload(Group.orders)
-        ).filter(
-            Group.category == CategoryType.GROUP_BUY,
-            Group.is_closed == False,
-            Group.deadline > now,
-            _visible,
-        ).order_by(Group.deadline.asc()).all()
-    except Exception:
-        db.rollback()
-        groupbuy_groups = []
-    
-    # 已截止的團（最近 10 個）
-    closed_groups = visible_closed_groups(db, user, now)
-    
-    # 超夯清單
-    hot_items = get_hot_items(db, limit=10)
-    
-    # 公告（V2.10.0：改讀 announcements 表）
-    announcements = get_active_announcements(db)
-    
-    # 進行中的投票（V2.11.2 N-02：共用查詢，含可見性過濾）
-    active_votes = visible_active_votes(db, user, now)
-    
-    # 取得用戶的部門 IDs
-    from app.models.department import UserDepartment, StoreDepartment
-    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
-        UserDepartment.user_id == user.id
-    ).all()]
-    
-    # 店家列表（根據部門過濾）
-    all_stores = db.query(Store).filter(Store.is_personal != True).options(
-        joinedload(Store.branches)
-    ).filter(Store.is_active == True).order_by(Store.name).all()
-    
-    # 過濾用戶可見的店家
-    visible_stores = []
-    for s in all_stores:
-        if s.is_public:
-            visible_stores.append(s)
-        elif user.is_admin:
-            visible_stores.append(s)
-        else:
-            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
-                StoreDepartment.store_id == s.id
-            ).all()}
-            if store_dept_ids & set(user_dept_ids):
-                visible_stores.append(s)
-    stores = visible_stores
-    
-    return templates.TemplateResponse("partials/home_groups.html", {
-        "request": request,
-        "user": user,
-        "drink_groups": drink_groups,
-        "meal_groups": meal_groups,
-        "groupbuy_groups": groupbuy_groups,
-        "closed_groups": closed_groups,
-        "hot_items": hot_items,
-        "announcements": announcements,
-        "active_votes": active_votes,
-        "stores": stores,
-    })
+    return templates.TemplateResponse("partials/home_groups.html", _home_context(request, db, user))
 
 
 @router.get("/my/groups")
-async def my_groups(request: Request, db: Session = Depends(get_db)):
-    """我參與過的團單"""
-    user = await get_current_user(request, db)
-    
-    # 我開的團 + 我有下單的團
-    my_group_ids = db.query(Order.group_id).filter(Order.user_id == user.id).distinct()
-    
-    groups = db.query(Group).filter(
-        or_(
-            Group.owner_id == user.id,
-            Group.id.in_(my_group_ids)
-        )
-    ).order_by(Group.created_at.desc()).all()
-    
-    return templates.TemplateResponse("my_groups.html", {
-        "request": request,
-        "user": user,
-        "groups": groups,
-    })
+async def my_groups():
+    """V2.17.0：併入紀錄頁「我開的」"""
+    return RedirectResponse(url="/records?tab=groups", status_code=302)
 
 
 @router.get("/profile")
@@ -394,14 +220,21 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
     user = await get_current_user(request, db)
     
     # 統計資料
-    order_count = db.query(Order).filter(Order.user_id == user.id).count()
+    from app.models.order import OrderStatus
+    order_count = db.query(Order).filter(Order.user_id == user.id, Order.status == OrderStatus.SUBMITTED).count()
     group_count = db.query(Group).filter(Group.owner_id == user.id).count()
+    # V2.17.0：部門顯示在個人卡上（✎ 進既有的我的部門頁）
+    from app.models.department import UserDepartment, Department
+    dept_names = [d.name for d in db.query(Department).join(
+        UserDepartment, UserDepartment.department_id == Department.id
+    ).filter(UserDepartment.user_id == user.id).order_by(Department.name).all()]
     
     return templates.TemplateResponse("profile.html", {
         "request": request,
         "user": user,
         "order_count": order_count,
         "group_count": group_count,
+        "dept_names": dept_names,
     })
 
 
@@ -457,80 +290,59 @@ async def update_profile(
 
 
 @router.get("/history")
-async def history(request: Request, page: int = 1, db: Session = Depends(get_db)):
-    """歷史團單列表"""
-    user = await get_current_user(request, db)
-    
-    taipei_tz = timezone(timedelta(hours=8))
-    now = datetime.now(taipei_tz).replace(tzinfo=None)
-    
-    # V2.11.1 P0-06：page<=0 在 PostgreSQL 會讓 OFFSET 變負數而 500
-    page = max(1, page)
-    per_page = 20
-    offset = (page - 1) * per_page
-    
-    # V2.11.1 P0-05：歷史列表原本沒有可見性過濾
-    from app.services.visibility import visible_group_clause
-    _visible = visible_group_clause(user)
-    
-    # 總數
-    total = db.query(Group).filter(
-        or_(Group.is_closed == True, Group.deadline <= now),
-        _visible,
-    ).count()
-    
-    # 分頁查詢
-    closed_groups = db.query(Group).options(
-        joinedload(Group.store),
-        joinedload(Group.owner),
-        joinedload(Group.orders)
-    ).filter(
-        or_(Group.is_closed == True, Group.deadline <= now),
-        _visible,
-    ).order_by(Group.deadline.desc()).offset(offset).limit(per_page).all()
-    
-    total_pages = (total + per_page - 1) // per_page
-    
-    return templates.TemplateResponse("history.html", {
-        "request": request,
-        "user": user,
-        "groups": closed_groups,
-        "page": page,
-        "total_pages": total_pages,
-        "total": total,
-    })
+async def history():
+    """V2.17.0：歷史團單併入紀錄頁（我點的／我開的）"""
+    return RedirectResponse(url="/records", status_code=302)
 
 
 @router.get("/my-orders")
-async def my_orders(request: Request, page: int = 1, db: Session = Depends(get_db)):
-    """我的訂單歷史"""
-    user = await get_current_user(request, db)
-    
-    page = max(1, page)  # V2.11.1 P0-06：負數 OFFSET 在 PostgreSQL 會 500
+async def my_orders():
+    """V2.17.0：我的訂單併入紀錄頁「我點的」"""
+    return RedirectResponse(url="/records", status_code=302)
 
-    per_page = 20
-    offset = (page - 1) * per_page
-    
-    # 總數
-    total = db.query(Order).filter(Order.user_id == user.id).count()
-    
-    # 分頁查詢
-    orders = db.query(Order).options(
-        joinedload(Order.group).joinedload(Group.store)
-    ).filter(
-        Order.user_id == user.id
-    ).order_by(Order.created_at.desc()).offset(offset).limit(per_page).all()
-    
-    total_pages = (total + per_page - 1) // per_page
-    
-    return templates.TemplateResponse("my_orders.html", {
-        "request": request,
-        "user": user,
-        "orders": orders,
-        "page": page,
-        "total_pages": total_pages,
-        "total": total,
-    })
+
+RECORDS_PER_PAGE = 20
+RECORDS_TABS = ("orders", "groups", "stats")
+
+
+@router.get("/records")
+async def records_page(request: Request, tab: str = "orders", page: int = 1, db: Session = Depends(get_db)):
+    """紀錄分頁（V2.17.0 IA 根頁）：我點的｜我開的｜統計。
+    原本「我的訂單」「歷史團單」「我參與過的團」「消費統計」四頁散在個人頁與首頁底下，合成一頁三分頁。
+    統計分頁沿用 /stats（期間篩選的網址都在那裡），只是加上同一列分頁 chip。
+    """
+    user = await get_current_user(request, db)
+    if tab not in RECORDS_TABS:
+        tab = "orders"
+    if tab == "stats":
+        return RedirectResponse(url="/stats", status_code=302)
+    page = max(1, page)  # V2.11.1 P0-06：負數 OFFSET 在 PostgreSQL 會 500
+    offset = (page - 1) * RECORDS_PER_PAGE
+    now = taipei_now()
+    ctx = {"request": request, "user": user, "tab": tab, "page": page}
+
+    if tab == "orders":
+        base = db.query(Order).options(
+            joinedload(Order.group).joinedload(Group.store),
+            joinedload(Order.items),
+        ).join(Group, Order.group_id == Group.id).filter(Order.user_id == user.id)
+        _open = (Group.is_closed == False) & (Group.deadline > now)
+        # 進行中的不分頁（最多就今天那幾個），之前的分頁
+        active = base.filter(_open).order_by(Group.deadline.asc()).all()
+        past_q = base.filter(~_open)
+        total = past_q.count()
+        past = past_q.order_by(Order.created_at.desc()).offset(offset).limit(RECORDS_PER_PAGE).all()
+        ctx.update({"active_orders": active, "past_orders": past, "total": total,
+                    "total_pages": (total + RECORDS_PER_PAGE - 1) // RECORDS_PER_PAGE})
+    else:
+        q = db.query(Group).options(
+            joinedload(Group.store), joinedload(Group.orders).joinedload(Order.items),
+        ).filter(Group.owner_id == user.id)
+        total = q.count()
+        groups = q.order_by(Group.created_at.desc()).offset(offset).limit(RECORDS_PER_PAGE).all()
+        ctx.update({"groups": groups, "total": total,
+                    "total_pages": (total + RECORDS_PER_PAGE - 1) // RECORDS_PER_PAGE})
+    return templates.TemplateResponse("records.html", ctx)
 
 
 @router.get("/feedback")
@@ -575,23 +387,9 @@ async def submit_feedback(
 
 
 @router.get("/favorites")
-async def favorites_page(request: Request, db: Session = Depends(get_db)):
-    """收藏店家頁面"""
-    user = await get_current_user(request, db)
-    
-    from app.models.user import UserFavorite
-    
-    favorites = db.query(UserFavorite).options(
-        joinedload(UserFavorite.store)
-    ).filter(
-        UserFavorite.user_id == user.id
-    ).order_by(UserFavorite.created_at.desc()).all()
-    
-    return templates.TemplateResponse("favorites.html", {
-        "request": request,
-        "user": user,
-        "favorites": favorites,
-    })
+async def favorites_page():
+    """V2.17.0：收藏店家頁併入店家分頁的「只看收藏」，舊網址轉址（書籤不壞）"""
+    return RedirectResponse(url="/stores?fav=1", status_code=302)
 
 
 @router.post("/favorites/{store_id}")
@@ -722,6 +520,40 @@ async def leave_department(request: Request, dept_id: int, db: Session = Depends
         db.commit()
     
     return RedirectResponse(url="/my-departments?success=1", status_code=302)
+
+
+def store_catalog_context(db: Session, user):
+    """店家分頁的資料（V2.17.0）：看得到的店家＋收藏＋全體開團次數／上次開團（排序用）。
+    與開團選店覆蓋層同一套排序鍵（localStorage `sela_store_sort`），資料形狀也對齊。
+    """
+    from app.models.user import UserFavorite
+    stores = visible_stores_for(db, user)
+    favorite_ids = [f.store_id for f in db.query(UserFavorite).filter(UserFavorite.user_id == user.id).all()]
+    group_counts = dict(
+        db.query(Group.store_id, func.count(Group.id)).filter(Group.store_id.isnot(None)).group_by(Group.store_id).all()
+    )
+    _last = db.query(Group.store_id, func.max(Group.created_at)).filter(Group.store_id.isnot(None)).group_by(Group.store_id).all()
+    last_group_at = {sid: (to_taipei_time(dt).strftime("%m/%d") if dt else "") for sid, dt in _last}
+    last_group_ts = {sid: (dt.timestamp() if dt else 0) for sid, dt in _last}
+    payload = [{
+        "id": s.id,
+        "name": s.name,
+        "category": s.category.value if s.category else "meal",
+        "logo_url": s.logo_url or "",
+        "group_count": group_counts.get(s.id, 0),
+        "last_group": last_group_at.get(s.id, ""),
+        "last_ts": last_group_ts.get(s.id, 0),
+    } for s in stores]
+    return {"stores_json": payload, "favorite_ids": favorite_ids, "store_total": len(stores)}
+
+
+@router.get("/stores")
+async def stores_page(request: Request, fav: int = 0, db: Session = Depends(get_db)):
+    """店家分頁（V2.17.0 IA 新根頁）：搜尋、分類、只看收藏、排序；底部推薦入口"""
+    user = await get_current_user(request, db)
+    ctx = store_catalog_context(db, user)
+    ctx.update({"request": request, "user": user, "fav_only": bool(fav)})
+    return templates.TemplateResponse("stores.html", ctx)
 
 
 @router.get("/stores/{store_id}")

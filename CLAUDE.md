@@ -1,7 +1,7 @@
 # CLAUDE.md — SELA 快點來點餐（線上訂餐）
 
 > **⚠ 給同時拿到 SELA-Starter-Kit 的 Claude：**
-> 這是**已對齊 Kit V1.18.0 的成熟線上專案**（30 人團隊每日使用），不是新專案。
+> 這是**已對齊 Kit V1.36.0 的成熟線上專案**（30 人團隊每日使用），不是新專案。
 >
 > 衝突仲裁規則：
 > 1. **以本專案 CLAUDE.md 為主、Kit 為輔**
@@ -13,8 +13,8 @@
 > 3. **不要為對齊 Kit 而動既有設計** — 已驗證的就是事實標準
 > 4. 版號規則照 Kit（部署版無後綴、備份版 -source）
 > 5. **下次完成版本時記得評估 SELA-handoff.md**（鐵律 #0 — 完整見 Kit master CLAUDE.md）
-> 6. **優化體檢（對齊 Kit V1.18.0 時做）**：對照 `optimizations.md` 4 條 OPT，本專案無中招值得改項 — OPT-1（threading.Timer 排程）不適用（自動催單是前端提示+手動催單，非後端定時任務）；OPT-2/3/4（種子 JSON、outbox、自我驗證迴圈）情境不符。體檢通過，無需改 code。
-> 7. **對齊歷程**：V1.0.0 首次對齊 Kit V1.9.0；V1.16.0 對齊升級至 Kit V1.18.0（更新此區塊 + 補回漏更新的開頭版本號 V1.13.3→V1.16.0 + 優化體檢 + app logo）。
+> 6. **優化體檢**：V1.16.0 對照 4 條 OPT 無中招；V2.17.0 補看 V1.18→V1.36 新增的 OPT-5（雙版同構重構）／OPT-6（LLM 預填 `{`）——本專案沒有雙版、沒有呼叫 LLM，技術不適用。6 條中 6 條不適用或已等效，0 項可升級。
+> 7. **對齊歷程**：V1.0.0 首次對齊 Kit V1.9.0；V1.16.0 升級至 Kit V1.18.0；**V2.17.0 落差評估 Kit V1.18.0→V1.36.0（18 個 b 版，走 claude-init 二章「已對齊過但 Kit 跳版」）**——區間新坑逐條核對本專案：#61 UI 改名只改顯示文字（V2.17.0 用語統一照此做：`pending_count`／`DRAFT` 等變數不動）；#64/#65 測試 baseline（煙霧測試每版先跑原始檔）；#81 假完成訊號（jsdom 檢查「跳過」不算通過，已在 handoff 列為防線）；#86 外部輸入過 schema（匯入已走 Pydantic）；#88 舊網址永遠公開（V2.17.0 舊路由一律 302 轉址、不留裸頁）；#90 自我描述文案同步（**這次真正撿到的舊債**：README 還寫 `docs/` 有四份規範、版尾停在 V1.0.0／Kit V1.9.0，已修；自我描述清單＝README 功能段＋目錄樹＋版尾，升版 SOP 第 10 步）；#92 `async def` 裡同步 DB 呼叫——本專案全站如此（審核 P2-F3 已列），3 workers／30 人規模可承受，列為「不做，理由：改法是全站 `def` 或 threadpool，屬長工重構」。交付格式改用 Kit V1.36.0 的回報格式（✓ 已交付／技術棧／主要功能／下版第一優先／§3 鐵律逐條核對／handoff 評估）。
 
 > **這份文件是給下次 Claude 看的工作上下文，不是文件。**
 > 判斷標準：下次 Claude 讀完，能不能直接動手？
@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.16.3（UI 審核 hotfix：湊團／催單被強制開啟、甜冰預設寫死、12 處時區、訂單牆金額、草稿標示、星號、快捷標籤、FE0F）
+- **版本：** V2.17.0（IA 重整：五格導航 今天｜店家｜＋｜紀錄｜我的、首頁分區、店家分頁、紀錄分頁三合一、我的瘦身、開團頁頂列）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -83,7 +83,9 @@
 | 訂單 CRUD | `app/routers/orders.py` + `routers/orders_extra.py` |
 | JSON 匯入 | `app/services/import_service.py` |
 | Cloudinary 上傳 | `app/routers/admin.py`（圖片相關端點） |
-| 首頁 / 訂單牆 | `app/routers/home.py` + `templates/home.html` + `templates/partials/order_wall.html` |
+| 首頁 / 店家分頁 / 紀錄分頁 / 我的 | `app/routers/home.py`（`_home_context`／`split_home_groups`／`store_catalog_context`／`records_page`）+ `templates/partials/home_groups.html`、`stores.html`、`records.html`（＋`partials/records_tabs.html`）、`profile.html` |
+| 底部導航 / 頁首 | `app/templates/base.html`（`nav_items` 五格、active 規則） |
+| 訂單牆 | `templates/partials/order_wall.html` |
 | Railway 設定 | `railway.toml`（builder=dockerfile）、`Dockerfile`、`start.sh` |
 | 依賴版本（**鎖死**，坑 #10） | `requirements.txt` |
 | 部署排除清單 | `.gitignore`（V1.0.0 對齊 Kit 模板） |
@@ -456,6 +458,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.17.0 | **IA 重整（Sela 兩輪意見：「導航列投票跟回報佔一格但很少用」「首頁混了不必要的資訊」；畫面稿 `preview_ia_v2170.html` 核准）**。原則：物件的所有動作都在物件自己的頁面。(1) **底部導航五格對稱 今天｜店家｜＋｜紀錄｜我的**（`base.html` 改成 `nav_items` 迴圈；active 規則：/stores*、/recommend → 店家；/records、/stats、/history、/my-orders、/my/groups → 紀錄；/profile、/feedback、/my-departments → 我的；/home、/groups*、/votes* → 今天；後台不亮）；**頁首只留 logo**，⚙／頭像／版號搬到「我的」。投票沒有格子：有進行中的投票才在首頁出卡，發起入口在開團頁。(2) **首頁**：`/home` 與 `/home/groups` 原本是兩份複製貼上的查詢（N-02 的老問題），合成 `_home_context()`；`_open_groups()` 一次撈開放團（不再分飲料／餐廳／團購三段）、`split_home_groups()` 分「要你處理的」（我開的且〔我沒送出或有人要催〕／我購物車有東西沒送出）與「開放中」（依截止、一團一張、✓ 已送出／還沒點；空購物車算還沒點，否則每個團都要處理等於沒分）；公告只展開第一則（置頂優先）其餘「還有 N 則 ›」就地展開；投票卡（前兩名票數、剩餘、去投票／看結果、全部投票）；底部「已截止的團 ›」→ 紀錄；空狀態「今天還沒有人開團，＋ 開一個？」。店家目錄、已截止展開、`get_hot_items`／`hot_items.html`／`visible_closed_groups` 死碼一併移除。催單文字「結單」→「截止」，改用 `data-text` + `__ORIGIN__` 佔位（坑 #37）。(3) **店家分頁 `/stores`**（新根頁）：`visible_stores_for()` 把三份逐店查部門的 N+1 收成一次；`store_catalog_context()` 帶 group_counts／last_group；前端搜尋（攤平）、分類 chip、只看收藏（`?fav=1` 預選）、排序下拉與開團選店共用 `localStorage.sela_store_sort`；底部「想推薦新店家？」。`/favorites` → 302 `/stores?fav=1`。(4) **紀錄分頁 `/records`**：我點的（進行中不分頁在上、之前的分頁）｜我開的（只有我開的，每列 進團／複製開團／存成範本）｜統計（`/stats` 套同一列 chip，`partials/records_tabs.html`）；`/history`、`/my-orders` → 302 `/records`、`/my/groups` → `/records?tab=groups`；`save_template_from_group` 加 `next`（只收站內路徑）。(5) **我的**：個人卡（名稱 ✎ 就地改、部門 ✎ 進既有部門頁、送出 N 單／開過 N 團）、管理後台（管理員）、問題回報、登出、版號。(6) **開團頁頂列**：「還沒決定吃哪家？發起投票 ›」＋快速開團 chip 最多 4 顆＋「管理範本 ›」（範本只從這裡進）。用語：「待點餐」→「你還沒點」。資料表不動；團頁本體、開團表單、後台不動。刪除 `history.html`／`my_orders.html`／`my_groups.html`／`favorites.html`／`partials/hot_items.html`。**測試**：煙霧第 28 節 157 → **167 項**（分區函式含 7 種情境、五格導航、首頁無重複與順序、投票卡出現／隱藏、店家 JSON、四條轉址、存範本 next 擋外站；分區條件與 next 都做過改壞會紅）；jsdom 加 `catalog` 模式（收藏區／只看收藏／排序下拉／分類／搜尋攤平，第一版沒驗順序改壞不會紅——補上順序斷言後兩種改壞都紅，坑 #28 再提醒）；`check_template_js` 登記 `stores.html`／`home.html`，函式名正則放寬到有參數的 `countdown(deadline)`。**Kit V1.18.0 → V1.36.0 落差評估**見開頭仲裁區塊第 7 點；撿到的舊債是 README 自述（坑 #90）。路由 137 → 139。 |
 | V2.16.3 | **兩份 UI 審核（《UI／UX 全面精簡建議》＋《內部審核 V2.16.1 UI 優化與簡化建議》）的 hotfix 包**（Sela 選先做這包，零設計爭議）。審核列的功能錯誤逐條查證**全部屬實**。**P0-1**：湊團／催單被強制開啟（坑 #42）→ 三個欄位 `:disabled`。**P0-2**：甜冰預設寫死 → `group_new.html` 改依 `selectedStore.sugar_options/ice_options`（`allStores` 從 `store.options` 帶），店家沒設選項時顯示提示；後端 `sanitize_drink_defaults()` 開團與範本開團共用；`group.html` 鎖定 hidden `{{ x or '' }}`；加點前端 `checkDrinkOptions()` 有選項沒選就 toast「請選擇甜度」並捲過去（`@htmx:config-request` 擋）；後端訊息改「請重新選擇甜度（這個選項不在店家目前的清單裡）」。**P1-1**：`created_at.strftime` 沒過 `|taipei` 不只「我的訂單」一處——全站 **12 處**（我的訂單、團頁上次訂單、回報、我的開團、推薦、投票、後台回報／公告／團單／使用者詳情／推薦／重複診斷）＋ `joined_at`／`reviewed_at`／`last_active_at`／`last_treat` 4 處一併補；煙霧測試掃「UTC 欄位的 strftime 必過 taipei」。**P1-2**：a 訂單牆 `${{ x|sum() }}` 躲過 money 掃描 → 改 `final_amount|money`，掃描規則補 `|sum(`；b 收藏星號實心＋主色；c 截止快捷「今天 12:00」過午自動變「明天 12:00」（`presetLabel()`）；d 「點 +1」→「點「跟單」」；e 見 P0-2；f 已截止的草稿改灰「未送出・已截止（未計入）」、進行中的「草稿」改「未送出」（用語統一的第一步）。U+FE0F 變體符 13 處清掉。煙霧測試 150 → **157 項**，jsdom 加隱藏欄位／甜冰選項／快捷標籤三項；改壞四處實測會紅。 |
 | V2.16.2 | **Sela 兩項需求**。(1) **推薦店家可上傳多張菜單照片（最多 5）**：`store_recommendations.menu_image_urls TEXT`（JSON 陣列，`ADD COLUMN IF NOT EXISTS`），`menu_image_url` 保留＝第一張，model `menu_images` property 新欄位優先、舊資料退回單張、壞 JSON 不炸（坑 #33 的「既有資料怎麼辦」）。送出改走 `upload_service.upload_image(folder="sela/recommendations", max_size=1600)`（順手做掉審核 P2-F5；`max_size` 新參數，logo／品項圖維持 400；白名單加 HEIC／HEIF），一張失敗整筆 400 不留半筆、超過上限 400。表單用 Alpine `photoPicker()` 自己維護清單（再選是加進去不是取代、× 單張移除、縮圖編號、送出前就擋張數與 5MB），用 `DataTransfer` 寫回真正送出的 `<input name=menu_image multiple>`；後台推薦列表縮圖橫列、核准後匯入頁推薦卡把每張都放出來（`alt="菜單照片 N"`，與 B-3 的對照照片區分）。(2) **店家排序可自訂，預設熱門**：熱門＝全體累計開團次數多→少（同次數依名稱）、名稱＝注音序、最近開過＝上次開團新→舊。開團選店覆蓋層搜尋列下方加排序 chip（記 `localStorage.sela_store_sort`，`openPicker()` 時讀），**原本獨立的「熱門 3 家」區塊拿掉**（全部預設就是熱門順序，再多一區重複），「我的最愛」與「全部」兩區都照選的排序，卡片小字依排序顯示「開過 N 次」／「上次 月/日」；`_new_group_context` 加 `last_group_at`／`last_group_ts`（一次聚合）。後台店家列表篩選列下加排序 chip（記 sessionStorage 同一把 key），每列顯示「開過 N 次 · 上次 月/日」；`store_list` 加 `group_counts`。匯入頁的搜尋選店維持名稱序（打字找店，熱門沒意義）。**新增第七支檢查** `scripts/jsdom_store_sort_check.js`（由 `check_frontend_import.py` 一起跑）：三家店固定資料，實際切 chip 讀卡片／列順序，改壞排序方向實測會紅——煙霧測試只看得到資料有傳到模板，看不到 Alpine 排出來的順序。煙霧測試 144 → **150 項**（推薦四條做過改壞驗證）。`check_template_js` 假資料補 `last_group_at`／`last_group_ts`／`group_counts`。 |
 | V2.16.1 | **審稿《菜單管理優化》B 系列七項（Sela 選 B-3/5/6/7/8/9/10）**，資料表不動、匯入語意不變。**B-10**：匯入頁「匯入至」的原生 `<select>` 改搜尋選店（Alpine 過濾，NFKC＋去空白，最多 8 家，顯示「第 N 版 · M 項」），店家清單放 `<script type="application/json" id="import-stores">`；hidden `store_id` 用 `:value` 綁定，所以選完要 `$nextTick` 後再 `htmx.trigger(form, 'store-changed')`（hx-trigger 從 `change from:find select` 改成自訂事件）。`_stores_for_picker()` 兩次聚合查詢算版號與項數。**B-8**：新增 `app/services/store_match.py`（NFKC、去括號內容、去空白、去「總店／分店／門市／店」字尾；相同／包含／`SequenceMatcher` ≥ 0.8），`_preview_from_data` 在「新增一家店且沒有完全同名」時帶 `similar`；片段的「改為更新「X」」`$dispatch('switch-store')`，根 `x-data` 接住呼叫 `pickStore()`；「確定是新店家」用根層 `ignoreSimilar` 收起（片段每次重新檢查都會再渲染，狀態要放在片段外）。**B-5**：`GET /admin/stores/{id}/menu-json` 把使用中版本轉回匯入格式（`_menu_to_import_json`：時價寫 "時價"、停售／說明有才帶、整數價不帶 .0），匯入頁「帶入目前菜單」用 XHR 拿來填輸入框並觸發自動檢查，貼回去判定「相同」；工作台菜單分頁多「改幾個價格」連到 `?load=current` 進頁就帶入。**B-3**：「對照照片」`URL.createObjectURL` 本機顯示不上傳，可收合／放大／移除；拖圖片進輸入框也當對照照片。**B-6**：三份 AI 指令合成 `promptBody`＋`buildPrompt()`（既有店家時結尾帶「店名：X」），畫面只剩一顆「複製 AI 轉換指令」。**B-7**：`parse_price_input` 對 `?`／`？` 拋 `UNCLEAR_PRICE_MSG`，`_preview_from_data` 把這類驗證錯誤分流成 `unclear_items`，片段集中成「N 個品項的價格 AI 看不清」紅卡（沒有確認鈕）；AI 指令加「看不清填 "?"，不要猜、不要填 0」。**B-9**：`menu_diff._detect_renamed_categories()`（舊分類消失＋新分類出現＋品名重疊 ≥ 80%）回 `renamed_categories`，只因分類改了的品項抽回不變、其他變更拿掉「分類改了」註記；摘要一行「分類改名：「小菜」→「招牌小菜」（6 項，5 項不變）」，明細多「分類改名」段；`identical` 把改名也算變更。jsdom 檢查改測搜尋選店、帶入目前菜單、近似店名切換與收起、拖圖片；改壞三處實測會紅。煙霧測試 138 → **144 項**，B-7/B-8/B-9/B-5 都做過改壞驗證。路由 136 → 137。順修：V2.16.0 漏改 `base.html` 的 `app_version`（標題列仍顯示 V2.15.1），這版補上——升版 SOP 第 1 步，打包前 grep 一次。 |
@@ -563,7 +566,9 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 >
 > **兩份 UI 審核（2026-10-16，《UI／UX 全面精簡建議》＋《內部審核 V2.16.1 UI 優化與簡化建議》）— hotfix 已做（V2.16.3），其餘待 Sela 排序**。內部審核建議的順序：**用語統一**（「結單」一詞三義——截止時間／團員送出／團主關團，建議全站改「截止／送出訂單／提前截止」，草稿一律「未送出」）＋**底部常駐結帳列**取代購物車 FAB、團單頁隱藏底部導航（解「以為點了其實沒送出」）→ **團單頁依身分×階段重排**（團員：精簡標頭→菜單→結帳列；已送出後菜單收合成「再加點」；已截止團主看「下一步卡」傳給店家／核對單／收款明細；拿掉「快速點餐」卡——常點與熱門併入菜單導覽、看別人點什麼併入訂單牆「跟單」、隨機收進導覽列；訂單牆改一行摘要；團主工具 7 格→分享／催單／更多）→ **開團頁只問店家＋截止**（團名自動帶「店名＋時段」、截止預設 1 小時、其他收進進階設定；「開團」改 `.btn-primary`；可見範圍 radio 改 chip）＋**首頁去重**（同一團不出現兩次、店家清單移到底部、團列表不分段依截止排序、頁首只留 logo）＋**底部導航三格**（首頁｜＋開團｜我的；投票進首頁、回報進我的）。加點彈窗：✕＋拖曳條、「加入購物車・$25」帶金額、備註收起、「上次」標籤。購物車 sheet：去雙標題、整單刪除收進 ⋯、減到 0 即移除。全站：主要按鈕統一 `.btn-primary`、圓角統一、手機一律底部 sheet、`alert()` 改 toast、透明度收成三階。《UI／UX 全面精簡》另提：後台首頁先待處理事項、個人頁分「資料／活動」、統計先總覽。**不照做**：匯入改「上傳照片→辨識狀態」（辨識是外部 AI 做的，系統沒有 OCR）；桌機寬版佈局（30 人幾乎全手機）。
 >
-> **審稿《菜單管理優化》＋內部審核 V2.15.0 — Sela 已排定順序**：✅ V2.16.0 A-1/A-2/A-5/A-8 菜單呈現 → ✅ V2.16.1 匯入介面 B-3/5/6/7/8/9/10 → **V2.17.0 第二階段工作台分頁重組**（菜單／共用選項／店家設定／更多；甜冰點選標籤＋預設組；加料批次編輯一次儲存）→ **V2.18.0 P1-7 套件升級鏈**。每包先出畫面稿。**不做**（Sela 決定）：A-4 菜單搜尋、A-6 停售灰字列出、A-7 時價提示文。
+> **IA 重整（Sela 2026-10-16 兩輪意見）— ✅ V2.17.0 做完導航／首頁／店家／紀錄／我的／開團頁頂列。後續包（Sela 排序）**：**V2.18.0 團頁**（底部常駐結帳列取代購物車 FAB、團頁隱藏底部導航、團主管理分頁、用語統一「截止／送出訂單／提前截止」——團頁 `pending_orders`「尚未結單」「確定結單」那批）→ **開團頁進階設定收合**（只問店家＋截止、團名自動帶店名＋時段）→ **工作台分頁重組**（菜單／共用選項／店家設定／更多；甜冰點選標籤＋預設組；加料批次編輯）→ **P1-7 套件升級鏈**。每包先出畫面稿。**不做**（Sela 決定）：A-4 菜單搜尋、A-6 停售灰字列出、A-7 時價提示文。
+>
+> **審稿《菜單管理優化》＋內部審核 V2.15.0**：✅ V2.16.0 A-1/A-2/A-5/A-8 → ✅ V2.16.1 B-3/5/6/7/8/9/10 → 工作台分頁重組（見上）。
 >
 > **匯入 P2 後半（仍要動資料表）**：`item.variants` 取代 price/price_l、店家層級加料匯入、後台上傳照片直接轉 JSON、`store.currency`。
 >
@@ -605,6 +610,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
      - 《SELA-菜單匯入格式規範》改到匯入就同步；《專案架構精簡》改到資料表／路由／套件就同步；《部署檢查清單》改到檢查流程就同步；《常見錯誤與解決方案》新坑值得速查就加；《開發指導手冊》業務規則或排程變了就同步。都是 `project_write` 原地覆蓋同檔名。
      - 程式碼快照 `線上訂餐_bundle_VX.Y.Z.txt`：每版用 `python scripts/匯整專案.py "Online-Drink VX.Y.Z" 線上訂餐_bundle_VX.Y.Z.txt` 產生（約 1.4MB，含 CLAUDE.md），**先 `project_delete` 舊版號的那份再寫新的**（檔名帶版號，不會自動覆蓋；用 `local_path` 上傳時會落在 `claude/` 命名空間，路徑是 `claude/線上訂餐_bundle_VX.Y.Z.txt`）。
      - 這四份背景 md **不再放在 zip 的 `docs/`**（V2.16.1 移除，避免兩邊漂移）；zip 裡只留 CLAUDE.md 與 handoff。
+  10. **自我描述文案同步**（Kit 坑 #90，V2.17.0 起）：README 的「主要功能」「專案結構」目錄樹、版尾「Made by … 對齊 Kit Vx」、本檔第三章路徑表——動到導航／頁面／目錄就一併改。V2.17.0 對齊時發現 README 版尾停在 V1.0.0、`docs/` 說明是 V2.16.1 之前的，沒有任何測試抓得到這種腐化。
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
 ### V1.1.0 部署動作

@@ -1,0 +1,11 @@
+{# 紀錄分頁的頁首（V2.17.0）：records.html 與 stats.html 共用，三個 chip 永遠同一列 #}
+{% macro header(active) -%}
+<div class="flex items-baseline gap-2 mb-3">
+    <h1 class="text-xl font-bold text-sela-800">紀錄</h1>
+</div>
+<div class="flex gap-1.5 text-xs mb-4" id="records-tabs">
+    {% for key, label, href in [('orders', '我點的', '/records'), ('groups', '我開的', '/records?tab=groups'), ('stats', '統計', '/stats')] %}
+    <a href="{{ href }}" class="px-3 py-1.5 rounded-full border {% if active == key %}bg-sela-800 text-white border-sela-800{% else %}bg-white border-sela-300 text-sela-800/70{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+{%- endmacro %}

@@ -36,6 +36,7 @@
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
+import json
 import os
 import sys
 from decimal import Decimal
@@ -1680,12 +1681,14 @@ def main():
         db.add(_gc); db.flush()
         _od = _O(group_id=_gc.id, user_id=user.id, status=_OS.DRAFT, created_at=datetime(2026, 10, 16, 4, 22))
         db.add(_od); db.commit()
-        r = _c.get("/my-orders")
+        r = _c.get("/my-orders", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/records", "V2.17.0：/my-orders 轉址到紀錄頁"
+        r = _c.get("/records")
         t = _T(r)
-        assert "2026/10/16 12:22" in t, "created_at 是 UTC，顯示要 +8"
-        assert "未送出・已截止（未計入）" in t, t[t.find("我的訂單", 100):][:400]
+        assert "10/16 12:22" in t, "created_at 是 UTC，顯示要 +8"
+        assert "未送出・已截止" in t, t[t.find("之前的", 100):][:400]
         assert "草稿" not in t, t[t.find("草稿")-200:t.find("草稿")+50]
-        check("P1-1／P1-2f：我的訂單時間台北、已截止草稿標「未送出・已截止（未計入）」")
+        check("P1-1／P1-2f：紀錄頁「我點的」時間台北、已截止未送出標「未送出・已截止」（V2.17.0 搬到 /records）")
     finally:
         _home.get_current_user = _orig_home_cu
 
@@ -1698,6 +1701,156 @@ def main():
             _left.append(f"{_tp.name}: U+FE0F")
     assert not _left, _left
     check("P1-1 全站：UTC 欄位的 strftime 都過 taipei；模板無 U+FE0F 殘留")
+
+    # ---------- 28. V2.17.0 IA 重整 ----------
+    print("\n[28] V2.17.0 IA（五格導航／首頁分區／店家頁／紀錄頁／我的／開團頁頂列）")
+    from app.routers.home import split_home_groups, my_status_in
+    from app.models.order import Order as _O2, OrderStatus as _OS2, OrderItem as _OI2
+    from app.models.vote import Vote as _V, VoteOption as _VO, VoteRecord as _VR
+    _other = User(line_user_id="smoke-other", display_name="別人"); db.add(_other); db.flush()
+    _ia_store = Store(name="IA 測試店", category=CategoryType.MEAL, is_public=True); db.add(_ia_store); db.flush()
+    import_menu(db, MenuImport(store_id=_ia_store.id, menu={"items": [{"name": "便當", "price": 100}]}))
+    _ia_menu = db.query(Menu).filter(Menu.store_id == _ia_store.id, Menu.is_active == True).first()
+    _ia_item = db.query(_MI).filter(_MI.menu_id == _ia_menu.id).first()
+    _dl = taipei_now() + timedelta(hours=2)
+    def _mk(name, owner, hours=2):
+        g = Group(owner_id=owner.id, store_id=_ia_store.id, menu_id=_ia_menu.id, name=name, category=CategoryType.MEAL,
+                  deadline=taipei_now() + timedelta(hours=hours), is_public=True)
+        db.add(g); db.flush(); return g
+    def _order(g, who, status, with_item=True):
+        o = _O2(group_id=g.id, user_id=who.id, status=status); db.add(o); db.flush()
+        if with_item:
+            db.add(_OI2(order_id=o.id, menu_item_id=_ia_item.id, item_name="便當", unit_price=100, quantity=1))
+        db.flush(); return o
+    # 先把前面幾節留下的開放團關掉，首頁只剩這一組（舊資料可能有自己開又沒送出的團，會混進「要你處理的」）
+    for _g in db.query(Group).filter(Group.is_closed == False, Group.deadline > taipei_now()).all():
+        _g.is_closed = True
+    db.commit()
+    ga = _mk("A 我開的有人沒送出", user, 1); _order(ga, _other, _OS2.DRAFT)                 # 團主＋有人要催 → 要處理
+    gb = _mk("B 別人開我沒送出", _other, 3); _order(gb, user, _OS2.DRAFT)                 # 我購物車有東西 → 要處理
+    gc = _mk("C 別人開我已送出", _other, 2); _order(gc, user, _OS2.SUBMITTED)             # 開放中 ✓ 已送出
+    gd = _mk("D 別人開我還沒點", _other, 4)                                               # 開放中 還沒點
+    ge = _mk("E 我開的我也送出了沒人要催", user, 5); _order(ge, user, _OS2.SUBMITTED)      # 開放中（不用處理）
+    gf = _mk("F 別人開我空購物車", _other, 6); _order(gf, user, _OS2.DRAFT, with_item=False)  # 空車＝還沒點
+    gg = _mk("G 我開的我送出了但有人沒送出", user, 7); _order(gg, user, _OS2.SUBMITTED); _order(gg, _other, _OS2.EDITING)  # 要催 → 要處理
+    db.commit()
+    for g in (ga, gb, gc, gd, ge, gf, gg):
+        db.refresh(g)
+    assert my_status_in(ga, user) == "none" and my_status_in(gb, user) == "unsent" and my_status_in(gc, user) == "submitted" and my_status_in(gf, user) == "none"
+    att, rest = split_home_groups([ga, gb, gc, gd, ge, gf, gg], user)
+    assert [e["group"].name[0] for e in att] == ["A", "B", "G"], [e["group"].name for e in att]
+    assert [e["group"].name[0] for e in rest] == ["C", "D", "E", "F"], [e["group"].name for e in rest]
+    assert [e["status"] for e in rest] == ["submitted", "none", "submitted", "none"]
+    check("首頁分區：團主有人要催／我沒送出 → 要你處理的；其餘開放中，空購物車算還沒點，一團只出現一次")
+
+    _home.get_current_user = _fake_owner
+    try:
+        r = _c.get("/home")
+        assert r.status_code == 200
+        t = _T(r)
+        nav = r.text[r.text.index("<nav"):r.text.index("</nav>")]
+        assert all(x in nav for x in ("今天", "店家", "紀錄", "我的", 'href="/records"', 'href="/stores"', 'href="/groups/new"')) and "回報" not in nav and "投票" not in nav
+        hdr = r.text[r.text.index("<header"):r.text.index("</header>")]
+        assert "/admin" not in hdr and "/profile" not in hdr and "V2." not in hdr, "頁首只留 logo"
+        check("五格導航：今天｜店家｜＋｜紀錄｜我的；頁首只留 logo（⚙／頭像／版號搬到我的）")
+        assert "要你處理的" in t and "開放中" in t and "待點餐" not in t
+        # 一個團只出現一次（連結數）
+        for g in (ga, gb, gc, gd, ge, gf, gg):
+            assert r.text.count(f'href="/groups/{g.id}"') == 1, (g.name, r.text.count(f'href="/groups/{g.id}"'))
+        # 順序：要處理的 A、B、G；開放中依截止 C(2h) D(4h) E(5h) F(6h)
+        pos = [r.text.index(f'href="/groups/{g.id}"') for g in (ga, gb, gg, gc, gd, ge, gf)]
+        assert pos == sorted(pos), pos
+        assert "你還沒點" in t and "0 人已送出" in t and "催單 1" in t
+        assert "截止，還沒點的快來點餐" in r.text and "結單，還沒點" not in r.text, "催單文字「結單」→「截止」"
+        assert "已送出" in t and "還沒點" in t and "未送出" in t
+        assert "投票中" not in t, "沒有投票時整塊隱藏"
+        assert "已截止的團" in t and 'href="/records"' in r.text
+        assert "店家目錄" not in t and "(" not in t.split("開放中")[1][:5], "首頁不再放店家清單與分類段落"
+        check("首頁：要你處理的（催單帶人數、你還沒點）、開放中依截止、無重複、催單文字改截止、沒投票不出現投票卡")
+
+        # 公告：只展開第一則、「還有 N 則」
+        r = _c.get("/home"); t = _T(r)
+        assert "還有 2 則" in t, t[:300]
+        check("公告只展開第一則（置頂優先），其餘「還有 N 則 ›」就地展開")
+
+        # 投票卡：有進行中的投票才出現；投過了顯示「看結果」
+        _v = _V(title="週五吃哪家", creator_id=_other.id, deadline=taipei_now() + timedelta(hours=1), is_public=True); db.add(_v); db.flush()
+        _vo = _VO(vote_id=_v.id, store_id=_ia_store.id, added_by_id=_other.id); db.add(_vo); db.flush()
+        db.add(_VR(option_id=_vo.id, user_id=_other.id)); db.commit()
+        r = _c.get("/home"); t = _T(r)
+        assert "投票中：週五吃哪家" in t and "IA 測試店 1 票" in t and "去投票" in t and f'href="/votes/{_v.id}"' in r.text
+        db.add(_VR(option_id=_vo.id, user_id=user.id)); db.commit()
+        r = _c.get("/home"); t = _T(r)
+        assert "看結果" in t and "你投過了" in t
+        _v.is_closed = True; db.commit()
+        r = _c.get("/home/groups"); t = _T(r)
+        assert "投票中" not in t and "要你處理的" in t, "片段與整頁同一份 context"
+        check("投票卡：只在有進行中投票時出現、顯示票數與去投票、投過改看結果；/home/groups 片段同 context")
+
+        # 店家分頁
+        _pers = Store(name="個人代購店", category=CategoryType.MEAL, is_personal=True, owner_user_id=user.id); db.add(_pers); db.commit()
+        r = _c.get("/stores")
+        assert r.status_code == 200 and 'id="stores-data"' in r.text
+        _sj = json.loads(r.text.split('id="stores-data">', 1)[1].split("</script>", 1)[0])
+        _names = [x["name"] for x in _sj]
+        assert "IA 測試店" in _names and "個人代購店" not in _names and all(k in _sj[0] for k in ("group_count", "last_group", "last_ts", "category", "logo_url")), _names
+        assert "favOnly: false" in r.text and "sela_store_sort" in r.text and 'href="/recommend"' in r.text and "只看收藏" in _T(r)
+        r = _c.get("/stores?fav=1"); assert "favOnly: true" in r.text
+        r = _c.get("/favorites", follow_redirects=False); assert r.status_code == 302 and r.headers["location"] == "/stores?fav=1"
+        r = _c.get(f"/stores/{_ia_store.id}"); assert r.status_code == 200 and "店家</span>" in r.text, "店家頁返回鍵回店家分頁"
+        check("店家分頁：看得到的店家 JSON、個人代購店排除、?fav=1 預選只看收藏、/favorites 轉址、推薦入口")
+
+        # 紀錄分頁
+        for old, loc in (("/history", "/records"), ("/my-orders", "/records"), ("/my/groups", "/records?tab=groups"), ("/records?tab=stats", "/stats")):
+            r = _c.get(old, follow_redirects=False); assert r.status_code == 302 and r.headers["location"] == loc, (old, r.headers.get("location"))
+        r = _c.get("/records"); t = _T(r)
+        assert r.status_code == 200 and "進行中" in t and "之前的" in t and "B 別人開我沒送出" in t and "C 別人開我已送出" in t
+        assert t.index("B 別人開我沒送出") < t.index("之前的"), "進行中的訂單在上"
+        r = _c.get("/records?tab=groups"); t = _T(r)
+        assert "A 我開的有人沒送出" in t and "B 別人開我沒送出" not in t and "存成範本" in t and "複製開團" in t and 'name="next" value="/records?tab=groups"' in r.text
+        r = _c.get("/records?tab=xx"); assert r.status_code == 200 and "進行中" in _T(r)
+        r = _c.get("/records?page=-3"); assert r.status_code == 200
+        r = _c.get("/stats"); assert r.status_code == 200 and 'id="records-tabs"' in r.text and "個人資料" not in _T(r)
+        check("紀錄分頁：我點的（進行中在上）／我開的（只有我開的、三顆動作）／統計同一列 chip；四條舊網址轉址；壞參數不炸")
+
+        # 我的
+        r = _c.get("/profile"); t = _T(r)
+        assert r.status_code == 200 and "問題回報" in t and "登出" in t and "V2." in t and "管理後台" not in t
+        assert "/my-orders" not in r.text and "/favorites" not in r.text and "/templates" not in r.text and 'href="/my-departments"' in r.text
+        user.is_admin = True; db.commit()
+        r = _c.get("/profile"); assert "管理後台" in _T(r) and 'href="/admin"' in r.text
+        user.is_admin = False; db.commit()
+        check("我的：只剩個人卡／問題回報／登出／版號，管理後台只有管理員看得到，舊的六個連結都不在")
+    finally:
+        _home.get_current_user = _orig_home_cu
+
+    # 開團頁頂列：發起投票一行、快速開團最多 4 顆、管理範本
+    _grp.get_current_user = _fake_owner
+    _grp.get_current_user_optional = _fake_owner_opt
+    _tplr.get_current_user = _fake_owner
+    try:
+        r = _c.get("/groups/new"); t = _T(r)
+        assert "發起投票" in t and 'href="/votes/new"' in r.text and 'href="/templates"' in r.text
+        for i in range(5):
+            db.add(GroupTemplate(user_id=user.id, name=f"範本{i}", store_id=_ia_store.id, group_name=f"團{i}", default_duration_minutes=60, is_public=True, use_count=i))
+        db.commit()
+        r = _c.get("/groups/new")
+        assert r.text.count('/use"') == 4 and 'href="/templates"' in r.text and "範本4" in r.text and "範本0" not in r.text, "最多 4 顆、依使用次數"
+        # 紀錄頁「存成範本」：next 只收站內路徑
+        r = _c.post(f"/templates/save-from-group/{ge.id}", data={"template_name": "從紀錄存", "next": "/records?tab=groups"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/records?tab=groups&saved_template=1", r.headers.get("location")
+        r = _c.post(f"/templates/save-from-group/{ge.id}", data={"template_name": "從紀錄存2", "next": "//evil.example"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == f"/groups/{ge.id}"
+        check("開團頁頂列：發起投票、快速開團最多 4 顆、管理範本；紀錄頁存成範本回紀錄頁，外站 next 不收")
+    finally:
+        _grp.get_current_user = _orig_cu
+        _grp.get_current_user_optional = _orig_cuo
+        _tplr.get_current_user = _orig_tpl_cu
+
+    # 舊模板已刪、死碼不留
+    for _dead in ("history.html", "my_orders.html", "my_groups.html", "favorites.html", "partials/hot_items.html"):
+        assert not (Path("app/templates") / _dead).exists(), f"{_dead} 已由紀錄／店家頁取代，不該留著"
+    check("舊頁面模板（歷史／我的訂單／我的團單／收藏／超夯）已移除")
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")
