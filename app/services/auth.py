@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
-from jose import jwt, JWTError
+# V2.22.0：python-jose → PyJWT（jose 有兩條沒有修正版的已知漏洞，且拉進 ecdsa）。
+# 同樣是 HS256，舊 cookie 裡的 token 照樣解得開，部署後不用重新登入。
+import jwt
+from jwt import PyJWTError as JWTError
 from fastapi import Request, HTTPException
 from sqlalchemy.orm import Session
 import httpx

@@ -84,7 +84,7 @@ async def vote_list(request: Request, db: Session = Depends(get_db)):
     ).order_by(Vote.created_at.desc()).limit(20).all()
     closed_votes = filter_visible_votes(closed_votes_raw)[:10]
     
-    return templates.TemplateResponse("votes/list.html", {
+    return templates.TemplateResponse(request, "votes/list.html", {
         "request": request,
         "user": user,
         "active_votes": active_votes,
@@ -104,7 +104,7 @@ async def new_vote_page(request: Request, db: Session = Depends(get_db)):
     from app.models.department import Department
     departments = db.query(Department).filter(Department.is_active == True).all()
     
-    return templates.TemplateResponse("votes/new.html", {
+    return templates.TemplateResponse(request, "votes/new.html", {
         "request": request,
         "user": user,
         "stores": stores,
@@ -210,7 +210,7 @@ async def vote_detail(vote_id: int, request: Request, db: Session = Depends(get_
     existing_store_ids = {opt.store_id for opt in vote.options}
     available_stores = [s for s in stores if s.id not in existing_store_ids]
     
-    return templates.TemplateResponse("votes/detail.html", {
+    return templates.TemplateResponse(request, "votes/detail.html", {
         "request": request,
         "user": user,
         "vote": vote,

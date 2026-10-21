@@ -37,348 +37,16 @@ async def lifespan(app: FastAPI):
     if _missing:
         raise RuntimeError(f"必要環境變數未設定，拒絕啟動：{', '.join(_missing)}")
     
-    # Startup: create tables
-    # Import all models to ensure tables are created
-    from app.models import department  # noqa: F401
-    from app.models import treat  # noqa: F401 - Phase 3 請客記錄
-    from app.models import vote  # noqa: F401 - Phase 3 投票系統
-    from app.models import template  # noqa: F401 - Phase 5 開團模板
-    
-    Base.metadata.create_all(bind=engine)
-    
-    # 自動新增欄位（如果不存在）
-    def add_column_if_not_exists(table: str, column: str, column_type: str):
-        try:
-            with engine.begin() as conn:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
-            print(f"Added column: {table}.{column}")
-        except Exception as e:
-            # 欄位已存在
-            print(f"Column {table}.{column} check: OK")
-    
-    add_column_if_not_exists("order_items", "size", "VARCHAR(10)")
-    add_column_if_not_exists("order_items", "created_at", "TIMESTAMP DEFAULT NOW()")
-    add_column_if_not_exists("orders", "discount_amount", "NUMERIC(10,2) DEFAULT 0")
-    add_column_if_not_exists("orders", "discount_note", "VARCHAR(100)")
-    add_column_if_not_exists("menu_items", "price_l", "NUMERIC(10,2)")
-    add_column_if_not_exists("stores", "phone", "VARCHAR(50)")
-    add_column_if_not_exists("stores", "branch", "VARCHAR(100)")
-    add_column_if_not_exists("groups", "branch_id", "INTEGER")
-    add_column_if_not_exists("groups", "note", "TEXT")
-    add_column_if_not_exists("groups", "delivery_fee", "NUMERIC(10,2)")
-    add_column_if_not_exists("groups", "is_public", "BOOLEAN DEFAULT TRUE")
-    add_column_if_not_exists("groups", "store_name", "VARCHAR(100)")  # V1.10.0 店名快照
-    # V1.10.0：store_id / menu_id 改可為 NULL（刪店家後斷開連結但保留團單）
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE groups ALTER COLUMN store_id DROP NOT NULL"))
-        print("groups.store_id set nullable")
-    except Exception:
-        print("groups.store_id nullable check: OK")
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE groups ALTER COLUMN menu_id DROP NOT NULL"))
-        print("groups.menu_id set nullable")
-    except Exception:
-        print("groups.menu_id nullable check: OK")
-    # V1.10.0：訂單明細外鍵改可空（刪店家斷開但保留訂單；已有 item_name/option_name 快照）
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE order_items ALTER COLUMN menu_item_id DROP NOT NULL"))
-        print("order_items.menu_item_id set nullable")
-    except Exception:
-        print("order_items.menu_item_id nullable check: OK")
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE order_item_options ALTER COLUMN item_option_id DROP NOT NULL"))
-        print("order_item_options.item_option_id set nullable")
-    except Exception:
-        print("order_item_options.item_option_id nullable check: OK")
-    add_column_if_not_exists("users", "nickname", "VARCHAR(100)")
-    add_column_if_not_exists("users", "last_login_at", "TIMESTAMP")
-    add_column_if_not_exists("users", "last_active_at", "TIMESTAMP")
-    add_column_if_not_exists("users", "is_guest", "BOOLEAN DEFAULT FALSE")
-    
-    # Phase 3: 趣味功能欄位
-    add_column_if_not_exists("groups", "is_blind_mode", "BOOLEAN DEFAULT FALSE")
-    add_column_if_not_exists("groups", "enable_lucky_draw", "BOOLEAN DEFAULT FALSE")
-    add_column_if_not_exists("groups", "lucky_draw_count", "INTEGER DEFAULT 1")
-    add_column_if_not_exists("groups", "lucky_winner_ids", "TEXT")
-    add_column_if_not_exists("groups", "treat_user_id", "INTEGER")
-    
-    # Phase 3: 湊團制欄位
-    add_column_if_not_exists("groups", "min_members", "INTEGER")
-    add_column_if_not_exists("groups", "auto_extend", "BOOLEAN DEFAULT FALSE")
-    
-    # Phase 4: 店家連結欄位
-    add_column_if_not_exists("stores", "website_url", "VARCHAR(500)")
-    add_column_if_not_exists("stores", "ubereats_url", "VARCHAR(500)")
-    add_column_if_not_exists("stores", "foodpanda_url", "VARCHAR(500)")
-    add_column_if_not_exists("stores", "google_maps_url", "VARCHAR(500)")
-    add_column_if_not_exists("stores", "address", "VARCHAR(300)")
-    
-    # Phase 5: 自動催單欄位
-    add_column_if_not_exists("groups", "auto_remind_minutes", "INTEGER")
-    add_column_if_not_exists("groups", "last_remind_at", "TIMESTAMP")
-    
-    # V2.1.0 每單金額上限
-    add_column_if_not_exists("groups", "order_limit", "NUMERIC(10,2)")
-    add_column_if_not_exists("groups", "allow_over_limit", "BOOLEAN DEFAULT FALSE")
-    
-    # V2.3.0 整單折扣 + 店家單據
-    add_column_if_not_exists("groups", "discount_percent", "NUMERIC(5,2)")
-    add_column_if_not_exists("stores", "provides_invoice", "BOOLEAN DEFAULT FALSE")
-    add_column_if_not_exists("stores", "provides_receipt", "BOOLEAN DEFAULT FALSE")
-    
-    # V2.4.0 缺貨候補（order_item_backups 新表由 create_all 自動建立）
-    add_column_if_not_exists("groups", "enable_backup", "BOOLEAN DEFAULT FALSE")
-    add_column_if_not_exists("groups", "backup_count", "INTEGER DEFAULT 2")
-    
-    # V2.5.0 缺貨處理
-    # V2.7.0 代購
-    add_column_if_not_exists("stores", "is_personal", "BOOLEAN DEFAULT FALSE")
-    add_column_if_not_exists("stores", "owner_user_id", "INTEGER")
-    add_column_if_not_exists("menu_items", "description", "VARCHAR(200)")
-    add_column_if_not_exists("menu_items", "image_url", "VARCHAR(500)")
-    add_column_if_not_exists("menu_items", "stock_limit", "INTEGER")
-    add_column_if_not_exists("menu_items", "is_available", "BOOLEAN DEFAULT TRUE")
-    add_column_if_not_exists("menu_items", "price_tbd", "BOOLEAN DEFAULT FALSE")
-    
-    add_column_if_not_exists("order_items", "fulfillment", "VARCHAR(20)")
-    add_column_if_not_exists("order_items", "fulfilled_backup_id", "INTEGER")
-    add_column_if_not_exists("order_items", "diff_settled", "BOOLEAN DEFAULT FALSE")
-    # V2.14.1 P1-3：候補的加購加料金額分開存，時價定價回寫才不會把它蓋掉
-    add_column_if_not_exists("order_item_backups", "extras_price", "NUMERIC(10,2) DEFAULT 0")
-    
-    # Phase 7: 投票可見性欄位
-    add_column_if_not_exists("votes", "is_public", "BOOLEAN DEFAULT TRUE")
-    
-    # Phase 7: 建立 vote_departments 表（如果不存在）
-    def create_table_if_not_exists(create_sql: str, table_name: str):
-        try:
-            with engine.begin() as conn:
-                conn.execute(text(create_sql))
-            print(f"Created table: {table_name}")
-        except Exception as e:
-            if "already exists" in str(e):
-                print(f"Table {table_name} check: OK")
-            else:
-                print(f"Table {table_name} check: {e}")
-    
-    create_table_if_not_exists("""
-        CREATE TABLE IF NOT EXISTS vote_departments (
-            id SERIAL PRIMARY KEY,
-            vote_id INTEGER REFERENCES votes(id),
-            department_id INTEGER REFERENCES departments(id)
-        )
-    """, "vote_departments")
-    
-    create_table_if_not_exists("""
-        CREATE TABLE IF NOT EXISTS announcements (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR(100) NOT NULL,
-            content VARCHAR(500) NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            is_pinned BOOLEAN DEFAULT FALSE,
-            created_by_id INTEGER REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT NOW(),
-            expires_at TIMESTAMP
-        )
-    """, "announcements")
-    
-    # 店家推薦表
-    create_table_if_not_exists("""
-        CREATE TABLE IF NOT EXISTS store_recommendations (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            store_name VARCHAR(100) NOT NULL,
-            category VARCHAR(20) NOT NULL,
-            menu_url VARCHAR(500),
-            menu_image_url VARCHAR(500),
-            note VARCHAR(500),
-            status VARCHAR(20) DEFAULT 'pending',
-            reject_reason VARCHAR(200),
-            created_at TIMESTAMP DEFAULT NOW(),
-            reviewed_at TIMESTAMP,
-            reviewer_id INTEGER,
-            created_store_id INTEGER
-        )
-    """, "store_recommendations")
-    add_column_if_not_exists("store_recommendations", "menu_image_urls", "TEXT")  # V2.16.2：多張菜單照片（JSON 陣列）
-    
-    # 店家-部門關聯表
-    create_table_if_not_exists("""
-        CREATE TABLE IF NOT EXISTS store_departments (
-            id SERIAL PRIMARY KEY,
-            store_id INTEGER REFERENCES stores(id) ON DELETE CASCADE,
-            department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
-            UNIQUE(store_id, department_id)
-        )
-    """, "store_departments")
-    
-    # 店家 is_public 欄位
-    add_column_if_not_exists("stores", "is_public", "BOOLEAN DEFAULT TRUE")
-    
-    # 投票唯一約束：同一人對同一選項只能投一票
-    def add_unique_constraint_if_not_exists():
-        try:
-            with engine.begin() as conn:
-                # 先刪除重複資料（保留最早的）
-                conn.execute(text("""
-                    DELETE FROM vote_records a USING vote_records b
-                    WHERE a.id > b.id 
-                    AND a.option_id = b.option_id 
-                    AND a.user_id = b.user_id
-                """))
-                # 嘗試建立唯一約束
-                conn.execute(text("""
-                    ALTER TABLE vote_records 
-                    ADD CONSTRAINT vote_records_option_user_unique 
-                    UNIQUE (option_id, user_id)
-                """))
-            print("Added unique constraint: vote_records_option_user_unique")
-        except Exception as e:
-            if "already exists" in str(e):
-                print("Unique constraint vote_records_option_user_unique: OK")
-            else:
-                print(f"Unique constraint check: {e}")
-    
-    add_unique_constraint_if_not_exists()
-
-    def add_v2111_unique_indexes():
-        """V2.11.1 P1-06：orders 與 user_favorites 的唯一索引。
-
-        `get_or_create_order` 是「先查再建」，手機連點兩下「加入」就可能建出
-        兩筆 Order，之後 `.first()` 拿到哪筆不確定，兩筆都可能被送出 → 重複收款。
-        收藏也一樣，V2.11.0 新增的星號讓連點更容易發生。
-
-        **收藏的重複可以直接刪**（收藏是冪等的，刪掉多的不影響任何人）；
-        **訂單的重複絕對不自動刪** —— 那是某個人的餐與金額。建不起來就把
-        排查 SQL 印在啟動日誌裡，由人決定怎麼合併。
-        """
-        try:
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    DELETE FROM user_favorites a USING user_favorites b
-                    WHERE a.id > b.id AND a.user_id = b.user_id AND a.store_id = b.store_id
-                """))
-                conn.execute(text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_favorites "
-                    "ON user_favorites (user_id, store_id)"
-                ))
-            print("Unique index uq_user_favorites: OK")
-        except Exception as e:
-            print(f"Unique index uq_user_favorites failed: {e}")
-
-        try:
-            with engine.begin() as conn:
-                # V2.11.1 P1-07：一團一筆請客紀錄。重複的直接刪（純統計資料，
-                # 且重複本身就是 bug 產生的，保留最早的那筆即可）
-                conn.execute(text("""
-                    DELETE FROM treat_records a USING treat_records b
-                    WHERE a.id > b.id AND a.group_id = b.group_id
-                """))
-                conn.execute(text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_treat_records_group "
-                    "ON treat_records (group_id)"
-                ))
-            print("Unique index uq_treat_records_group: OK")
-        except Exception as e:
-            print(f"Unique index uq_treat_records_group failed: {e}")
-
-        try:
-            with engine.begin() as conn:
-                conn.execute(text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_orders_group_user "
-                    "ON orders (group_id, user_id)"
-                ))
-            print("Unique index uq_orders_group_user: OK")
-        except Exception as e:
-            print("=" * 70)
-            print("!! 無法建立 uq_orders_group_user，很可能已有重複訂單。")
-            print("!! 不會自動刪除（那是使用者的餐與金額）。請手動排查：")
-            print("!!   SELECT group_id, user_id, COUNT(*) FROM orders")
-            print("!!   GROUP BY 1,2 HAVING COUNT(*) > 1;")
-            print(f"!! 原始錯誤：{e}")
-            print("=" * 70)
-
-    add_v2111_unique_indexes()
-    add_column_if_not_exists("group_templates", "department_ids", "VARCHAR(200)")
-
-    # V2.15.1 審核 P2-10：兩位管理員同時確認匯入，READ COMMITTED 下兩份新菜單都會是 is_active。
-    # do_import 已用 FOR UPDATE 鎖店家列，這條部分唯一索引是最後防線。建不起來代表線上已有重複，印出排查 SQL
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_menus_one_active "
-                "ON menus (store_id) WHERE is_active"
-            ))
-        print("Unique index uq_menus_one_active: OK")
-    except Exception as e:
-        print("=" * 70)
-        print("!! 無法建立 uq_menus_one_active，很可能有店家同時有兩份使用中菜單。排查：")
-        print("!!   SELECT store_id, COUNT(*) FROM menus WHERE is_active GROUP BY 1 HAVING COUNT(*) > 1;")
-        print("!!   保留最新的一份：UPDATE menus SET is_active = false WHERE id NOT IN (SELECT MAX(id) FROM menus WHERE is_active GROUP BY store_id) AND is_active;")
-        print(f"!! 原始錯誤：{e}")
-        print("=" * 70)
-    
-    # 添加新的 enum 值（團購類型）
-    def add_enum_value_if_not_exists(enum_name: str, new_value: str):
-        try:
-            with engine.begin() as conn:
-                # 檢查值是否已存在
-                result = conn.execute(text(f"SELECT 1 FROM pg_enum WHERE enumlabel = '{new_value}' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = '{enum_name}')"))
-                if result.fetchone() is None:
-                    conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{new_value}'"))
-                    print(f"Added enum value: {enum_name}.{new_value}")
-                else:
-                    print(f"Enum value {enum_name}.{new_value} check: OK")
-        except Exception as e:
-            print(f"Enum {enum_name}.{new_value} check: {e}")
-    
-    # 添加大寫版本（SQLAlchemy 使用 enum name）
-    add_enum_value_if_not_exists("categorytype", "GROUP_BUY")
-    
-    # 修正舊的小寫 group_buy -> GROUP_BUY
-    def fix_enum_case():
-        try:
-            with engine.begin() as conn:
-                # 檢查是否有使用小寫 group_buy 的記錄
-                result = conn.execute(text("SELECT COUNT(*) FROM stores WHERE category = 'group_buy'"))
-                store_count = result.scalar()
-                result = conn.execute(text("SELECT COUNT(*) FROM groups WHERE category = 'group_buy'"))
-                group_count = result.scalar()
-                
-                if store_count > 0 or group_count > 0:
-                    # 更新為大寫
-                    conn.execute(text("UPDATE stores SET category = 'GROUP_BUY' WHERE category = 'group_buy'"))
-                    conn.execute(text("UPDATE groups SET category = 'GROUP_BUY' WHERE category = 'group_buy'"))
-                    print(f"Fixed enum case: {store_count} stores, {group_count} groups")
-                else:
-                    print("Enum case fix: OK (no lowercase values)")
-        except Exception as e:
-            print(f"Enum case fix check: {e}")
-    
-    fix_enum_case()
-    
-    # 確保 system_settings 有初始資料和 announcement 欄位
-    from app.models.user import SystemSetting
-    add_column_if_not_exists("system_settings", "announcement", "VARCHAR(500)")
-    
-    try:
-        with engine.begin() as conn:
-            result = conn.execute(text("SELECT COUNT(*) FROM system_settings"))
-            count = result.scalar()
-            if count == 0:
-                conn.execute(text("INSERT INTO system_settings (id, token_version, updated_at) VALUES (1, 1, NOW())"))
-                print("Created initial system_settings")
-            else:
-                # 修復可能的 NULL updated_at
-                conn.execute(text("UPDATE system_settings SET updated_at = NOW() WHERE updated_at IS NULL"))
-                print("system_settings check: OK")
-    except Exception as e:
-        # 表可能不存在，SQLAlchemy 會自動建立
-        print(f"system_settings check: {e}")
+    # V2.23.0（審核 P1-8）：遷移搬到 app/migrations.py——PostgreSQL advisory lock 讓 3 個 worker
+    # 不會同時跑、每一步先查再改（已是最新就不下 ALTER，休眠喚醒時不再跟第一批請求搶表鎖）。
+    # 也可以在部署前單獨跑：python scripts/migrate.py
+    from app.migrations import run_migrations
+    _mig = run_migrations(engine)
+    # V2.23.2 審稿 P2-02：遷移有錯誤（缺欄位補不上之類）就不啟動——寧可讓 Railway 健康檢查失敗、
+    # 繼續跑舊版，也不要讓新程式在不完整的資料表上服務。警告（重複資料建不起唯一索引）不擋。
+    # 緊急時可設 MIGRATIONS_ALLOW_ERRORS=1 強制啟動
+    if _mig.errors and os.environ.get("MIGRATIONS_ALLOW_ERRORS") != "1":
+        raise RuntimeError(f"資料庫遷移有 {len(_mig.errors)} 項錯誤，拒絕啟動：{'；'.join(e[:120] for e in _mig.errors[:3])}")
     
     # 確保目錄存在
     os.makedirs("app/static/images", exist_ok=True)
@@ -502,6 +170,41 @@ def to_taipei_time(dt):
 templates.env.filters['taipei'] = to_taipei_time
 
 # Routers
+# V2.23.2 審稿 P1-03：會改資料的請求（POST/PUT/PATCH/DELETE）擋跨站來源。
+# 主防線是 cookie 的 SameSite=Lax（up.railway.app 在公開後綴清單上，別的 Railway 網站算跨站）；
+# 這裡是第二道：瀏覽器標明 Sec-Fetch-Site: cross-site、或 Origin 不是本站，就直接 403。
+# 沒帶這兩個標頭的（很舊的瀏覽器、伺服器對伺服器）放行——那種情況 SameSite 仍在
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _allowed_hosts(request: Request) -> set:
+    from urllib.parse import urlparse
+    hosts = {request.headers.get("host", ""), request.headers.get("x-forwarded-host", ""), request.url.netloc,
+             os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")}  # Railway 自動提供的正式網域
+    try:
+        hosts.add(urlparse(settings.base_url).netloc)
+    except Exception:
+        pass
+    return {h.lower() for h in hosts if h}
+
+
+@app.middleware("http")
+async def reject_cross_site_writes(request: Request, call_next):
+    if request.method in _UNSAFE_METHODS:
+        from urllib.parse import urlparse
+        from fastapi.responses import JSONResponse as _JR
+        site = (request.headers.get("sec-fetch-site") or "").lower()
+        origin = request.headers.get("origin")
+        bad = site == "cross-site"
+        if origin is not None and not bad:
+            netloc = urlparse(origin).netloc.lower() if origin != "null" else ""
+            bad = netloc not in _allowed_hosts(request)
+        if bad:
+            logger.warning(f"擋下跨站寫入：{request.method} {request.url.path} origin={origin} sec-fetch-site={site or '-'}")
+            return _JR({"detail": "請求來源不符，已拒絕"}, status_code=403)
+    return await call_next(request)
+
+
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(home.router, tags=["home"])
 app.include_router(groups.router, prefix="/groups", tags=["groups"])
@@ -517,7 +220,7 @@ app.include_router(templates_router.router, tags=["templates"])
 async def root(request: Request, db: Session = Depends(get_db)):
     user, new_token = await get_current_user_optional(request, db)
     if not user:
-        return templates.TemplateResponse("login.html", {"request": request})
+        return templates.TemplateResponse(request, "login.html", {"request": request})
     
     response = RedirectResponse(url="/home", status_code=302)
     # 如果需要刷新 token

@@ -113,6 +113,12 @@
     {% if duplicate_store %}
     <div class="mt-2 pt-2 border-t border-green-200 text-xs text-amber-700">
         <i class="ti ti-info-circle"></i> 已有同名店家「{{ duplicate_store.name }}」，菜單會更新到那家店，不會新增重複店家
+        {# V2.23.2 審稿 P1-04：同名不同店（例如不同分店）要有出口，不然只能硬著頭皮蓋掉別家 #}
+        <div class="mt-1.5 text-sela-800/70" id="not-same-store">
+            不是同一家（例如不同分店）？把上面的店名改成不一樣的，例如「{{ duplicate_store.name }} 中山店」，就會新增一家店。
+            <button type="button" class="underline text-sela-700 ml-1"
+                    onclick="var i=document.querySelector('[name=new_store_name]'); if(i){ i.focus(); i.select(); i.scrollIntoView({block:'center'}); }">改店名</button>
+        </div>
     </div>
     {% endif %}
     {% if ignored_store_block %}

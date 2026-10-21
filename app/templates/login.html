@@ -14,6 +14,19 @@
         <img src="/static/images/order-logo.png" alt="ORDER" class="h-24 w-24 mx-auto mb-5">
         <h1 class="text-2xl font-bold mb-2" style="color:#5B4733;">SELA 快點來點餐</h1>
         <p class="mb-7" style="color:#5B4733;opacity:.6;">團購訂餐好幫手</p>
+        {# V2.23.1：登入失敗原本什麼都不說，看起來就是登入頁又跑出來（像無限迴圈） #}
+        {% set login_error = request.query_params.get('error') %}
+        {% if login_error %}
+        <div id="login-error" class="mb-5 -mt-3 text-sm rounded-xl px-4 py-3 text-left" style="background:#FEF3C7;color:#92400E;">
+            {% if login_error == 'invalid_state' %}
+            登入逾時，或是換了一個瀏覽器才回來。請再按一次下面的按鈕。
+            {% elif login_error == 'user_mismatch' %}
+            帳號驗證不一致，已停止登入。請再試一次；一直發生請告訴管理員。
+            {% else %}
+            這次登入沒有完成，請再按一次。若一直回到這一頁，請改從 LINE 裡點連結開啟。
+            {% endif %}
+        </div>
+        {% endif %}
         <a href="/auth/login"
            class="flex items-center justify-center gap-2 w-full text-white font-medium py-3.5 px-4 rounded-xl transition active:scale-95"
            style="background:#06C755;">

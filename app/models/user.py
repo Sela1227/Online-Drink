@@ -159,3 +159,24 @@ class StoreRecommendation(Base):
             except (TypeError, ValueError):
                 pass
         return [self.menu_image_url] if self.menu_image_url else []
+
+
+class LoginAttempt(Base):
+    """一次 LINE 登入嘗試的結果（V2.23.1）
+
+    Android Chrome 從 LINE app 授權跳回來時，會把同一個 /auth/callback 連送兩次
+    （第一次自己取消、第二次帶同一組一次性授權碼）。第一次在伺服器端照樣登入成功，
+    但 cookie 被瀏覽器丟掉；第二次拿用過的授權碼去換，LINE 回 400 → 導回登入頁 → 無限迴圈。
+    這張表讓第二次可以等第一次的結果並沿用，而不是再去跟 LINE 換一次。
+
+    key 是 sha256(state + code)：要同時拿到這次登入的 state cookie 與授權碼才對得上。
+    只存 user_id 與要導去的頁面，不存 token；超過 10 分鐘的列在每次登入時清掉。
+    """
+    __tablename__ = "login_attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    attempt_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending / done / failed
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

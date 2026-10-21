@@ -5,7 +5,11 @@
     SECRET_KEY=x DATABASE_URL="sqlite:///./_smoke.db" PYTHONPATH=. python scripts/smoke_test.py
 跑完記得 `rm -f _smoke.db`，打包前不要把它一起裝進去。
 
-涵蓋範圍（V2.10.3）：
+這支跑的是 SQLite＋FastAPI TestClient 的 HTTP 請求（約 150 個真實請求）；
+「兩個人同一瞬間」的並行情況 SQLite 測不到，另見 scripts/pg_concurrency_check.py（PostgreSQL，V2.23.2）。
+前端互動（Alpine／htmx）另見 check_frontend_toast.py、check_frontend_import.py。
+
+涵蓋範圍（依節號；V2.10.3 起逐版累加）：
   1. 首頁公告的過濾與排序（啟用/停用、到期、置頂、則數上限）
   2. deadline 的時區比對（清除測試團、進行中團數）— 坑 #25 的回歸測試
   3. 飲料選項字串解析（全形逗號、去重、長度上限）
@@ -33,6 +37,15 @@
   26. V2.16.2 推薦多張菜單照片（欄位相容、上限、走 upload_service）＋店家排序資料（開團覆蓋層／後台列表）
   27. V2.16.3 hotfix（審核）：甜冰預設對照店家選項、範本同、隱藏欄位、時區、金額、草稿標示、星號、FE0F
   18. 匯入分類／品項計數
+  28. V2.17.0 IA 重整：首頁分區、五格導航、店家／紀錄分頁、舊網址轉址
+  29. V2.18.0 團頁重排：身分 × 階段、結帳列片段、訂單牆跟單、用語統一
+  30. V2.19.0 開團頁：進階設定收合、欄位 name 保留、複製開團帶入
+  31. V2.20.0 加點與購物車 sheet：主鈕帶金額、數量 0＝移除、修改中用語
+  32. V2.21.0 工作台分頁：甜冰標籤、加料批次儲存與驗證
+  33. V2.22.0 套件升級：TemplateResponse 新寫法、PyJWT 舊 token 相容、版本鎖
+  34. V2.23.0 遷移：可重複跑、只補缺的、錯誤記錄
+  35. V2.23.1 LINE 登入回呼重複送出：只換一次授權碼、沿用結果
+  36. V2.23.2 外部審核：我的訂單可見性、跨站寫入、同名店家、候補順位、遷移錯誤不啟動
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -2110,6 +2123,279 @@ def main():
         check("送空清單＝刪光這家店的加料")
     finally:
         _adm.get_admin_user = _orig
+
+    # ---------- 33. V2.22.0 套件升級鏈（P1-7） ----------
+    print("\n[33] V2.22.0 套件升級（TemplateResponse 新寫法、PyJWT、版本鎖）")
+    import ast as _ast
+    _old_tr = []
+    for _py in Path("app").rglob("*.py"):
+        for _n in _ast.walk(_ast.parse(_py.read_text(encoding="utf-8"))):
+            if isinstance(_n, _ast.Call) and getattr(_n.func, "attr", "") == "TemplateResponse":
+                if not (_n.args and isinstance(_n.args[0], _ast.Name) and _n.args[0].id == "request"):
+                    _old_tr.append(f"{_py}:{_n.lineno}")
+    assert not _old_tr, _old_tr
+    check("全部 TemplateResponse 都是新寫法 TemplateResponse(request, 模板, context)（坑 #10 的長期方案）")
+
+    _req = {l.split("==")[0].split("[")[0].lower(): l.split("==")[1] for l in Path("requirements.txt").read_text(encoding="utf-8").split() if "==" in l}
+    _raw = Path("requirements.txt").read_text(encoding="utf-8")
+    assert ">=" not in _raw and "alembic" not in _raw.lower() and "python-jose" not in _raw and "ecdsa" not in _raw
+    assert _req["fastapi"] == "0.143.2" and _req["starlette"] == "1.8.0" and _req["python-multipart"] == "0.0.32" and _req["jinja2"] == "3.1.6" and _req["pyjwt"] == "2.15.1" and "pydantic" in _req
+    import starlette as _sl, fastapi as _fa
+    assert _sl.__version__ == _req["starlette"] and _fa.__version__ == _req["fastapi"], "本機環境要跟 requirements.txt 一致（用升級後的 venv 跑）"
+    check("requirements 全鎖 ==、沒有 python-jose／alembic；pydantic 也鎖住；本機版本與 requirements 一致")
+
+    # PyJWT：舊版 python-jose 簽的 token（固定字串，金鑰與 exp=2099 寫死）要解得開；竄改、alg=none、別的金鑰都要拒絕
+    import app.services.auth as _au, jwt as _pj
+    from types import SimpleNamespace as _NS
+    _orig_settings = _au.settings
+    try:
+        _au.settings = _NS(secret_key="smoke-jwt-compat-key-0123456789abcdef")
+        _jose_tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo1LCJsaW5lX3VzZXJfaWQiOiJVNSIsImlhdCI6MTc5MjEwODgwMCwiZXhwIjo0MDcwOTA4ODAwLCJsYXN0X2FjdGl2ZSI6IjIwMjYtMTAtMTZUMDA6MDA6MDAiLCJ0b2tlbl92ZXJzaW9uIjoyfQ.SYrEFhg03tEkjsZsNY2wfe1GZXQv5qiHHtXV2woWBGc"
+        _pl = _au.decode_token(_jose_tok)
+        assert _pl and _pl["user_id"] == 5 and _pl["line_user_id"] == "U5" and _pl["token_version"] == 2
+        assert _au.decode_token(_jose_tok[:-4] + "AAAA") is None
+        assert _au.decode_token(_pj.encode({"user_id": 5}, None, algorithm="none")) is None
+        assert _au.decode_token(_pj.encode({"user_id": 5}, "another-key-another-key-another-key", algorithm="HS256")) is None
+        _new = _au.create_access_token(8, "U8", 3)
+        assert isinstance(_new, str) and _au.decode_token(_new)["user_id"] == 8
+        _p2 = _au.decode_token(_new); _p2["last_active"] = "2000-01-01T00:00:00"
+        assert _au.decode_token(_au.refresh_token_if_needed(_p2))["user_id"] == 8
+    finally:
+        _au.settings = _orig_settings
+    check("PyJWT：python-jose 簽的舊 token 解得開（部署後不用重新登入）；竄改／alg=none／別的金鑰拒絕；新簽與刷新正常")
+
+    # ---------- 34. V2.23.0 遷移搬出 lifespan（P1-8） ----------
+    print("\n[34] V2.23.0 遷移（先查再改、可重複跑、lifespan 不再直接下 DDL）")
+    from sqlalchemy import create_engine as _ce34, inspect as _insp34, text as _t34
+    import app.migrations as _mig
+    _mdb = Path("_migcheck.db")
+    if _mdb.exists():
+        _mdb.unlink()
+    _e34 = _ce34(f"sqlite:///./{_mdb}")
+    try:
+        _logs = []
+        _r1 = _mig.run_migrations(_e34, log=_logs.append)
+        assert not _r1.errors and not _r1.warnings, (_r1.errors, _r1.warnings)
+        assert not [c for c in _r1.changed if "." in c and "nullable" not in c], f"新庫不該需要補欄位（model 與 COLUMNS 不一致）：{_r1.changed}"
+        _r2 = _mig.run_migrations(_e34, log=_logs.append)
+        assert _r2.changed == [] and not _r2.errors, f"第二次跑應該什麼都不改：{_r2.changed}"
+        assert any(l.startswith("遷移完成：變更 0 項") for l in _logs)
+        check("遷移可重複跑：新庫第一次不需補欄位、第二次變更 0 項")
+
+        # 模擬舊庫：拿掉兩個欄位與一個索引 → 只補這三樣
+        with _e34.begin() as _cn34:
+            _cn34.execute(_t34("ALTER TABLE groups DROP COLUMN store_name"))
+            _cn34.execute(_t34("ALTER TABLE order_item_backups DROP COLUMN extras_price"))
+            _cn34.execute(_t34("DROP INDEX uq_menus_one_active"))
+        _r3 = _mig.run_migrations(_e34, log=_logs.append)
+        assert sorted(_r3.changed) == ["groups.store_name", "order_item_backups.extras_price", "uq_menus_one_active"], _r3.changed
+        _cols = {c["name"] for c in _insp34(_e34).get_columns("groups")}
+        assert "store_name" in _cols and not _r3.errors
+        check("舊庫缺欄位／缺索引：只補缺的那幾樣（其他不下 DDL）")
+
+        # 補欄位真的失敗時要算「錯誤」（migrate.py 才會回 1），不能只印一行就當沒事
+        _orig_cols = _mig.COLUMNS
+        try:
+            _mig.COLUMNS = _orig_cols + [("groups", "broken_col", "NOT A TYPE ((")]
+            _r4 = _mig.run_migrations(_e34, log=_logs.append)
+        finally:
+            _mig.COLUMNS = _orig_cols
+        assert len(_r4.errors) == 1 and "groups.broken_col" in _r4.errors[0], _r4.errors
+        check("補欄位失敗會記成錯誤（migrate.py 據此回退出碼 1）")
+    finally:
+        _e34.dispose()
+        if _mdb.exists():
+            _mdb.unlink()
+
+    # lifespan 只呼叫 run_migrations，不再自己下 ALTER／CREATE；部署前可單獨跑 scripts/migrate.py
+    _main_src = Path("app/main.py").read_text(encoding="utf-8")
+    assert "run_migrations(engine)" in _main_src and "ALTER TABLE" not in _main_src and "CREATE UNIQUE INDEX" not in _main_src and "add_column_if_not_exists" not in _main_src
+    _ms = Path("scripts/migrate.py").read_text(encoding="utf-8")
+    assert "sys.exit(1 if result.errors else 0)" in _ms
+    _src = Path("app/migrations.py").read_text(encoding="utf-8")
+    assert "pg_try_advisory_lock" in _src and "lock_timeout" in _src and "pg_advisory_unlock" in _src
+    check("lifespan 只呼叫 run_migrations；PostgreSQL 有 advisory lock 與 lock_timeout；migrate.py 錯誤時退出碼 1")
+
+    # ---------- 35. V2.23.1 LINE 登入回呼重複送兩次 ----------
+    print("\n[35] V2.23.1 登入回呼重複（Android Chrome 從 LINE app 跳回來會送兩次）")
+    import asyncio as _aio35
+    import httpx as _hx35
+    import app.routers.auth as _ar35
+    from app.models.user import LoginAttempt as _LA35
+    _orig_ex, _orig_pf = _ar35.exchange_line_token, _ar35.get_line_user_profile
+    _used_codes, _ex_calls = set(), []
+    _u35 = User(line_user_id="Uloop35", display_name="迴圈測試", nickname="迴圈測試"); db.add(_u35); db.commit()
+
+    async def _fake_exchange(code):
+        _ex_calls.append(code)
+        await _aio35.sleep(0.5)  # 跟 LINE 換 token 要一點時間，第二個請求就在這段時間進來
+        if code in _used_codes:
+            raise RuntimeError("Client error '400 Bad Request' for url 'https://api.line.me/oauth2/v2.1/token'")
+        _used_codes.add(code)
+        return "line-at-" + code
+
+    async def _fake_profile(at):
+        return {"userId": "Uloop35", "displayName": "迴圈測試"}
+
+    async def _two_callbacks(state, code, cookie_state=None, gap=0.25):
+        _tr = _hx35.ASGITransport(app=_main.app)
+        async with _hx35.AsyncClient(transport=_tr, base_url="https://testserver") as _ac:
+            _ck = {"oauth_state": cookie_state or state}
+            async def _one(delay):
+                await _aio35.sleep(delay)
+                return await _ac.get("/auth/callback", params={"code": code, "state": state}, cookies=_ck)
+            return await _aio35.gather(_one(0), _one(gap))
+
+    try:
+        _ar35.exchange_line_token, _ar35.get_line_user_profile = _fake_exchange, _fake_profile
+        _r1, _r2 = _aio35.run(_two_callbacks("st-A-0123456789", "code-A"))
+        assert len(_ex_calls) == 1, f"同一組授權碼只能跟 LINE 換一次（實際 {len(_ex_calls)} 次）"
+        for _r in (_r1, _r2):
+            assert _r.status_code == 302 and _r.headers["location"] == "/home", (_r.status_code, _r.headers.get("location"))
+            assert "access_token=" in _r.headers.get("set-cookie", ""), "兩個回應都要帶登入 cookie（瀏覽器只收到其中一個）"
+        _tok = _r2.headers["set-cookie"].split("access_token=")[1].split(";")[0].strip('"')
+        import app.services.auth as _as35
+        _pl = _as35.decode_token(_tok)
+        assert _pl and _pl["user_id"] == _u35.id
+        check("重複的回呼（同 state＋同授權碼，晚 0.25 秒）：只跟 LINE 換一次，兩個回應都導到 /home 並帶登入 cookie")
+
+        # 第一次失敗（例如授權碼本來就無效）→ 重複的那次不再重試，直接回登入失敗
+        _ex_calls.clear(); _used_codes.add("code-B")
+        _r1, _r2 = _aio35.run(_two_callbacks("st-B-0123456789", "code-B"))
+        assert len(_ex_calls) == 1 and all(_r.headers["location"] == "/?error=login_failed" for _r in (_r1, _r2))
+        check("第一次登入失敗 → 重複的那次也回登入失敗，不再拿同一組授權碼去試")
+
+        # state 不同就是不同的登入嘗試；state cookie 對不上一律擋（拿到別人的授權碼也沒用）
+        _ex_calls.clear()
+        _r1, _r2 = _aio35.run(_two_callbacks("st-C-0123456789", "code-C", cookie_state="someone-else"))
+        assert not _ex_calls and all(_r.headers["location"] == "/?error=invalid_state" for _r in (_r1, _r2))
+        _ex_calls.clear()
+        _rA = _c.get("/auth/callback", params={"code": "code-A", "state": "st-other-0123"}, cookies={"oauth_state": "st-other-0123"}, follow_redirects=False)
+        assert _rA.headers["location"] == "/?error=login_failed" and len(_ex_calls) == 1, "換了 state 就不能沿用別次的結果"
+        check("state cookie 對不上一律擋；換一組 state 拿舊授權碼不能沿用別次的登入結果")
+
+        # 表裡只存 user_id 與導向，不存 token；超過 10 分鐘的會被清掉
+        _rows = db.query(_LA35).all()
+        assert _rows and all(not hasattr(_r, "token") for _r in _rows)
+        from datetime import datetime as _dt35, timedelta as _td35
+        for _r in _rows:
+            _r.created_at = _dt35.utcnow() - _td35(minutes=11)
+        db.commit()
+        _c.get("/auth/callback", params={"code": "code-D", "state": "st-D-0123456789"}, cookies={"oauth_state": "st-D-0123456789"}, follow_redirects=False)
+        db.expire_all()
+        assert db.query(_LA35).count() == 1, "舊的登入嘗試要清掉，只剩剛才那一筆"
+        check("登入嘗試表只存 user_id 與導向頁（不存 token），超過 10 分鐘的自動清掉")
+    finally:
+        _ar35.exchange_line_token, _ar35.get_line_user_profile = _orig_ex, _orig_pf
+
+    # 登入頁會說出原因（原本什麼都不顯示，看起來就是登入頁又跑出來）
+    for _err, _txt in (("login_failed", "這次登入沒有完成"), ("invalid_state", "登入逾時"), ("user_mismatch", "帳號驗證不一致")):
+        _rr = _c.get(f"/?error={_err}")
+        assert 'id="login-error"' in _rr.text and _txt in _rr.text, _err
+    assert 'id="login-error"' not in _c.get("/").text
+    check("登入頁依 error 顯示原因（失敗／逾時／帳號不一致），沒有 error 時不顯示")
+
+    # ---------- 36. V2.23.2 外部審核修正 ----------
+    print("\n[36] V2.23.2 外部審核（我的訂單可見性、跨站寫入、同名店家、候補順位、遷移錯誤不啟動）")
+    import app.routers.orders as _ord36
+    from app.models.order import Order as _O36, OrderItem as _OI36, OrderStatus as _OS36, OrderItemBackup as _OB36
+    from app.models.menu import Menu as _M36, MenuCategory as _MC36, MenuItem as _MI36
+    _orig_ord36 = _ord36.get_current_user
+    _u36 = User(line_user_id="smoke-36", display_name="三十六", nickname="三十六"); db.add(_u36); db.flush()
+    _st36 = Store(name="審核三十六店", category=CategoryType.MEAL, is_active=True); db.add(_st36); db.flush()
+    _mn36 = _M36(store_id=_st36.id, is_active=True); db.add(_mn36); db.flush()
+    _ct36 = _MC36(menu_id=_mn36.id, name="主食"); db.add(_ct36); db.flush()
+    _it36 = _MI36(menu_id=_mn36.id, category_id=_ct36.id, name="雞腿飯", price=100); db.add(_it36); db.flush()
+    _gp36 = Group(owner_id=_other.id, store_id=_st36.id, menu_id=_mn36.id, name="別人的私密團", category=CategoryType.MEAL,
+                  deadline=taipei_now() + timedelta(hours=1), is_public=False, enable_backup=True, backup_count=2)
+    db.add(_gp36); db.commit()
+    async def _fake36(request, db_):
+        return db_.query(User).filter(User.id == _u36.id).first()
+    try:
+        _ord36.get_current_user = _fake36
+        # P1-02：不存在的團 404；看不到又沒訂單 403；自己有訂單就看得到自己的那張
+        assert _c.get("/groups/999999/orders/mine").status_code == 404
+        assert _c.get(f"/groups/{_gp36.id}/orders/mine").status_code == 403
+        _o36 = _O36(group_id=_gp36.id, user_id=_u36.id, status=_OS36.SUBMITTED); db.add(_o36); db.flush()
+        _oi36 = _OI36(order_id=_o36.id, menu_item_id=_it36.id, item_name="雞腿飯", quantity=1, unit_price=100); db.add(_oi36); db.commit()
+        _r = _c.get(f"/groups/{_gp36.id}/orders/mine")
+        assert _r.status_code == 200 and "雞腿飯" in _r.text
+        check("我的訂單：團不存在 404；看不到的團又沒訂單 403；自己已有訂單的團一律看得到自己那張")
+
+        # P2-01：候補順位唯一；上限照資料庫算；刪除後重排不撞號
+        _o36.status = _OS36.EDITING; db.commit()
+        _form = {"menu_item_id": str(_it36.id), "quantity": "1", "backup_for": str(_oi36.id)}
+        assert _c.post(f"/groups/{_gp36.id}/orders/items", data=_form, headers={"HX-Request": "true"}).status_code == 403, "看不到的團不能加候補"
+        _gp36.is_public = True; db.commit()
+        for _ in range(2):
+            assert _c.post(f"/groups/{_gp36.id}/orders/items", data=_form, headers={"HX-Request": "true"}).status_code == 200
+        _r = _c.post(f"/groups/{_gp36.id}/orders/items", data=_form, headers={"HX-Request": "true"})
+        assert _r.status_code == 400 and "上限" in _r.text
+        db.expire_all()
+        _bks = db.query(_OB36).filter(_OB36.order_item_id == _oi36.id).order_by(_OB36.priority).all()
+        assert [b.priority for b in _bks] == [1, 2]
+        from sqlalchemy.exc import IntegrityError as _IE36
+        db.add(_OB36(order_item_id=_oi36.id, priority=2, item_name="重複", unit_price=100))
+        try:
+            db.commit(); raise AssertionError("同一品項同一順位應被唯一約束擋下")
+        except _IE36:
+            db.rollback()
+        assert _c.delete(f"/orders/backups/{_bks[0].id}", headers={"HX-Request": "true"}).status_code == 200
+        db.expire_all()
+        assert [b.priority for b in db.query(_OB36).filter(_OB36.order_item_id == _oi36.id).order_by(_OB36.priority).all()] == [1]
+        check("候補：上限以資料庫重算；(品項, 順位) 唯一約束擋重複；刪除後重排不撞號")
+    finally:
+        _ord36.get_current_user = _orig_ord36
+
+    # P1-03：跨站寫入擋下；同站、沒帶標頭的放行
+    _ok_post = lambda **h: _c.post("/auth/heartbeat", headers=h).status_code
+    assert _ok_post(origin="https://evil.example.com") == 403
+    assert _ok_post(origin="null") == 403
+    assert _ok_post(**{"sec-fetch-site": "cross-site"}) == 403
+    assert _ok_post(**{"origin": "https://testserver", "sec-fetch-site": "same-origin"}) != 403
+    assert _ok_post() != 403
+    assert _c.get("/", headers={"origin": "https://evil.example.com"}).status_code == 200, "GET 不檢查"
+    check("跨站寫入：外站 Origin／null／Sec-Fetch-Site cross-site → 403；同站與沒帶標頭的放行；GET 不受影響")
+
+    # P1-04：同名判斷排除個人代購店；預覽有「不是同一家」出口
+    from app.services.import_service import same_name_store as _sns
+    _pers = Store(name="審核同名店", category=CategoryType.GROUP_BUY, is_personal=True, owner_user_id=_u36.id); db.add(_pers); db.commit()
+    assert _sns(db, "審核同名店") is None, "個人代購店不能被當成同名店家"
+    _real = Store(name="審核同名店", category=CategoryType.MEAL, is_active=True); db.add(_real); db.commit()
+    assert _sns(db, "審核同名店").id == _real.id
+    _adm.get_admin_user = _fake_admin
+    try:
+        _r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "審核同名店", "new_store_category": "meal",
+                     "json_text": json.dumps({"menu": {"items": [{"name": "麵", "price": 50}]}}, ensure_ascii=False)}, headers={"HX-Request": "true"})
+        assert "已有同名店家" in _r.text and 'id="not-same-store"' in _r.text and "改店名" in _r.text, _r.text[:400]
+    finally:
+        _adm.get_admin_user = _orig
+    check("同名店家：排除個人代購店；預覽提示「不是同一家？改店名」的出口")
+
+    # P2-02：遷移有錯誤就不啟動（可用 MIGRATIONS_ALLOW_ERRORS=1 強制）
+    import app.migrations as _mg36
+    _orig_run = _mg36.run_migrations
+    _s36 = _main.settings
+    _keep = (_s36.line_channel_id, _s36.line_channel_secret, _s36.secret_key)
+    try:
+        _s36.line_channel_id, _s36.line_channel_secret, _s36.secret_key = "x", "x", "smoke-not-default"
+        class _Bad:
+            errors, warnings, changed, ok = ["groups.x：故意的錯誤"], [], [], 0
+        _mg36.run_migrations = lambda engine, log=print: _Bad()
+        try:
+            with _TC(_main.app):
+                pass
+            raise AssertionError("遷移有錯誤時不該啟動")
+        except RuntimeError as _e:
+            assert "拒絕啟動" in str(_e)
+        os.environ["MIGRATIONS_ALLOW_ERRORS"] = "1"
+        with _TC(_main.app) as _c36:
+            assert _c36.get("/").status_code == 200
+    finally:
+        os.environ.pop("MIGRATIONS_ALLOW_ERRORS", None)
+        _mg36.run_migrations = _orig_run
+        _s36.line_channel_id, _s36.line_channel_secret, _s36.secret_key = _keep
+    check("遷移有錯誤 → 拒絕啟動（Railway 繼續跑舊版）；MIGRATIONS_ALLOW_ERRORS=1 可強制啟動")
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

@@ -9,6 +9,15 @@ from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.schemas.menu import FullImport, MenuImport, MenuContent
 
 
+def same_name_store(db: Session, name: str):
+    """完全同名的一般店家（排除個人代購店）；匯入預覽與確認共用"""
+    from sqlalchemy import or_
+    return db.query(Store).filter(
+        Store.name == name,
+        or_(Store.is_personal.is_(None), Store.is_personal == False),  # noqa: E712
+    ).order_by(Store.id).first()
+
+
 def import_store_and_menu(db: Session, data: FullImport) -> Store:
     """匯入店家 + 菜單
 
@@ -18,7 +27,9 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
     - 若不存在 → 正常新增店家 + 菜單。
     """
     # 完全比對店名，找既有同名店家
-    existing_store = db.query(Store).filter(Store.name == data.store.name).first()
+    # V2.23.2 審稿 P1-04：個人代購店（每位團主一家、隱藏）不算——它的菜單是每團一份，不能被匯入蓋掉。
+    # 預覽與確認都走 same_name_store()，畫面上說「會更新到哪家」跟實際寫入的一定是同一家
+    existing_store = same_name_store(db, data.store.name)
 
     if existing_store:
         # 同名店家已存在 → 把舊菜單全部停用（保留為舊版本），建立新菜單啟用

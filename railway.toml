@@ -1,3 +1,8 @@
+# V2.23.0 起：Railway 服務本身的設定才是準（2026-10-17 已在 production 服務上設好：
+#   Dockerfile 建置、健康檢查 /（100 秒）、失敗重啟 3 次——跟下面一模一樣）。
+# Railway 的 Config as Code（本檔）已停用，2026-12-01 之後不再讀取；留著只是對照，
+# 要改部署設定請到 Railway 服務的 Settings 改，或改用 Infrastructure as Code（.railway/railway.ts）。
+# 資料庫遷移不放 preDeployCommand：app 啟動時跑（有 advisory lock、先查再改），也可手動 python scripts/migrate.py
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"

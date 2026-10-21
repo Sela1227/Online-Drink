@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum, JSON, Text, Numeric, Boolean
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum, JSON, Text, Numeric, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from decimal import Decimal, ROUND_HALF_UP
@@ -197,6 +197,8 @@ from app.models.menu import MenuItem
 class OrderItemBackup(Base):
     """缺貨候補（V2.4.0 資訊型：給團主在店裡照著換，價差人工補退）"""
     __tablename__ = "order_item_backups"
+    # V2.23.2 審稿 P2-01：同一品項的候補順位不能重複（連點兩下的最後防線）
+    __table_args__ = (UniqueConstraint("order_item_id", "priority", name="uq_backups_item_priority"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.id"))

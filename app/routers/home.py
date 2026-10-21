@@ -198,14 +198,14 @@ def _home_context(request: Request, db: Session, user):
 async def home(request: Request, db: Session = Depends(get_db)):
     """首頁「今天」（V2.17.0 IA）：公告一則＋投票卡（有才出現）＋要你處理的＋開放中"""
     user = await get_current_user(request, db)
-    return templates.TemplateResponse("home.html", _home_context(request, db, user))
+    return templates.TemplateResponse(request, "home.html", _home_context(request, db, user))
 
 
 @router.get("/home/groups")
 async def home_groups_partial(request: Request, db: Session = Depends(get_db)):
     """首頁片段（倒數歸零時 htmx 自動刷新）。與 /home 共用同一個 context，不再各寫一份查詢。"""
     user = await get_current_user(request, db)
-    return templates.TemplateResponse("partials/home_groups.html", _home_context(request, db, user))
+    return templates.TemplateResponse(request, "partials/home_groups.html", _home_context(request, db, user))
 
 
 @router.get("/my/groups")
@@ -229,7 +229,7 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         UserDepartment, UserDepartment.department_id == Department.id
     ).filter(UserDepartment.user_id == user.id).order_by(Department.name).all()]
     
-    return templates.TemplateResponse("profile.html", {
+    return templates.TemplateResponse(request, "profile.html", {
         "request": request,
         "user": user,
         "order_count": order_count,
@@ -243,7 +243,7 @@ async def welcome_page(request: Request, db: Session = Depends(get_db)):
     """首次登入歡迎頁面"""
     user = await get_current_user(request, db)
     
-    return templates.TemplateResponse("welcome.html", {
+    return templates.TemplateResponse(request, "welcome.html", {
         "request": request,
         "user": user,
     })
@@ -342,7 +342,7 @@ async def records_page(request: Request, tab: str = "orders", page: int = 1, db:
         groups = q.order_by(Group.created_at.desc()).offset(offset).limit(RECORDS_PER_PAGE).all()
         ctx.update({"groups": groups, "total": total,
                     "total_pages": (total + RECORDS_PER_PAGE - 1) // RECORDS_PER_PAGE})
-    return templates.TemplateResponse("records.html", ctx)
+    return templates.TemplateResponse(request, "records.html", ctx)
 
 
 @router.get("/feedback")
@@ -357,7 +357,7 @@ async def feedback_page(request: Request, db: Session = Depends(get_db)):
         Feedback.user_id == user.id
     ).order_by(Feedback.created_at.desc()).limit(10).all()
     
-    return templates.TemplateResponse("feedback.html", {
+    return templates.TemplateResponse(request, "feedback.html", {
         "request": request,
         "user": user,
         "feedbacks": feedbacks,
@@ -461,7 +461,7 @@ async def my_departments_page(request: Request, db: Session = Depends(get_db)):
         ~Department.id.in_(my_dept_ids) if my_dept_ids else True
     ).all()
     
-    return templates.TemplateResponse("my_departments.html", {
+    return templates.TemplateResponse(request, "my_departments.html", {
         "request": request,
         "user": user,
         "my_departments": my_departments,
@@ -553,7 +553,7 @@ async def stores_page(request: Request, fav: int = 0, db: Session = Depends(get_
     user = await get_current_user(request, db)
     ctx = store_catalog_context(db, user)
     ctx.update({"request": request, "user": user, "fav_only": bool(fav)})
-    return templates.TemplateResponse("stores.html", ctx)
+    return templates.TemplateResponse(request, "stores.html", ctx)
 
 
 @router.get("/stores/{store_id}")
@@ -601,7 +601,7 @@ async def store_view(store_id: int, request: Request, db: Session = Depends(get_
         Menu.is_active == True
     ).first()
     
-    return templates.TemplateResponse("store_view.html", {
+    return templates.TemplateResponse(request, "store_view.html", {
         "request": request,
         "user": user,
         "store": store,
@@ -636,7 +636,7 @@ async def store_menu_view(store_id: int, request: Request, db: Session = Depends
         MenuCategory.menu_id == menu.id
     ).order_by(MenuCategory.sort_order).all()
     
-    return templates.TemplateResponse("store_menu.html", {
+    return templates.TemplateResponse(request, "store_menu.html", {
         "request": request,
         "user": user,
         "store": store,
@@ -660,7 +660,7 @@ async def recommend_store_page(request: Request, db: Session = Depends(get_db)):
         StoreRecommendation.user_id == user.id
     ).order_by(StoreRecommendation.created_at.desc()).all()
     
-    return templates.TemplateResponse("recommend.html", {
+    return templates.TemplateResponse(request, "recommend.html", {
         "request": request,
         "user": user,
         "recommendations": my_recommendations,
@@ -997,7 +997,7 @@ async def stats_page(
         *base_filters
     ).group_by(OrderItemTopping.topping_name).order_by(func.count(OrderItemTopping.id).desc()).limit(5).all()
     
-    return templates.TemplateResponse("stats.html", {
+    return templates.TemplateResponse(request, "stats.html", {
         "request": request,
         "user": user,
         "period": period,

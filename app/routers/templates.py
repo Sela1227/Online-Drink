@@ -30,7 +30,7 @@ async def template_list(request: Request, db: Session = Depends(get_db)):
         joinedload(GroupTemplate.store)
     ).order_by(GroupTemplate.use_count.desc()).all()
     
-    return templates.TemplateResponse("templates/list.html", {
+    return templates.TemplateResponse(request, "templates/list.html", {
         "request": request,
         "user": user,
         "my_templates": my_templates,
@@ -44,7 +44,7 @@ async def new_template_page(request: Request, db: Session = Depends(get_db)):
     
     stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
     
-    return templates.TemplateResponse("templates/new.html", {
+    return templates.TemplateResponse(request, "templates/new.html", {
         "request": request,
         "user": user,
         "stores": stores,

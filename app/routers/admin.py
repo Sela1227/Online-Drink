@@ -117,7 +117,7 @@ def _render_import_result(request, user, *, error_messages=None, data=None,
                           stale=False, src_digest=None, cleaned_note=False,
                           unclear_items=None, similar=None):
     """render 匯入結果片段（htmx 用），錯誤或成功預覽二擇一"""
-    return templates.TemplateResponse("admin/partials/import_result.html", {
+    return templates.TemplateResponse(request, "admin/partials/import_result.html", {
         "request": request,
         "user": user,
         "error_messages": error_messages,
@@ -183,7 +183,7 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         StoreRecommendation.status == "pending"
     ).count()
     
-    return templates.TemplateResponse("admin/index.html", {
+    return templates.TemplateResponse(request, "admin/index.html", {
         "request": request,
         "user": user,
         "store_count": store_count,
@@ -228,7 +228,7 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
     )
     from app.models.group import taipei_to_utc as _t2u  # noqa: F401  (保留匯入點以供日後時區統一)
 
-    return templates.TemplateResponse("admin/stores.html", {
+    return templates.TemplateResponse(request, "admin/stores.html", {
         "item_counts": item_counts,
         "last_groups": last_groups,
         "group_counts": group_counts,
@@ -296,7 +296,7 @@ async def import_page(request: Request, store_id: int = None, load: str = None, 
             active_version = db.query(Menu).filter(Menu.store_id == selected_store.id, Menu.created_at <= _am.created_at).count()
             active_item_count = db.query(MenuItem).filter(MenuItem.menu_id == _am.id).count()
 
-    return templates.TemplateResponse("admin/import.html", {
+    return templates.TemplateResponse(request, "admin/import.html", {
         "request": request,
         "user": user,
         "stores": stores,
@@ -549,7 +549,8 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
         ).first()
     else:
         # 完整匯入：偵測同名店家（完全比對）
-        duplicate_store = db.query(Store).filter(Store.name == validated.store.name).first()
+        from app.services.import_service import same_name_store
+        duplicate_store = same_name_store(db, validated.store.name)
         # V2.16.1 B-8：沒有完全同名時，找近似店名（去空白／全形／括號／「店」字尾後相同、包含或相似度 ≥ 80%）
         if not duplicate_store:
             _cands = db.query(Store).filter(Store.is_active == True, Store.is_personal != True).all()
@@ -731,7 +732,7 @@ async def group_list(request: Request, db: Session = Depends(get_db)):
     
     groups = db.query(Group).order_by(Group.created_at.desc()).all()
     
-    return templates.TemplateResponse("admin/groups.html", {
+    return templates.TemplateResponse(request, "admin/groups.html", {
         "request": request,
         "user": user,
         "groups": groups,
@@ -952,7 +953,7 @@ async def new_store_page(request: Request, db: Session = Depends(get_db)):
     """
     user = await get_admin_user(request, db)
     existing = [s.name for s in db.query(Store.name).filter(Store.is_personal != True).all()]
-    return templates.TemplateResponse("admin/store_new.html", {
+    return templates.TemplateResponse(request, "admin/store_new.html", {
         "request": request, "user": user, "existing_names": existing,
     })
 
@@ -1049,7 +1050,7 @@ async def store_workbench(
     def _values(opt_type):
         return [o.option_value for o in sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)]
 
-    return templates.TemplateResponse("admin/store_workbench.html", {
+    return templates.TemplateResponse(request, "admin/store_workbench.html", {
         "tab": tab,
         "created": created,
         "imported": imported, "imported_cats": cats, "imported_items": items, "imported_ver": ver,
@@ -1235,7 +1236,7 @@ async def user_list(request: Request, sort: str = "created", db: Session = Depen
     # 取得系統設定
     system_setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
     
-    return templates.TemplateResponse("admin/users.html", {
+    return templates.TemplateResponse(request, "admin/users.html", {
         "request": request,
         "user": user,
         "users": users,
@@ -1310,7 +1311,7 @@ async def users_duplicates(request: Request, db: Session = Depends(get_db)):
 
     dup_groups.sort(key=lambda g: g["count"], reverse=True)
 
-    return templates.TemplateResponse("admin/users_duplicates.html", {
+    return templates.TemplateResponse(request, "admin/users_duplicates.html", {
         "request": request,
         "user": admin,
         "dup_groups": dup_groups,
@@ -1393,7 +1394,7 @@ async def user_detail(user_id: int, request: Request, db: Session = Depends(get_
     order_count = db.query(Order).filter(Order.user_id == user_id).count()
     group_count = db.query(Group).filter(Group.owner_id == user_id).count()
     
-    return templates.TemplateResponse("admin/user_detail.html", {
+    return templates.TemplateResponse(request, "admin/user_detail.html", {
         "request": request,
         "user": admin,
         "target_user": target_user,
@@ -1639,7 +1640,7 @@ async def feedback_list(request: Request, db: Session = Depends(get_db)):
     recent_feedbacks = all_feedbacks[:5]
     history_feedbacks = all_feedbacks[5:]
     
-    return templates.TemplateResponse("admin/feedbacks.html", {
+    return templates.TemplateResponse(request, "admin/feedbacks.html", {
         "request": request,
         "user": user,
         "recent_feedbacks": recent_feedbacks,
@@ -1678,7 +1679,7 @@ async def department_list(request: Request, db: Session = Depends(get_db)):
     
     departments = db.query(Department).order_by(Department.created_at.desc()).all()
     
-    return templates.TemplateResponse("admin/departments.html", {
+    return templates.TemplateResponse(request, "admin/departments.html", {
         "request": request,
         "user": user,
         "departments": departments,
@@ -1730,7 +1731,7 @@ async def department_detail(request: Request, dept_id: int, db: Session = Depend
         ~User.id.in_(member_ids) if member_ids else True
     ).order_by(User.display_name).all()
     
-    return templates.TemplateResponse("admin/department_detail.html", {
+    return templates.TemplateResponse(request, "admin/department_detail.html", {
         "request": request,
         "user": user,
         "department": department,
@@ -1862,7 +1863,7 @@ async def announcements_page(request: Request, db: Session = Depends(get_db)):
         joinedload(Announcement.created_by)
     ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).all()
     
-    return templates.TemplateResponse("admin/announcements.html", {
+    return templates.TemplateResponse(request, "admin/announcements.html", {
         "request": request,
         "user": user,
         "announcements": announcements,
@@ -1973,7 +1974,7 @@ async def edit_announcement_page(ann_id: int, request: Request, db: Session = De
     if not ann:
         raise HTTPException(status_code=404, detail="公告不存在")
     
-    return templates.TemplateResponse("admin/announcement_edit.html", {
+    return templates.TemplateResponse(request, "admin/announcement_edit.html", {
         "request": request,
         "user": user,
         "announcement": ann,
@@ -2060,7 +2061,7 @@ async def recommendation_list(request: Request, db: Session = Depends(get_db)):
         StoreRecommendation.status != "pending"
     ).order_by(StoreRecommendation.reviewed_at.desc()).limit(20).all()
     
-    return templates.TemplateResponse("admin/recommendations.html", {
+    return templates.TemplateResponse(request, "admin/recommendations.html", {
         "request": request,
         "user": user,
         "pending": pending,

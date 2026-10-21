@@ -25,15 +25,15 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.21.0（工作台分頁重組：菜單／共用選項／店家設定／更多；甜冰改點選標籤＋預設組；加料一次儲存）
+- **版本：** V2.23.2（外部審核修正：我的訂單可見性、跨站寫入檢查、同名店家排除代購店、候補順位鎖＋唯一約束、遷移錯誤不啟動、PostgreSQL 並行測試腳本。前一版 V2.23.1：LINE 登入迴圈）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
-- **技術棧：** Python 3.11 + FastAPI 0.104.1 + Starlette 0.27.0 + SQLAlchemy 2.0.23 + PostgreSQL + Jinja2 3.1.2 + Tailwind（CDN）+ Alpine.js + HTMX + **Tabler Icons 3.17.0 webfont（jsDelivr CDN，V1.1.1）**
-- **部署：** Railway（Dockerfile 模式，不用 Nixpacks）
+- **技術棧：** Python 3.11 + FastAPI 0.143.2 + Starlette 1.8.0 + SQLAlchemy 2.0.23 + PostgreSQL + Jinja2 3.1.6 + PyJWT 2.15.1 + Tailwind（CDN）+ Alpine.js + HTMX + **Tabler Icons 3.17.0 webfont（jsDelivr CDN，V1.1.1）**
+- **部署：** Railway（Dockerfile 模式，不用 Nixpacks／Railpack；**以服務設定為準**，railway.toml 2026-12-01 起不再被讀，坑 #44）
 - **認證：** LINE Login
 - **圖片上傳：** Cloudinary
-- **入口點：** `app/main.py`（FastAPI app + startup 事件處理 raw SQL 遷移）
+- **入口點：** `app/main.py`（FastAPI app；lifespan 呼叫 `app/migrations.py::run_migrations`）
 
 ---
 
@@ -74,7 +74,7 @@
 
 | 想改什麼 | 動哪些檔 |
 |---------|---------|
-| 啟動順序 / 自動遷移邏輯 | `app/main.py` startup 事件 |
+| 啟動順序 / 自動遷移邏輯 | `app/main.py` lifespan → `app/migrations.py`（新欄位加進 `COLUMNS` 清單最後；手動跑 `scripts/migrate.py`） |
 | 環境變數 / 設定 | `app/config.py`（Pydantic Settings） |
 | 資料庫連線 | `app/database.py` |
 | LINE Login 流程 | `app/routers/auth.py` + `app/services/auth.py`（JWT） |
@@ -86,7 +86,7 @@
 | 首頁 / 店家分頁 / 紀錄分頁 / 我的 | `app/routers/home.py`（`_home_context`／`split_home_groups`／`store_catalog_context`／`records_page`）+ `templates/partials/home_groups.html`、`stores.html`、`records.html`（＋`partials/records_tabs.html`）、`profile.html` |
 | 底部導航 / 頁首 | `app/templates/base.html`（`nav_items` 五格、active 規則；`{% block bottom_nav %}` 讓團頁覆寫成空） |
 | 訂單牆 | `templates/partials/order_wall.html` |
-| Railway 設定 | `railway.toml`（builder=dockerfile）、`Dockerfile`、`start.sh` |
+| Railway 設定 | **Railway 服務 Settings（準）**、`Dockerfile`、`start.sh`；`railway.toml` 只剩對照用（坑 #44） |
 | 依賴版本（**鎖死**，坑 #10） | `requirements.txt` |
 | 部署排除清單 | `.gitignore`（V1.0.0 對齊 Kit 模板） |
 
@@ -100,7 +100,7 @@
 1. **Alembic 在 Railway 部署造成失敗**
    - 症狀：`railway.toml` startCommand 包含 `alembic upgrade head` 時，部署多次 timeout 或 schema 衝突；引入 alembic 套件導致 build 變慢且偶發失敗
    - 原因：本專案 schema 演進量小、SELA 一人開發、Railway cold start 對額外指令敏感
-   - 做法：**完全不用 Alembic**；`requirements.txt` 不裝 alembic；schema 變更走 `app/main.py` startup 事件內的 raw SQL（`ADD COLUMN IF NOT EXISTS` / `ALTER TYPE ... ADD VALUE IF NOT EXISTS`）。**與 Kit FastAPI 預設衝突，已在衝突仲裁區塊明寫。**
+   - 做法：**完全不用 Alembic**；`requirements.txt` 不裝 alembic；schema 變更走 raw SQL：V2.23.0 起集中在 `app/migrations.py`（先查 inspector 再 `ADD COLUMN`、`ALTER TYPE ... ADD VALUE IF NOT EXISTS`，PostgreSQL advisory lock 互斥）。**與 Kit FastAPI 預設衝突，已在衝突仲裁區塊明寫。**
 
 2. **PostgreSQL Enum 大小寫陷阱**
    - 症狀：`invalid input value for enum categorytype: "drink"`
@@ -148,6 +148,7 @@
     - 影響範圍：全專案 27 處 `TemplateResponse` 都是舊寫法
     - 做法（已套用）：**`requirements.txt` 全部改 `==` 精確版本**，鎖在 2023 年版（starlette==0.27.0 + fastapi==0.104.1 + jinja2==3.1.2 等）。Railway fallback 機制保留舊 container，所以 rebuild 失敗時服務沒中斷，但下次重啟若沒 fallback 就會真壞
     - 長期方案：下版改 27 處為新 API `templates.TemplateResponse(request, "name.html", {...})`，再放寬版本鎖
+    - **✅ V2.22.0 完成**：實數 54 處全改新寫法，升到 fastapi 0.143.2／starlette 1.8.0 並照樣全部 `==` 鎖死（鎖版本的原則不變，只是鎖在新版）；煙霧測試第 33 節用 AST 守「第一參數是 request」
 
 11. **cdnjs 的 `tabler-icons` 是 2020 年舊 package（不是 webfont），同名 package 跨 CDN 不等價**
     - 症狀：V1.1.0 部署後底部導航 5 個 `<i class="ti ti-xxx">` 全部空白，但中央橘色圓圈與文字標籤都還在
@@ -420,6 +421,24 @@
     - 守護：`jsdom_store_sort_check.js` 用 `FormData` 讀真正會送出的欄位（不勾→沒有、勾→有），並驗選店後 `<select>` 的 options 等於店家的 `store_options`；兩者改壞都會紅
     - 同族：坑 #33（既有資料怎麼辦）——上線後已被寫入 5／15 的舊團，handoff 附清查 SQL 由 Sela 決定是否清
 
+43. **框架升級後，靠「數 app.routes」的檢查會無聲變瞎**（V2.22.0 踩到，Kit 坑 #81 假完成訊號的實例）
+    - 症狀：升到 FastAPI 0.143／Starlette 1.8 後，`check_routes.py` 照樣印「路由檢查通過」，但數字從 137 變成 **1**；煙霧測試 187 項全綠，所以第一眼看不出問題
+    - 原因：新版 `include_router` 不再把子路由攤平進 `app.routes`，而是包成 `_IncludedRouter`（`original_router` ＋ `include_context.prefix`）。舊腳本只挑 `hasattr(r, "methods")` 的，七個 router 全被略過——重複路由檢查形同關閉，而 V2.9.1 那次就是靠它才抓到 `copy_last_order` 重複
+    - 做法：遞迴走 `original_router.routes` 並累加 prefix（舊的攤平形狀也照走）；**加數量下限防線**（少於 100 條直接失敗），下次攤平方式再變就會紅而不是說謊
+    - 通用原則：**升級框架後，所有「自己去讀框架內部結構」的檢查腳本都要看一次它數到幾個**，不能只看最後一行有沒有寫通過。檢查的輸出要包含一個你知道正確值的數字
+
+44. **部署設定以為在 `railway.toml`，實際上服務自己存的是另一套**（V2.23.0 查線上時發現）
+    - 症狀：CLAUDE.md、README、部署檢查清單都寫「Dockerfile 模式（railway.toml）」，但 Railway 服務設定讀出來是 **Railpack、沒有健康檢查、沒有重啟策略**
+    - 原因：`railway.toml` 在每次部署時覆蓋服務設定，所以一直能用；Railway 已把 Config as Code 停用，**2026-12-01 起不再讀這個檔**——之後下一次部署就會照服務自己的設定（Railpack，Python 版本不受控）建，整站可能起不來，而且沒有任何警告
+    - 做法：2026-10-17 已把 production 服務設定改成跟 `railway.toml` 一樣（Dockerfile、健康檢查 `/` 100 秒、ON_FAILURE ×3）並讀回確認。之後改部署設定**到服務 Settings 改**（或改用 `.railway/railway.ts`），不要只改 `railway.toml`
+    - 通用原則：**平台設定要讀線上實際值，不要相信 repo 裡的設定檔就是真相**；部署檢查清單加一條「部署設定以 Railway 服務設定為準」。另外 develop 環境沒動（只改 production）
+
+45. **煙霧測試是一支 2000 多行的 `main()`，後面的節拿共用變數名去裝別的東西，會蓋掉前面建立的物件**（V2.23.1 踩到）
+    - 症狀：第 35 節要用 `_c`（TestClient）與 `_main`（app 模組）時噴 `'Connection' object has no attribute 'app'`、`'str' object has no attribute 'app'`
+    - 原因：第 34 節寫了 `with _e34.begin() as _c:` 和 `_main = Path("app/main.py").read_text()`——同一個函式作用域，直接覆蓋了第 17 節建立的 `_c` 與第 16 節 import 的 `_main`。第 34 節當時是最後一節所以沒事
+    - 做法：每節自己的暫存變數一律帶節號後綴（`_cn34`、`_main_src`、`_r35`…）；**不要重用 `_c`、`_main`、`db`、`user`、`_grp`、`_ord`、`_adm` 這些全檔共用的名字**
+    - 長期：把煙霧測試拆成多個函式（每節一個），作用域分開就不會互相蓋——列入「大重構」
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -458,6 +477,10 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.23.2 | **外部審核《Online-Drink V2.23.1 外部審核報告》修正（Sela 選「屬實的全修＋證據腳本」）**。**逐條查證**：P1-01「草稿不鎖庫存」**不成立**——草稿本來就不佔庫存，送出時 `_lock_menu_items`（FOR UPDATE）＋重算總量（V2.8.0 起）；PostgreSQL 兩行程同時搶最後一份 10 輪皆恰好 1 人成功，拿掉 FOR UPDATE 對照 10 輪有 6 輪超賣。P1-02 屬實但風險低；P1-03 風險很低（cookie SameSite=Lax，而 `up.railway.app` 在公開後綴清單上——Railway 自己登記，別的 Railway 網站對本站算跨站；全站只有 `GET /auth/logout` 是 GET 改狀態）；P1-04 部分成立（預覽本來就寫「會更新到那家店」＋差異＋舊版可切回，但沒排除個人代購店、同名不同店沒出口）；P2-01 屬實；P2-02 部分；P2-03 部分（其實有約 150 個 TestClient HTTP 請求，但沒有 PostgreSQL 並行測試、檔頭說明停在 V2.16）；P2-04 設計建議，V2.15～V2.20 已做過。**修正**：(1) **P1-02** `GET /groups/{id}/orders/mine`：團不存在 404；可見性規則定為「現行團單看得到才能看／操作，但自己已有訂單的團一律看得到自己那張」（被移出部門也能查自己的訂單與金額）。(2) **P1-03** `main.py` 中介層 `reject_cross_site_writes`：POST/PUT/PATCH/DELETE 帶 `Sec-Fetch-Site: cross-site`、或 `Origin` 不是本站（含 `null`）→ 403「請求來源不符」並寫 log；沒帶這兩個標頭的放行（SameSite 仍在）。「本站」同時接受 `Host`、`X-Forwarded-Host`、uvicorn 解析的網址、`BASE_URL`、Railway 自動提供的 `RAILWAY_PUBLIC_DOMAIN`——判斷錯會擋掉所有送出，所以多重保險。(3) **P1-04** `import_service.same_name_store()`：預覽與確認共用、排除個人代購店（它的菜單是每團一份，不能被匯入蓋掉）；同名提示多一行「不是同一家（例如不同分店）？把店名改成不一樣的……」＋「改店名」按鈕（focus 新店名欄位）。(4) **P2-01** 候補：鎖原品項列（`with_for_update().populate_existing()`）、以資料庫 `COUNT` 重算（原本 `len(target.backups)` 讀記憶體）；新增唯一約束 `uq_backups_item_priority (order_item_id, priority)`（model `__table_args__`＋migrations 索引規格；既有重複只警告並印重新編號 SQL、不自動改）；撞約束回 400；刪候補後的重排改兩段式（先改負數再改回），避免 3→2 時撞到還沒改走的 2。(5) **P2-02** 遷移有錯誤（警告不算）就 `RuntimeError` 拒絕啟動——新部署健康檢查失敗、Railway 繼續跑舊版；`MIGRATIONS_ALLOW_ERRORS=1` 可強制。(6) **P2-03** 新增 `scripts/pg_concurrency_check.py`（只接受 `PG_TEST_URL`、資料庫名須含 test／check、看到 railway／rlwy 主機拒絕，因為會清空資料庫）：A 搶最後一份、B 候補連點、C 登入回呼重複跨行程、D 遷移 3 行程同時跑＋再跑 0 變更；本機 PostgreSQL 16 跑 10 輪全過；把候補改回舊寫法對照 5 輪全部變成兩筆同順位。煙霧測試檔頭補上 28～36 節與兩支測試的分工。**測試**：煙霧第 36 節 199 → **204 項**（我的訂單 404／403／自己的看得到、看不到的團不能加候補、候補上限與唯一約束與刪除重排、跨站四種情況與 GET 不受影響、同名排除代購店與「改店名」出口、遷移錯誤拒絕啟動與強制旗標）。 |
+| V2.23.1 | **Hotfix：Android Chrome 用 LINE 登入無限迴圈（Sela 回報；跟 V2.23.0 一起上）**。**查證**：從 Railway log 看到 10/18、10/20、10/21 都有，只發生在 Sela 的 Android Chrome——每次按 LINE 登入，從 LINE app 授權跳回 Chrome 時，**`/auth/callback` 被連送兩次**（第一次 0.03 秒就被瀏覽器自己取消＝HTTP 499，0.5 秒後再送一次，帶同一組一次性授權碼）。伺服器把被取消的第一次照樣處理完（log 有「登入完成：Sela」），但 cookie 被瀏覽器丟掉；第二次拿用過的授權碼去換，LINE 回 400 → 導回 `/?error=login_failed` → 登入頁又出現 → 無限迴圈。其他人都在 LINE 內建瀏覽器開，不經過「跳出 LINE app 再跳回來」，所以沒事；跟 V2.22/V2.23 無關（線上仍是 V2.21.0）。**修法**：新表 `login_attempts`（model 在 `app/models/user.py::LoginAttempt`，create_all 建）以 `sha256(state:code)` 為唯一鍵——第一個請求搶到就去跟 LINE 換，成功寫 `done＋user_id＋next_url`、失敗寫 `failed`；**重複的請求搶不到唯一鍵，就每 0.2 秒查一次、最多等 6 秒**，看到 done 就替同一人發 JWT、寫 cookie、導向同一頁（兩個回應都帶 cookie，瀏覽器收到哪個都能登入），看到 failed 或逾時就回登入失敗、**不再拿同一組授權碼重試**。唯一鍵在資料庫，3 個 worker 之間也成立（本機 PostgreSQL 兩個行程實測：第二個看到 pending → 等到 done）。表裡**只存 user_id 與導向頁、不存 token**，超過 10 分鐘的每次登入時清掉；要同時拿到這次登入的 state cookie 與授權碼才對得上，state 比對改 `secrets.compare_digest`。**登入頁說出原因**：原本 `?error=` 完全不顯示（所以看起來就是「又回到登入頁」），現在依 `login_failed`／`invalid_state`／`user_mismatch` 顯示琥珀色提示，失敗時建議改從 LINE 裡點連結開。**測試**：煙霧第 35 節 194 → **199 項**（用 `httpx.ASGITransport` 真的並行送兩個回呼、假 LINE 授權碼只收一次：只換一次、兩個回應都 /home 帶 cookie、token 是同一人；第一次失敗則兩個都失敗不重試；state cookie 不符擋下；換 state 不能沿用別次結果；舊列清除；登入頁三種提示）；把去重關掉（＝舊行為）實測會紅「同一組授權碼只能跟 LINE 換一次（實際 2 次）」。順手：第 34 節把 `_c`、`_main` 拿去當別的變數，蓋掉了後面要用的 TestClient 與 app 模組，改名（坑 #45）。 |
+| V2.23.0 | **P1-8 遷移搬出 lifespan＋Railway 部署設定移到服務上（Sela 選「我直接改服務設定」）**。**動手前查了線上**：Railway 文件寫 Config as Code（`railway.toml`）已停用、**2026-12-01 起不再讀取**；用已連線的 Railway 讀 production 服務設定，發現服務自己存的是 **Railpack 建置、沒有健康檢查、沒有重啟策略**——現在能用 Dockerfile（python:3.11-slim）只是因為 `railway.toml` 在部署時蓋過去（build log 確認：`load build definition from Dockerfile`、Healthcheck `/` 1m40s）。12/01 之後下一次部署會掉回 Railpack，Python 版本不受控（SQLAlchemy 2.0.23 不相容 3.13），很可能整站起不來（坑 #44）。**2026-10-17 已用 Railway `update-service` 把 production 服務設成 Dockerfile（`dockerfilePath=Dockerfile`）＋健康檢查 `/` 100 秒＋ON_FAILURE 重啟 3 次**，讀回確認 `builder: DOCKERFILE`；只改設定、沒觸發部署。`railway.toml` 留著（值相同）並在檔頭註明以服務設定為準。**遷移**：lifespan 裡 340 行搬到 `app/migrations.py::run_migrations(engine)`——(1) PostgreSQL `pg_try_advisory_lock` 互斥，3 個 worker 一個做、其他等完只做快速檢查（最多等 120 秒，逾時不加鎖繼續，因為每步都冪等）；(2) **先查再改**：欄位、可空、索引、約束、enum 都先用 inspector／`pg_enum` 查，已是最新就不下 DDL——原本每次啟動對 53 個欄位都下 `ALTER TABLE ... ADD COLUMN` 靠例外判斷，而 PostgreSQL 的 ALTER 不論成敗都要先拿 ACCESS EXCLUSIVE 鎖；服務開了**閒置休眠**，每次被叫醒都整串跑一遍，正好跟第一批請求搶鎖（實測：讀取交易佔著 `groups` 時，舊寫法對已存在欄位的 ALTER 一直等）；(3) 真要下 DDL 時 `SET LOCAL lock_timeout = '10s'`，拿不到鎖就放棄這步記成錯誤、下次啟動再補，不會卡死整站；(4) 結果分「變更／已是最新／警告／錯誤」，結尾印一行「遷移完成：變更 N 項、已是最新 M 項、警告 W 項、錯誤 E 項（x 秒）」；重複訂單／重複菜單建不起唯一索引維持原本決定（不自動刪、印排查 SQL），算警告不算錯誤；(5) 順修：小寫 `group_buy` 修正改用 `category::text` 比較（原寫法在 PG 上拿無效 enum 字面值比較每次都報錯）、`NOW()` 改 `CURRENT_TIMESTAMP`、建表前先 `has_table`（SQLite 上原本每次印三條語法錯誤）。新增 `scripts/migrate.py`（錯誤時退出碼 1）供部署前手動跑或排查。**不放 preDeployCommand**（Sela 選項；社群有 pre-deploy 連不到內網 Postgres、Dockerfile 建置寫入不生效的回報，啟動時跑已經安全）。**實測（本機 PostgreSQL 16）**：新庫跑兩次（第二次變更 0）、模擬舊庫（拿掉兩欄位、改回 NOT NULL、刪索引與約束、塞 3 筆重複收藏 → 只補缺的、收藏去重成 1）、三個行程同時跑（一個做、兩個等鎖後 0 變更）、`groups` 被交易佔著時已是最新 0.6 秒完成／缺欄位 10.1 秒放棄並回報、uvicorn 3 worker 啟動正常。**測試**：煙霧第 34 節 190 → **194 項**（新庫第一次不需補欄位＝model 與 COLUMNS 一致、第二次 0 變更、舊庫只補缺的、補欄位失敗記成錯誤、lifespan 不再有 DDL）；改壞三處都會紅（不先查欄位、索引永遠當不存在、補欄位失敗不記錯誤——第三處第一版只有手動 PG 測抓得到，補了錯誤路徑測試才在煙霧測試紅）。 |
+| V2.22.0 | **P1-7 套件升級鏈（排定的最後一包；畫面不變、資料表不動）**。(1) **`TemplateResponse` 全站 54 處改新寫法** `TemplateResponse(request, "x.html", {...})`（坑 #10 寫的是 27 處，實數 54；用括號配對的轉換腳本改，`"request": X` 的變數拿來當第一參數，context 是變數（`_home_context(...)`、`ctx`）的預設 `request`；改完用 AST 逐一確認第一參數就是所在函式的 `request` 參數）。(2) **升級目標改了（Sela 決定「最新＋jose 換 PyJWT」）**：原計畫 fastapi 0.115／starlette 0.46／python-multipart 0.0.20，`pip-audit` 還有 **34 條**——starlette 的修正要到 0.47.2／0.49.1／1.1.0／1.3.0、multipart 要到 0.0.31、python-jose 3.3.0 有 6 條（2 條沒有修正版）、它拉進的 ecdsa 1 條無修正。最後鎖 **fastapi 0.143.2／starlette 1.8.0／python-multipart 0.0.32／jinja2 3.1.6／httpx 0.28.1／pyjwt 2.15.1**，另把原本沒鎖的 **pydantic 鎖 2.14.1**（坑 #10 的同一類洞：沒列在 requirements 就是浮動）；uvicorn 0.24 未被列漏洞、不動。`pip-audit -r requirements.txt` 與整個安裝環境都 **0 條**。(3) **python-jose → PyJWT**：`auth.py` 兩行（`import jwt`、`PyJWTError as JWTError`），其餘呼叫相同。HS256 格式一樣——實測 jose 簽的 token PyJWT 解得開、PyJWT 簽的 jose 也解得開（回滾安全），**部署後不用重新登入**；竄改、`alg=none`、別的金鑰、過期都拒絕。(4) **`check_routes.py` 在新版只數到 1 條**（坑 #43）：FastAPI 0.13x 起 `include_router` 不再攤平子路由，`app.routes` 只剩 7 個 `_IncludedRouter`＋1 個 Mount＋1 條根路由——舊腳本照樣印「通過」，重複路由檢查等於關掉。改成遞迴走 `original_router.routes`＋`include_context.prefix`（新舊兩種形狀都支援），並加防線「少於 100 條就失敗」。(5) **實際啟動**：uvicorn 起得來、`/` 200、未登入 `/home` 302 到 `/auth/login?next=/home`、靜態檔 200；Python **3.11（與 Dockerfile 同）與 3.12 都跑過全部測試**。**測試**：煙霧第 33 節 187 → **190 項**（全站 TemplateResponse 第一參數是 request（AST）、requirements 全 `==` 且沒有 jose／alembic、本機版本與 requirements 一致、固定字串的 jose 舊 token 解得開＋四種壞 token 拒絕＋新簽與刷新）。改壞四處都會紅（一處退回舊寫法、解 token 不驗簽、路由檢查不往下走（<100 防線）、真的重複路由）；第一次做「重複路由」改壞時加的是 `GET /votes/`，跟既有 `GET /votes` 不同，檢查照樣通過——改成複製既有那一行才真的紅（坑 #28：改壞要改成真的會撞的樣子）。**已知但不處理**：`starlette.testclient` 對 httpx 印棄用警告（建議改 httpx2；只影響測試，app 本身 LINE 登入仍用 httpx）。 |
 | V2.21.0 | **工作台分頁重組（Sela：「不用出圖，直接改版」，沒有畫面稿）**。`admin/store_workbench.html`＋`admin.py`，資料表不動。(1) **分頁**：菜單｜**共用選項**（甜冰＋加料，只有飲料／餐廳店有，團購店不出這格）｜**店家設定**（基本資料＋分店＋可見範圍，原本分散在「基本資料」「營運設定」）｜更多。舊網址 `?tab=info` → 店家設定、`?tab=ops` → 共用選項；團購店 `?tab=options` 落到店家設定；`/edit` 301 改指店家設定；各 POST 的導回改指新分頁，後台店家列表的「編輯」鈕同步。(2) **甜冰點選標籤**（`tagEditor()`）：原本逗號字串輸入框 → 標籤列（深咖啡實心、‹ 往前、× 移除）＋輸入框新增（全形逗號拆開、去空白、重複不加、上限 20／50 字，與後端 `_parse_option_values` 同規則）＋**預設組**（甜度「無糖 → 全糖」「正常糖 → 無糖」、冰塊「正常冰 → 去冰」「含常溫／熱」，整組取代）＋「全部清除」；隱藏欄位 `sugar_options`／`ice_options` 照舊送逗號字串，**後端路由不變**；改了會顯示「有未儲存的變更」；儲存後回共用選項並提示。(3) **加料批次編輯**（`toppingEditor()`）：一張表單列出全部加料，直接改名、改加價、開關停用、↑ 排序、＋ 新增一項、垃圾桶刪除（列在「儲存後刪除」可按一下復原），整份清單序列化成 `toppings_json` 一次送；前端擋空名稱／重複／加價超出 0～9999（儲存鈕停用＋紅字），沒改不能存；有刪除時送出前確認。後端新路由 `POST /admin/stores/{id}/toppings/batch`（`_parse_topping_rows()` 任一列不合法整批 400 不寫入；id 不屬於這家店 400；依畫面順序重寫 `sort_order`；既有列原地更新 id 不變；**刪除前先把 `order_item_toppings.store_topping_id` 設 NULL**——原本逐筆刪除直接 `db.delete`，加料被點過就撞外鍵，順手解審核 P2-14）。舊的逐筆三支路由（新增／停用／刪除）移除，路由 139 → **137**。**測試**：煙霧第 17、20、22 節的分頁斷言改新名稱，新增第 32 節 180 → **187 項**（分頁組成、團購無共用選項、舊分頁對應、各 POST 導回、舊路由 404/405、批次一次完成五種變更且被點過的加料刪掉後訂單保留名稱價格、七種不合法輸入 400 且完全不寫、別家店 id、送空清單＝刪光）；**新增第九支檢查** `scripts/jsdom_workbench_check.js`（由 `check_frontend_import.py` 跑：標籤新增／往前／移除／預設組 → FormData 送出值；加料沒改停用、改名可存、空白與重複擋下、新增、↑、刪除與復原 → `toppings_json` 內容與順序；有刪除要確認、取消就不送；分頁切換與網址）。改壞五處（標籤往前方向、payload 丟停用、不擋重複、刪除前不斷外鍵、不檢查 id 歸屬）都會紅。開發時 HTML 註解 `<!-- 共用選項 -->` 放在 `{% if %}` 外面，團購店的原始碼仍出現「共用選項」字樣讓斷言紅了——註解移進條件內。 |
 | V2.20.0 | **加點彈窗與購物車 sheet 內部（畫面稿 `preview_sheets_v2200.html` 核准）**。只動 `group.html` 的加點彈窗與購物車 sheet、`partials/my_order.html`；後端、資料表、路由都不變。(1) **加點改成底部 sheet** `#add-item-sheet`：拖曳條＋右上 ✕（取代底部「取消」），點背景也關；選項區中間捲動，**數量＋主鈕釘在底部**，主鈕 `addButtonLabel()`＝「加入購物車・$金額」（時價品項不帶金額），取代「本品小計」一行；候補模式「設為候補 N・+$5」（價差＝每份小計 − 主品項每份價，`startBackup` 多收第四個參數 `baseUnit`，由 `my_order.html` 帶 `item.subtotal / item.quantity`）。**備註收成「＋ 加備註」**（`noteOpen`，每次開 sheet 重設）。**帶入上次偏好時顯示一行**「已帶入上次：L・半糖・少冰」（`lastPrefNote`；原本悄悄帶入看不出來；尺寸只在有 L 價的品項才帶）。(2) **購物車 sheet** 標題列 `#cart-header`「購物車 N 件」／「修改中」＋ ⋯ ＋ ✕；片段裡未送出／修改中**不再有第二個「我的訂單」標題、不再包卡**（`in_cart`），已送出的頁面卡「✓ 你已送出 $X」不變。**數量 1 時「−」變垃圾桶**＝`hx-put` 數量 0（後端本來就刪，連候補 cascade），每列獨立刪除鈕拿掉。**整單刪除收進 ⋯「清空購物車」**（`#clear-cart`，仍有確認框），不再跟主鈕並排。(3) **修改中**主鈕「送出修改」（確認框與提示同步），旁邊「取消修改」（原本只寫「取消」）。**測試**：煙霧第 31 節 175 → **180 項**（sheet 結構、片段無雙標題、數量 1／2 的 − 鈕、修改中用語、PUT 0 真的刪品項與候補）；`jsdom_group_check.js` member 加：開加點 sheet 主鈕帶金額、＋ 後金額加倍、沒有「取消」、備註預設收合／展開、✕ 關閉、購物車垃圾桶 hx-vals、整單刪除不在內容裡、⋯ 才出現清空。改壞四處（金額不乘數量、數量 1 不變垃圾桶、備註不收合、修改中用語）都會紅。開發時差點在雙引號 `@htmx:after-request` 裡放 `tojson`（坑 #37），寫完自查改成 Jinja if 產生單引號字串。 |
 | V2.19.0 | **開團頁只問店家＋截止（畫面稿 `preview_groupnew_v2190.html` 核准）**。只動 `group_new.html`，欄位 name、後端驗證、範本開團都不變。(1) **類型** 4 格大按鈕 → 一列 chip（`@click='selectCategory({{ key\|tojson }})'` 單引號屬性，坑 #37）。(2) **主畫面只剩 截止＋團名**：選好店（或選代購）`ensureDefaults()`——截止沒填就 `setDeadline('1h')`，快捷 chip 亮著（`deadlinePreset`，手動改時間就熄）；**團名自動**「店名 · 時段」（`slotOf()`：<10 早餐、<14 午餐、<17 下午茶、其餘晚餐；團購只帶店名、代購「代購 · M/D」），使用者一輸入就 `nameTouched` 不再自動換；換類別時沒動過的團名清空。(3) **進階設定**（`#advanced`，預設收合）：誰看得到（radio 改兩顆 chip）、備註、外送費／每單上限（兩欄並排）、飲料預設甜冰＋鎖定（只在飲料店）、開關一列一個 toggle（缺貨候補／盲點／隨機免單／湊團／自動催單／我請客），打開才出細項，細項一律 `:disabled`（坑 #42；`lucky_draw_count`、`backup_count` 這版也補上）。收合時 `advSummary()` 一行摘要「公開 · 無上限 · 無外送費 · …」。原本巢狀的 `hasLimit`／`bkOn`／`isPublic`／`enableLucky`… 各自 x-data 收成主元件的狀態，摘要才讀得到。表單 `@invalid.capture` 碰到進階裡的欄位就自動展開（瀏覽器原生驗證）。(4) **複製開團**：`nameTouched: true` 沿用舊團名；`copiedCount`（備註／外送費／上限／候補非預設的項數）＞0 時進階列標「已帶入 N 項」並在摘要列出，不自動展開。**沒做到畫面稿的一點**：稿上摘要示意了「限定部門」，但複製開團本來就不帶可見範圍（`copy_group_page` 沒傳部門），這版不改後端，所以帶入計數不含可見範圍。(5) 「開團」改 `.btn-primary` 全寬、「取消」降成文字連結；代購提示改「更多 → 管理 → 管理品項」（V2.18.0 團主工具已拿掉）。**測試**：煙霧第 30 節 173 → **175 項**（欄位 name 全保留、細項 :disabled、複製開團帶入值與計數；計數改壞會紅）；`jsdom_store_sort_check.js` picker 模式加：預設截止 1 小時後且 chip 亮、團名自動與換截止跟著換、改過不再換、`slotOf` 六個切點、進階預設收合與摘要跟著變、開團是主鈕、FormData 送出值、沒開免單不送 `lucky_draw_count`；改壞四處（nameTouched、預設截止、切點、摘要）都會紅。開發時拼接錨點 `"    </form>\n"` 是範本表單 `"            </form>\n"` 的子字串（坑 #30 第五次），assert 擋下沒寫入，改用連後面兩行的唯一錨點。 |
@@ -566,11 +589,11 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 > - **V2.12 防再犯基礎設施**：Alembic 評估（注意坑 #1，本專案刻意不用）、授權 dependency 取代 handler 各自檢查、時間單一真相（坑 #24 那類時區問題的根治）、表單輸入 schema — 見「程式碼優化與維護建議」md 的 H/A/G/J 節
 > - **獨立長工 大重構**：巨型 router 拆分（`admin.py` 已 1700+ 行）、`group.html` 1359 行拆 JS、Jinja 環境統一（解坑 #6）、函式內 import 清理 — 功能穩定期再動，需全站回歸
 >
-> **V2.14.0 審核未做清單（依優先）**：P1-7 套件升級鏈（TemplateResponse 新 API → fastapi 0.115/starlette 0.46/python-multipart 0.0.20/jinja2 3.1.6 → pip-audit）；P1-8 啟動遷移改 `railway.toml` preDeployCommand + advisory lock + 先查 information_schema；P2-5 匯入預覽→確認的版本檢查（409）；P2-7/8/11 時價生命週期配套（未定價時送出提示上限、禁折扣、禁重開團）；P2-13 收款文字沒讀 `lucky_winner_ids`（待確認是否刻意）；~~P2-14 刪加料硬刪 FK~~（✅ V2.21.0 批次儲存先斷外鍵）；P2-15 清除訪客子表與 aborted 交易；P2-16 清除測試團加 7 天條件；P2-17 Excel 公式注入；P2-F1 倒數計時器不清除；P2-F2 點餐彈窗不重設；P2-F3 async 路由含同步 IO；P2-F4 開團不檢查店家可用；~~P2-F5 推薦上傳不走 upload_service~~（✅ V2.16.2）；P2-F6 CDN 鎖版＋SRI；P2-F7 LINE 取消授權 422；P3 ×13（`quote` safe、GET logout、安全標頭、last_active 節流、QR 端點未登入、README 變數名、close_group 抽獎無鎖、中獎 contains、投票雙送、複製上次排序不一致、`int()` 截斷、範本邊界、死碼）。
+> **V2.14.0 審核未做清單（依優先）**：~~P1-7 套件升級鏈~~（✅ V2.22.0，目標改為 fastapi 0.143／starlette 1.8，pip-audit 0 條）；~~P1-8 啟動遷移~~（✅ V2.23.0：advisory lock＋先查再改＋lock_timeout；Sela 選不放 preDeployCommand）；P2-5 匯入預覽→確認的版本檢查（409）；P2-7/8/11 時價生命週期配套（未定價時送出提示上限、禁折扣、禁重開團）；P2-13 收款文字沒讀 `lucky_winner_ids`（待確認是否刻意）；~~P2-14 刪加料硬刪 FK~~（✅ V2.21.0 批次儲存先斷外鍵）；P2-15 清除訪客子表與 aborted 交易；P2-16 清除測試團加 7 天條件；P2-17 Excel 公式注入；P2-F1 倒數計時器不清除；P2-F2 點餐彈窗不重設；P2-F3 async 路由含同步 IO；P2-F4 開團不檢查店家可用；~~P2-F5 推薦上傳不走 upload_service~~（✅ V2.16.2）；P2-F6 CDN 鎖版＋SRI；P2-F7 LINE 取消授權 422；P3 ×13（`quote` safe、GET logout（V2.23.2 外部審核也點到，風險＝被騙點一下登出，未改）、安全標頭、last_active 節流、QR 端點未登入、README 變數名、close_group 抽獎無鎖、中獎 contains、投票雙送、複製上次排序不一致、`int()` 截斷、範本邊界、死碼）。
 >
 > **兩份 UI 審核（2026-10-16，《UI／UX 全面精簡建議》＋《內部審核 V2.16.1 UI 優化與簡化建議》）— hotfix 已做（V2.16.3），其餘待 Sela 排序**。內部審核建議的順序：**用語統一**（「結單」一詞三義——截止時間／團員送出／團主關團，建議全站改「截止／送出訂單／提前截止」，草稿一律「未送出」）＋**底部常駐結帳列**取代購物車 FAB、團單頁隱藏底部導航（解「以為點了其實沒送出」）→ **團單頁依身分×階段重排**（團員：精簡標頭→菜單→結帳列；已送出後菜單收合成「再加點」；已截止團主看「下一步卡」傳給店家／核對單／收款明細；拿掉「快速點餐」卡——常點與熱門併入菜單導覽、看別人點什麼併入訂單牆「跟單」、隨機收進導覽列；訂單牆改一行摘要；團主工具 7 格→分享／催單／更多）→ **開團頁只問店家＋截止**（團名自動帶「店名＋時段」、截止預設 1 小時、其他收進進階設定；「開團」改 `.btn-primary`；可見範圍 radio 改 chip）＋**首頁去重**（同一團不出現兩次、店家清單移到底部、團列表不分段依截止排序、頁首只留 logo）＋**底部導航三格**（首頁｜＋開團｜我的；投票進首頁、回報進我的）。加點彈窗：✕＋拖曳條、「加入購物車・$25」帶金額、備註收起、「上次」標籤。購物車 sheet：去雙標題、整單刪除收進 ⋯、減到 0 即移除。全站：主要按鈕統一 `.btn-primary`、圓角統一、手機一律底部 sheet、`alert()` 改 toast、透明度收成三階。《UI／UX 全面精簡》另提：後台首頁先待處理事項、個人頁分「資料／活動」、統計先總覽。**不照做**：匯入改「上傳照片→辨識狀態」（辨識是外部 AI 做的，系統沒有 OCR）；桌機寬版佈局（30 人幾乎全手機）。
 >
-> **IA 重整（Sela 2026-10-16 兩輪意見）— ✅ V2.17.0 導航／首頁／店家／紀錄／我的／開團頁頂列；✅ V2.18.0 團頁重排；✅ V2.19.0 開團頁只問店家＋截止；✅ V2.20.0 加點彈窗與購物車 sheet 內部；✅ V2.21.0 工作台分頁重組。後續包（Sela 排序）**：**P1-7 套件升級鏈**（最後一包；畫面不變）。**不做**（Sela 決定）：A-4 菜單搜尋、A-6 停售灰字列出、A-7 時價提示文。
+> **IA 重整（Sela 2026-10-16 兩輪意見）— ✅ V2.17.0 導航／首頁／店家／紀錄／我的／開團頁頂列；✅ V2.18.0 團頁重排；✅ V2.19.0 開團頁只問店家＋截止；✅ V2.20.0 加點彈窗與購物車 sheet 內部；✅ V2.21.0 工作台分頁重組；✅ V2.22.0 P1-7 套件升級鏈。**排定的系列到此全部完成**；之後從下面幾段的待辦再挑（Sela 排序）。V2.23.0 做了 P1-8。**期限**：Railway 2026-12-01 停讀 `railway.toml`——production 服務設定已改好（坑 #44），develop 環境沒動。**不做**（Sela 決定）：A-4 菜單搜尋、A-6 停售灰字列出、A-7 時價提示文。
 >
 > **審稿《菜單管理優化》＋內部審核 V2.15.0**：✅ V2.16.0 A-1/A-2/A-5/A-8 → ✅ V2.16.1 B-3/5/6/7/8/9/10 → ✅ V2.21.0 工作台分頁重組。
 >
@@ -581,7 +604,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 > **emoji 全站清除已完成（V1.1.0~V1.5.0）。** 以下為更早的功能性 backlog。
 
 1. ~~匯入價格容錯~~（✅ V2.14.0 做掉：`parse_price_input()`，時價轉 `price_tbd`）
-2. **27 處 `TemplateResponse` 改新 API**（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
+2. ~~**27 處 `TemplateResponse` 改新 API**~~（✅ V2.22.0：實數 54 處）（解坑 #10 的長期方案）— 把 `TemplateResponse("name.html", {"request": request, ...})` 改成 `TemplateResponse(request, "name.html", {...})`，改完才能放寬 `requirements.txt` 版本鎖，享受套件安全更新
 2. 訂單匯出 Excel — 原本 backlog（見 `docs/SELA-開發指導手冊.md`「待開發」）
 3. 外送費分攤功能 — `scripts/DELIVERY_FEE_CHANGES.py` 已有設計稿
 4. 多尺寸定價 — 之前因 bug 回滾過，重做注意 schema 三方對齊
@@ -614,6 +637,8 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
      - 《SELA-菜單匯入格式規範》改到匯入就同步；《專案架構精簡》改到資料表／路由／套件就同步；《部署檢查清單》改到檢查流程就同步；《常見錯誤與解決方案》新坑值得速查就加；《開發指導手冊》業務規則或排程變了就同步。都是 `project_write` 原地覆蓋同檔名。
      - 程式碼快照 `線上訂餐_bundle_VX.Y.Z.txt`：每版用 `python scripts/匯整專案.py "Online-Drink VX.Y.Z" 線上訂餐_bundle_VX.Y.Z.txt` 產生（約 1.4MB，含 CLAUDE.md），**先 `project_delete` 舊版號的那份再寫新的**（檔名帶版號，不會自動覆蓋；用 `local_path` 上傳時會落在 `claude/` 命名空間，路徑是 `claude/線上訂餐_bundle_VX.Y.Z.txt`）。
      - 這四份背景 md **不再放在 zip 的 `docs/`**（V2.16.1 移除，避免兩邊漂移）；zip 裡只留 CLAUDE.md 與 handoff。
+  12. **動到庫存、候補、登入、遷移時跑 `scripts/pg_concurrency_check.py`**（V2.23.2 起；需要拋棄式 PostgreSQL：`PG_TEST_URL=postgresql://…/xxx_check`，名稱要含 test／check）。本機沙盒有 `/usr/lib/postgresql/16/bin`，用非 root 帳號 `initdb` 起一個即可（見 handoff）
+  11. **跑 `pip-audit -r requirements.txt`**（V2.22.0 起；要網路，會查 PyPI 的漏洞資料庫）。有新漏洞且有修正版就升到修正版並全跑一次；沒有修正版的寫進交班文件說明為什麼不影響本專案。動到 requirements 後也要看 `check_routes.py` 數到的條數還對不對（坑 #43）
   10. **自我描述文案同步**（Kit 坑 #90，V2.17.0 起）：README 的「主要功能」「專案結構」目錄樹、版尾「Made by … 對齊 Kit Vx」、本檔第三章路徑表——動到導航／頁面／目錄就一併改。V2.17.0 對齊時發現 README 版尾停在 V1.0.0、`docs/` 說明是 V2.16.1 之前的，沒有任何測試抓得到這種腐化。
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 

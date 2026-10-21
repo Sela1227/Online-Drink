@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 
@@ -146,7 +147,7 @@ async def order_wall(group_id: int, request: Request, db: Session = Depends(get_
 
     is_open = group.is_open
 
-    return templates.TemplateResponse("partials/order_wall.html", {
+    return templates.TemplateResponse(request, "partials/order_wall.html", {
         "request": request,
         "user": user,  # V2.18.0：訂單牆標「（你）」、自己的列不出跟單鈕
         "submitted_orders": submitted_orders,
@@ -164,6 +165,8 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="團單不存在")
     order = db.query(Order).filter(
         Order.group_id == group_id,
         Order.user_id == user.id,
@@ -171,8 +174,12 @@ async def my_order(group_id: int, request: Request, db: Session = Depends(get_db
         joinedload(Order.items).joinedload(OrderItem.selected_options),
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
+    # V2.23.2 審稿 P1-02：可見性規則——「現行團單」看得到才能看／操作；
+    # 但自己已經有訂單的團，一律看得到自己那張（例如後來被移出部門，自己的訂單與金額仍要能查）
+    if not (order and order.items):
+        _ensure_visible(group, user, db)
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -356,7 +363,11 @@ async def add_item(
             raise HTTPException(status_code=400, detail="請先進入修改模式")
         if not group.enable_backup:
             raise HTTPException(status_code=400, detail="此團未開啟候補")
-        if len(target.backups) >= (group.backup_count or 1):
+        # V2.23.2 審稿 P2-01：連點兩下會同時進來。鎖住原品項列（PostgreSQL FOR UPDATE），
+        # 再用資料庫重算現有候補數——記憶體裡的 target.backups 在並行時是舊的
+        db.query(OrderItem).filter(OrderItem.id == target.id).with_for_update().populate_existing().first()
+        _bk_count = db.query(func.count(OrderItemBackup.id)).filter(OrderItemBackup.order_item_id == target.id).scalar() or 0
+        if _bk_count >= (group.backup_count or 1):
             raise HTTPException(status_code=400, detail="候補已達上限")
         
         # 每份總價 = 尺寸單價 + 加購 + 加料（快照）
@@ -383,7 +394,7 @@ async def add_item(
         
         db.add(OrderItemBackup(
             order_item_id=target.id,
-            priority=len(target.backups) + 1,
+            priority=_bk_count + 1,
             menu_item_id=menu_item_id,
             item_name=menu_item.name,
             size=size,
@@ -393,13 +404,18 @@ async def add_item(
             unit_price=full_unit,
             extras_price=full_unit - Decimal(str(unit_price)),  # V2.14.1
         ))
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # 唯一約束 (order_item_id, priority) 是最後防線：同時送出的那一筆被擋下
+            db.rollback()
+            raise HTTPException(status_code=400, detail="候補已達上限或重複送出，請重新整理")
         
         order = db.query(Order).filter(Order.id == target.order_id).options(
             joinedload(Order.items).joinedload(OrderItem.selected_options),
             joinedload(Order.items).joinedload(OrderItem.selected_toppings)
         ).first()
-        return templates.TemplateResponse("partials/my_order.html", {
+        return templates.TemplateResponse(request, "partials/my_order.html", {
             "request": request,
             "order": order,
             "group": group,
@@ -504,7 +520,7 @@ async def add_item(
     ).first()
     
     # 回傳更新後的訂單
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -541,6 +557,10 @@ async def delete_backup(
     remaining = db.query(OrderItemBackup).filter(
         OrderItemBackup.order_item_id == target_item.id
     ).order_by(OrderItemBackup.priority).all()
+    # V2.23.2：(order_item_id, priority) 有唯一約束，直接改號可能暫時撞號（3→2 時舊的 2 還沒改走），先改成負數再改回來
+    for i, b in enumerate(remaining, start=1):
+        b.priority = -i
+    db.flush()
     for i, b in enumerate(remaining, start=1):
         b.priority = i
     db.commit()
@@ -549,7 +569,7 @@ async def delete_backup(
         joinedload(Order.items).joinedload(OrderItem.selected_options),
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -608,7 +628,7 @@ async def update_item(
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -646,7 +666,7 @@ async def delete_item(item_id: int, request: Request, db: Session = Depends(get_
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -700,7 +720,7 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -789,7 +809,7 @@ async def edit_order(group_id: int, request: Request, db: Session = Depends(get_
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -843,7 +863,7 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
     db.commit()
     db.refresh(order)
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -875,7 +895,7 @@ async def delete_order(group_id: int, request: Request, db: Session = Depends(ge
         order.snapshot = None
         db.commit()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,
@@ -970,7 +990,7 @@ async def follow_item(
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
     
-    return templates.TemplateResponse("partials/my_order.html", {
+    return templates.TemplateResponse(request, "partials/my_order.html", {
         "request": request,
         "order": order,
         "group": group,

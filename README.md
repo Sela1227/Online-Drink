@@ -19,13 +19,13 @@
 
 | 層 | 技術 |
 |----|------|
-| 後端 | FastAPI 0.104.1 + SQLAlchemy 2.0.23 |
-| Web 框架核心 | Starlette 0.27.0（鎖版本，見 CLAUDE.md 坑 #10） |
+| 後端 | FastAPI 0.143.2 + SQLAlchemy 2.0.23 |
+| Web 框架核心 | Starlette 1.8.0（全部 `==` 鎖版本，見 CLAUDE.md 坑 #10；V2.22.0 升級，pip-audit 0 條） |
 | 資料庫 | PostgreSQL |
-| 前端 | Jinja2 3.1.2 + Tailwind CSS（CDN）+ Alpine.js + HTMX |
-| 認證 | LINE Login |
+| 前端 | Jinja2 3.1.6 + Tailwind CSS（CDN）+ Alpine.js + HTMX |
+| 認證 | LINE Login（JWT：PyJWT） |
 | 圖片 | Cloudinary |
-| 部署 | Railway（Dockerfile 模式） |
+| 部署 | Railway（Dockerfile 模式；設定在 Railway 服務上，見 CLAUDE.md 坑 #44） |
 
 ---
 
@@ -77,7 +77,8 @@ CLOUDINARY_API_SECRET=xxx
 ```
 線上訂餐/
 ├── app/
-│   ├── main.py              FastAPI 入口 + 自動遷移
+│   ├── main.py              FastAPI 入口（啟動時呼叫遷移）
+│   ├── migrations.py        資料庫遷移（advisory lock、先查再改；V2.23.0）
 │   ├── config.py            Pydantic Settings
 │   ├── database.py          SQLAlchemy 連線
 │   ├── models/              SQLAlchemy Model（User/Store/Menu/Group/Order/...）
@@ -91,7 +92,7 @@ CLOUDINARY_API_SECRET=xxx
 ├── menu/                    各店家菜單 JSON 範本
 ├── scripts/                 煙霧測試與七支檢查（smoke_test／check_*／jsdom_*）、種子資料、專案匯整
 ├── requirements.txt         依賴（== 鎖版本，坑 #10）
-├── railway.toml             Railway 部署設定（Dockerfile 模式）
+├── railway.toml             舊的 Railway 設定檔（對照用；2026-12-01 起不再被讀，以服務設定為準）
 ├── Dockerfile
 ├── start.sh
 ├── .gitignore
@@ -120,7 +121,7 @@ CLOUDINARY_API_SECRET=xxx
 
 ## 部署
 
-走 Railway Dockerfile 模式。詳細部署檢查清單見 Claude Project「快點來點餐」的《SELA-部署檢查清單》。
+走 Railway Dockerfile 模式。**部署設定以 Railway 服務的 Settings 為準**（V2.23.0 已設：Dockerfile、健康檢查 `/` 100 秒、失敗重啟 3 次）；下面的 `railway.toml` 只是對照，2026-12-01 起 Railway 不再讀它。詳細部署檢查清單見 Claude Project「快點來點餐」的《SELA-部署檢查清單》。
 
 ```toml
 # railway.toml
@@ -136,7 +137,7 @@ restartPolicyMaxRetries = 3
 ```
 
 ⚠ **重要**：
-- 本專案刻意不用 Alembic，schema 演進走 `app/main.py` startup 內的 raw SQL（見 CLAUDE.md 坑 #1）
+- 本專案刻意不用 Alembic，schema 演進走 `app/migrations.py` 的 raw SQL（見 CLAUDE.md 坑 #1；可手動 `python scripts/migrate.py`）
 - `requirements.txt` 必須維持 `==` 精確版本鎖死，否則 Railway rebuild 時會抓到不相容的 Starlette 新版（見 CLAUDE.md 坑 #10）
 
 ---
@@ -151,4 +152,4 @@ restartPolicyMaxRetries = 3
 
 ---
 
-> Made by **SELA** · V2.21.0 · 對齊 SELA-Starter-Kit V1.36.0
+> Made by **SELA** · V2.23.2 · 對齊 SELA-Starter-Kit V1.36.0

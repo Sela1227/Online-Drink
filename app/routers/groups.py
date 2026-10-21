@@ -221,7 +221,7 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     # 取得啟用中的部門
     departments = db.query(Department).filter(Department.is_active == True).all()
     
-    return templates.TemplateResponse("group_new.html", {
+    return templates.TemplateResponse(request, "group_new.html", {
         "request": request,
         **_new_group_context(db, user, stores=stores, departments=departments,
                              preselect_store_id=store_id),
@@ -550,7 +550,7 @@ async def group_page(group_id: int, request: Request, db: Session = Depends(get_
     if group.treat_user_id:
         treat_user = db.query(User).filter(User.id == group.treat_user_id).first()
     
-    return templates.TemplateResponse("group.html", {
+    return templates.TemplateResponse(request, "group.html", {
         "request": request,
         "user": user,
         "group": group,
@@ -591,7 +591,7 @@ async def proxy_items_panel(group_id: int, request: Request, db: Session = Depen
         for cat in group.menu.categories:
             items.extend(cat.items)
     items.sort(key=lambda x: (x.sort_order, x.id))
-    return templates.TemplateResponse("partials/proxy_items_panel.html", {
+    return templates.TemplateResponse(request, "partials/proxy_items_panel.html", {
         "request": request, "group": group, "items": items,
     })
 
@@ -925,7 +925,7 @@ async def fulfillment_panel(group_id: int, request: Request, db: Session = Depen
             groups_map.setdefault(label, []).append({"order": o, "item": it})
     item_groups = [{"label": k, "entries": v} for k, v in sorted(groups_map.items())]
     
-    return templates.TemplateResponse("partials/fulfillment_panel.html", {
+    return templates.TemplateResponse(request, "partials/fulfillment_panel.html", {
         "request": request,
         "group": group,
         "item_groups": item_groups,
@@ -1173,7 +1173,7 @@ async def treat_history(group_id: int, request: Request, db: Session = Depends(g
         TreatRecord.treat_user_id, User.display_name
     ).order_by(func.count(TreatRecord.id).desc()).all()
     
-    return templates.TemplateResponse("partials/treat_history.html", {
+    return templates.TemplateResponse(request, "partials/treat_history.html", {
         "request": request,
         "records": records,
         "store_name": group.store_display_name
@@ -1264,7 +1264,7 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
     from app.models.department import Department
     departments = db.query(Department).filter(Department.is_active == True).all()
     
-    return templates.TemplateResponse("group_new.html", {
+    return templates.TemplateResponse(request, "group_new.html", {
         "request": request,
         **_new_group_context(db, user, stores=stores, departments=departments,
                              preselect_store_id=group.store_id, copy_from=group),
@@ -1287,7 +1287,7 @@ async def export_order(group_id: int, request: Request, db: Session = Depends(ge
     
     text = generate_order_text(db, group)
     
-    return templates.TemplateResponse("export.html", {
+    return templates.TemplateResponse(request, "export.html", {
         "request": request,
         "user": user,
         "group": group,
@@ -1312,7 +1312,7 @@ async def export_payment(group_id: int, request: Request, db: Session = Depends(
     
     text = generate_payment_text(db, group)
     
-    return templates.TemplateResponse("export.html", {
+    return templates.TemplateResponse(request, "export.html", {
         "request": request,
         "user": user,
         "group": group,
