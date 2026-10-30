@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "partials/nav.html" as nav %}
+
+{% block title %}我會訂的縣市 - SELA 快點來點餐{% endblock %}
+
+{% block content %}
+{{ nav.back('/profile', '我的') }}
+{# V2.26.0：勾縣市 → 店家頁與開團選店只顯示這些縣市的店；都不勾＝全部 #}
+<form method="POST" action="/profile/cities" class="space-y-4" x-data='{ picked: {{ my_cities | tojson }} }'>
+    <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-map-pin"></i> 我會訂的縣市</h1>
+    <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4 space-y-4">
+        <p class="text-sm text-sela-800/70">勾選後，店家頁和開團選店只顯示這些縣市的店。都不勾＝全部顯示。宅配、團購這種「不分縣市」的店，和還沒設縣市的店，永遠都會顯示。</p>
+        {% for grp, cs in city_groups %}
+        <div>
+            <div class="text-sm font-bold text-sela-800 mb-2">{{ grp }}</div>
+            <div class="flex flex-wrap gap-2">
+                {% for c in cs %}
+                <label class="cursor-pointer">
+                    <input type="checkbox" name="cities" value="{{ c }}" x-model="picked" class="sr-only">
+                    <span class="inline-block px-3.5 py-2 rounded-full border text-sm"
+                          :class='picked.includes({{ c | tojson }}) ? "bg-sela-800 border-sela-800 text-white" : "bg-white border-sela-300 text-sela-800"'>
+                        {{ c }}{% if city_counts.get(c) %} <span class="opacity-60 text-xs">{{ city_counts[c] }}</span>{% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="flex gap-2">
+        <button type="button" @click="picked = []" class="px-4 py-3 rounded-xl border border-sela-200 bg-white text-sm text-sela-800">全部清除</button>
+        <button type="submit" class="flex-1 py-3 rounded-xl bg-sela-700 text-white font-bold text-base"
+                x-text="picked.length ? '儲存（' + picked.length + ' 個縣市）' : '儲存（全部顯示）'">儲存</button>
+    </div>
+</form>
+{% endblock %}

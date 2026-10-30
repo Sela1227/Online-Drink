@@ -184,6 +184,10 @@ def _new_group_context(db: Session, user, *, stores, departments,
         "last_group_at": last_group_at,
         "last_group_ts": last_group_ts,
         "copy_from": copy_from,
+        # V2.26.0：分店轉成純資料給模板 tojson（ORM 物件不能直接序列化）；停用的分店不給選
+        "branch_map": {st.id: [{"id": b.id, "name": b.name, "phone": b.phone or "", "address": b.address or ""}
+                               for b in (st.branches or []) if b.is_active is not False] for st in stores},
+        "my_cities": __import__("app.services.city", fromlist=["parse_user_cities"]).parse_user_cities(user.cities),  # V2.26.0
     }
 
 

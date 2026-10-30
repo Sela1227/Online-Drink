@@ -108,6 +108,19 @@ def _render_pages() -> dict:
     db.add(UserFavorite(user_id=u.id, store_id=yi.id)); db.commit()
     home_r.get_current_user = fake_user
     pages["__catalog__"] = c.get("/stores").text
+    # V2.26.0：縣市篩選＋最新加入。我只勾彰化縣；甲店彰化縣（10 天前加入）、乙店台中市（1 天前，已收藏）、
+    # 丙店沒設縣市（5 天前）、丁店不分縣市
+    _now = datetime.utcnow()
+    for st_, city, d_ in ((jia, "彰化縣", 10), (yi, "台中市", 1), (bing, None, 5), (ding, "不分縣市", 3)):
+        st_.city = city; st_.created_at = _now - timedelta(days=d_)
+    _u = db.query(User).filter(User.line_user_id == "importcheck").first()
+    _u.cities = '["彰化縣"]'; db.commit()
+    pages["__catalog_city__"] = c.get("/stores").text
+    pages["__picker_city__"] = c.get("/groups/new").text
+    _u.cities = None
+    for st_ in (jia, yi, bing, ding):
+        st_.city = None
+    db.commit()
 
     # V2.18.0 團頁：member＝別人開的團、我購物車有 1 件 $100；owner＝我開的團、別人點了還沒送出
     from app.models.order import Order, OrderItem, OrderStatus
@@ -172,7 +185,8 @@ def main():
         frag_path.write_text(pages.pop("__fragment__"), encoding="utf-8")
         sim_path = Path(td) / "similar.html"
         sim_path.write_text(pages.pop("__similar__"), encoding="utf-8")
-        sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__"), "catalog": pages.pop("__catalog__")}
+        sort_pages = {"picker": pages.pop("__picker__"), "admin": pages.pop("__admin_stores__"), "catalog": pages.pop("__catalog__"),
+                      "catalog_city": pages.pop("__catalog_city__"), "picker_city": pages.pop("__picker_city__")}
         group_pages = {k: (pages.pop(f"__group_{k}__"), pages.pop(f"__group_{k}_mine__"), pages.pop(f"__group_{k}_wall__")) for k in ("member", "owner")}
         workbench_page = pages.pop("__workbench__")
         for mode, html in pages.items():
@@ -202,7 +216,9 @@ def main():
                 res = json.loads(line)
             except Exception:
                 res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
-            if res.get("ok"):
+            if res.get("ok") and mode.endswith("_city"):
+                print(f"  OK  {mode}：只顯示我的縣市（沒設縣市／不分縣市照樣顯示）、看全部可切回、最新加入排序與卡片小字")
+            elif res.get("ok"):
                 print(f"  OK  {mode}：預設熱門、三種排序順序正確、卡片小字、選擇有記住{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")

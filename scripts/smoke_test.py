@@ -48,6 +48,7 @@
   36. V2.23.2 外部審核：我的訂單可見性、跨站寫入、同名店家、候補順位、遷移錯誤不啟動
   37. V2.24.0 匯入店家電話地址：新店家一起建立、既有店家只補空白、清理與驗證、AI 指令
   38. V2.25.0 新推薦提醒（首頁卡／我的紅點）、站內拍照轉成菜單（只有 Sela）、新增店家走匯入
+  39. V2.26.0 版本號單一來源（文件同步）、店家縣市（地址判斷／匯入／工作台／遷移補值）、我會訂的縣市、最新加入
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -1581,7 +1582,7 @@ def main():
 
         # 店家排序資料：後台列表 group_counts／lastTs；開團覆蓋層 last_group_at／last_ts
         r = _c.get("/admin/stores")
-        assert "sorts: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開團']]" in r.text and "sort: 'hot'" in r.text
+        assert "sorts: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開團'], ['new', '最新加入']]" in r.text and "sort: 'hot'" in r.text
         assert "groups: " in r.text and "lastTs: " in r.text and "cmp(a, b)" in r.text
         check("後台店家列表：排序 chip 資料（熱門／名稱／最近開團，預設熱門）與每店開團次數")
     finally:
@@ -1592,7 +1593,7 @@ def main():
     try:
         r = _c.get("/groups/new")
         assert r.status_code == 200
-        assert "sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', '']]" in r.text
+        assert "sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', ''], ['new', '最新加入', '']]" in r.text
         assert "sortKey: 'hot'" in r.text and "last_group: " in r.text and "last_ts: " in r.text and "sela_store_sort" in r.text
         assert "大家最常開的" not in r.text, "原本獨立的熱門 3 家區塊應拿掉"
         # 複製開團走同一個 context（P0-02 那條回歸）
@@ -2584,6 +2585,117 @@ def main():
         _home38.get_current_user = _orig_cu38
         _adm.get_admin_user = _orig
         _set38.anthropic_api_key, _set38.admin_line_user_id = _keep38
+
+    # ---------- 39. V2.26.0 版本號、縣市、最新加入 ----------
+    print("\n[39] 版本號、縣市篩選、最新加入")
+    from app.version import APP_VERSION as _V39
+    _root39 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _rd = lambda f: open(os.path.join(_root39, f), encoding="utf-8").read()
+    assert f"- **版本：** {_V39}（" in _rd("CLAUDE.md"), "CLAUDE.md 狀態行要跟 app/version.py 同一版"
+    assert f"· {_V39} ·" in _rd("README.md"), "README 版尾要跟 app/version.py 同一版"
+    assert f"目前版本:{_V39}" in _rd("SELA-handoff-快點來點餐.md"), "handoff 版本要跟 app/version.py 同一版"
+    assert "set app_version" not in _rd("app/templates/base.html"), "版本號不能再寫死在 base.html"
+    _who39 = {"u": None}
+    _u39 = User(line_user_id="U_city39", display_name="縣市測試"); db.add(_u39); db.commit(); _who39["u"] = _u39.id
+    async def _cu39(request, db_):
+        return db_.query(User).filter(User.id == _who39["u"]).first()
+    import app.routers.home as _home39
+    import app.routers.groups as _grp39
+    _o39 = (_home39.get_current_user, _grp39.get_current_user)
+    _home39.get_current_user = _cu39; _grp39.get_current_user = _cu39
+    r = _c.get("/profile")
+    assert _V39 in r.text, "我的頁最下面要顯示目前版本"
+    check(f"版本號：唯一來源 app/version.py（{_V39}），我的頁顯示；CLAUDE.md／README／handoff 漏改就紅")
+
+    from app.services.city import city_from_address as _cfa, normalize_city as _nc, store_visible_in as _vis, parse_user_cities as _puc
+    for _a, _want in (("彰化縣鹿港鎮中山路 100 號", "彰化縣"), ("臺中市西屯區台灣大道", "台中市"), ("505彰化縣鹿港鎮", "彰化縣"),
+                      ("台灣省台中縣大里區", "台中市"), ("台北縣板橋市", "新北市"), ("中華民國 106 台北市大安區", "台北市"),
+                      ("嘉義市東區", "嘉義市"), ("嘉義縣民雄鄉", "嘉義縣"), ("鹿港鎮中山路 88 號", None), ("", None), (None, None)):
+        assert _cfa(_a) == _want, (_a, _cfa(_a), _want)
+    for _a, _want in (("臺中", "台中市"), ("彰化", "彰化縣"), ("新竹", None), ("宅配", "不分縣市"), ("台北縣", "新北市"), ("火星", None), ("", None)):
+        assert _nc(_a) == _want, (_a, _nc(_a))
+    assert _vis("台中市", ["彰化縣"]) is False and _vis("彰化縣", ["彰化縣"]) and _vis(None, ["彰化縣"]) and _vis("不分縣市", ["彰化縣"]) and _vis("台中市", [])
+    assert _puc('["臺中市", "火星", "台中市", "不分縣市"]') == ["台中市"] and _puc("壞掉") == [] and _puc(None) == []
+    check("縣市判斷：地址開頭（郵遞區號／臺／舊縣名／台灣省）、寫法容錯（新竹有市有縣不猜）、可見規則、壞資料當沒設")
+
+    _adm.get_admin_user = _fake_admin
+    try:
+        _HX = {"HX-Request": "true"}
+        _m39 = {"items": [{"name": "肉圓", "price": 50}]}
+        # 新店家：沒給 city → 從地址判斷；給了臺中 → 台中市
+        _j = json.dumps({"store": {"name": "", "category": "meal", "address": "彰化縣鹿港鎮民族路 9 號"}, "menu": _m39}, ensure_ascii=False)
+        r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "縣市三十九店", "new_store_category": "meal", "json_text": _j}, headers=_HX)
+        assert "縣市：彰化縣" in r.text and "從地址判斷" in r.text, r.text[:400]
+        r = _c.post("/admin/import", data={"json_str": json.dumps({"store": {"name": "縣市三十九店", "category": "meal", "address": "彰化縣鹿港鎮民族路 9 號"}, "menu": _m39}, ensure_ascii=False)}, headers=_HX)
+        assert r.status_code == 200
+        r = _c.post("/admin/import", data={"json_str": json.dumps({"store": {"name": "台中三十九店", "category": "meal", "city": "臺中"}, "menu": _m39}, ensure_ascii=False)}, headers=_HX)
+        assert r.status_code == 200
+        db.expire_all()
+        _s39 = db.query(Store).filter(Store.name == "縣市三十九店").one(); _t39 = db.query(Store).filter(Store.name == "台中三十九店").one()
+        assert _s39.city == "彰化縣" and _t39.city == "台中市"
+        # 既有店家：空白才補；已有不覆蓋
+        _e39 = Store(name="既有縣市店", category=CategoryType.MEAL, is_active=True); db.add(_e39); db.commit()
+        r = _c.post("/admin/import", data={"json_str": json.dumps({"store_id": _e39.id, "mode": "new", "menu": _m39,
+                     "contact": {"address": "南投縣埔里鎮中山路 1 號"}}, ensure_ascii=False)}, headers=_HX)
+        assert r.status_code == 200
+        db.expire_all(); assert db.get(Store, _e39.id).city == "南投縣"
+        r = _c.post("/admin/import", data={"base_menu_id": str(db.query(_M36).filter(_M36.store_id == _e39.id, _M36.is_active == True).one().id),
+                     "json_str": json.dumps({"store_id": _e39.id, "mode": "new", "menu": {"items": [{"name": "米糕", "price": 40}]},
+                     "contact": {"city": "高雄市"}}, ensure_ascii=False)}, headers=_HX)
+        db.expire_all(); assert db.get(Store, _e39.id).city == "南投縣", "已有縣市不覆蓋"
+        check("匯入縣市：新店家從地址判斷或吃資料（臺中→台中市）、預覽標「從地址判斷」；既有店家只補空白")
+
+        # 工作台：空白＝依地址；不分縣市；亂填 400
+        _form = {"name": "縣市三十九店", "category": "meal", "address": "雲林縣斗六市", "city": "auto"}
+        assert _c.post(f"/admin/stores/{_s39.id}/edit", data=_form, follow_redirects=False).status_code == 302
+        db.expire_all(); assert db.get(Store, _s39.id).city == "雲林縣"
+        _form["city"] = "不分縣市"; _c.post(f"/admin/stores/{_s39.id}/edit", data=_form, follow_redirects=False)
+        db.expire_all(); assert db.get(Store, _s39.id).city == "不分縣市"
+        _form["city"] = "火星"; assert _c.post(f"/admin/stores/{_s39.id}/edit", data=_form).status_code == 400
+        r = _c.get(f"/admin/stores/{_s39.id}?tab=settings")
+        assert 'id="store-city"' in r.text and '<option value="auto"' in r.text and '<option value="不分縣市" selected' in r.text
+        r = _c.get("/admin/stores")
+        assert "['new', '最新加入']" in r.text and "未設縣市" in r.text
+        check("工作台縣市：空白＝依地址判斷、可選不分縣市、亂填 400；後台列表顯示縣市與最新加入排序")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # 遷移補值：有地址沒縣市的補上；已設的不動
+    from app.migrations import run_migrations as _rm39
+    _b1 = Store(name="補值店", category=CategoryType.MEAL, address="屏東縣東港鎮"); _b2 = Store(name="已設店", category=CategoryType.MEAL, address="屏東縣東港鎮", city="不分縣市")
+    db.add_all([_b1, _b2]); db.commit()
+    _rm39(engine, log=lambda *a: None)
+    db.expire_all()
+    assert db.get(Store, _b1.id).city == "屏東縣" and db.get(Store, _b2.id).city == "不分縣市"
+    check("遷移：有地址、還沒設縣市的店家從地址補上；已設的不動")
+
+    # 我會訂的縣市：只收 22 縣市、依固定順序、空＝全部
+    try:
+        r = _c.post("/profile/cities", data={"cities": ["彰化縣", "火星", "台中市", "彰化縣", "不分縣市"]}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/stores"
+        db.expire_all(); assert json.loads(db.get(User, _u39.id).cities) == ["台中市", "彰化縣"]
+        r = _c.get("/profile/cities")
+        assert r.status_code == 200 and "我會訂的縣市" in r.text and "picked: [" in r.text
+        r = _c.get("/profile")
+        assert 'id="profile-cities"' in r.text and "台中市、彰化縣" in r.text
+        r = _c.get("/stores")
+        import re as _re39, html as _h39
+        _mc = json.loads(_h39.unescape(_re39.search(r'<script type="application/json" id="my-cities">(.*?)</script>', r.text, _re39.S).group(1)))
+        _sd = json.loads(_h39.unescape(_re39.search(r'<script type="application/json" id="stores-data">(.*?)</script>', r.text, _re39.S).group(1)))
+        assert _mc == ["台中市", "彰化縣"] and 'id="city-filter"' in r.text and "['new', '最新加入']" in r.text
+        assert all("city" in x and "created_ts" in x for x in _sd)
+        # V2.26.0 順便修：有分店的店家讓開團頁 500（tojson ORM 物件）。這裡的使用者看得到前面幾節建的分店
+        from app.models.store import StoreBranch as _SB39
+        assert db.query(_SB39).count() > 0, "要有分店才測得到"
+        r = _c.get("/groups/new")
+        assert r.status_code == 200, "有分店的店家不能讓開團頁 500"
+        assert "myCities" in r.text and "picker-city-filter" in r.text and "['new', '最新加入', '']" in r.text
+        _c.post("/profile/cities", data={}, follow_redirects=False)
+        db.expire_all(); assert db.get(User, _u39.id).cities is None
+        assert "全部顯示" in _c.get("/profile").text
+        check("我會訂的縣市：只收 22 縣市、固定順序、去重、空＝全部；店家頁／開團選店帶縣市篩選與最新加入")
+    finally:
+        _home39.get_current_user, _grp39.get_current_user = _o39
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

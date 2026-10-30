@@ -44,6 +44,52 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
   const byName = [...names].sort(zh);
   const expect = { hot: ["甲店", "乙店", "丙店"], name: byName, recent: ["乙店", "甲店", "丙店"] };
 
+  if (mode === "catalog_city" || mode === "picker_city") {
+    // V2.26.0：只勾彰化縣。甲店彰化（10 天前）、乙店台中（1 天前，收藏）、丙店未設（5 天前）、丁店不分縣市（飲料）
+    let readAll;
+    if (mode === "picker_city") {
+      [...d.querySelectorAll("button")].find(b => b.textContent.includes("餐廳") && (b.getAttribute("@click") || "").includes("selectCategory")).click();
+      await sleep(100);
+      [...d.querySelectorAll("button")].find(b => b.textContent.includes("點此選擇店家")).click();
+      await sleep(150);
+      readAll = () => [...d.querySelectorAll("div[role=button] .text-xs.font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n));
+    } else {
+      readAll = () => [...d.querySelectorAll("a[href^='/stores/'] .text-xs.font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n));
+    }
+    const box = d.getElementById(mode === "picker_city" ? "picker-city-filter" : "city-filter");
+    if (!box || !box.textContent.includes("彰化縣")) fail("縣市篩選列應顯示「彰化縣」");
+    let got = readAll();
+    if (got.includes("乙店")) fail("只勾彰化縣，台中市的乙店不該出現（" + got.join("/") + "）");
+    if (!got.includes("甲店") || !got.includes("丙店")) fail("彰化縣的甲店、沒設縣市的丙店都要出現（" + got.join("/") + "）");
+    if (mode === "catalog_city") {
+      if (!d.body.textContent.includes("丁店")) fail("不分縣市的丁店要出現");
+      const m = box.textContent.match(/顯示 (\d+)／共 (\d+) 家/);
+      if (!m || Number(m[2]) - Number(m[1]) !== 1) fail("應寫「顯示 N／共 N+1 家」（只藏台中的乙店）（" + box.textContent.replace(/\s+/g, " ") + "）");
+    }
+    const toggle = [...box.querySelectorAll("button")].find(b => b.textContent.trim() === "看全部");
+    if (!toggle) fail("找不到「看全部」");
+    toggle.click(); await sleep(80);
+    got = readAll();
+    if (!got.includes("乙店")) fail("按看全部後乙店要出現（" + got.join("/") + "）");
+    if (![...box.querySelectorAll("button")].some(b => b.textContent.trim() === "只看我的縣市")) fail("看全部後按鈕應變「只看我的縣市」");
+    // 最新加入：乙（1 天）→ 丙（5 天）→ 甲（10 天）
+    if (mode === "picker_city") {
+      [...d.querySelectorAll("button")].find(b => b.textContent.replace(/\s+/g, "") === "最新加入").click();
+    } else {
+      const sel = d.querySelector("select[aria-label=排序]");
+      sel.value = "new"; sel.dispatchEvent(new w.Event("change", { bubbles: true }));
+    }
+    await sleep(80);
+    got = readAll();
+    const want = mode === "catalog_city" ? ["丙店", "甲店"] : ["乙店", "丙店", "甲店"];  // 店家頁：乙店在收藏區，另外讀
+    const rest = mode === "catalog_city" ? got.filter(n => n !== "乙店") : got;
+    if (rest.join() !== want.join()) fail("最新加入順序應為 " + want.join("/") + "（" + got.join("/") + "）");
+    if (!d.body.textContent.includes("台中市")) fail("看全部時卡片要標縣市");
+    if (!/\d\d\/\d\d 加入/.test(d.body.textContent)) fail("最新加入時卡片應顯示「月/日 加入」");
+    console.log(JSON.stringify({ ok: true, mode }));
+    process.exit(0);
+  }
+
   if (mode === "picker") {
     // 選類別（餐廳）→ 按「點此選擇店家」打開覆蓋層
     const catBtn = [...d.querySelectorAll("button")].find(b => b.textContent.includes("餐廳") && (b.getAttribute("@click") || "").includes("selectCategory"));

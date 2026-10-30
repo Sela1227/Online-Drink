@@ -226,13 +226,14 @@
         <div class="px-4 pb-4 space-y-4">
             <div>
                 <div class="text-sm font-medium text-sela-800/70 mb-2">新增店家（含菜單）</div>
-                <div class="text-xs text-sela-800/60 mb-2">phone、address 可省略；更新既有店家時，只會補上店家原本空白的電話地址，不會覆蓋。</div>
+                <div class="text-xs text-sela-800/60 mb-2">phone、address、city 可省略（city 沒填會從地址判斷）；更新既有店家時，只會補上店家原本空白的欄位，不會覆蓋。</div>
                 <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
   "store": {
     "name": "可不可熟成紅茶",
     "category": "drink",
     "phone": "04-2345-6789",
     "address": "彰化縣鹿港鎮中山路 100 號",
+    "city": "彰化縣",
     "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
     "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]
   },

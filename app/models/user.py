@@ -23,6 +23,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cities: Mapped[str | None] = mapped_column(Text, nullable=True)  # V2.26.0：我會訂的縣市（JSON 陣列）；空＝全部
     
     # Relationships
     preset: Mapped["UserPreset | None"] = relationship(back_populates="user", uselist=False)

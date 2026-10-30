@@ -251,7 +251,35 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         "group_count": group_count,
         "dept_names": dept_names,
         "new_rec_count": pending_recommendations(db, user, limit=0)[0],  # V2.25.0
+        "my_cities": __import__("app.services.city", fromlist=["parse_user_cities"]).parse_user_cities(user.cities),  # V2.26.0
     })
+
+
+@router.get("/profile/cities")
+async def profile_cities_page(request: Request, db: Session = Depends(get_db)):
+    """V2.26.0：我會訂的縣市"""
+    user = await get_current_user(request, db)
+    from app.services.city import CITY_GROUPS, parse_user_cities
+    counts = {}
+    for s in visible_stores_for(db, user):
+        if s.city:
+            counts[s.city] = counts.get(s.city, 0) + 1
+    return templates.TemplateResponse(request, "profile_cities.html", {
+        "request": request, "user": user, "city_groups": CITY_GROUPS,
+        "my_cities": parse_user_cities(user.cities), "city_counts": counts,
+    })
+
+
+@router.post("/profile/cities")
+async def profile_cities_save(request: Request, db: Session = Depends(get_db)):
+    """V2.26.0：只收 22 縣市的正式名稱；其他值丟掉。空＝全部顯示（存 NULL）"""
+    user = await get_current_user(request, db)
+    from app.services.city import ALL_CITIES
+    form = await request.form()
+    picked = [c for c in ALL_CITIES if c in set(form.getlist("cities"))]  # 依固定順序、去重
+    user.cities = json.dumps(picked, ensure_ascii=False) if picked else None
+    db.commit()
+    return RedirectResponse(url="/stores", status_code=302)
 
 
 @router.get("/welcome")
@@ -559,8 +587,14 @@ def store_catalog_context(db: Session, user):
         "group_count": group_counts.get(s.id, 0),
         "last_group": last_group_at.get(s.id, ""),
         "last_ts": last_group_ts.get(s.id, 0),
+        # V2.26.0：縣市篩選、最新加入排序
+        "city": s.city or "",
+        "created_ts": s.created_at.timestamp() if s.created_at else 0,
+        "created": to_taipei_time(s.created_at).strftime("%Y/%m/%d") if s.created_at else "",
     } for s in stores]
-    return {"stores_json": payload, "favorite_ids": favorite_ids, "store_total": len(stores)}
+    from app.services.city import parse_user_cities
+    return {"stores_json": payload, "favorite_ids": favorite_ids, "store_total": len(stores),
+            "my_cities": parse_user_cities(user.cities)}
 
 
 @router.get("/stores")

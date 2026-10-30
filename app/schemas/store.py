@@ -60,10 +60,24 @@ def _clean_contact(v, what: str, maxlen: int):
     return t
 
 
+def _clean_city(v):
+    """V2.26.0：縣市寫法容錯（臺／台、舊縣名、「不分」）；認不得就當沒填（之後從地址判斷）"""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    from app.services.city import normalize_city
+    return normalize_city(v)
+
+
 class StoreContact(BaseModel):
-    """V2.24.0：既有店家更新菜單時，從資料帶過來的電話、地址（只補空白，不覆蓋）"""
+    """V2.24.0：既有店家更新菜單時，從資料帶過來的電話、地址（只補空白，不覆蓋）；V2.26.0 加縣市"""
     phone: str | None = None
     address: str | None = None
+    city: str | None = None
+
+    @field_validator("city", mode="before")
+    @classmethod
+    def _city(cls, v):
+        return _clean_city(v)
 
     @field_validator("phone", mode="before")
     @classmethod
@@ -132,6 +146,7 @@ class StoreImport(BaseModel):
     logo_url: str | None = None
     phone: str | None = None    # V2.24.0：照片上的店家電話
     address: str | None = None  # V2.24.0：照片上的店家地址
+    city: str | None = None     # V2.26.0：縣市；沒填就從地址判斷
     sugar_options: list[str] | None = None
     ice_options: list[str] | None = None
     toppings: list[ToppingImport] | None = None
@@ -160,3 +175,8 @@ class StoreImport(BaseModel):
     @classmethod
     def _address(cls, v):
         return _clean_contact(v, "地址", 300)
+
+    @field_validator("city", mode="before")
+    @classmethod
+    def _city(cls, v):
+        return _clean_city(v)

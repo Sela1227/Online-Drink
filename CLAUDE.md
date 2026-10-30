@@ -25,7 +25,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.25.0（新推薦提醒：管理員首頁卡＋「我的」紅點；站內拍照轉成菜單〔Claude API，只有 ADMIN_LINE_USER_ID 能用〕；新增店家一律走匯入。前一版 V2.24.0：匯入時一併建立照片上的店家電話與地址；既有店家只補空白、不覆蓋。前一版 V2.23.2：外部審核修正：我的訂單可見性、跨站寫入檢查、同名店家排除代購店、候補順位鎖＋唯一約束、遷移錯誤不啟動、PostgreSQL 並行測試腳本。前一版 V2.23.1：LINE 登入迴圈）
+- **版本：** V2.26.0（版本號改單一來源 app/version.py；店家縣市＋「我會訂的縣市」篩選；排序加「最新加入」。前一版 V2.25.0：新推薦提醒：管理員首頁卡＋「我的」紅點；站內拍照轉成菜單〔Claude API，只有 ADMIN_LINE_USER_ID 能用〕；新增店家一律走匯入。前一版 V2.24.0：匯入時一併建立照片上的店家電話與地址；既有店家只補空白、不覆蓋。前一版 V2.23.2：外部審核修正：我的訂單可見性、跨站寫入檢查、同名店家排除代購店、候補順位鎖＋唯一約束、遷移錯誤不啟動、PostgreSQL 並行測試腳本。前一版 V2.23.1：LINE 登入迴圈）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -442,6 +442,18 @@
     - 症狀：只是在底部導航加了新推薦紅點（`hx-get="/admin/recommendations/badge" hx-trigger="load"`），`check_frontend_import` 兩頁都報「貼上後沒有自動檢查」；實際上預覽有發，只是 `posts.length !== 1`
     - 原因：jsdom 檢查用「攔到幾個 XHR」判斷行為，base 每頁多一個 GET，計數就多 1
     - 做法：`jsdom_import_check.js` 的 XHR 模擬略過 `/recommendations/badge`；**以後 base.html 再加全站請求，同一處要一起略過**，並把失敗訊息改成印出實際請求清單再查
+47. **版本號寫死在模板裡，兩版都忘了改**（V2.26.0 Sela 回報「不然我不知道成功沒有」）
+    - 症狀：V2.24.0、V2.25.0 部署後，「我的」頁最下面仍顯示 V2.23.2；Sela 靠它判斷新版上線沒
+    - 原因：`base.html` 一行 `{% set app_version = 'V2.23.2' %}`，升版 SOP 沒列這一處
+    - 做法：唯一來源 `app/version.py`（`register_filters` 掛成 Jinja global；啟動 log 印「SELA 快點來點餐 VX.Y.Z 啟動完成」）。**煙霧第 39 節核對 CLAUDE.md 狀態行、README 版尾、handoff 跟它同一版**——只改一處就紅
+48. **FastAPI 0.14x 把空白的表單值當成「沒送」（None），用空字串表示「自動」會無聲失效**（V2.26.0 踩到）
+    - 症狀：工作台縣市下拉選「依地址自動判斷」（value=""）存檔，縣市沒變
+    - 原因：`city: str = Form(None)` 收到空字串時給的是預設值 None，程式走「沒送就不動」
+    - 做法：有意義的選項一律給非空值（`value="auto"`）；空白只用在「真的沒填」
+49. **模板裡 `tojson` ORM 物件，平常沒資料不會爆，有資料才 500**（V2.26.0 測縣市時順便抓到，屬既有 bug）
+    - 症狀：任何一家店有分店，開團頁 `/groups/new` 整頁 500（`Object of type StoreBranch is not JSON serializable`）
+    - 原因：`branches: {{ store.branches | tojson if store.branches else "[]" }}`——沒分店時走 `"[]"`，有分店才真的序列化 ORM 物件
+    - 做法：路由先轉成純資料（`branch_map`：id／name／phone／address，停用的不給）；**tojson 只餵 dict／list／字串數字**。煙霧第 39 節在有分店的情況下開開團頁
 
 ---
 
@@ -481,6 +493,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.26.0 | **版本號修正＋店家縣市篩選＋最新加入排序**（Sela：「記得要把版本號更新，不然我不知道成功沒有」「店家排序還有依新舊」「店家篩選可以選縣市，個人可以設定要顯示哪些縣市」；看過畫面稿選「照畫面稿做」）。**(1) 版本號**：寫死在 base.html 停在 V2.23.2（坑 #47）→ `app/version.py` 唯一來源、Jinja global、FastAPI version、啟動 log「…VX.Y.Z 啟動完成」；煙霧測試核對三份文件。**(2) 縣市**：`services/city.py`（22 縣市分北中南東四組、`NO_CITY`＝「不分縣市」、`city_from_address`〔郵遞區號／臺→台／台灣省／中華民國／舊縣名 台北縣→新北市等〕、`normalize_city`〔「彰化」→彰化縣；新竹、嘉義有市有縣不猜〕、`store_visible_in`）。`stores.city` VARCHAR(10)（NULL＝還沒設＝永遠顯示）、`users.cities` TEXT（JSON 陣列，空＝全部）。遷移：補兩欄＋**有地址、city IS NULL 的店家從地址補值**（只動 NULL）。匯入：`store.city` 選填，沒給從地址判斷；既有店家只補空白（`fill_contact` 加 city）；預覽多一行「縣市：彰化縣（從地址判斷）」；AI 指令加 city 規則與三個範例。工作台「店家設定」加縣市下拉（依地址自動判斷＝`auto`〔坑 #48〕／22 縣市／不分縣市；亂填 400；沒設顯示「還沒設，所有人都會看到」）。**(3) 我會訂的縣市**：`/profile/cities`（GET 勾選頁，每縣市顯示店家數；POST 只收 22 縣市、依固定順序去重、空存 NULL，存完回店家頁）；我的頁一列顯示目前設定。**店家頁**：搜尋下方一列「彰化縣、台中市 · 顯示 N／共 M 家 ｜看全部｜改」，沒設時「顯示全部縣市｜設定我會訂的縣市 ›」；**開團選店覆蓋層**同規則（已選的店永遠在）；看全部或勾多個縣市時卡片小字帶縣市。**(4) 最新加入**：店家頁、開團選店、後台列表都加（`created_ts` 新→舊，卡片顯示「月/日 加入」）；後台列表另顯示縣市、沒設標「未設縣市」，搜尋可搜縣市。**(5) 順便修**：開團頁 tojson 分店 ORM 物件，有分店就 500（坑 #49）。路由 138 → **140**。**測試**：煙霧第 39 節 213 → **219 項**；jsdom 新增 catalog_city／picker_city（只看我的縣市、沒設／不分縣市照顯示、看全部、最新加入順序與小字）；PostgreSQL：舊表補欄位＋補值（臺中市→台中市）＋重跑 0 變更、並行腳本 A～D 全過；改壞四次（只改 version.py／篩選失效／覆蓋既有縣市／分店改回 tojson）都會紅。 |
 | V2.25.0 | **新推薦提醒＋站內拍照轉成菜單＋新增店家走匯入**（Sela：「別人推薦的餐廳我很晚才知道，藏在很深的資訊裡」「匯入店家的流程還是很麻煩，不會再自己建了，都由匯入」；看過畫面稿選「在 App 裡自動轉，但只有我能作」）。**(1) 推薦提醒**：`home.pending_recommendations()`；管理員首頁最上面一張卡（`#home-new-recs`：有 N 家新推薦、最新 3 家的照片／店名／推薦人／照片數，點了到審核頁；沒待審不顯示）；底部導航「我的」紅點（`#nav-rec-badge`，`hx-get /admin/recommendations/badge` 頁面載入後才問，只有管理員）；我的頁最上面一列（`#profile-new-recs`）。審核頁改名「新推薦」、返回到「今天」，一筆一卡：照片放大（128px 橫捲）、推薦說明、全寬「核准並建立店家」、「不收」（原因選填）。**(2) 站內 AI 轉換**：`services/ai_menu.py` 直接呼叫 Claude Messages API（httpx，不加套件；`ANTHROPIC_API_KEY`、`ANTHROPIC_MODEL` 預設 `claude-sonnet-5-5`）；**權限 = 有金鑰 且 `user.line_user_id == ADMIN_LINE_USER_ID`**（Sela 指定只有他能用；別的管理員 403、頁面不顯示，照舊複製指令）。照片：自己拍的在瀏覽器用 canvas 縮成 JPEG 長邊 1600（不用 Pillow）；推薦照片從 Cloudinary 取 `f_jpg,w_1600` 版本（HEIC 也能送）；最多 5 張、單張 5MB。結果只填進匯入頁輸入框並觸發 input，**照舊走自動檢查→預覽→確認**（AI 讀錯、看不清的 `"?"` 照樣擋）。推薦核准：Sela 且有照片 → `/admin/import?store_id=X&ai=1`，進頁自動轉。錯誤（金鑰無效／忙碌／逾時／格式）回中文。**AI 指令唯一來源**搬到 `services/menu_prompt.py`（`PROMPT_LINES`＋`prompt_tail()`），匯入頁用 `<script id="import-prompt">` tojson 讀，不再兩份；新店家指令改為「照片上有店名就填，沒有留空」。新店家的店名／類別欄位改選填（留空用資料裡的）；店名欄位輸入也會重新檢查。**(3) 新增店家走匯入**：拿掉 V2.13.0 手動表單（`store_new.html`、`POST /admin/stores/new`），`GET /admin/stores/new` 302 到 `/admin/import`；店家列表兩顆鈕合成一顆「新增店家」。路由 137 → **138**（+`/admin/import/ai`、+`/admin/recommendations/badge`、−`POST /admin/stores/new`）。**測試**：煙霧第 38 節 208 → **213 項**（第 17 節手動新增改成轉址測試）；jsdom 新增 `ai` 模式（ai=1 進頁自動送 rec_id → 填入 → 自動檢查 → 按鈕恢復）；改壞三次（權限只看金鑰／轉完不觸發檢查／團員也看到推薦卡）都會紅。坑 #46。**部署要做**：Railway Variables 加 `ANTHROPIC_API_KEY`（不加也能部署，只是看不到拍照轉換）。 |
 | V2.24.0 | **匯入店家電話地址**（Sela：「拍的照片有店家電話住址，匯入時一併建好，json 也要改」）。**格式**：`store` 新增選填 `phone`、`address`（舊 JSON 沒有這兩欄照樣匯入）。**清理**（`schemas/store.py::_clean_contact`）：去多餘空白；電話 NFKC（全形數字／全形破折號→半形）；「無／?／？／N/A／null／-／未提供」當沒有；**電話必須是字串**——AI 寫成數字 `0423456789` 會變 `423456789`，直接擋下並請加引號；電話 ≤50、地址 ≤300（資料表長度）。**寫入**（`import_service.fill_contact`）：新店家直接建立；**既有店家（畫面選店或同名店家）只補空白、不覆蓋**——店家設定裡人工填的比照片辨識可靠，菜單照片也可能是別家分店的。畫面選了既有店家時 store 區塊照舊忽略，**只留電話地址**放進 `MenuImport.contact` 帶到確認。**預覽**（`#contact-plan`）逐欄說明：一起建立／店家原本沒填，會補上／跟店家設定一樣／店家已有「…」，不會覆蓋。**AI 指令**：store 規則加 phone、address（照原樣抄、看不到填 null 不要猜；照片列多家分店各有電話地址時兩欄都填 null，只有一支訂購專線則照填），三個範例都加欄位；頁面「進階：資料格式說明」與 `examples/drink_store_with_toppings.json` 同步。無資料表變動（stores.phone／address 早就有）。**測試**：煙霧第 37 節 204 → **209 項**（清理與驗證、新店家建立、既有店家補空白不覆蓋＋預覽送出的資料帶 contact、同名店家不覆蓋、AI 指令）；改壞驗證三次（改成覆蓋／預覽不帶 contact／新店家不寫電話）都會紅。 |
 | V2.23.2 | **外部審核《Online-Drink V2.23.1 外部審核報告》修正（Sela 選「屬實的全修＋證據腳本」）**。**逐條查證**：P1-01「草稿不鎖庫存」**不成立**——草稿本來就不佔庫存，送出時 `_lock_menu_items`（FOR UPDATE）＋重算總量（V2.8.0 起）；PostgreSQL 兩行程同時搶最後一份 10 輪皆恰好 1 人成功，拿掉 FOR UPDATE 對照 10 輪有 6 輪超賣。P1-02 屬實但風險低；P1-03 風險很低（cookie SameSite=Lax，而 `up.railway.app` 在公開後綴清單上——Railway 自己登記，別的 Railway 網站對本站算跨站；全站只有 `GET /auth/logout` 是 GET 改狀態）；P1-04 部分成立（預覽本來就寫「會更新到那家店」＋差異＋舊版可切回，但沒排除個人代購店、同名不同店沒出口）；P2-01 屬實；P2-02 部分；P2-03 部分（其實有約 150 個 TestClient HTTP 請求，但沒有 PostgreSQL 並行測試、檔頭說明停在 V2.16）；P2-04 設計建議，V2.15～V2.20 已做過。**修正**：(1) **P1-02** `GET /groups/{id}/orders/mine`：團不存在 404；可見性規則定為「現行團單看得到才能看／操作，但自己已有訂單的團一律看得到自己那張」（被移出部門也能查自己的訂單與金額）。(2) **P1-03** `main.py` 中介層 `reject_cross_site_writes`：POST/PUT/PATCH/DELETE 帶 `Sec-Fetch-Site: cross-site`、或 `Origin` 不是本站（含 `null`）→ 403「請求來源不符」並寫 log；沒帶這兩個標頭的放行（SameSite 仍在）。「本站」同時接受 `Host`、`X-Forwarded-Host`、uvicorn 解析的網址、`BASE_URL`、Railway 自動提供的 `RAILWAY_PUBLIC_DOMAIN`——判斷錯會擋掉所有送出，所以多重保險。(3) **P1-04** `import_service.same_name_store()`：預覽與確認共用、排除個人代購店（它的菜單是每團一份，不能被匯入蓋掉）；同名提示多一行「不是同一家（例如不同分店）？把店名改成不一樣的……」＋「改店名」按鈕（focus 新店名欄位）。(4) **P2-01** 候補：鎖原品項列（`with_for_update().populate_existing()`）、以資料庫 `COUNT` 重算（原本 `len(target.backups)` 讀記憶體）；新增唯一約束 `uq_backups_item_priority (order_item_id, priority)`（model `__table_args__`＋migrations 索引規格；既有重複只警告並印重新編號 SQL、不自動改）；撞約束回 400；刪候補後的重排改兩段式（先改負數再改回），避免 3→2 時撞到還沒改走的 2。(5) **P2-02** 遷移有錯誤（警告不算）就 `RuntimeError` 拒絕啟動——新部署健康檢查失敗、Railway 繼續跑舊版；`MIGRATIONS_ALLOW_ERRORS=1` 可強制。(6) **P2-03** 新增 `scripts/pg_concurrency_check.py`（只接受 `PG_TEST_URL`、資料庫名須含 test／check、看到 railway／rlwy 主機拒絕，因為會清空資料庫）：A 搶最後一份、B 候補連點、C 登入回呼重複跨行程、D 遷移 3 行程同時跑＋再跑 0 變更；本機 PostgreSQL 16 跑 10 輪全過；把候補改回舊寫法對照 5 輪全部變成兩筆同順位。煙霧測試檔頭補上 28～36 節與兩支測試的分工。**測試**：煙霧第 36 節 199 → **204 項**（我的訂單 404／403／自己的看得到、看不到的團不能加候補、候補上限與唯一約束與刪除重排、跨站四種情況與 GET 不受影響、同名排除代購店與「改店名」出口、遷移錯誤拒絕啟動與強制旗標）。 |
@@ -589,6 +602,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
+> **V2.26.0 延伸（未做）**：後台店家列表加縣市篩選（目前只顯示＋可搜尋）；首頁「今天」的開放中團不依縣市篩（團是人開的，不是店）。
 > **V2.25.0 延伸（未做）**：AI 轉完若有看不清的價格，在預覽直接給輸入框補（畫面稿方案 A 第二張），現在仍是回輸入框改；推薦送出時 LINE 推播給管理員（需另開 Messaging API 頻道）；PWA 名稱（manifest 寫死「SELA」，iPhone 讀當頁標題）——2026-10-23 已提方案待 Sela 確認名稱。
 
 > **V2.24.0 延伸（未做）**：匯入時一併建分店（`store.branches: [{name, phone, address}]` → `store_branches`）。目前照片列多家分店時 AI 指令要求 phone／address 填 null，分店要手動加。
@@ -624,12 +638,13 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 八、升版必讀
 
-### 版本號管理（V1.3.0 起）
+### 版本號管理（V2.26.0 起改單一來源）
 
-- 版本號定義在 `app/templates/base.html` 的 `{% set app_version = 'VX.Y.Z' %}`（緊跟 `<body>` 標籤）
-- 升版時**只需改這一行**，所有頁面標題列自動更新
+- 版本號定義在 **`app/version.py` 的 `APP_VERSION`**（V2.26.0 前寫死在 `base.html`，V2.24／V2.25 都忘了改，坑 #47）
+- 顯示在「我的」頁最下面；啟動 log 印「SELA 快點來點餐 VX.Y.Z 啟動完成」——Sela 靠這兩處確認部署成功
+- 煙霧第 39 節核對 CLAUDE.md 狀態行、README 版尾、handoff「目前版本」跟它一致，漏改就紅
 - **升版 SOP：**
-  1. 改 `base.html` 內 `{% set app_version = ... %}`
+  1. 改 `app/version.py` 的 `APP_VERSION`（**取代**舊的「改 base.html」）
   2. 改 `CLAUDE.md` 第〇章「當前狀態」的版本字串
   3. `CLAUDE.md` 第六章「版本歷程」加新一列
   4. 打包 zip 命名 `Online-Drink VX.Y.Z.zip`

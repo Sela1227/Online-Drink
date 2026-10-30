@@ -159,4 +159,4 @@ restartPolicyMaxRetries = 3
 
 ---
 
-> Made by **SELA** · V2.25.0 · 對齊 SELA-Starter-Kit V1.36.0
+> Made by **SELA** · V2.26.0 · 對齊 SELA-Starter-Kit V1.36.0

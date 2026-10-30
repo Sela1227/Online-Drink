@@ -51,13 +51,16 @@ async def lifespan(app: FastAPI):
     # 確保目錄存在
     os.makedirs("app/static/images", exist_ok=True)
     os.makedirs("app/static/uploads/stores", exist_ok=True)
-    
+
+    from app.version import APP_VERSION
+    print(f"SELA 快點來點餐 {APP_VERSION} 啟動完成")  # V2.26.0：Deploy Logs 一眼看到跑的是哪一版
     yield
     # Shutdown
 
 
 app = FastAPI(
     title=settings.app_name,
+    version=__import__("app.version", fromlist=["APP_VERSION"]).APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs" if settings.debug else None,
     redoc_url=None,

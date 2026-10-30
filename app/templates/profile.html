@@ -57,6 +57,12 @@
     </a>
     {% endif %}
 
+    {# V2.26.0：我會訂的縣市 #}
+    <a href="/profile/cities" id="profile-cities" class="flex items-center justify-between bg-white rounded-2xl px-4 py-3.5 border border-sela-100 text-sm text-sela-800 active:bg-sela-50">
+        <span class="font-medium"><i class="ti ti-map-pin"></i> 我會訂的縣市</span>
+        <span class="flex items-center gap-1 text-sela-800/55 min-w-0"><span class="truncate">{{ '、'.join(my_cities) if my_cities else '全部顯示' }}</span><i class="ti ti-chevron-right text-sela-800/35"></i></span>
+    </a>
+
     <a href="/feedback" class="flex items-center justify-between bg-white rounded-2xl px-4 py-3.5 border border-sela-100 text-sm text-sela-800 active:bg-sela-50">
         <span class="font-medium"><i class="ti ti-mailbox"></i> 問題回報</span>
         <i class="ti ti-chevron-right text-sela-800/35"></i>

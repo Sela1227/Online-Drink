@@ -6,14 +6,28 @@
 {# 店家分頁（V2.17.0 IA）：根頁、無返回鍵。店家資料整包交給前端篩選／排序（規模門檻同開團選店：約五百家以內） #}
 <script type="application/json" id="stores-data">{{ stores_json | tojson }}</script>
 <script type="application/json" id="favorite-ids">{{ favorite_ids | tojson }}</script>
+<script type="application/json" id="my-cities">{{ (my_cities if my_cities is defined else []) | tojson }}</script>
 <div x-data="storePage()" class="space-y-4">
     <div class="flex items-baseline gap-2">
         <h1 class="text-xl font-bold text-sela-800">店家</h1>
-        <span class="text-xs text-sela-800/45">{{ store_total }} 家</span>
+        <span class="text-xs text-sela-800/45" x-text="cityPool.length + ' 家'">{{ store_total }} 家</span>
     </div>
 
     <input type="search" x-model="q" placeholder="搜尋店名" autocomplete="off"
            class="w-full border border-sela-200 rounded-xl px-4 py-2.5 text-sm bg-white text-sela-800">
+
+    {# V2.26.0：縣市篩選——預設只顯示「我會訂的縣市」；沒設縣市／不分縣市的店永遠顯示 #}
+    <div id="city-filter" class="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-sela-100 text-sm">
+        <template x-if="myCities.length">
+            <span class="min-w-0 truncate"><b class="text-sela-900" x-text="myCities.join('、')"></b>
+                <span class="text-xs text-sela-800/50" x-text="showAll ? '· 暫時顯示全部縣市' : ('· 顯示 ' + cityPool.length + '／共 ' + all.length + ' 家')"></span></span>
+        </template>
+        <template x-if="!myCities.length"><span class="text-sela-800/60">顯示全部縣市</span></template>
+        <span class="flex items-center gap-3 flex-shrink-0 text-xs">
+            <button type="button" x-show="myCities.length" @click="showAll = !showAll" class="text-sela-700 font-medium" x-text="showAll ? '只看我的縣市' : '看全部'"></button>
+            <a href="/profile/cities" class="text-sela-700 underline" x-text="myCities.length ? '改' : '設定我會訂的縣市 ›'"></a>
+        </span>
+    </div>
 
     <div class="flex items-center gap-1.5 flex-wrap text-xs">
         <template x-for="c in cats" :key="c[0]">
@@ -85,10 +99,18 @@ function storePage() {
         cats: [['all', '全部'], ['drink', '飲料'], ['meal', '餐廳'], ['group_buy', '團購']],
         // 與開團選店覆蓋層同一把鍵（V2.16.2），兩邊記同一個偏好
         sortKey: 'hot',
-        sortOptions: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開過']],
+        sortOptions: [['hot', '熱門'], ['name', '名稱'], ['recent', '最近開過'], ['new', '最新加入']],
+        myCities: JSON.parse(document.getElementById('my-cities').textContent || '[]'),
+        showAll: false,
+        all,
         init() {
-            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent'].includes(k)) this.sortKey = k; } catch (e) {}
+            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent', 'new'].includes(k)) this.sortKey = k; } catch (e) {}
         },
+        // V2.26.0：沒勾縣市＝全部；店家沒設縣市或「不分縣市」永遠顯示（與後端 store_visible_in 同規則）
+        inMyCities(st) {
+            return this.showAll || !this.myCities.length || !st.city || st.city === '不分縣市' || this.myCities.includes(st.city);
+        },
+        get cityPool() { return all.filter(s => this.inMyCities(s)); },
         setSort(k) {
             this.sortKey = k;
             try { localStorage.setItem('sela_store_sort', k); } catch (e) {}
@@ -100,18 +122,23 @@ function storePage() {
             const byName = (a, b) => a.name.localeCompare(b.name, 'zh-Hant');
             if (this.sortKey === 'name') return [...list].sort(byName);
             if (this.sortKey === 'recent') return [...list].sort((a, b) => (b.last_ts - a.last_ts) || byName(a, b));
+            if (this.sortKey === 'new') return [...list].sort((a, b) => (b.created_ts - a.created_ts) || byName(a, b));
             return [...list].sort((a, b) => (b.group_count - a.group_count) || byName(a, b));
         },
         sortNote() {
-            return { hot: '· 依熱門', name: '· 依名稱', recent: '· 依最近開過' }[this.sortKey] || '';
+            return { hot: '· 依熱門', name: '· 依名稱', recent: '· 依最近開過', new: '· 依最新加入' }[this.sortKey] || '';
         },
         cardMeta(st) {
-            if (this.sortKey === 'hot') return st.group_count ? '開過 ' + st.group_count + ' 次' : '還沒開過';
-            if (this.sortKey === 'recent') return st.last_group ? '上次 ' + st.last_group : '還沒開過';
-            return ' ';
+            let m = '';
+            if (this.sortKey === 'hot') m = st.group_count ? '開過 ' + st.group_count + ' 次' : '還沒開過';
+            else if (this.sortKey === 'recent') m = st.last_group ? '上次 ' + st.last_group : '還沒開過';
+            else if (this.sortKey === 'new') m = st.created ? st.created.slice(5) + ' 加入' : '';
+            // V2.26.0：縣市放前面（看全部或勾了不只一個縣市時才有意義）
+            const c = (this.showAll || this.myCities.length !== 1) && st.city ? st.city : '';
+            return [c, m].filter(Boolean).join(' · ') || ' ';
         },
         get pool() {
-            let list = all;
+            let list = this.cityPool;
             if (this.cat !== 'all') list = list.filter(s => s.category === this.cat);
             if (this.favOnly) list = list.filter(s => favoriteIds.includes(s.id));
             return list;

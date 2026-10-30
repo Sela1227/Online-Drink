@@ -4,6 +4,7 @@
     "category": "drink",
     "phone": "04-2345-6789",
     "address": "彰化縣鹿港鎮中山路 100 號",
+    "city": "彰化縣",
     "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
     "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"],
     "toppings": [

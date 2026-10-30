@@ -555,7 +555,7 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
             ignored_store_block = True
             # V2.24.0：store 區塊其餘忽略，只留電話地址（之後只補店家空白欄位）
             _sb = data.get("store") if isinstance(data.get("store"), dict) else {}
-            _c = {k: _sb.get(k) for k in ("phone", "address") if _sb.get(k) not in (None, "")}
+            _c = {k: _sb.get(k) for k in ("phone", "address", "city") if _sb.get(k) not in (None, "")}
             _contact = _c or None
         data = {"store_id": store_id_int, "mode": "new", "menu": menu_data}
         if _contact:
@@ -624,10 +624,10 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
     # V2.24.0：電話地址的處理方式（新店家一起建立／既有店家只補空白）
     from app.services.import_service import contact_plan
     if is_full_import:
-        contact = contact_plan(duplicate_store, validated.store.phone, validated.store.address)
+        contact = contact_plan(duplicate_store, validated.store.phone, validated.store.address, validated.store.city)
     else:
         _ct = validated.contact
-        contact = contact_plan(target_store, _ct.phone, _ct.address) if _ct else []
+        contact = contact_plan(target_store, _ct.phone, _ct.address, _ct.city) if _ct else []
 
     # V2.13.1：有使用中版本就算差異，讓管理員按確認前看到這版會改掉什麼
     diff = None
@@ -1083,7 +1083,9 @@ async def store_workbench(
     def _values(opt_type):
         return [o.option_value for o in sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)]
 
+    from app.services.city import CITY_GROUPS, NO_CITY
     return templates.TemplateResponse(request, "admin/store_workbench.html", {
+        "city_groups": CITY_GROUPS, "no_city": NO_CITY,  # V2.26.0
         "tab": tab,
         "created": created,
         "imported": imported, "imported_cats": cats, "imported_items": items, "imported_ver": ver,
@@ -1184,6 +1186,7 @@ async def update_store(
     category: str = Form(...),
     phone: str = Form(None),
     address: str = Form(None),
+    city: str = Form(None),
     website_url: str = Form(None),
     google_maps_url: str = Form(None),
     ubereats_url: str = Form(None),
@@ -1207,6 +1210,17 @@ async def update_store(
     store.name = clean_text(name, 100, field="店名", required=True)
     store.phone = clean_text(phone, 50, field="電話")
     store.address = clean_text(address, 300, field="地址")
+    # V2.26.0：縣市。"auto"＝依地址判斷（判斷不出來就留空＝永遠顯示）；其他要是 22 縣市或「不分縣市」。
+    # 不用空字串當「自動」：FastAPI 會把空白表單值當成沒送（None），等於不動
+    if city is not None:
+        from app.services.city import normalize_city, city_from_address
+        if city.strip() == "auto":
+            store.city = city_from_address(store.address)
+        else:
+            _c = normalize_city(city)
+            if not _c:
+                raise HTTPException(status_code=400, detail="縣市請從選單選")
+            store.city = _c
     # V2.11.1 P0-06：只 strip 不驗協定，javascript: 會被原樣寫進 href
     from app.services.validation import clean_http_url
     store.website_url = clean_http_url(website_url, field="官網網址")

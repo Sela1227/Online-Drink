@@ -124,8 +124,14 @@
                         <i class="ti ti-x"></i>
                     </button>
                 </div>
+                {# V2.26.0：縣市篩選（同店家頁；按「看全部」暫時顯示全部縣市） #}
+                <div x-show="myCities.length" id="picker-city-filter" class="max-w-3xl mx-auto px-3 pb-2 flex items-center justify-between gap-2 text-xs">
+                    <span class="min-w-0 truncate text-sela-800/70"><b class="text-sela-900" x-text="myCities.join('、')"></b>
+                        <span x-text="showAllCities ? '· 暫時顯示全部縣市' : ('· ' + pool.length + '／' + poolAllCities.length + ' 家')"></span></span>
+                    <button type="button" @click="showAllCities = !showAllCities" class="text-sela-700 font-medium flex-shrink-0" x-text="showAllCities ? '只看我的縣市' : '看全部'"></button>
+                </div>
                 {# V2.16.2：排序可自訂，預設熱門；記在 localStorage #}
-                <div class="max-w-3xl mx-auto px-3 pb-2 flex items-center gap-1.5 text-xs">
+                <div class="max-w-3xl mx-auto px-3 pb-2 flex items-center gap-1.5 text-xs flex-wrap">
                     <span class="text-sela-800/50 mr-1">排序</span>
                     <template x-for="o in sortOptions" :key="o[0]">
                         <button type="button" @click="setSort(o[0])"
@@ -412,14 +418,18 @@ function newGroupForm() {
             id: {{ store.id }},
             name: {{ store.name | tojson }},
             category: {{ (store.category.value if store.category else 'meal') | tojson }},
-            branches: {{ store.branches | tojson if store.branches else "[]" }},
+            {# V2.26.0 修正：原本直接 tojson ORM 物件，任何一家店有分店整個開團頁就 500（煙霧第 39 節測到） #}
+            branches: {{ (branch_map.get(store.id, []) if branch_map is defined else []) | tojson }},
             sugar_options: {{ (store.options | selectattr('option_type.value', 'equalto', 'sugar') | map(attribute='option_value') | list) | tojson }},
             ice_options: {{ (store.options | selectattr('option_type.value', 'equalto', 'ice') | map(attribute='option_value') | list) | tojson }},
             has_toppings: {{ 'true' if store.toppings else 'false' }},
             logo_url: {{ store.logo_url | tojson if store.logo_url else 'null' }},
             group_count: {{ group_counts.get(store.id, 0) }},
             last_group: {{ last_group_at.get(store.id, '') | tojson }},
-            last_ts: {{ last_group_ts.get(store.id, 0) }}
+            last_ts: {{ last_group_ts.get(store.id, 0) }},
+            city: {{ (store.city or '') | tojson }},
+            created_ts: {{ store.created_at.timestamp() if store.created_at else 0 }},
+            created: {{ ((store.created_at | taipei).strftime('%m/%d') if store.created_at else '') | tojson }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -427,6 +437,9 @@ function newGroupForm() {
     // 預選店家 ID
     const preselectStoreId = {{ (preselect_store_id or "") | string | tojson }};
     
+    // V2.26.0：我會訂的縣市（空＝全部）
+    const myCities = {{ (my_cities if my_cities is defined else []) | tojson }};
+
     // 使用者收藏的店家（V2.11.0 選店覆蓋層分區用）
     const initialFavoriteIds = {{ favorite_store_ids | tojson }};
     
@@ -462,8 +475,17 @@ function newGroupForm() {
         favSnapshot: [],
         favBusy: null,
         
-        // 目前分類的可選店家
+        // 目前分類的可選店家（V2.26.0：再依「我會訂的縣市」篩；沒設縣市／不分縣市的店、已選的店永遠在）
+        myCities,
+        showAllCities: false,
+        inMyCities(s) {
+            return this.showAllCities || !myCities.length || !s.city || s.city === '不分縣市'
+                || myCities.includes(s.city) || String(s.id) === String(this.storeId);
+        },
         get pool() {
+            return allStores.filter(s => s.category === this.selectedCategory && this.inMyCities(s));
+        },
+        get poolAllCities() {
             return allStores.filter(s => s.category === this.selectedCategory);
         },
         
@@ -486,7 +508,7 @@ function newGroupForm() {
         },
         // V2.16.2：排序可自訂。熱門＝全體累計開團次數多→少（同次數依名稱）；最近開過＝上次開團新→舊；名稱＝注音序
         sortKey: 'hot',
-        sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', '']],
+        sortOptions: [['hot', '熱門', 'ti-flame'], ['name', '名稱', ''], ['recent', '最近開過', ''], ['new', '最新加入', '']],
         setSort(k) {
             this.sortKey = k;
             try { localStorage.setItem('sela_store_sort', k); } catch (e) {}
@@ -495,17 +517,20 @@ function newGroupForm() {
             const byName = (a, b) => a.name.localeCompare(b.name, 'zh-Hant');
             if (this.sortKey === 'name') return [...list].sort(byName);
             if (this.sortKey === 'recent') return [...list].sort((a, b) => (b.last_ts - a.last_ts) || byName(a, b));
+            if (this.sortKey === 'new') return [...list].sort((a, b) => (b.created_ts - a.created_ts) || byName(a, b));
             return [...list].sort((a, b) => (b.group_count - a.group_count) || byName(a, b));
         },
         sortNote() {
-            return { hot: '依熱門', name: '依名稱', recent: '依最近開過' }[this.sortKey] || '';
+            return { hot: '依熱門', name: '依名稱', recent: '依最近開過', new: '依最新加入' }[this.sortKey] || '';
         },
         cardMeta(st) {
             const br = st.branches.length ? st.branches.length + ' 家分店' : '';
             let m = '';
             if (this.sortKey === 'hot') m = st.group_count ? '開過 ' + st.group_count + ' 次' : '還沒開過';
             else if (this.sortKey === 'recent') m = st.last_group ? '上次 ' + st.last_group : '還沒開過';
-            return [m, br].filter(Boolean).join(' · ') || '\u00a0';
+            else if (this.sortKey === 'new') m = st.created ? st.created + ' 加入' : '';
+            const c = (this.showAllCities || myCities.length !== 1) && st.city ? st.city : '';
+            return [c, m, br].filter(Boolean).join(' · ') || '\u00a0';
         },
         
         isFavorite(store) {
@@ -535,7 +560,8 @@ function newGroupForm() {
         
         openPicker() {
             this.pickerQuery = '';
-            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent'].includes(k)) this.sortKey = k; } catch (e) {}
+            try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent', 'new'].includes(k)) this.sortKey = k; } catch (e) {}
+            this.showAllCities = false;
             this.favSnapshot = this.favoriteIds.slice();
             this.pickerOpen = true;
             // 讓手機返回鍵先關閉覆蓋層，而不是離開整個開團頁

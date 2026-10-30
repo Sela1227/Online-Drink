@@ -40,3 +40,6 @@ def money(v) -> str:
 def register_filters(env):
     env.filters["taipei"] = to_taipei_time
     env.filters["money"] = money
+    # V2.26.0：版本號（base.html「我的」頁最下面），唯一來源 app/version.py
+    from app.version import APP_VERSION
+    env.globals["app_version"] = APP_VERSION

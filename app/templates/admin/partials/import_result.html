@@ -126,8 +126,8 @@
     <div class="mt-2 pt-2 border-t border-green-200 text-xs space-y-1" id="contact-plan">
         {% for c in contact %}
         <div class="{{ 'text-sela-800/60' if c.action in ('keep', 'same') else 'text-sela-800' }}">
-            <i class="ti {{ 'ti-phone' if c.key == 'phone' else 'ti-map-pin' }}"></i>
-            {{ c.label }}：{{ c.value }}
+            <i class="ti {{ 'ti-phone' if c.key == 'phone' else ('ti-map' if c.key == 'city' else 'ti-map-pin') }}"></i>
+            {{ c.label }}：{{ c.value }}{% if c.note %}<span class="text-sela-800/50">（{{ c.note }}）</span>{% endif %}
             {% if c.action == 'new' %}<span class="text-green-700">（一起建立）</span>
             {% elif c.action == 'fill' %}<span class="text-green-700">（店家原本沒填，會補上）</span>
             {% elif c.action == 'same' %}（跟店家設定一樣）

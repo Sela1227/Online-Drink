@@ -79,6 +79,8 @@ COLUMNS = [
     ("stores", "is_public", "BOOLEAN DEFAULT TRUE"),
     ("group_templates", "department_ids", "VARCHAR(200)"),
     ("system_settings", "announcement", "VARCHAR(500)"),
+    ("stores", "city", "VARCHAR(10)"),   # V2.26.0
+    ("users", "cities", "TEXT"),         # V2.26.0
 ]
 
 # V1.10.0：刪店家改成斷開連結保留歷史，這些外鍵要可為 NULL
@@ -306,6 +308,28 @@ def run_migrations(engine, log=print) -> _Result:
             except Exception as e:
                 r.warnings.append(f"enum case：{e}")
                 log(f"Enum case fix check: {e}")
+
+        # 6a. V2.26.0：有地址、還沒設縣市的店家，從地址開頭補縣市（判斷不出來的留空＝永遠顯示）。
+        #     只動 city IS NULL 的列，管理員改過的不會被蓋；每次啟動跑一次，沒得補就 0 筆
+        if "stores" in tables:
+            try:
+                from app.services.city import city_from_address
+                with engine.begin() as conn:
+                    rows = conn.execute(text("SELECT id, address FROM stores WHERE city IS NULL AND address IS NOT NULL AND address <> ''")).fetchall()
+                    n = 0
+                    for sid, addr in rows:
+                        c = city_from_address(addr)
+                        if c:
+                            conn.execute(text("UPDATE stores SET city = :c WHERE id = :i AND city IS NULL"), {"c": c, "i": sid})
+                            n += 1
+                if n:
+                    r.changed.append(f"店家縣市補值 × {n}")
+                    log(f"Backfilled stores.city from address: {n}")
+                else:
+                    r.ok += 1
+            except Exception as e:
+                r.warnings.append(f"店家縣市補值：{e}")
+                log(f"!! 店家縣市補值：{e}")
 
         # 6. system_settings 初始列
         try:

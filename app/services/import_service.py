@@ -7,6 +7,7 @@ from decimal import Decimal
 from app.models.store import Store, StoreOption, StoreTopping, CategoryType, OptionType
 from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.schemas.menu import FullImport, MenuImport, MenuContent
+from app.services.city import city_from_address  # V2.26.0
 
 
 def same_name_store(db: Session, name: str):
@@ -18,7 +19,7 @@ def same_name_store(db: Session, name: str):
     ).order_by(Store.id).first()
 
 
-def fill_contact(store: Store, phone, address) -> list[str]:
+def fill_contact(store: Store, phone, address, city=None) -> list[str]:
     """V2.24.0：把資料裡的電話、地址補進店家。**只補空白，不覆蓋**——
     店家設定裡人工填過的電話比照片辨識可靠，菜單照片也可能是別家分店的。
     回傳實際補上的欄位（給預覽與提示用）。"""
@@ -29,14 +30,28 @@ def fill_contact(store: Store, phone, address) -> list[str]:
     if address and not (store.address or "").strip():
         store.address = address
         filled.append("address")
+    # V2.26.0：縣市一樣只補空白；資料沒給就從（補完後的）地址判斷
+    if not store.city:
+        from app.services.city import city_from_address
+        c = city or city_from_address(store.address)
+        if c:
+            store.city = c
+            filled.append("city")
     return filled
 
 
-def contact_plan(store, phone, address) -> list[dict]:
+def contact_plan(store, phone, address, city=None) -> list[dict]:
     """V2.24.0：預覽用——每個有值的欄位會怎麼處理。store=None 代表新店家。
     action：new（新店家一起建立）／fill（既有店家空白，會補上）／keep（既有店家已有值，不覆蓋）／same（一樣）"""
     out = []
-    for key, label, val in (("phone", "電話", phone), ("address", "地址", address)):
+    # V2.26.0：縣市沒給就從地址判斷（新店家看資料的地址；既有店家地址空白時也用資料的地址）
+    from app.services.city import city_from_address
+    city_note = ""
+    if not city:
+        _addr = address if (store is None or not (getattr(store, "address", None) or "").strip()) else store.address
+        city = city_from_address(_addr)
+        city_note = "從地址判斷" if city else ""
+    for key, label, val in (("phone", "電話", phone), ("address", "地址", address), ("city", "縣市", city)):
         if not val:
             continue
         cur = (getattr(store, key, None) or "").strip() if store is not None else ""
@@ -48,7 +63,8 @@ def contact_plan(store, phone, address) -> list[dict]:
             action = "same"
         else:
             action = "keep"
-        out.append({"key": key, "label": label, "value": val, "current": cur, "action": action})
+        out.append({"key": key, "label": label, "value": val, "current": cur, "action": action,
+                    "note": city_note if key == "city" else ""})
     return out
 
 
@@ -68,7 +84,7 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
     if existing_store:
         # 同名店家已存在 → 把舊菜單全部停用（保留為舊版本），建立新菜單啟用
         db.query(Menu).filter(Menu.store_id == existing_store.id).update({"is_active": False})
-        fill_contact(existing_store, data.store.phone, data.store.address)
+        fill_contact(existing_store, data.store.phone, data.store.address, data.store.city)
         db.flush()
         _create_menu(db, existing_store.id, data.menu, is_active=True)
         db.commit()
@@ -81,6 +97,7 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
         logo_url=data.store.logo_url,
         phone=data.store.phone,
         address=data.store.address,
+        city=data.store.city or city_from_address(data.store.address),  # V2.26.0
         is_active=True,
     )
     db.add(store)
@@ -156,7 +173,7 @@ def import_menu(db: Session, data: MenuImport) -> Menu:
     if data.contact:
         _st = db.query(Store).filter(Store.id == store_id).first()
         if _st is not None:
-            fill_contact(_st, data.contact.phone, data.contact.address)
+            fill_contact(_st, data.contact.phone, data.contact.address, data.contact.city)
 
     menu = _create_menu(db, store_id, content, is_active=True)
     db.commit()

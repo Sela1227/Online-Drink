@@ -324,6 +324,20 @@
                     <label class="block text-xs text-sela-800/60 mb-1">地址</label>
                     <input type="text" name="address" value="{{ store.address or '' }}" maxlength="300" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base">
                 </div>
+                {# V2.26.0：縣市——大家的店家頁／開團選店依「我會訂的縣市」篩選；沒設＝永遠顯示 #}
+                <div class="sm:col-span-2" id="store-city">
+                    <label class="block text-xs text-sela-800/60 mb-1">縣市
+                        {% if not store.city %}<span class="text-amber-700">（還沒設，所有人都會看到）</span>{% endif %}</label>
+                    <select name="city" class="w-full border border-sela-200 rounded-lg px-3 py-2 text-base bg-white">
+                        <option value="auto" {% if not store.city %}selected{% endif %}>依地址自動判斷</option>
+                        {% for grp, cs in (city_groups or []) %}
+                        <optgroup label="{{ grp }}">
+                            {% for c in cs %}<option value="{{ c }}" {% if store.city == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                        <option value="{{ no_city }}" {% if no_city and store.city == no_city %}selected{% endif %}>{{ no_city }}（宅配／團購，所有人都看得到）</option>
+                    </select>
+                </div>
             </div>
 
             <details class="text-sm" {% if store.website_url or store.google_maps_url or store.ubereats_url or store.foodpanda_url %}open{% endif %}>
