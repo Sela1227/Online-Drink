@@ -49,6 +49,7 @@
   37. V2.24.0 匯入店家電話地址：新店家一起建立、既有店家只補空白、清理與驗證、AI 指令
   38. V2.25.0 新推薦提醒（首頁卡／我的紅點）、站內拍照轉成菜單（只有 Sela）、新增店家走匯入
   39. V2.26.0 版本號單一來源（文件同步）、店家縣市（地址判斷／匯入／工作台／遷移補值）、我會訂的縣市、最新加入
+  40. V2.27.0 外部 UI 審稿：後台首頁三段、店家列表不巢狀、清除測試團移到維護區＋先列清單＋留紀錄、工作台摘要
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -654,8 +655,8 @@ def main():
         check("列表 200，含新增店家入口（V2.25.0 起直接進匯入）與上次開團欄")
 
         r = _c.get(f"/admin/stores/{store.id}")
-        assert r.status_code == 200 and "店家設定" in r.text and "營運設定" not in r.text and "基本資料" in r.text
-        check("工作台 200，分頁（V2.21.0 起：菜單／共用選項／店家設定／更多）")
+        assert r.status_code == 200 and "店家資料" in r.text and "營運設定" not in r.text and "基本資料" in r.text
+        check("工作台 200，分頁（V2.27.0 起：菜單／甜冰加料／店家資料／停用／刪除）")
 
         r = _c.get(f"/admin/stores/{store.id}/edit", follow_redirects=False)
         assert r.status_code == 301 and r.headers["location"].endswith("?tab=settings")
@@ -2047,7 +2048,7 @@ def main():
         _gb = Store(name="分頁測試團購", category=CategoryType.GROUP_BUY, is_active=True); db.add(_gb); db.commit()
 
         r = _c.get(f"/admin/stores/{_ds.id}"); t = r.text
-        assert r.status_code == 200 and "共用選項" in t and "店家設定" in t and 'id="tab-options"' in t and 'id="tab-settings"' in t
+        assert r.status_code == 200 and "甜冰加料" in t and "店家資料" in t and "停用／刪除" in t and 'id="tab-options"' in t and 'id="tab-settings"' in t
         assert "營運設定" not in t and "基本資料" in t and "分店" in t and "可見範圍" in t
         # 甜冰：標籤元件帶目前清單（順序保留）、預設組、送出欄位名不變
         assert ("tagEditor(" + json.dumps(["全糖", "半糖"]) + ")") in t and 'name="sugar_options"' in t and 'name="ice_options"' in t
@@ -2056,10 +2057,10 @@ def main():
         assert 'action="/admin/stores/%d/toppings/batch"' % _ds.id in t and 'name="toppings_json"' in t
         assert "/toppings/%d/toggle" % _ta.id not in t and "/toppings/%d/delete" % _ta.id not in t
         assert ('"name": "珍珠"' in t or json.dumps("珍珠") in t)
-        check("飲料店工作台：菜單／共用選項／店家設定／更多；甜冰是標籤＋預設組（欄位名不變）；加料一張表單")
+        check("飲料店工作台：菜單／甜冰加料／店家資料／停用／刪除；甜冰是標籤＋預設組（欄位名不變）；加料一張表單")
 
         r = _c.get(f"/admin/stores/{_gb.id}?tab=options")
-        assert r.status_code == 200 and "共用選項" not in r.text and 'id="tab-options"' not in r.text and 'tab: "settings"' in r.text
+        assert r.status_code == 200 and "甜冰加料" not in r.text and 'id="tab-options"' not in r.text and 'tab: "settings"' in r.text
         r = _c.get(f"/admin/stores/{_ds.id}?tab=ops")
         assert 'tab: "options"' in r.text
         check("團購店沒有共用選項分頁（?tab=options → 店家設定）；舊 ?tab=ops → 共用選項")
@@ -2696,6 +2697,83 @@ def main():
         check("我會訂的縣市：只收 22 縣市、固定順序、去重、空＝全部；店家頁／開團選店帶縣市篩選與最新加入")
     finally:
         _home39.get_current_user, _grp39.get_current_user = _o39
+
+    # ---------- 40. V2.27.0 外部 UI 審稿：後台首頁／店家列表／清除測試團／工作台 ----------
+    print("\n[40] 後台 UI 重整")
+    from html.parser import HTMLParser as _HP40
+    class _Nest40(_HP40):
+        def __init__(self):
+            super().__init__(); self.depth = 0; self.nested = 0
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                if self.depth: self.nested += 1
+                self.depth += 1
+        def handle_endtag(self, tag):
+            if tag == "a" and self.depth: self.depth -= 1
+    def _nested40(html):
+        p = _Nest40(); p.feed(html); return p.nested
+    from app.models.user import StoreRecommendation as _SR40, Feedback as _FB40
+    _adm.get_admin_user = _fake_admin
+    try:
+        db.query(_SR40).filter(_SR40.status == "pending").update({"status": "rejected"})
+        db.query(_FB40).filter(_FB40.status == "pending").update({"status": "resolved"}); db.commit()
+        r = _c.get("/admin")
+        assert r.status_code == 200 and 'id="admin-todo"' not in r.text, "沒有待處理時整段不出現"
+        assert 'id="go-new-store" class' in r.text.replace("\n", " ") or 'id="go-new-store"' in r.text
+        assert all(f'id="{k}"' in r.text for k in ("go-stores", "go-groups", "go-announcements", "go-users", "go-departments", "go-recs"))
+        assert "grid-cols-4" not in r.text and "aspect-square" not in r.text, "九宮格方塊拿掉"
+        db.add(_SR40(user_id=_uid, store_name="待審四十", category="meal")); db.commit()
+        r = _c.get("/admin")
+        assert 'id="admin-todo"' in r.text and 'id="todo-recs"' in r.text and 'id="go-recs"' not in r.text
+        assert r.text.index('id="admin-todo"') < r.text.index('id="admin-common"'), "待處理要在最上面"
+        check("後台首頁：待處理（有才出現、在最上面）→ 常用（新增店家／店家與菜單／團單／公告）→ 管理；沒有九宮格")
+
+        r = _c.get("/admin/stores")
+        assert r.status_code == 200 and _nested40(r.text) == 0, "店家列表不能有巢狀連結"
+        assert 'data-store-row' in r.text and 'id="filter-panel"' in r.text and 'id="issue-chips"' in r.text
+        assert "?tab=settings#store-city" in r.text and "'/admin/import?store_id=' + s.id" in r.text
+        check("店家列表：列是容器、店名與「管理」各自是連結（無巢狀）；排序收進篩選；沒菜單／未設縣市可直接點去修")
+
+        # 清除測試團：維護區在清單之後；列出的就是會刪的；刪完留紀錄
+        _now40 = taipei_now()
+        _gt = Group(owner_id=_uid, store_id=None, menu_id=None, name="四十測試團", category=CategoryType.MEAL,
+                    deadline=_now40 - timedelta(hours=2), is_public=True)
+        _gk = Group(owner_id=_uid, store_id=None, menu_id=None, name="四十進行中", category=CategoryType.MEAL,
+                    deadline=_now40 + timedelta(hours=2), is_public=True)
+        db.add_all([_gt, _gk]); db.commit()
+        r = _c.get("/admin/groups")
+        assert 'id="maintenance"' in r.text and "四十測試團" in r.text.split('id="test-group-list"')[1].split("</ul>")[0]
+        assert "四十進行中" not in r.text.split('id="test-group-list"')[1].split("</ul>")[0], "進行中的團不能列為測試團"
+        assert r.text.index('id="maintenance"') > r.text.index("/groups/%d" % _gt.id), "維護區要在團單清單之後"
+        _n40 = len(_adm._test_group_candidates(db))
+        _gt_id, _gk_id = _gt.id, _gk.id
+        assert ("清除這 %d 個" % _n40) in r.text
+        import io as _io40, contextlib as _cl40
+        _buf = _io40.StringIO()
+        with _cl40.redirect_stdout(_buf):
+            r = _c.post("/admin/groups/cleanup-test", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("cleaned=%d" % _n40)
+        assert "清除測試團：" in _buf.getvalue() and str(_gt_id) in _buf.getvalue(), _buf.getvalue()
+        db.expire_all()
+        assert db.get(Group, _gt_id) is None and db.get(Group, _gk_id) is not None
+        r = _c.get("/admin/groups")
+        assert 'id="no-test-groups"' in r.text and "cleanup-test" not in r.text, "沒有符合的就不給按"
+        check("清除測試團：移到最下面維護區、先列出會刪哪些（與實際刪除同一個函式）、數字寫在按鈕上、log 記錄誰刪了哪幾團；沒有符合就不給按")
+
+        # 工作台摘要
+        _w40 = Store(name="工作台四十", category=CategoryType.DRINK, is_active=True, city="彰化縣", phone="04-1"); db.add(_w40); db.commit()
+        r = _c.get(f"/admin/stores/{_w40.id}")
+        t = r.text
+        assert 'id="wb-summary"' in t and 'id="wb-update-menu"' in t and "彰化縣" in t.split('id="wb-summary"')[1][:2000]
+        for _aid in ('id="store-city"', 'id="branches"', 'id="visibility"', 'id="store-phone"', 'id="tab-options"'):
+            assert _aid in t, _aid
+        assert "go('settings', 'store-city')" in t and "go('options', 'tab-options')" in t
+        _g40 = Store(name="團購四十", category=CategoryType.GROUP_BUY, is_active=True); db.add(_g40); db.commit()
+        r = _c.get(f"/admin/stores/{_g40.id}")
+        assert "go('options'" not in r.text and "未設縣市" in r.text.split('id="wb-summary"')[1][:2000]
+        check("工作台：更新菜單全寬；摘要（縣市／分店／可見範圍／甜冰加料／電話）可點跳到欄位；團購店沒有甜冰加料")
+    finally:
+        _adm.get_admin_user = _orig
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

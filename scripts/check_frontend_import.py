@@ -219,7 +219,7 @@ def main():
             if res.get("ok") and mode.endswith("_city"):
                 print(f"  OK  {mode}：只顯示我的縣市（沒設縣市／不分縣市照樣顯示）、看全部可切回、最新加入排序與卡片小字")
             elif res.get("ok"):
-                print(f"  OK  {mode}：預設熱門、三種排序順序正確、卡片小字、選擇有記住{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
+                print(f"  OK  {mode}：預設熱門、排序順序正確、卡片小字、選擇有記住{'；無巢狀連結、篩選收合、沒菜單標記可篩可點' if mode == 'admin' else ''}{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")
                 print(f"  !   sort/{mode}：{res.get('msg')}")

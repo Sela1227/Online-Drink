@@ -113,12 +113,26 @@ const setVal = async (el, v) => { el.value = v; el.dispatchEvent(new w.Event("in
   if (ev.defaultPrevented || confirms.length !== 1) fail("沒有刪除時直接送出、不該再確認");
 
   // ── 分頁切換 ──
-  const tabBtn = [...d.querySelectorAll("button")].find(b => text(b) === "店家設定");
+  const tabBtn = [...d.querySelectorAll("button")].find(b => text(b) === "店家資料");
   tabBtn.click(); await sleep(60);
-  if (!visible(sets) || visible(opts)) fail("按「店家設定」應切到店家設定分頁");
+  if (!visible(sets) || visible(opts)) fail("按「店家資料」應切到店家資料分頁");
   if (!w.location.search.includes("tab=settings")) fail("切分頁後網址應更新為 ?tab=settings（" + w.location.search + "）");
   const tabNames = [...d.querySelectorAll("button")].filter(b => b.className.includes("border-b-2")).map(text);
-  if (tabNames.join("/") !== "菜單/共用選項/店家設定/更多") fail("分頁應為 菜單/共用選項/店家設定/更多（" + tabNames.join("/") + "）");
+  if (tabNames.join("/") !== "菜單/甜冰加料/店家資料/停用／刪除") fail("分頁應為 菜單/甜冰加料/店家資料/停用／刪除（" + tabNames.join("/") + "）");
+  // V2.27.0：頂部摘要可點——縣市 → 店家資料分頁、捲到縣市欄位；甜冰加料 → 甜冰加料分頁
+  const summary = d.getElementById("wb-summary");
+  if (!summary) fail("找不到店家資料摘要 #wb-summary");
+  const sbtn = (kw) => [...summary.querySelectorAll("button")].find(b => text(b).includes(kw));
+  const optBtn = sbtn("甜度");
+  if (!optBtn) fail("摘要應有甜冰加料");
+  optBtn.click(); await sleep(60);
+  if (!visible(opts) || visible(sets)) fail("按摘要的甜冰加料應切到甜冰加料分頁");
+  const cityBtn = sbtn("縣市") || sbtn("市") || sbtn("縣");
+  if (!cityBtn) fail("摘要應有縣市");
+  cityBtn.click(); await sleep(80);
+  if (!visible(sets)) fail("按摘要的縣市應切到店家資料分頁");
+  if (d.activeElement !== d.querySelector("#store-city select")) fail("按摘要的縣市應聚焦到縣市下拉");
+  for (const kw of ["分店", "公開", "電話"]) { if (!sbtn(kw)) fail("摘要應有「" + kw + "」"); }
   if (jsErrors.length) fail("操作過程有 JS 錯誤：" + jsErrors.join(" | "));
   console.log(JSON.stringify({ ok: true }));
   process.exit(0);

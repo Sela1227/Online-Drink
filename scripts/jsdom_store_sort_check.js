@@ -256,19 +256,38 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
   }
 
   if (mode === "admin") {
-    const readOrder = () => [...d.querySelectorAll("a[href^='/admin/stores/'] .font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n));
-    const chips = () => [...d.querySelectorAll("button")].filter(b => /^(熱門|名稱|最近開團)$/.test(b.textContent.trim()));
-    if (chips().length !== 3) fail("後台列表應有三顆排序 chip（" + chips().length + "）");
+    // V2.27.0：列不再是整列 <a>；店名是 [data-store-name]，排序收進「篩選」
+    if (d.querySelector("a a")) fail("不能有巢狀連結（a 裡面又有 a）");
+    const readOrder = () => [...d.querySelectorAll("[data-store-row] [data-store-name]")].map(e => e.textContent.trim()).filter(n => names.includes(n));
+    const panel = d.getElementById("filter-panel");
+    if (!panel || panel.style.display !== "none") fail("篩選面板預設應收合");
+    d.getElementById("filter-toggle").click(); await sleep(60);
+    if (panel.style.display === "none") fail("按「篩選」應展開");
+    const chips = () => [...panel.querySelectorAll("button")].filter(b => /^(熱門|名稱|最近開團|最新加入)$/.test(b.textContent.trim()));
+    if (chips().length !== 4) fail("篩選裡應有四顆排序 chip（" + chips().length + "）");
     let got = readOrder();
     if (got.join() !== expect.hot.join()) fail("預設應依熱門：期望 " + expect.hot.join("/") + "，實際 " + got.join("/"));
-    const row = [...d.querySelectorAll("a[href^='/admin/stores/']")].find(e => e.textContent.includes("甲店"));
+    const row = [...d.querySelectorAll("[data-store-row]")].find(e => e.textContent.includes("甲店"));
     if (!row || !row.textContent.includes("開過 5 次")) fail("每列應顯示「開過 N 次」");
+    const manage = [...row.querySelectorAll("a")].find(a => a.textContent.trim() === "管理");
+    if (!manage || !/^\/admin\/stores\/\d+$/.test(manage.getAttribute("href"))) fail("每列要有獨立的「管理」連結");
     for (const [label, key] of [["名稱", "name"], ["最近開團", "recent"], ["熱門", "hot"]]) {
       chips().find(b => b.textContent.trim() === label).click();
       await sleep(80);
       got = readOrder();
       if (got.join() !== expect[key].join()) fail(label + "：期望 " + expect[key].join("/") + "，實際 " + got.join("/"));
     }
+    // 問題標記：甲、乙有菜單（建了 Menu 但沒品項＝0 品項也算沒菜單）→ 只驗切換會篩、再按取消
+    const nm = [...d.querySelectorAll("#issue-chips button")].find(b => b.textContent.includes("沒菜單"));
+    if (!nm) fail("找不到「沒菜單」標記");
+    const before = readOrder().length;
+    nm.click(); await sleep(80);
+    const rows = [...d.querySelectorAll("[data-store-row]")];
+    if (!rows.length || rows.some(r => !r.textContent.includes("沒菜單"))) fail("按「沒菜單」後每列都應是沒菜單的店");
+    const fix = [...rows[0].querySelectorAll("a")].find(a => a.textContent.trim() === "沒菜單");
+    if (!fix || !fix.getAttribute("href").startsWith("/admin/import?store_id=")) fail("「沒菜單」要能直接點到匯入");
+    nm.click(); await sleep(80);
+    if (readOrder().length !== before) fail("再按一次應取消篩選");
     let st = {};
     try { st = JSON.parse(w.sessionStorage.getItem("admin_store_list_state") || "{}"); } catch (e) {}
     if (st.sort !== "hot") fail("排序選擇應記在 sessionStorage（" + JSON.stringify(st) + "）");

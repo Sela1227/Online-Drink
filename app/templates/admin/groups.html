@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
 
-{% block title %}所有團單 - 團購系統{% endblock %}
+{% block title %}所有團單 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 {{ nav.back('/admin', '管理後台') }}
@@ -13,21 +13,9 @@
 
     {% if request.query_params.get('cleaned') %}
     <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800 text-sm">
-        <i class="ti ti-check"></i> 已清除 {{ request.query_params.get('cleaned') }} 個測試團
+        <i class="ti ti-check"></i> 已清除 {{ request.query_params.get('cleaned') | int }} 個測試團
     </div>
     {% endif %}
-
-    <!-- 清除測試團 -->
-    <div class="bg-white rounded-2xl shadow-sm p-4 flex items-center justify-between gap-3">
-        <div>
-            <div class="font-medium text-sela-800 text-sm">清除測試團</div>
-            <div class="text-xs text-sela-800/60">刪除「沒有人下單」或「只有團主自己下單」的團</div>
-        </div>
-        <form action="/admin/groups/cleanup-test" method="post"
-              onsubmit="return confirm('確定清除所有測試團（無人下單／只有團主下單）嗎？\n此動作無法復原。')">
-            <button type="submit" class="btn btn-danger whitespace-nowrap"><i class="ti ti-trash"></i> 清除</button>
-        </form>
-    </div>
 
     {% if groups %}
     <div class="bg-white rounded-2xl shadow-sm divide-y">
@@ -67,12 +55,12 @@
                     {% endif %}
                     {% set others = group.orders | rejectattr('user_id', 'equalto', group.owner_id) | list %}
                     {% if others | length == 0 %}
-                    <span class="text-[10px] bg-sela-100 text-sela-800/55 px-1.5 py-0.5 rounded">測試團</span>
+                    <span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded">測試團</span>
                     {% endif %}
                     {# V2.14.1 P0-1：名稱放 data-*，屬性內的 JS 字串不能直接插值（坑 #37） #}
                     <form action="/admin/groups/{{ group.id }}/delete" method="post" data-name="{{ group.name }}"
                           onsubmit="return confirm('確定刪除「' + this.dataset.name + '」？\n此動作無法復原。')">
-                        <button type="submit" class="text-xs text-red-500 active:text-red-700 px-1 py-0.5"><i class="ti ti-trash"></i> 刪除</button>
+                        <button type="submit" class="text-sm text-red-600 active:text-red-700 px-2 min-h-[36px]"><i class="ti ti-trash"></i> 刪除</button>
                     </form>
                 </div>
             </div>
@@ -85,5 +73,31 @@
         <p>還沒有任何團單</p>
     </div>
     {% endif %}
+
+    {# V2.27.0（外部 UI 審稿 P0-2）：清除測試團從頁面最上面移到這裡。先列出會刪哪幾團（與後端同一個函式算），
+       沒有符合的就不給按；按下去再確認一次，後端 log 記錄誰清了哪幾團 #}
+    <section id="maintenance" class="bg-white rounded-2xl border border-red-200 p-4 space-y-2 mt-6">
+        <h2 class="font-bold text-red-700"><i class="ti ti-tool"></i> 維護</h2>
+        <div class="text-[15px] font-medium text-sela-900">清除測試團</div>
+        <p class="text-sm text-sela-800/70">已截止、而且沒人下單（或只有團主自己點）的團。刪除後無法復原。</p>
+        {% if test_groups %}
+        <details class="text-sm">
+            <summary class="cursor-pointer text-sela-800 min-h-[36px] flex items-center">目前符合：<b class="mx-1">{{ test_groups | length }}</b> 個（展開看清單）</summary>
+            <ul class="mt-1 space-y-1 text-sela-800/75" id="test-group-list">
+                {% for g in test_groups %}
+                <li>・{{ g.name }} <span class="text-sela-800/50">（{{ g.owner.display_name if g.owner else '' }} · {{ (g.created_at|taipei).strftime('%m/%d') }}）</span></li>
+                {% endfor %}
+            </ul>
+        </details>
+        <form action="/admin/groups/cleanup-test" method="post" data-n="{{ test_groups | length }}"
+              onsubmit="return confirm('確定清除這 ' + this.dataset.n + ' 個測試團嗎？\n此動作無法復原。')">
+            <button type="submit" class="w-full min-h-[44px] rounded-xl border border-red-300 text-red-700 font-medium bg-white active:bg-red-50">
+                <i class="ti ti-trash"></i> 清除這 {{ test_groups | length }} 個
+            </button>
+        </form>
+        {% else %}
+        <p class="text-sm text-sela-800/50" id="no-test-groups">目前沒有符合的團。</p>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

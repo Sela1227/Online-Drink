@@ -186,9 +186,17 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
         StoreRecommendation.status == "pending"
     ).count()
     
+    # V2.27.0（UI 審稿 P0-3）：首頁改「待處理 → 常用 → 管理」，數字變成右側說明
+    _active_store_ids = [sid for (sid,) in db.query(Store.id).filter(Store.is_personal != True, Store.is_active == True).all()]
+    _with_menu = {sid for (sid,) in db.query(Menu.store_id).filter(Menu.is_active == True).distinct().all()}
+    no_menu_count = sum(1 for sid in _active_store_ids if sid not in _with_menu)
+    open_group_count = db.query(Group).filter(Group.is_closed == False, Group.deadline > taipei_now()).count()
+
     return templates.TemplateResponse(request, "admin/index.html", {
         "request": request,
         "user": user,
+        "no_menu_count": no_menu_count,
+        "open_group_count": open_group_count,
         "store_count": store_count,
         "group_count": group_count,
         "user_count": user_count,
@@ -801,7 +809,19 @@ async def group_list(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "user": user,
         "groups": groups,
+        "test_groups": _test_group_candidates(db),  # V2.27.0：先看會刪哪些
     })
+
+
+def _test_group_candidates(db: Session) -> list:
+    """V2.27.0（UI 審稿 P0-2）：清除測試團的對象——已截止（或已關閉）、而且沒人下單或只有團主自己下單。
+    頁面先列出來給人看，清除時用同一個函式，看到的和刪掉的一定一致。"""
+    # V2.10.1：deadline 是台北牆上時間，用 utcnow() 比會差 8 小時（坑 #25）
+    now = taipei_now()
+    groups = db.query(Group).filter(
+        or_(Group.is_closed == True, Group.deadline <= now)
+    ).order_by(Group.created_at.desc()).all()
+    return [g for g in groups if all(o.user_id == g.owner_id for o in g.orders)]
 
 
 def _delete_group_cascade(db: Session, group: Group):
@@ -829,20 +849,15 @@ async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
     `all()` 對零訂單恆為真，導致「早上開、還沒人點」的進行中團單
     會被當成測試團實體刪除且不可復原。
     """
-    await get_admin_user(request, db)
-    # V2.10.1：deadline 是台北牆上時間，用 utcnow() 比會差 8 小時，
-    # 害當天剛截止的測試團要等到晚上才清得掉（坑 #25）
-    now = taipei_now()
-    groups = db.query(Group).filter(
-        or_(Group.is_closed == True, Group.deadline <= now)
-    ).all()
-    removed = 0
-    for g in groups:
-        # 沒有訂單，或全部訂單都是團主自己的 → 視為測試團
-        if all(o.user_id == g.owner_id for o in g.orders):
-            _delete_group_cascade(db, g)
-            removed += 1
+    user = await get_admin_user(request, db)
+    targets = _test_group_candidates(db)
+    ids = [g.id for g in targets]
+    for g in targets:
+        _delete_group_cascade(db, g)
+    removed = len(ids)
     db.commit()
+    # V2.27.0（UI 審稿 P0-2）：留紀錄——誰、清了哪幾團
+    print(f"清除測試團：{user.show_name}（user_id={user.id}）刪除 {removed} 團 {ids}")
     return RedirectResponse(url=f"/admin/groups?cleaned={removed}", status_code=302)
 
 

@@ -4,66 +4,46 @@
 {% block title %}後台管理 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/home', '首頁') }}
-<div class="space-y-4">
-    <!-- 標題列 -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800">後台管理</h1>
-        
-    </div>
-    
-    <!-- 統計方塊（可點擊） -->
-    <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/stores" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-800">{{ store_count }}</div>
-            <div class="text-xs text-sela-800/60">店家</div>
-        </a>
-        <a href="/admin/groups" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-800">{{ group_count }}</div>
-            <div class="text-xs text-sela-800/60">團單</div>
-        </a>
-        <a href="/admin/users" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-800">{{ user_count }}</div>
-            <div class="text-xs text-sela-800/60">使用者</div>
-        </a>
-        <a href="/admin/departments" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-sela-800">{{ department_count }}</div>
-            <div class="text-xs text-sela-800/60"><i class="ti ti-users"></i> 部門</div>
-        </a>
-    </div>
-    
-    <!-- 第二排統計 -->
-    <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/users" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-green-600">{{ online_count }}</div>
-            <div class="text-xs text-sela-800/60"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> 在線</div>
-        </a>
-        <a href="/admin/feedbacks" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
-            <div class="text-2xl font-bold text-red-500">{{ feedback_count }}</div>
-            <div class="text-xs text-sela-800/60"><i class="ti ti-mailbox"></i> 回報</div>
-            {% if feedback_count > 0 %}
-            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            {% endif %}
-        </a>
-        <a href="/admin/recommendations" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center relative">
-            <div class="text-2xl font-bold text-amber-600">{{ recommendation_count }}</div>
-            <div class="text-xs text-sela-800/60"><i class="ti ti-bulb"></i> 推薦</div>
-            {% if recommendation_count > 0 %}
-            <span class="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
-            {% endif %}
-        </a>
-        <a href="/admin/announcements" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-blue-600">{{ active_announcement_count }}</div>
-            <div class="text-xs text-sela-800/60"><i class="ti ti-speakerphone"></i> 公告顯示中</div>
-        </a>
-    </div>
-    
-    <!-- 第三排功能 -->
-    <div class="grid grid-cols-4 gap-3">
-        <a href="/admin/import" class="bg-white rounded-2xl shadow-sm p-3 text-center hover:shadow-md transition aspect-square flex flex-col items-center justify-center">
-            <div class="text-xl"><i class="ti ti-inbox"></i></div>
-            <div class="text-xs text-sela-800/60 mt-1">匯入</div>
-        </a>
-    </div>
+{{ nav.back('/home', '今天') }}
+{# V2.27.0（外部 UI 審稿 P0-3）：原本 4+4+1 九個方塊，數字與功能混用、字 11px。
+   改成「待處理 → 常用 → 管理」三段清單：每列一個任務，數字變成右側說明；沒有待處理時整段不出現。 #}
+{% macro row(href, icon, label, note='', id='', badge=0, warn=False) -%}
+<a href="{{ href }}"{% if id %} id="{{ id }}"{% endif %}
+   class="flex items-center gap-3 rounded-2xl px-4 py-3 min-h-[56px] border active:bg-sela-100 {{ 'bg-amber-50 border-amber-300' if warn else 'bg-white border-sela-100' }}">
+    <span class="w-9 h-9 rounded-xl bg-sela-100 flex items-center justify-center flex-shrink-0"><i class="ti {{ icon }} text-lg text-sela-800"></i></span>
+    <span class="text-base font-medium text-sela-900">{{ label }}</span>
+    <span class="ml-auto flex items-center gap-2 text-sm text-sela-800/60 text-right">
+        {% if badge %}<span class="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold leading-[22px] text-center">{{ badge }}</span>{% endif %}
+        {% if note %}<span>{{ note }}</span>{% endif %}
+        <i class="ti ti-chevron-right text-sela-800/35"></i>
+    </span>
+</a>
+{%- endmacro %}
+<div class="space-y-5">
+    <h1 class="text-xl font-bold text-sela-800">後台管理</h1>
+
+    {% if recommendation_count or feedback_count %}
+    <section class="space-y-2" id="admin-todo">
+        <h2 class="text-sm font-bold text-sela-800/60 px-1">待處理</h2>
+        {% if recommendation_count %}{{ row('/admin/recommendations', 'ti-bulb', '新推薦', id='todo-recs', badge=recommendation_count, warn=True) }}{% endif %}
+        {% if feedback_count %}{{ row('/admin/feedbacks', 'ti-mailbox', '問題回報', id='todo-feedback', badge=feedback_count, warn=True) }}{% endif %}
+    </section>
+    {% endif %}
+
+    <section class="space-y-2" id="admin-common">
+        <h2 class="text-sm font-bold text-sela-800/60 px-1">常用</h2>
+        {{ row('/admin/import', 'ti-plus', '新增店家', '拍照或貼上', id='go-new-store') }}
+        {{ row('/admin/stores', 'ti-building-store', '店家與菜單', store_count ~ ' 家' ~ ((' · ' ~ no_menu_count ~ ' 家沒菜單') if no_menu_count else ''), id='go-stores') }}
+        {{ row('/admin/groups', 'ti-clipboard-list', '團單', ('進行中 ' ~ open_group_count) if open_group_count else ('共 ' ~ group_count), id='go-groups') }}
+        {{ row('/admin/announcements', 'ti-speakerphone', '公告', ('顯示中 ' ~ active_announcement_count) if active_announcement_count else '沒有顯示中', id='go-announcements') }}
+    </section>
+
+    <section class="space-y-2" id="admin-manage">
+        <h2 class="text-sm font-bold text-sela-800/60 px-1">管理</h2>
+        {{ row('/admin/users', 'ti-user', '人員', user_count ~ ' 人 · 在線 ' ~ online_count, id='go-users') }}
+        {{ row('/admin/departments', 'ti-users', '部門', department_count ~ ' 個', id='go-departments') }}
+        {% if not recommendation_count %}{{ row('/admin/recommendations', 'ti-bulb', '推薦紀錄', '沒有待審', id='go-recs') }}{% endif %}
+        {% if not feedback_count %}{{ row('/admin/feedbacks', 'ti-mailbox', '問題回報', '沒有待處理', id='go-feedback') }}{% endif %}
+    </section>
 </div>
 {% endblock %}
