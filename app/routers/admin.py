@@ -413,8 +413,12 @@ def _stores_for_picker(db, stores):
     return out
 
 
-def _menu_to_import_json(menu) -> dict:
-    """V2.16.1 B-5：使用中版本 → 匯入格式（只放匯入會讀的欄位；時價寫 "時價"、停售／說明有才帶）"""
+def _menu_to_import_json(menu, overrides: dict | None = None) -> dict:
+    """V2.16.1 B-5：使用中版本 → 匯入格式（只放匯入會讀的欄位；時價寫 "時價"、停售／說明有才帶）。
+    V2.29.0：`overrides` = {item_id: (price, price_l)}，工作台直接改價用——其他內容原封不動照抄，
+    再走跟匯入同一條路存成新版本（進行中的團釘著舊 menu_id，不受影響）。"""
+    overrides = overrides or {}
+
     def _num(d):
         if d is None:
             return None
@@ -425,6 +429,13 @@ def _menu_to_import_json(menu) -> dict:
         o = {"name": it.name, "price": "時價" if it.price_tbd else _num(it.price)}
         if it.price_l is not None and not it.price_tbd:
             o["price_l"] = _num(it.price_l)
+        if it.id in overrides and not it.price_tbd:
+            _p, _pl = overrides[it.id]
+            o["price"] = _num(_p)
+            if _pl is None:
+                o.pop("price_l", None)
+            else:
+                o["price_l"] = _num(_pl)
         if it.options:
             o["options"] = [{"name": op.name, "price_diff": _num(op.price_diff) or 0} for op in it.options]
         if it.is_available is False:
@@ -439,6 +450,70 @@ def _menu_to_import_json(menu) -> dict:
     if loose:
         body["items"] = loose
     return {"menu": body}
+
+
+@router.post("/stores/{store_id}/menu/prices")
+async def update_menu_prices(
+    store_id: int,
+    request: Request,
+    base_menu_id: int = Form(...),
+    changes_json: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """V2.29.0（外部審稿 V2.28.0 P1-B，Sela 選 A）：工作台菜單分頁直接改價。
+    只改 M／L 價格；整份照抄使用中版本、套上改的價，走匯入同一條路存成新版本——
+    原地改 MenuItem 不行，進行中的團釘的就是那一列（V2.15.0 決定）。
+    使用中版本跟畫面載入時不同（別人剛更新）→ 不寫入，請重新整理。"""
+    user = await get_admin_user(request, db)
+    from app.schemas.menu import parse_price_input, TBD
+    store = db.query(Store).filter(Store.id == store_id).with_for_update().first()
+    if not store:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    menu = db.query(Menu).filter(Menu.store_id == store_id, Menu.is_active == True).first()
+    if not menu:
+        raise HTTPException(status_code=400, detail="這家店還沒有使用中的菜單")
+    if menu.id != base_menu_id:
+        raise HTTPException(status_code=409, detail="菜單剛被別人更新過，請重新整理後再改")
+    try:
+        rows = json.loads(changes_json)
+        assert isinstance(rows, list)
+    except Exception:
+        raise HTTPException(status_code=400, detail="改價資料格式錯誤")
+    items = {i.id: i for i in menu.items}
+    overrides = {}
+    for r in rows:
+        try:
+            iid = int(r.get("id"))
+        except Exception:
+            raise HTTPException(status_code=400, detail="改價資料格式錯誤")
+        it = items.get(iid)
+        if it is None:
+            raise HTTPException(status_code=400, detail="品項不在使用中的菜單裡，請重新整理")
+        if it.price_tbd:
+            raise HTTPException(status_code=400, detail=f"「{it.name}」是時價，這裡不能改")
+        try:
+            p = parse_price_input(str(r.get("price", "")))
+            pl = parse_price_input(str(r.get("price_l") or ""))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"「{it.name}」：{e}")
+        if p is None or p is TBD or pl is TBD:
+            raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要填數字")
+        if p < 0 or p > 999999 or (pl is not None and (pl < 0 or pl > 999999)):
+            raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要在 0～999,999 之間")
+        overrides[iid] = (p, pl)
+    data = _menu_to_import_json(menu, overrides)
+    try:
+        validated = MenuImport(store_id=store_id, mode="new", menu=data["menu"])
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail="資料驗證錯誤：" + "；".join(humanize_validation_error(e, data)[:3]))
+    if diff_menu(menu, validated.menu)["identical"]:
+        raise HTTPException(status_code=400, detail="價格沒有變更")
+    new_menu = import_menu(db, validated)
+    _ver = db.query(Menu).filter(Menu.store_id == store_id).count()
+    cat_count, item_count = _count_import(validated.menu)
+    print(f"工作台改價：{user.show_name}（user_id={user.id}）{store.name} 改 {len(overrides)} 項 → 第 {_ver} 版")
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=menu&imported=1&cats={cat_count}&items={item_count}&ver={_ver}&priced={len(overrides)}",
+                            status_code=303)
 
 
 @router.get("/stores/{store_id}/menu-json")
@@ -954,7 +1029,7 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
 
 
 @router.post("/stores/{store_id}/delete")
-async def delete_store(store_id: int, request: Request, confirm_name: str = Form(""), db: Session = Depends(get_db)):
+async def delete_store(store_id: int, request: Request, confirm: str = Form(""), db: Session = Depends(get_db)):
     """刪除店家（V1.10.0：斷開團單/訂單連結但保留歷史，不再被舊團單擋）"""
     user = await get_admin_user(request, db)
 
@@ -964,8 +1039,10 @@ async def delete_store(store_id: int, request: Request, confirm_name: str = Form
 
     # V2.13.0：不可復原的操作改成輸入店名確認（V2.11 審稿的危險操作包，延到現在）。
     # 歷史團的 store_id 會被清成 NULL、菜單全部刪除，confirm() 一下就刪太輕率。
-    if confirm_name.strip() != store.name.strip():
-        raise HTTPException(status_code=400, detail="輸入的店名與要刪除的店家不符，未刪除")
+    # V2.29.0：輸入店名確認改成確認框（Sela：太麻煩）；後端仍要求確認框送來的 confirm=yes，
+    # 不帶就不刪（防止舊表單、誤送）
+    if confirm != "yes":
+        raise HTTPException(status_code=400, detail="請在確認框按「確定刪除」")
 
     store_name = store.name
 
@@ -1087,7 +1164,7 @@ async def update_store_visibility(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=visibility#visibility", status_code=302)
 
 
 @router.get("/stores/new")
@@ -1110,6 +1187,8 @@ async def store_workbench(
     cats: int = 0,
     items: int = 0,
     ver: int = 0,
+    priced: int = 0,
+    edit: str = "",
     db: Session = Depends(get_db),
 ):
     """店家工作台（V2.13.0）：一頁取代 store_detail + store_edit + menus。
@@ -1165,8 +1244,28 @@ async def store_workbench(
     def _values(opt_type):
         return [o.option_value for o in sorted([o for o in store.options if o.option_type == opt_type], key=lambda o: o.sort_order)]
 
+    # V2.29.0 工作台直接改價：使用中版本的品項（分類順序＝畫面順序），價格轉成字串給輸入框比對
+    def _pstr(d):
+        if d is None:
+            return None
+        f = float(d)
+        return str(int(f)) if f == int(f) else str(f)
+    price_items = []
+    if active_menu:
+        for c in active_menu.categories:
+            for it in c.items:
+                price_items.append({"id": it.id, "cat": c.name, "name": it.name, "tbd": bool(it.price_tbd),
+                                    "available": it.is_available is not False,
+                                    "orig": _pstr(it.price) or "0", "orig_l": _pstr(it.price_l)})
+        for it in active_menu.items:
+            if it.category_id is None:
+                price_items.append({"id": it.id, "cat": "其他", "name": it.name, "tbd": bool(it.price_tbd),
+                                    "available": it.is_available is not False,
+                                    "orig": _pstr(it.price) or "0", "orig_l": _pstr(it.price_l)})
+
     from app.services.city import CITY_GROUPS, NO_CITY
     return templates.TemplateResponse(request, "admin/store_workbench.html", {
+        "price_items": price_items, "start_price_edit": edit == "price", "priced": priced,
         "city_groups": CITY_GROUPS, "no_city": NO_CITY,  # V2.26.0
         "tab": tab,
         "created": created,
@@ -1333,7 +1432,7 @@ async def update_store(
     
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=info#store-info", status_code=302)
 
 
 @router.get("/users")
@@ -1486,7 +1585,7 @@ async def add_branch(
     db.add(branch)
     db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=branch_added#branches", status_code=302)
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/delete")
@@ -1509,7 +1608,7 @@ async def delete_branch(
         db.delete(branch)
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=branch_deleted#branches", status_code=302)
 
 
 # V2.28.0（內部審核 A-3）：編輯分店路由拿掉——畫面從來沒有入口，分店改名就刪掉重加。
@@ -1535,7 +1634,7 @@ async def toggle_branch(
         branch.is_active = not branch.is_active
         db.commit()
     
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=branch_toggled#branches", status_code=302)
 
 
 def _parse_topping_rows(raw: str) -> list[dict]:

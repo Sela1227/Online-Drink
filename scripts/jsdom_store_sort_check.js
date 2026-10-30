@@ -295,6 +295,17 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     if (!fix || !fix.getAttribute("href").startsWith("/admin/import?store_id=")) fail("「沒菜單」要能直接點到匯入");
     nm.click(); await sleep(80);
     if (readOrder().length !== before) fail("再按一次應取消篩選");
+    // V2.29.0（審稿 P1-C）：問題數跟著搜尋算——搜「甲」之後「沒菜單」應是 1，點下去也是 1 家
+    const qIn = d.querySelector("input[x-model='q']");
+    qIn.value = "甲"; qIn.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    const nmCount = () => { const b = [...d.querySelectorAll("#issue-chips button")].find(x => x.textContent.includes("沒菜單")); return b ? Number(b.querySelector("span").textContent) : -1; };
+    if (nmCount() !== 1) fail("搜尋「甲」後「沒菜單」應是 1（" + nmCount() + "）");
+    qIn.value = ""; qIn.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    // V2.29.0（審稿 P3）：問題標記在那類問題歸零時要清掉，之後問題再出現也不會自己又篩起來
+    [...d.querySelectorAll("#issue-chips button")].find(x => x.textContent.includes("沒菜單")).click(); await sleep(60);
+    qIn.value = "不存在的店"; qIn.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    qIn.value = ""; qIn.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(80);
+    if (issueHint() !== "點了只看這些") fail("問題歸零後標記應清掉，不該自己又套用（" + issueHint() + "）");
     let st = {};
     try { st = JSON.parse(w.sessionStorage.getItem("admin_store_list_state") || "{}"); } catch (e) {}
     if (st.sort !== "hot") fail("排序選擇應記在 sessionStorage（" + JSON.stringify(st) + "）");

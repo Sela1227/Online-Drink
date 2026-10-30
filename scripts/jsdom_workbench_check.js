@@ -123,16 +123,44 @@ const setVal = async (el, v) => { el.value = v; el.dispatchEvent(new w.Event("in
   const summary = d.getElementById("wb-summary");
   if (!summary) fail("找不到店家資料摘要 #wb-summary");
   const sbtn = (kw) => [...summary.querySelectorAll("button")].find(b => text(b).includes(kw));
-  const optBtn = sbtn("甜度");
-  if (!optBtn) fail("摘要應有甜冰加料");
-  optBtn.click(); await sleep(60);
-  if (!visible(opts) || visible(sets)) fail("按摘要的甜冰加料應切到甜冰加料分頁");
+  // V2.29.0（審稿 P2-B）：摘要只留縣市／分店／可見範圍三顆
+  if (summary.querySelectorAll("button").length !== 3) fail("摘要應只有 3 顆（" + summary.querySelectorAll("button").length + "）");
+  if (sbtn("甜度") || sbtn("電話")) fail("摘要不該再有甜冰／電話");
   const cityBtn = sbtn("縣市") || sbtn("市") || sbtn("縣");
   if (!cityBtn) fail("摘要應有縣市");
   cityBtn.click(); await sleep(80);
   if (!visible(sets)) fail("按摘要的縣市應切到店家資料分頁");
   if (d.activeElement !== d.querySelector("#store-city select")) fail("按摘要的縣市應聚焦到縣市下拉");
-  for (const kw of ["分店", "公開", "電話"]) { if (!sbtn(kw)) fail("摘要應有「" + kw + "」"); }
+  for (const kw of ["分店", "公開"]) { if (!sbtn(kw)) fail("摘要應有「" + kw + "」"); }
+  // V2.29.0（審稿 P1-A）：按摘要切分頁，網址要帶 #欄位；之後點分頁鈕要拿掉 #，tab 參數跟著換
+  if (w.location.hash !== "#store-city" || !w.location.search.includes("tab=settings")) fail("按摘要的縣市，網址應是 ?tab=settings#store-city（" + w.location.search + w.location.hash + "）");
+  [...d.querySelectorAll("button")].find(b => text(b) === "菜單").click(); await sleep(60);
+  if (w.location.hash !== "" || !w.location.search.includes("tab=menu")) fail("點分頁鈕應拿掉 #欄位（" + w.location.search + w.location.hash + "）");
+  sbtn("分店").click(); await sleep(60);
+  if (w.location.hash !== "#branches") fail("按摘要的分店，網址應帶 #branches（" + w.location.hash + "）");
+  // V2.29.0：刪除店家改確認框——按鈕打開、取消關閉、確定送出 confirm=yes
+  [...d.querySelectorAll("button")].find(b => text(b).includes("停用／刪除")).click(); await sleep(60);
+  const dlg = d.getElementById("del-store-dialog");
+  if (!dlg || visible(dlg)) fail("確認框一開始不顯示");
+  d.getElementById("del-store-btn").click(); await sleep(60);
+  if (!visible(dlg)) fail("按「刪除這家店」應跳出確認框");
+  if (!text(dlg).includes("無法復原")) fail("確認框要寫出影響");
+  [...dlg.querySelectorAll("button")].find(b => text(b) === "取消").click(); await sleep(60);
+  if (visible(dlg)) fail("按取消應關閉確認框");
+  const dform = dlg.querySelector("form");
+  if (!dform || new w.FormData(dform).get("confirm") !== "yes") fail("確認框的表單要送 confirm=yes");
+  if (d.querySelector("input[name=confirm_name]")) fail("不該再要求輸入店名");
+  // V2.29.0（審稿 P2-C）：改了沒存就離開要提醒。前面的步驟真的送出過表單（jsdom 不會換頁），先把狀態歸零
+  const rootData = w.Alpine.$data(d.querySelector("[x-data*='delOpen']"));
+  rootData.leaving = false; rootData.unsaved = false; await sleep(20);
+  const ev1 = new w.Event("beforeunload", { cancelable: true });
+  w.dispatchEvent(ev1);
+  if (ev1.defaultPrevented) fail("沒改東西不該提醒");
+  const ph = d.querySelector("#branches input[name=phone]");
+  ph.value = "04"; ph.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(20);
+  const ev2 = new w.Event("beforeunload", { cancelable: true });
+  w.dispatchEvent(ev2);
+  if (!ev2.defaultPrevented) fail("改了沒存就離開應提醒");
   if (jsErrors.length) fail("操作過程有 JS 錯誤：" + jsErrors.join(" | "));
   console.log(JSON.stringify({ ok: true }));
   process.exit(0);

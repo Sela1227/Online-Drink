@@ -664,10 +664,10 @@ def main():
         assert r.status_code == 301 and "tab=menu" in r.headers["location"]
         check("舊網址 /edit、/menus 轉址到工作台對應分頁")
 
-        r = _c.post(f"/admin/stores/{store.id}/delete", data={"confirm_name": "錯的"})
+        r = _c.post(f"/admin/stores/{store.id}/delete", data={"confirm_name": store.name})
         assert r.status_code == 400
         assert db.query(Store).filter(Store.id == store.id).first() is not None
-        check("刪除店家：店名不符回 400，店家仍在")
+        check("刪除店家：沒有確認框送來的 confirm=yes 回 400，店家仍在（V2.29.0 改確認框）")
 
         r = _c.get("/admin/stores/new", follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"] == "/admin/import", "/stores/new 必須排在 /stores/{id} 之前，否則 'new' 進 int 路由 422"
@@ -924,7 +924,7 @@ def main():
         # P1-2：工作台 x-data 經 tojson 的值要放在單引號屬性，解析後屬性值必須完整
         r = _c.get(f"/admin/stores/{store.id}?tab=info")  # 舊分頁名 → 店家設定（V2.21.0）
         xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "tab:" in v]
-        assert xd and 'tab: "settings"' in xd[0] and "confirmName" in xd[0], xd
+        assert xd and 'tab: "settings"' in xd[0] and "delOpen" in xd[0], xd
         check("P1-2：tojson 放單引號屬性，x-data 不再被雙引號截斷（V2.13.0 的工作台分頁因此失效）")
     finally:
         _adm.get_admin_user = _orig
@@ -1069,7 +1069,7 @@ def main():
     db.add(_do2); db.commit()
     _adm.get_admin_user = _fake_admin
     try:
-        r = _c.post(f"/admin/stores/{_ds2.id}/delete", data={"confirm_name": "要刪的店"}, follow_redirects=False)
+        r = _c.post(f"/admin/stores/{_ds2.id}/delete", data={"confirm": "yes"}, follow_redirects=False)
         assert r.status_code == 302, (r.status_code, r.text[:200])
     finally:
         _adm.get_admin_user = _orig
@@ -1491,8 +1491,7 @@ def main():
     r = _c.get(f"/admin/import?store_id={_r5.id}")
     assert "loadCurrentMenu(false" not in r.text
     r = _c.get(f"/admin/stores/{_r5.id}")
-    assert f"/admin/import?store_id={_r5.id}&amp;load=current" in r.text or f"/admin/import?store_id={_r5.id}&load=current" in r.text, "工作台應有「改幾個價格」"
-    assert "改幾個價格" in r.text
+    assert 'id="wb-price-edit"' in r.text and 'id="price-editor"' in r.text, "工作台應有「改價格」（V2.29.0 本頁直接改）"
     # B-6：只剩一份指令，且含 "?" 規則
     r = _c.get("/admin/import")
     assert r.text.count("AI 轉換指令") == 1 and "promptMenuForStore" not in r.text and "promptNewStore" not in r.text
@@ -1500,7 +1499,7 @@ def main():
     import re as _re25, html as _h25
     _pl = json.loads(_h25.unescape(_re25.search(r'<script type="application/json" id="import-prompt">(.*?)</script>', r.text, _re25.S).group(1)))
     assert any('price 填字串 "?"' in l for l in _pl), "頁面上的指令要含 ? 規則"
-    check("B-10／B-6：選店清單帶版號項數、沒有原生下拉、load=current 帶入、工作台「改幾個價格」、單一 AI 指令含 ? 規則")
+    check("B-10／B-6：選店清單帶版號項數、沒有原生下拉、load=current 帶入、工作台「改價格」、單一 AI 指令含 ? 規則")
     _adm.get_admin_user = _orig
 
     # ---------- 26. V2.16.2 推薦多張照片＋店家排序 ----------
@@ -2070,11 +2069,14 @@ def main():
         r = _c.post(f"/admin/stores/{_ds.id}/options", data={"sugar_options": "無糖,半糖,全糖", "ice_options": "去冰"}, follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"].endswith("?tab=options&saved=options")
         r = _c.get(r.headers["location"]); assert "甜度／冰塊已儲存" in r.text and ("tagEditor(" + json.dumps(["無糖", "半糖", "全糖"]) + ")") in r.text
+        # V2.29.0（審稿 P2-D）：回到那張卡片（#錨點）並寫「已儲存」
         r = _c.post(f"/admin/stores/{_ds.id}/branches", data={"name": "中山店"}, follow_redirects=False)
-        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings&saved=branch_added#branches")
+        assert "分店已新增" in _c.get(r.headers["location"].split("#")[0]).text
         r = _c.post(f"/admin/stores/{_ds.id}/visibility", data={"visibility": "public"}, follow_redirects=False)
-        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
-        check("儲存甜冰回共用選項並提示、順序照標籤；分店／可見範圍回店家設定")
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings&saved=visibility#visibility")
+        assert "可見範圍已儲存" in _c.get(r.headers["location"].split("#")[0]).text
+        check("儲存甜冰回甜冰加料並提示、順序照標籤；分店／可見範圍回店家資料那張卡片（#錨點）並寫已儲存")
 
         # 舊的逐筆加料路由已移除
         for _u in (f"/admin/stores/{_ds.id}/toppings", f"/admin/stores/{_ds.id}/toppings/{_ta.id}/toggle", f"/admin/stores/{_ds.id}/toppings/{_ta.id}/delete"):
@@ -2773,11 +2775,14 @@ def main():
         assert 'id="wb-summary"' in t and 'id="wb-update-menu"' in t and "彰化縣" in t.split('id="wb-summary"')[1][:2000]
         for _aid in ('id="store-city"', 'id="branches"', 'id="visibility"', 'id="store-phone"', 'id="tab-options"'):
             assert _aid in t, _aid
-        assert "go('settings', 'store-city')" in t and "go('options', 'tab-options')" in t
+        assert "go('settings', 'store-city')" in t and "go('settings', 'visibility')" in t
+        _sum40 = t.split('id="wb-summary"')[1].split("</div>")[0]
+        assert _sum40.count("<button") == 3 and "go('options'" not in _sum40 and "store-phone" not in _sum40, "V2.29.0 摘要只留縣市／分店／可見範圍"
+        assert "min-h-[44px]" in _sum40
         _g40 = Store(name="團購四十", category=CategoryType.GROUP_BUY, is_active=True); db.add(_g40); db.commit()
         r = _c.get(f"/admin/stores/{_g40.id}")
         assert "go('options'" not in r.text and "未設縣市" in r.text.split('id="wb-summary"')[1][:2000]
-        check("工作台：更新菜單全寬；摘要（縣市／分店／可見範圍／甜冰加料／電話）可點跳到欄位；團購店沒有甜冰加料")
+        check("工作台：更新菜單全寬；摘要三顆（縣市／分店／可見範圍，44px）可點跳到欄位")
     finally:
         _adm.get_admin_user = _orig
 
@@ -2979,6 +2984,99 @@ def main():
         r = _c.get(f"/admin/stores/{_w41.id}")
         assert "甜度 0" not in r.text.split('id="wb-summary"')[1][:3000] and "按上方「更新菜單」" in r.text
         check("後台首頁：沒有待處理時推薦與回報合成一列；店家數只算啟用的；餐廳摘要只寫加料、沒菜單提示寫「按上方」")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 42. V2.28.1 PWA 名稱 ----------
+    print("\n[42] PWA 名稱")
+    import re as _re42
+    from pathlib import Path as _P42
+    _mf = json.loads(_P42("app/static/favicon/site.webmanifest").read_text(encoding="utf-8"))
+    assert _mf["name"] == "快點來點餐" and _mf["short_name"] == "快點來點餐", "加到主畫面的名稱要是「快點來點餐」"
+    assert _mf["start_url"] == "/home" and _mf["display"] == "standalone"
+    _base42 = _P42("app/templates/base.html").read_text(encoding="utf-8")
+    assert '<meta name="apple-mobile-web-app-title" content="快點來點餐">' in _base42, "iPhone 讀這個 meta，不讀 manifest"
+    _tc = _re42.search(r'<meta name="theme-color" content="([^"]+)"', _base42).group(1)
+    assert _mf["theme_color"].lower() == _tc.lower(), "manifest 與頁面的 theme-color 要一致"
+    r = _c.get("/static/favicon/site.webmanifest")
+    assert r.status_code == 200 and "快點來點餐" in r.content.decode("utf-8")
+    check("PWA：manifest 名稱「快點來點餐」、start_url /home、iPhone 的 apple-mobile-web-app-title、theme-color 一致")
+
+    # ---------- 43. V2.29.0 刪店確認框＋外部審稿 V2.28.0 ----------
+    print("\n[43] 工作台直接改價、刪店確認框、店家列表")
+    from app.schemas.menu import MenuImport as _MI43
+    from app.services.import_service import import_menu as _im43
+    from app.models.menu import Menu as _M43, MenuItem as _MIt43
+    _adm.get_admin_user = _fake_admin
+    try:
+        _s43 = Store(name="改價四三", category=CategoryType.DRINK, is_active=True); db.add(_s43); db.commit()
+        _sid43 = _s43.id
+        _im43(db, _MI43(store_id=_sid43, mode="new", menu={"categories": [
+            {"name": "茶", "items": [{"name": "紅茶", "price": 30, "price_l": 35, "options": [{"name": "加珍珠", "price_diff": 10}]},
+                                    {"name": "綠茶", "price": 25, "note": "無糖較好喝"},
+                                    {"name": "季節茶", "price": "時價"},
+                                    {"name": "停售茶", "price": 40, "is_available": False}]}],
+            "items": [{"name": "餅乾", "price": 20}]}))
+        _m1 = db.query(_M43).filter(_M43.store_id == _sid43, _M43.is_active == True).one()
+        _m1_id = _m1.id
+        _ids = {i.name: i.id for i in _m1.items}
+        _g43 = Group(owner_id=_uid, store_id=_sid43, menu_id=_m1_id, name="四三進行中", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
+        db.add(_g43); db.commit(); _g43_id = _g43.id
+
+        r = _c.get(f"/admin/stores/{_sid43}?tab=menu&edit=price")
+        t = r.text
+        assert 'id="price-editor"' in t and "priceEdit: true" in t
+        _pi = json.loads(t.split('<script type="application/json" id="price-items">')[1].split("</script>")[0])
+        assert [x["name"] for x in _pi] == ["紅茶", "綠茶", "季節茶", "停售茶", "餅乾"] and _pi[-1]["cat"] == "其他"
+        assert _pi[0]["orig"] == "30" and _pi[0]["orig_l"] == "35" and _pi[2]["tbd"] and not _pi[3]["available"]
+
+        def _post43(rows, base=None):
+            return _c.post(f"/admin/stores/{_sid43}/menu/prices", data={"base_menu_id": str(base or _m1_id), "changes_json": json.dumps(rows)},
+                           follow_redirects=False)
+        _n_before = db.query(_M43).filter(_M43.store_id == _sid43).count()
+        for rows, why in (([{"id": _ids["季節茶"], "price": "100"}], "時價"), ([{"id": _ids["紅茶"], "price": "abc"}], "非數字"),
+                          ([{"id": 999999, "price": "10"}], "不在菜單"), ([{"id": _ids["紅茶"], "price": "30", "price_l": "35"}], "沒變更"),
+                          ([{"id": _ids["紅茶"], "price": "-5"}], "負數"), ("x", "格式")):
+            assert _post43(rows).status_code == 400, why
+        assert _post43([{"id": _ids["紅茶"], "price": "32"}], base=_m1_id + 9999).status_code == 409, "別人剛更新過要擋"
+        db.expire_all(); assert db.query(_M43).filter(_M43.store_id == _sid43).count() == _n_before, "被擋下時不能多出版本"
+
+        r = _post43([{"id": _ids["紅茶"], "price": "32", "price_l": "38"}, {"id": _ids["綠茶"], "price": "27.5"}, {"id": _ids["餅乾"], "price": "22"}])
+        assert r.status_code == 303 and "priced=3" in r.headers["location"] and "tab=menu" in r.headers["location"]
+        db.expire_all()
+        _m2 = db.query(_M43).filter(_M43.store_id == _sid43, _M43.is_active == True).one()
+        assert _m2.id != _m1_id
+        _new = {i.name: i for i in _m2.items}
+        assert float(_new["紅茶"].price) == 32 and float(_new["紅茶"].price_l) == 38 and float(_new["綠茶"].price) == 27.5 and float(_new["餅乾"].price) == 22
+        assert [o.name for o in _new["紅茶"].options] == ["加珍珠"] and _new["綠茶"].description == "無糖較好喝"
+        assert _new["季節茶"].price_tbd and _new["停售茶"].is_available is False and _new["餅乾"].category_id is None, "其他內容原封不動"
+        _old = {i.name: i for i in db.get(_M43, _m1_id).items}
+        assert float(_old["紅茶"].price) == 30 and db.get(Group, _g43_id).menu_id == _m1_id, "進行中的團照舊用原本的菜單"
+        r = _c.get(r.headers["location"])
+        assert "已改 3 項價格" in r.text and "進行中的團照舊用原本的價格" in r.text
+        # 拿掉大杯價
+        r = _post43([{"id": _new["紅茶"].id, "price": "32", "price_l": ""}], base=_m2.id)
+        db.expire_all()
+        _m3 = db.query(_M43).filter(_M43.store_id == _sid43, _M43.is_active == True).one()
+        assert r.status_code == 303 and next(i for i in _m3.items if i.name == "紅茶").price_l is None
+        check("工作台直接改價：只改 M／L、其他照抄、存成新版本（進行中的團不受影響）；時價／非數字／負數／沒變更／別人剛更新過都擋且不多版本")
+
+        # 刪除店家：確認框
+        r = _c.get(f"/admin/stores/{_sid43}?tab=more")
+        assert 'id="del-store-dialog"' in r.text and 'name="confirm" value="yes"' in r.text and "confirm_name" not in r.text
+        assert "進行中的團" in r.text.split('id="del-store-dialog"')[1][:3000]
+        r = _c.post(f"/admin/stores/{_sid43}/delete", follow_redirects=False)
+        db.expire_all(); assert r.status_code == 400 and db.get(Store, _sid43) is not None
+        r = _c.post(f"/admin/stores/{_sid43}/delete", data={"confirm": "yes"}, follow_redirects=False)
+        db.expire_all(); assert r.status_code == 302 and db.get(Store, _sid43) is None
+        check("刪除店家：按鈕→確認框（寫出菜單版本、歷史團、進行中的團）→確定刪除；不用輸入店名，沒帶 confirm=yes 仍擋")
+
+        # 店家列表：手機也有菜單鈕、Logo 不是連結
+        r = _c.get("/admin/stores")
+        assert "data-menu-link" in r.text and "hidden sm:inline-flex" not in r.text and 'tabindex="-1"' not in r.text
+        assert "edit=price" in r.text and "matchBase(s)" in r.text
+        check("店家列表：每列「菜單」（有菜單→直接改價、沒菜單→匯入）手機也有；Logo 不再是連結；問題數跟著分類／搜尋算")
     finally:
         _adm.get_admin_user = _orig
 

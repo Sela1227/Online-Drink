@@ -1,6 +1,12 @@
 {
-  "name": "SELA",
-  "short_name": "SELA",
+  "name": "快點來點餐",
+  "short_name": "快點來點餐",
+  "lang": "zh-Hant-TW",
+  "start_url": "/home",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#E8D9C0",
+  "background_color": "#E8D9C0",
   "icons": [
     {
       "src": "android-chrome-192x192.png",
@@ -12,8 +18,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#C9A977",
-  "background_color": "#E8D9C0",
-  "display": "standalone"
+  ]
 }

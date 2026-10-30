@@ -9,7 +9,8 @@
    V2.27.0（外部 UI 審稿 P0-1／P1）：原本整列是 <a>、裡面又包「菜單」「編輯」兩個 <a>（巢狀互動元素，不合法、手機易誤點）。
    改成列是普通容器：Logo、店名、「管理」各自是連結；問題標記（沒菜單／未設縣市）可以點、直接到修正的地方。
    排序與「含已停用」收進「篩選」；字級 15／13px、按鈕至少 40px 高。 #}
-<div class="space-y-3" x-data="storeList()" x-init="init()">
+{# V2.29.0（審稿 P3）：那類問題歸零（補完菜單、或換分類／搜尋後沒有了）就把標記清掉，不留一個隱形的篩選 #}
+<div class="space-y-3" x-data="storeList()" x-init="init()" x-effect="if (issue && !issueCount(issue)) issue = ''">
     <div class="flex items-center justify-between gap-3">
         <h1 class="text-xl font-bold text-sela-800">店家</h1>
         {# V2.25.0：新增店家一律走匯入（貼資料或拍照轉換），不再有手動表單 #}
@@ -70,11 +71,12 @@
     <div class="bg-white rounded-xl border border-sela-100 divide-y divide-sela-100">
         <template x-for="s in filtered" :key="s.id">
             <div class="flex items-center gap-3 px-3 py-3" data-store-row>
-                <a :href="'/admin/stores/' + s.id" tabindex="-1" aria-hidden="true"
+                {# V2.29.0（審稿 P3）：Logo 只是裝飾，不再是連結（原本滑鼠點得到、鍵盤與報讀器卻跳過，語意不一致） #}
+                <div aria-hidden="true"
                    class="w-11 h-11 rounded-lg bg-sela-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     <img x-show="s.logo" :src="s.logo" alt="" class="w-full h-full object-cover">
                     <i x-show="!s.logo" :class="'ti ' + icon(s.category) + ' text-xl text-sela-700'"></i>
-                </a>
+                </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <a :href="'/admin/stores/' + s.id" data-store-name class="text-[15px] font-medium text-sela-900 truncate hover:underline" x-text="s.name"></a>
@@ -91,7 +93,10 @@
                         <span x-show="s.branches"> · <span x-text="s.branches"></span> 家分店</span>
                     </div>
                 </div>
-                <a :href="'/admin/import?store_id=' + s.id" class="hidden sm:inline-flex items-center px-3 min-h-[40px] rounded-xl border border-sela-200 text-sm text-sela-800 whitespace-nowrap hover:bg-sela-50">更新菜單</a>
+                {# V2.29.0（審稿 P2-A）：手機也有菜單直達。有菜單→工作台直接改價；沒菜單→匯入 #}
+                <a :href="s.items ? '/admin/stores/' + s.id + '?tab=menu&edit=price' : '/admin/import?store_id=' + s.id" data-menu-link
+                   class="inline-flex items-center px-3 min-h-[40px] rounded-xl border border-sela-200 text-sm text-sela-800 whitespace-nowrap hover:bg-sela-50"
+                   :aria-label="'菜單 ' + s.name">菜單</a>
                 <a :href="'/admin/stores/' + s.id" class="inline-flex items-center px-3 min-h-[40px] rounded-xl border border-sela-200 text-sm text-sela-900 font-medium whitespace-nowrap hover:bg-sela-50"
                    :aria-label="'管理 ' + s.name">管理</a>
             </div>
@@ -155,14 +160,17 @@ function storeList() {
         // V2.28.0（內部審核 P1-3）：問題標記是「這一趟要處理的事」，不存 sessionStorage；
         // 而且那類問題已經沒有了（補完菜單回來）就自動失效，不會剩下一個看不到、取消不了的篩選
         get activeIssue() { return this.issue && this.issueCount(this.issue) ? this.issue : ''; },
-        issueCount(k) { return this.stores.filter(s => (this.showInactive || s.active) && this.hasIssue(s, k)).length; },
+        // V2.29.0（審稿 P1-C）：數字跟著分類、搜尋、含已停用一起算——選了飲料就只數飲料，點下去的家數跟數字一樣
+        matchBase(s) {
+            const kw = this.q.trim().toLowerCase();
+            return (this.cat === 'all' || s.category === this.cat) && (this.showInactive || s.active)
+                && (!kw || s.name.toLowerCase().includes(kw) || s.phone.includes(kw) || s.address.toLowerCase().includes(kw) || s.city.includes(kw));
+        },
+        issueCount(k) { return this.stores.filter(s => this.matchBase(s) && this.hasIssue(s, k)).length; },
         countCat(c) { return this.stores.filter(s => (c === 'all' || s.category === c) && (this.showInactive || s.active)).length; },
         get filtered() {
-            const kw = this.q.trim().toLowerCase();
             return this.stores
-                .filter(s => (this.cat === 'all' || s.category === this.cat) && (this.showInactive || s.active)
-                    && (!this.activeIssue || this.hasIssue(s, this.activeIssue))
-                    && (!kw || s.name.toLowerCase().includes(kw) || s.phone.includes(kw) || s.address.toLowerCase().includes(kw) || s.city.includes(kw)))
+                .filter(s => this.matchBase(s) && (!this.activeIssue || this.hasIssue(s, this.activeIssue)))
                 .sort((a, b) => this.cmp(a, b));
         },
         // V2.16.2：熱門＝開團次數多→少、同次數依名稱；最近開團＝新→舊；名稱＝注音序

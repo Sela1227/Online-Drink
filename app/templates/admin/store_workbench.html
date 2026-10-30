@@ -12,9 +12,23 @@
 {# V2.27.0（外部 UI 審稿 P1，Sela 選方案 A）：保留分頁，頂部加可點的「店家資料」摘要（縣市／分店／可見範圍／甜冰加料／電話），
    點了切到對應分頁並捲到那個欄位；分頁改名 共用選項→甜冰加料、店家設定→店家資料、更多→停用／刪除。
    網址參數 ?tab=options／settings／more 不變。 #}
-<div class="space-y-4" x-data='{ tab: {{ tab | tojson }}, menuOpen: false, histOpen: false, confirmName: "",
-        go(t, anchor) { this.tab = t; this.$nextTick(() => { const el = anchor && document.getElementById(anchor); if (el) { try { el.scrollIntoView({ block: "center" }); } catch (e) {} const f = el.querySelector("input, select"); if (f) { try { f.focus({ preventScroll: true }); } catch (e) {} } } }); } }'
-     x-init="$watch('tab', t => { try { history.replaceState({}, '', '?tab=' + t); } catch (e) {} }); if (location.hash) $nextTick(() => { const el = document.getElementById(location.hash.slice(1)); if (el) { try { el.scrollIntoView({ block: 'center' }); } catch (e) {} } })">
+{# V2.29.0（外部審稿 V2.28.0）：P1-A 切分頁保留／清掉網址 #欄位（原本 replaceState 只寫 ?tab= 會把 # 洗掉）；
+   P2-C 有沒存的變更就離開會提醒；刪除店家改確認框（Sela：輸入店名太麻煩）。
+   一次性的提示參數（saved／imported…）切分頁時順便拿掉，重新整理不會再跳一次。 #}
+<div class="space-y-4" x-data='{ tab: {{ tab | tojson }}, menuOpen: false, histOpen: false, delOpen: false, priceEdit: {{ (start_price_edit and active_menu is not none) | tojson }},
+        anchor: "", unsaved: false, leaving: false,
+        url(t, anchor) { try { const u = new URL(location.href); u.searchParams.set("tab", t);
+            ["saved", "imported", "cats", "items", "ver", "priced", "created", "edit"].forEach(k => u.searchParams.delete(k));
+            history.replaceState(null, "", u.pathname + u.search + (anchor ? "#" + anchor : "")); } catch (e) {} },
+        go(t, anchor) { if (this.tab === t) { this.url(t, anchor || ""); } else { this.anchor = anchor || ""; this.tab = t; }
+            this.$nextTick(() => { const el = anchor && document.getElementById(anchor); if (el) { try { el.scrollIntoView({ block: "center" }); } catch (e) {} const f = el.querySelector("input, select"); if (f) { try { f.focus({ preventScroll: true }); } catch (e) {} } } }); },
+        init() {
+            this.$watch("tab", t => { this.url(t, this.anchor); this.anchor = ""; });
+            if (location.hash) this.$nextTick(() => { const el = document.getElementById(location.hash.slice(1)); if (el) { try { el.scrollIntoView({ block: "center" }); } catch (e) {} } });
+            window.addEventListener("beforeunload", e => { if (this.unsaved && !this.leaving) { e.preventDefault(); e.returnValue = ""; } });
+        } }'
+     @input="if ($event.target.closest('[data-track]')) unsaved = true" @change="if ($event.target.closest('[data-track]')) unsaved = true"
+     @submit="leaving = !$event.defaultPrevented">
 
     {% if created %}
     <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
@@ -24,7 +38,7 @@
     {% if imported %}
     {# V2.15.0：完成提示縮成一行 #}
     <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-        <i class="ti ti-circle-check"></i> 菜單已更新{% if imported_ver %}為第 {{ imported_ver }} 版{% endif %}（{{ imported_items }} 項）
+        <i class="ti ti-circle-check"></i> {% if priced %}已改 {{ priced }} 項價格，{% endif %}菜單已更新{% if imported_ver %}為第 {{ imported_ver }} 版{% endif %}（{{ imported_items }} 項）{% if priced %}；進行中的團照舊用原本的價格{% endif %}
     </div>
     {% endif %}
 
@@ -55,34 +69,28 @@
             </div>
         </div>
 
-        {# V2.27.0：主要動作一顆全寬 #}
-        <div class="mt-3 flex items-center gap-3">
+        {# V2.27.0：主要動作一顆全寬；V2.29.0「改價格」在本頁直接改（P1-B），不再進匯入頁改文字資料 #}
+        <div class="mt-3 flex items-center gap-2">
             <a href="/admin/import?store_id={{ store.id }}" id="wb-update-menu"
                class="flex-1 text-center bg-sela-700 text-white min-h-[44px] inline-flex items-center justify-center rounded-xl text-base font-medium">
                 <i class="ti ti-inbox mr-1"></i> 更新菜單
             </a>
             {% if active_item_count %}
-            {# V2.16.1 B-5：小幅改價——到匯入頁並直接帶入使用中菜單 #}
-            <a href="/admin/import?store_id={{ store.id }}&load=current" class="text-sm text-sela-700 underline whitespace-nowrap min-h-[44px] inline-flex items-center">改幾個價格</a>
+            <button type="button" id="wb-price-edit" @click="go('menu'); priceEdit = true"
+                    class="min-h-[44px] px-4 rounded-xl border border-sela-300 text-[15px] text-sela-900 bg-white whitespace-nowrap"><i class="ti ti-currency-dollar"></i> 改價格</button>
             {% endif %}
         </div>
 
-        {# V2.27.0：店家資料摘要——每顆都能點，切到那個分頁並捲到欄位（審稿：不用知道功能在「設定」或「更多」也找得到） #}
-        <div class="mt-3 flex flex-wrap gap-1.5" id="wb-summary">
-            {% set chip = 'inline-flex items-center gap-1 px-3 min-h-[34px] rounded-full border text-[13px] bg-white' %}
+        {# V2.27.0 摘要；V2.29.0（審稿 P2-B）只留最常要直達的三個：縣市／分店／可見範圍，44px 高。
+           甜冰看「甜冰加料」分頁、電話在「店家資料」 #}
+        <div class="mt-3 flex flex-wrap gap-2" id="wb-summary">
+            {% set chip = 'inline-flex items-center gap-1 px-3 min-h-[44px] rounded-full border text-[14px] bg-white' %}
             <button type="button" @click="go('settings', 'store-city')" class="{{ chip }} {{ 'border-sela-200 text-sela-900' if store.city else 'border-amber-300 text-amber-800 bg-amber-50' }}">
                 <i class="ti ti-map-pin"></i> {{ store.city or '未設縣市' }}</button>
             <button type="button" @click="go('settings', 'branches')" class="{{ chip }} border-sela-200 text-sela-900">
                 <i class="ti ti-building-store"></i> {% set _nb = (store.branches | selectattr('is_active') | list | length) if store.branches else 0 %}{{ (_nb ~ ' 家分店') if _nb else '沒有分店' }}</button>
             <button type="button" @click="go('settings', 'visibility')" class="{{ chip }} border-sela-200 text-sela-900">
                 <i class="ti ti-eye"></i> {{ '公開' if store.is_public else ('限 ' ~ (store_dept_ids | length) ~ ' 個部門') }}</button>
-            {% if has_options %}
-            <button type="button" @click="go('options', 'tab-options')" class="{{ chip }} border-sela-200 text-sela-900">
-                {# V2.28.0 P3：餐廳只有加料（甜冰是飲料店才有，原本餐廳也寫「甜度 0・冰塊 0」） #}
-                <i class="ti ti-adjustments"></i> {% if store.category.value == 'drink' %}甜度 {{ sugar_list | length }}・冰塊 {{ ice_list | length }}・{% endif %}加料 {{ topping_rows | length }}</button>
-            {% endif %}
-            <button type="button" @click="go('settings', 'store-phone')" class="{{ chip }} {{ 'border-sela-200 text-sela-900' if store.phone else 'border-sela-200 text-sela-800/55' }}">
-                <i class="ti ti-phone"></i> {{ store.phone or '沒有電話' }}</button>
         </div>
 
         <div class="flex gap-1 mt-4 border-b border-sela-100 -mb-4 overflow-x-auto">
@@ -110,7 +118,61 @@
     {% if item.description %}<span class="text-xs text-sela-800/45"><i class="ti ti-note"></i> {{ item.description }}</span>{% endif %}
 </div>
 {%- endmacro %}
-        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+        {# V2.29.0（外部審稿 V2.28.0 P1-B，Sela 選 A）：直接在這裡改價——每項價格變輸入框、可搜尋、改過的變色，
+           底部一次「存成第 N 版」。後端照抄使用中版本套上新價、走匯入同一條路存新版本（進行中的團不受影響）。
+           時價品項不能在這裡改。 #}
+        <script type="application/json" id="price-items">{{ price_items | tojson }}</script>
+        <div x-show="priceEdit" x-cloak id="price-editor" x-data="priceEditor()" data-track class="space-y-3">
+            <div class="flex items-center gap-2">
+                <input type="search" x-model="q" placeholder="搜尋品項…" aria-label="搜尋品項"
+                       class="flex-1 min-w-0 border border-sela-300 rounded-xl px-3 min-h-[44px] text-base bg-white">
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-sela-100 px-4 py-1">
+                <template x-for="g in groups()" :key="g.cat">
+                    <div>
+                        <div class="text-xs text-sela-800/55 pt-3 pb-1" x-text="g.cat"></div>
+                        <template x-for="it in g.items" :key="it.id">
+                            <div class="flex items-center gap-2 py-2 border-b border-sela-100 last:border-0" :data-item="it.id">
+                                <span class="flex-1 min-w-0 text-[15px] text-sela-900 truncate"><span x-text="it.name"></span><span x-show="!it.available" class="text-xs text-sela-800/45">（停售）</span></span>
+                                <template x-if="it.tbd"><span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-0.5 rounded-full">時價</span></template>
+                                <template x-if="!it.tbd">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="text-xs text-sela-800/50" x-show="it.orig_l !== null">M</span>
+                                        <input type="text" inputmode="decimal" x-model="it.price" :aria-label="it.name + ' 價格'"
+                                               :class="bad(it.price, false) ? 'border-red-400 bg-red-50' : (it.price !== it.orig ? 'border-sela-700 bg-amber-50 font-bold' : 'border-sela-200')"
+                                               class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
+                                        <template x-if="it.orig_l !== null">
+                                            <span class="flex items-center gap-1.5">
+                                                <span class="text-xs text-sela-800/50">L</span>
+                                                <input type="text" inputmode="decimal" x-model="it.price_l" :aria-label="it.name + ' 大杯價格'"
+                                                       :class="bad(it.price_l, true) ? 'border-red-400 bg-red-50' : (it.price_l !== it.orig_l ? 'border-sela-700 bg-amber-50 font-bold' : 'border-sela-200')"
+                                                       class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
+                                            </span>
+                                        </template>
+                                    </span>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <div x-show="!groups().length" class="py-6 text-center text-sm text-sela-800/50">找不到符合的品項</div>
+            </div>
+            <form action="/admin/stores/{{ store.id }}/menu/prices" method="post" data-track id="price-form"
+                  class="sticky z-10 bg-white border border-sela-200 rounded-2xl p-3 flex items-center gap-2 shadow-sm"
+                  style="bottom: calc(4.5rem + env(safe-area-inset-bottom))">
+                <input type="hidden" name="base_menu_id" value="{{ active_menu.id }}">
+                <input type="hidden" name="changes_json" :value="payload()">
+                <div class="flex-1 min-w-0 text-[13px] text-sela-800/70">
+                    <div x-show="hasBad()" x-cloak class="text-red-600">價格要填 0 以上的數字</div>
+                    <div x-show="!hasBad()"><span x-text="changed().length ? '改了 ' + changed().length + ' 項' : '還沒有改'"></span></div>
+                    <div class="truncate" x-text="summary()"></div>
+                </div>
+                <button type="button" @click="cancel()" class="min-h-[44px] px-3 rounded-xl border border-sela-300 text-sm whitespace-nowrap">取消</button>
+                <button type="submit" id="price-save" :disabled="!changed().length || hasBad()"
+                        class="min-h-[44px] px-4 rounded-xl bg-sela-700 text-white text-sm font-medium whitespace-nowrap disabled:opacity-40">存成第 {{ (menu_count or 0) + 1 }} 版</button>
+            </form>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4" x-show="!priceEdit">
             <div class="flex items-center justify-between mb-2">
                 <div>
                     <div class="font-medium text-sela-800"><i class="ti ti-circle-check text-green-600"></i> 使用中：第 {{ active_version }} 版</div>
@@ -189,7 +251,7 @@
         <p class="text-xs text-sela-800/55 px-1">這家店所有品項共用。菜單匯入不會動到這裡。</p>
 
         {% if store.category and store.category.value == 'drink' %}
-        <form action="/admin/stores/{{ store.id }}/options" method="post" id="options-form"
+        <form action="/admin/stores/{{ store.id }}/options" method="post" id="options-form" data-track
               class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4 space-y-4"
               x-data='{ dirty: false }' @tags-changed="dirty = true">
             <h2 class="font-medium text-sela-800"><i class="ti ti-cup"></i> 甜度／冰塊</h2>
@@ -238,7 +300,7 @@
         </form>
         {% endif %}
 
-        <form action="/admin/stores/{{ store.id }}/toppings/batch" method="post" id="toppings-form"
+        <form action="/admin/stores/{{ store.id }}/toppings/batch" method="post" id="toppings-form" data-track
               class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4"
               x-data='toppingEditor({{ topping_rows | tojson }})'
               @submit="if (!canSave()) { $event.preventDefault(); return; } if (removed.length && !confirm('刪除 ' + removed.length + ' 項加料？已點過的訂單保留原本的名稱和價格。')) $event.preventDefault()">
@@ -293,11 +355,16 @@
     </div>
     {% endif %}
 
+{# V2.29.0（審稿 P2-D）：存檔後回到那張卡片並寫「已儲存」，不再只回到分頁頂端看不出有沒有存到 #}
+{% macro saved_note(key, text) -%}
+{% if saved == key %}<div class="mb-3 p-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700" data-saved="{{ key }}"><i class="ti ti-circle-check"></i> {{ text }}</div>{% endif %}
+{%- endmacro %}
     <!-- ════ 店家設定（基本資料＋分店＋可見範圍） ════ -->
     <div x-show="tab === 'settings'" x-cloak class="space-y-3" id="tab-settings">
-        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4">
+        <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4" id="store-info">
+            {{ saved_note('info', '基本資料已儲存') }}
             <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-pencil"></i> 基本資料</h2>
-        <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4">
+        <form action="/admin/stores/{{ store.id }}/edit" method="post" enctype="multipart/form-data" class="space-y-4" data-track>
             <div class="grid sm:grid-cols-2 gap-3">
                 <div class="sm:col-span-2">
                     <label class="block text-xs text-sela-800/60 mb-1">店名 <span class="text-red-500">*</span></label>
@@ -391,6 +458,7 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4" id="branches">
+            {{ saved_note('branch_added', '分店已新增') }}{{ saved_note('branch_deleted', '分店已刪除') }}{{ saved_note('branch_toggled', '分店狀態已更新') }}
             <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-building-store"></i> 分店（{{ store.branches | length if store.branches else 0 }}）</h2>
             {% if store.branches %}
             <div class="divide-y divide-sela-100 text-sm mb-3">
@@ -403,7 +471,7 @@
                 {% endfor %}
             </div>
             {% endif %}
-            <form action="/admin/stores/{{ store.id }}/branches" method="POST" class="flex gap-2">
+            <form action="/admin/stores/{{ store.id }}/branches" method="POST" class="flex gap-2" data-track>
                 <input type="text" name="name" placeholder="分店名" required maxlength="100" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
                 <input type="text" name="phone" placeholder="電話" maxlength="50" class="w-28 border border-sela-200 rounded-lg px-3 py-2 text-base">
                 <button type="submit" class="bg-sela-700 text-white px-3 rounded-lg text-sm whitespace-nowrap">新增</button>
@@ -411,8 +479,9 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4" id="visibility" x-data="{ pub: {{ 'true' if store.is_public else 'false' }} }">
+            {{ saved_note('visibility', '可見範圍已儲存') }}
             <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-users"></i> 可見範圍</h2>
-            <form action="/admin/stores/{{ store.id }}/visibility" method="POST" class="space-y-2 text-sm">
+            <form action="/admin/stores/{{ store.id }}/visibility" method="POST" class="space-y-2 text-sm" data-track>
                 <label class="flex items-center gap-2"><input type="radio" name="visibility" value="public" {% if store.is_public %}checked{% endif %} @change="pub = true"> 公開 — 所有人看得到</label>
                 <label class="flex items-center gap-2"><input type="radio" name="visibility" value="departments" {% if not store.is_public %}checked{% endif %} @change="pub = false"> 限定部門</label>
                 <div x-show="!pub" class="ml-6 pt-1">
@@ -439,18 +508,30 @@
             <div class="text-sm text-sela-800/80">{% if store.is_active %}停用店家{% else %}啟用店家{% endif %}</div>
             <button type="submit" class="px-4 py-2 rounded-lg border border-sela-300 text-sm">{% if store.is_active %}停用{% else %}啟用{% endif %}</button>
         </form>
+        {# V2.29.0（Sela：「刪除店家的步驟太麻煩了，頂多二次確認」；選方案 A）：原本要輸入完整店名才能按，
+           改成按一下跳出確認框，框裡寫出影響範圍與進行中的團，按「確定刪除」完成。 #}
         <div class="border-t border-red-100 pt-4">
-            <div class="text-sm text-sela-800/80 mb-1">刪除店家</div>
-            <p class="text-xs text-sela-800/55 mb-2">
-                會刪除 {{ menu_count }} 個菜單版本；{{ group_count }} 個歷史團的店家連結會被清除（團單與訂單本身保留，顯示為「店家已移除」）。
-                {% if active_group_count %}<span class="text-red-600 font-medium">目前還有 {{ active_group_count }} 個進行中的團。</span>{% endif %}
-            </p>
-            <form action="/admin/stores/{{ store.id }}/delete" method="post" class="flex gap-2">
-                <input type="text" name="confirm_name" x-model="confirmName" placeholder="輸入店名「{{ store.name }}」以確認" autocomplete="off"
-                       class="flex-1 min-w-0 border border-red-200 rounded-lg px-3 py-2 text-base">
-                <button type="submit" :disabled='confirmName.trim() !== {{ store.name | tojson }}'
-                        class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">刪除</button>
-            </form>
+            <button type="button" id="del-store-btn" @click="delOpen = true"
+                    class="w-full min-h-[44px] rounded-xl border border-red-300 text-red-700 text-[15px] bg-white"><i class="ti ti-trash"></i> 刪除這家店</button>
+        </div>
+        <div id="del-store-dialog" x-show="delOpen" x-cloak @keydown.escape.window="delOpen = false"
+             class="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-5" @click.self="delOpen = false"
+             role="dialog" aria-modal="true" aria-labelledby="del-store-title">
+            <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3">
+                <div id="del-store-title" class="text-base font-bold text-sela-900">刪除「{{ store.name }}」？</div>
+                <ul class="text-[14px] text-sela-800 leading-relaxed list-disc pl-5">
+                    <li>{{ menu_count }} 個菜單版本會刪除</li>
+                    {% if group_count %}<li>{{ group_count }} 個歷史團保留，店名顯示「店家已移除」</li>{% endif %}
+                    {% if active_group_count %}<li class="text-red-700 font-bold">還有 {{ active_group_count }} 個進行中的團</li>{% endif %}
+                </ul>
+                <p class="text-[13px] text-sela-800/70">刪除後無法復原；只是暫時不用可以改「停用」。</p>
+                <form action="/admin/stores/{{ store.id }}/delete" method="post" class="flex gap-2 pt-1">
+                    <input type="hidden" name="confirm" value="yes">
+                    <button type="button" @click="delOpen = false" class="flex-1 min-h-[44px] rounded-xl border border-sela-300 text-[15px]">取消</button>
+                    <button type="submit" class="flex-1 min-h-[44px] rounded-xl bg-red-600 text-white text-[15px] font-bold">確定刪除</button>
+                </form>
+            </div>
+        </div>
         </div>
     </div>
 </div>
@@ -458,6 +539,50 @@
 
 {% block scripts %}
 <script>
+// V2.29.0 工作台直接改價（P1-B）。價格一律當字串比（輸入框的值是字串），原始值在 orig／orig_l
+function priceEditor() {
+    let src = [];
+    try { src = JSON.parse(document.getElementById('price-items').textContent) || []; } catch (e) {}
+    return {
+        q: '',
+        items: src.map(it => Object.assign({}, it, { price: it.orig, price_l: it.orig_l })),
+        norm(t) { return String(t || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase(); },
+        groups() {
+            const kw = this.norm(this.q);
+            const out = [];
+            for (const it of this.items) {
+                if (kw && !this.norm(it.name).includes(kw)) continue;
+                let g = out.find(x => x.cat === it.cat);
+                if (!g) { g = { cat: it.cat, items: [] }; out.push(g); }
+                g.items.push(it);
+            }
+            return out;
+        },
+        bad(v, optional) {
+            const t = String(v === null || v === undefined ? '' : v).trim();
+            if (t === '') return !optional;
+            return !/^\d{1,6}(\.\d{1,2})?$/.test(t);
+        },
+        changed() { return this.items.filter(it => !it.tbd && (it.price !== it.orig || it.price_l !== it.orig_l)); },
+        hasBad() { return this.changed().some(it => this.bad(it.price, false) || (it.orig_l !== null && this.bad(it.price_l, true))); },
+        payload() { return JSON.stringify(this.changed().map(it => ({ id: it.id, price: String(it.price).trim(), price_l: it.price_l === null ? '' : String(it.price_l).trim() }))); },
+        summary() {
+            const c = this.changed();
+            const parts = c.slice(0, 3).map(it => {
+                const p = [];
+                if (it.price !== it.orig) p.push((it.orig_l !== null ? 'M ' : '') + it.orig + '→' + it.price);
+                if (it.price_l !== it.orig_l) p.push('L ' + it.orig_l + '→' + it.price_l);
+                return it.name + ' ' + p.join('、');
+            });
+            return parts.join('、') + (c.length > 3 ? ' 等' : '');
+        },
+        cancel() {
+            if (this.changed().length && !confirm('放棄這次改的價格？')) return;
+            this.items.forEach(it => { it.price = it.orig; it.price_l = it.orig_l; });
+            this.q = ''; this.priceEdit = false; this.unsaved = false;
+        },
+    };
+}
 // V2.21.0：甜冰點選標籤（順序＝點餐時的順序；送出時 join 成逗號字串，後端不變）
 function tagEditor(initial) {
     return {

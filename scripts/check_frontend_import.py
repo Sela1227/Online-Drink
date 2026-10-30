@@ -23,6 +23,7 @@ SORT_SCRIPT = ROOT / "scripts" / "jsdom_store_sort_check.js"  # V2.16.2 店家�
 GROUP_SCRIPT = ROOT / "scripts" / "jsdom_group_check.js"  # V2.18.0 團頁
 WORKBENCH_SCRIPT = ROOT / "scripts" / "jsdom_workbench_check.js"  # V2.21.0 工作台共用選項
 ANN_SCRIPT = ROOT / "scripts" / "jsdom_announcements_check.js"  # V2.28.0 公告原地展開
+PRICE_SCRIPT = ROOT / "scripts" / "jsdom_price_check.js"  # V2.29.0 工作台直接改價
 
 os.environ["DATABASE_URL"] = "sqlite:///./_importcheck.db"
 os.environ["SECRET_KEY"] = "template_check_only"
@@ -170,6 +171,13 @@ def _render_pages() -> dict:
     a2 = Announcement(title="乙公告", content="內容乙", created_by_id=_me.id)
     db.add_all([a1, a2]); db.commit()
     pages["__ann__"] = (c.get(f"/admin/announcements?open={a1.id}").text, str(a1.id), str(a2.id))
+    # V2.29.0：工作台直接改價
+    from app.schemas.menu import MenuImport as _MI
+    from app.services.import_service import import_menu as _im
+    pst = Store(name="改價店", category=CategoryType.DRINK); db.add(pst); db.commit()
+    _im(db, _MI(store_id=pst.id, mode="new", menu={"categories": [{"name": "茶", "items": [
+        {"name": "紅茶", "price": 30, "price_l": 35}, {"name": "綠茶", "price": 25}, {"name": "季節茶", "price": "時價"}]}]}))
+    pages["__price__"] = c.get(f"/admin/stores/{pst.id}?tab=menu&edit=price").text
     db.close()
     return pages
 
@@ -198,6 +206,7 @@ def main():
         group_pages = {k: (pages.pop(f"__group_{k}__"), pages.pop(f"__group_{k}_mine__"), pages.pop(f"__group_{k}_wall__")) for k in ("member", "owner")}
         workbench_page = pages.pop("__workbench__")
         ann_page = pages.pop("__ann__")
+        price_page = pages.pop("__price__")
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -228,7 +237,7 @@ def main():
             if res.get("ok") and mode.endswith("_city"):
                 print(f"  OK  {mode}：只顯示我的縣市（沒設縣市／不分縣市照樣顯示）、看全部可切回、最新加入排序與卡片小字")
             elif res.get("ok"):
-                print(f"  OK  {mode}：預設熱門、排序順序正確、卡片小字、選擇有記住{'；無巢狀連結、篩選收合、沒菜單標記可篩可點、進頁不沿用上次的問題篩選' if mode == 'admin' else ''}{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
+                print(f"  OK  {mode}：預設熱門、排序順序正確、卡片小字、選擇有記住{'；無巢狀連結、篩選收合、沒菜單標記可篩可點、進頁不沿用上次的問題篩選、問題數跟著搜尋算' if mode == 'admin' else ''}{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")
                 print(f"  !   sort/{mode}：{res.get('msg')}")
@@ -263,6 +272,19 @@ def main():
         else:
             problems.append(f"workbench：{res.get('msg')}")
             print(f"  !   workbench：{res.get('msg')}")
+        print("[前端] 工作台直接改價（jsdom）")
+        p = Path(td) / "price.html"; p.write_text(price_page, encoding="utf-8")
+        r = subprocess.run(["node", str(PRICE_SCRIPT), str(p)], env=env, capture_output=True, text=True, timeout=60)
+        line = (r.stdout.strip().splitlines() or [""])[-1]
+        try:
+            res = json.loads(line)
+        except Exception:
+            res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
+        if res.get("ok"):
+            print("  OK  ?edit=price 進頁就是改價模式；改價變色、改了 N 項、送出的 JSON 只有改的那項；非數字擋下；時價沒輸入框；搜尋；取消還原")
+        else:
+            problems.append(f"price：{res.get('msg')}")
+            print(f"  !   price：{res.get('msg')}")
         print("[前端] 公告（jsdom）")
         p = Path(td) / "ann.html"; p.write_text(ann_page[0], encoding="utf-8")
         r = subprocess.run(["node", str(ANN_SCRIPT), str(p), ann_page[1], ann_page[2]], env=env, capture_output=True, text=True, timeout=60)
