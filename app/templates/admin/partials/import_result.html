@@ -311,7 +311,7 @@
 {% else %}
 <!-- 確認（V2.15.0：htmx 送出；成功 → HX-Redirect 到工作台；版本被別人更新 → 回傳重新比對的片段）-->
 <form hx-post="/admin/import" hx-target="#import-result" hx-swap="innerHTML" hx-disabled-elt="find button"
-      hx-include="[name=json_text],[name=store_id],[name=new_store_name],[name=new_store_category]:checked" class="mt-3">
+      hx-include="[name=json_text],[name=store_id],[name=new_store_name],[name=new_store_category]:checked,[name=rec_id]" class="mt-3">
     <input type="hidden" name="json_str" value="{{ json_str | e }}">
     <input type="hidden" name="base_menu_id" value="{{ existing_menu.id if existing_menu else 0 }}">
     <input type="hidden" name="src_digest" value="{{ src_digest or '' }}">

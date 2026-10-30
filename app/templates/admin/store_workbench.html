@@ -78,7 +78,8 @@
                 <i class="ti ti-eye"></i> {{ '公開' if store.is_public else ('限 ' ~ (store_dept_ids | length) ~ ' 個部門') }}</button>
             {% if has_options %}
             <button type="button" @click="go('options', 'tab-options')" class="{{ chip }} border-sela-200 text-sela-900">
-                <i class="ti ti-adjustments"></i> 甜度 {{ sugar_list | length }}・冰塊 {{ ice_list | length }}・加料 {{ topping_rows | length }}</button>
+                {# V2.28.0 P3：餐廳只有加料（甜冰是飲料店才有，原本餐廳也寫「甜度 0・冰塊 0」） #}
+                <i class="ti ti-adjustments"></i> {% if store.category.value == 'drink' %}甜度 {{ sugar_list | length }}・冰塊 {{ ice_list | length }}・{% endif %}加料 {{ topping_rows | length }}</button>
             {% endif %}
             <button type="button" @click="go('settings', 'store-phone')" class="{{ chip }} {{ 'border-sela-200 text-sela-900' if store.phone else 'border-sela-200 text-sela-800/55' }}">
                 <i class="ti ti-phone"></i> {{ store.phone or '沒有電話' }}</button>
@@ -139,7 +140,7 @@
         </div>
         {% else %}
         <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-            <i class="ti ti-alert-triangle"></i> 這家店還沒有菜單，團員無法點餐。按右上「更新菜單」匯入。
+            <i class="ti ti-alert-triangle"></i> 這家店還沒有菜單，團員看不到也無法開團。按上方「更新菜單」匯入。
         </div>
         {% endif %}
 
@@ -404,7 +405,7 @@
             {% endif %}
             <form action="/admin/stores/{{ store.id }}/branches" method="POST" class="flex gap-2">
                 <input type="text" name="name" placeholder="分店名" required maxlength="100" class="flex-1 min-w-0 border border-sela-200 rounded-lg px-3 py-2 text-base">
-                <input type="text" name="phone" placeholder="電話" class="w-28 border border-sela-200 rounded-lg px-3 py-2 text-base">
+                <input type="text" name="phone" placeholder="電話" maxlength="50" class="w-28 border border-sela-200 rounded-lg px-3 py-2 text-base">
                 <button type="submit" class="bg-sela-700 text-white px-3 rounded-lg text-sm whitespace-nowrap">新增</button>
             </form>
         </div>

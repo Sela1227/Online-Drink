@@ -1,132 +1,63 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
 
-{% block title %}問題回報管理 - SELA 快點來點餐{% endblock %}
+{% block title %}問題回報 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/admin', '管理後台') }}
-<div class="space-y-4">
-    <!-- 標題列 -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-mailbox"></i> 問題回報</h1>
-        
+{{ nav.back('/admin', '後台管理') }}
+{# V2.28.0（內部審核 P0-1／P2-6／B-3）：
+   - 複製鈕原本把回報內容與暱稱插進 JS 反引號字串，`${...}` 會以管理員身分執行（可提權）。
+     改放 data-copy 屬性（data-* 只是字串，autoescape 有效），按鈕只讀 dataset。check_template_js 已加反引號規則。
+   - 原本依「前 5 筆／其餘」切，第 6 筆以後的待處理被收進歷史；改依狀態分「待處理」與「已處理（收合，最近 50 筆）」。
+   - 兩段幾乎一樣的迴圈合成一個 macro。 #}
+{% macro feedback_card(f, muted=False) -%}
+<div class="bg-white rounded-2xl shadow-sm p-4 {{ 'opacity-70' if muted else '' }}" data-feedback="{{ f.id }}"
+     x-data="{ copied: false }"
+     data-copy="{{ '[' ~ (f.user.show_name if f.user else '') ~ '] ' ~ (f.created_at|taipei).strftime('%m/%d %H:%M') ~ '\n' ~ f.content }}">
+    <div class="flex items-center gap-2 mb-1.5 text-sm">
+        {% if f.user and f.user.picture_url %}<img src="{{ f.user.picture_url }}" alt="" class="w-6 h-6 rounded-full">{% endif %}
+        <span class="font-medium text-sela-800">{{ f.user.show_name if f.user else '' }}</span>
+        <span class="text-sela-800/50">{{ (f.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</span>
     </div>
-    
-    <!-- 最近回報（最多5筆） -->
-    {% if recent_feedbacks %}
-    <div class="space-y-3">
-        {% for feedback in recent_feedbacks %}
-        <div class="bg-white rounded-2xl shadow-sm p-4 {% if feedback.status == 'resolved' %}opacity-60{% endif %}"
-             x-data="{ copied: false }">
-            <div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                    <!-- 用戶資訊 -->
-                    <div class="flex items-center gap-2 mb-2">
-                        {% if feedback.user.picture_url %}
-                        <img src="{{ feedback.user.picture_url }}" class="w-6 h-6 rounded-full">
-                        {% endif %}
-                        <span class="font-medium text-sela-800/80">{{ feedback.user.show_name }}</span>
-                        <span class="text-xs text-sela-800/45">{{ (feedback.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</span>
-                    </div>
-                    
-                    <!-- 內容 -->
-                    <p class="text-sm text-sela-800/80 whitespace-pre-line">{{ feedback.content }}</p>
-                </div>
-                
-                <!-- 操作按鈕 -->
-                <div class="flex flex-col gap-2 flex-shrink-0">
-                    <!-- 複製按鈕 -->
-                    <button @click="
-                        const text = `[{{ feedback.user.show_name }}] {{ (feedback.created_at|taipei).strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
-                        navigator.clipboard.writeText(text);
-                        copied = true;
-                        setTimeout(() => copied = false, 2000);
-                    " class="text-xs px-3 py-1 rounded border transition"
-                       :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-sela-50 text-sela-800/70 hover:bg-sela-100 border-sela-200'">
-                        <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
-                        <span x-show="copied" x-cloak><i class="ti ti-check"></i> 已複製</span>
-                    </button>
-                    
-                    <!-- 狀態/處理 -->
-                    {% if feedback.status == 'resolved' %}
-                    <span class="text-xs bg-green-100 text-green-600 px-3 py-1 rounded text-center">已處理</span>
-                    {% else %}
-                    <form action="/admin/feedbacks/{{ feedback.id }}/resolve" method="POST">
-                        <button type="submit" class="text-xs bg-sela-500 text-sela-800 px-3 py-1 rounded hover:bg-sela-600 w-full">
-                            標記已處理
-                        </button>
-                    </form>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
-        <div class="text-4xl mb-2"><i class="ti ti-confetti"></i></div>
-        <p>目前沒有問題回報</p>
-    </div>
-    {% endif %}
-    
-    <!-- 歷史紀錄 -->
-    {% if history_feedbacks %}
-    <div x-data="{ showHistory: false }">
-        <button @click="showHistory = !showHistory" 
-                class="w-full py-3 bg-sela-100 active:bg-sela-100 rounded-lg text-sm text-sela-800/70 font-medium transition">
-            <span x-show="!showHistory"><i class="ti ti-folder-open"></i> 顯示歷史紀錄 ({{ history_feedbacks|length }} 筆)</span>
-            <span x-show="showHistory" x-cloak><i class="ti ti-folder"></i> 收起歷史紀錄</span>
+    <p class="text-[15px] text-sela-900 whitespace-pre-line break-words">{{ f.content }}</p>
+    <div class="flex items-center gap-2 mt-3">
+        <button type="button" class="px-3 min-h-[36px] rounded-lg border text-sm"
+                :class="copied ? 'bg-green-50 text-green-700 border-green-300' : 'bg-sela-50 text-sela-800 border-sela-200'"
+                @click="navigator.clipboard.writeText($root.dataset.copy); copied = true; setTimeout(() => copied = false, 2000)">
+            <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
+            <span x-show="copied" x-cloak><i class="ti ti-check"></i> 已複製</span>
         </button>
-        
-        <div x-show="showHistory" x-cloak x-collapse class="mt-3 space-y-3">
-            {% for feedback in history_feedbacks %}
-            <div class="bg-sela-50 rounded-lg p-4 {% if feedback.status == 'resolved' %}opacity-60{% endif %}"
-                 x-data="{ copied: false }">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                        <!-- 用戶資訊 -->
-                        <div class="flex items-center gap-2 mb-2">
-                            {% if feedback.user.picture_url %}
-                            <img src="{{ feedback.user.picture_url }}" class="w-6 h-6 rounded-full">
-                            {% endif %}
-                            <span class="font-medium text-sela-800/70">{{ feedback.user.show_name }}</span>
-                            <span class="text-xs text-sela-800/45">{{ (feedback.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</span>
-                        </div>
-                        
-                        <!-- 內容 -->
-                        <p class="text-sm text-sela-800/70 whitespace-pre-line">{{ feedback.content }}</p>
-                    </div>
-                    
-                    <!-- 操作按鈕 -->
-                    <div class="flex flex-col gap-2 flex-shrink-0">
-                        <!-- 複製按鈕 -->
-                        <button @click="
-                            const text = `[{{ feedback.user.show_name }}] {{ (feedback.created_at|taipei).strftime('%m/%d %H:%M') }}\n{{ feedback.content }}`;
-                            navigator.clipboard.writeText(text);
-                            copied = true;
-                            setTimeout(() => copied = false, 2000);
-                        " class="text-xs px-3 py-1 rounded border transition"
-                           :class="copied ? 'bg-green-100 text-green-600 border-green-300' : 'bg-sela-50 text-sela-800/60 hover:bg-sela-100 border-sela-300'">
-                            <span x-show="!copied"><i class="ti ti-clipboard-list"></i> 複製</span>
-                            <span x-show="copied" x-cloak><i class="ti ti-check"></i> 已複製</span>
-                        </button>
-                        
-                        <!-- 狀態 -->
-                        {% if feedback.status == 'resolved' %}
-                        <span class="text-xs bg-green-100 text-green-600 px-3 py-1 rounded text-center">已處理</span>
-                        {% else %}
-                        <form action="/admin/feedbacks/{{ feedback.id }}/resolve" method="POST">
-                            <button type="submit" class="text-xs bg-sela-500 text-sela-800 px-3 py-1 rounded hover:bg-sela-600 w-full">
-                                標記已處理
-                            </button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+        {% if f.status == 'resolved' %}
+        <span class="ml-auto text-sm text-green-700"><i class="ti ti-check"></i> 已處理</span>
+        {% else %}
+        <form action="/admin/feedbacks/{{ f.id }}/resolve" method="POST" class="ml-auto">
+            <button type="submit" class="px-4 min-h-[36px] rounded-lg bg-sela-700 text-white text-sm font-medium">標記已處理</button>
+        </form>
+        {% endif %}
     </div>
+</div>
+{%- endmacro %}
+<div class="space-y-4">
+    <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-mailbox"></i> 問題回報</h1>
+
+    <section id="fb-pending" class="space-y-3">
+        <h2 class="text-sm font-bold text-sela-800/60 px-1">待處理（{{ pending | length }}）</h2>
+        {% for f in pending %}{{ feedback_card(f) }}{% endfor %}
+        {% if not pending %}
+        <div class="text-center py-8 text-sela-800/60 bg-white rounded-2xl">
+            <div class="text-3xl mb-1"><i class="ti ti-confetti"></i></div>
+            <p>沒有待處理的回報</p>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if resolved %}
+    <details id="fb-resolved" class="group">
+        <summary class="cursor-pointer bg-white rounded-2xl shadow-sm px-4 min-h-[48px] flex items-center justify-between text-[15px] font-medium text-sela-800">
+            已處理（最近 {{ resolved | length }} 筆）<span class="text-sm text-sela-800/50">展開 ▾</span>
+        </summary>
+        <div class="mt-3 space-y-3">{% for f in resolved %}{{ feedback_card(f, True) }}{% endfor %}</div>
+    </details>
     {% endif %}
 </div>
 {% endblock %}

@@ -1,121 +1,75 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
 
-{% block title %}使用者管理 - SELA 快點來點餐{% endblock %}
+{% block title %}人員 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/admin', '管理後台') }}
+{{ nav.back('/admin', '後台管理') }}
+{# V2.28.0（內部審核 B-2）：「登出所有人」原本是頁首第一塊紅框，改到最下面的維護區並寫出會影響誰；
+   列表上的「設為管理員」拿掉（點進個人頁再改，與清單分開，避免誤觸）；「檢查重複用戶」拿掉（A-1）。 #}
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-xl font-bold text-sela-800">使用者管理</h1>
-            <div class="text-sm text-sela-800/60">共 {{ users|length }} 人 · <span class="text-green-600"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> {{ online_count }} 人在線</span></div>
-            <a href="/admin/users-duplicates" class="text-xs text-sela-800 hover:underline"><i class="ti ti-users-group"></i> 檢查重複用戶</a>
-        </div>
-        
+    <div>
+        <h1 class="text-xl font-bold text-sela-800">人員</h1>
+        <div class="text-sm text-sela-800/60">共 {{ users|length }} 人 · <span class="text-green-700"><i class="ti ti-circle-filled" style="color: #22c55e;"></i> {{ online_count }} 人在線</span></div>
     </div>
-    
-    <!-- 一鍵登出按鈕 -->
-    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="font-medium text-red-800">一鍵登出所有用戶</div>
-                <div class="text-sm text-red-600">執行後所有用戶需重新登入（Token 版本：{{ system_setting.token_version if system_setting else 1 }}）</div>
-            </div>
-            <form action="/admin/users/logout-all" method="post"
-                  onsubmit="return confirm('確定要登出所有用戶嗎？\n\n執行後所有人（包括你自己）都需要重新登入。')">
-                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                    <i class="ti ti-alert-octagon"></i> 登出所有人
-                </button>
-            </form>
-        </div>
-    </div>
-    
+
     {% if request.query_params.get('logout_all') == 'success' %}
-    <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
-        <i class="ti ti-check"></i> 已成功登出所有用戶，所有人需重新登入。
+    <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">
+        <i class="ti ti-check"></i> 已登出所有人，大家下次開啟要重新用 LINE 登入。
     </div>
     {% endif %}
 
-    <!-- 排序 -->
-    <div class="flex gap-1 bg-sela-100 p-1 rounded-lg text-sm overflow-x-auto">
+    <div class="flex gap-1 bg-sela-100 p-1 rounded-xl text-sm overflow-x-auto">
         {% for val, label in [('created','建立時間'), ('last_login','最近登入'), ('last_active','最近活動'), ('name','名稱')] %}
         <a href="/admin/users?sort={{ val }}"
-           class="flex-1 text-center whitespace-nowrap py-2 px-3 rounded-md font-medium transition {{ 'bg-white text-sela-800 shadow-sm' if sort == val else 'text-sela-800/60' }}">{{ label }}</a>
+           class="flex-1 text-center whitespace-nowrap py-2 px-3 min-h-[36px] rounded-lg font-medium {{ 'bg-white text-sela-800 shadow-sm' if sort == val else 'text-sela-800/60' }}">{{ label }}</a>
         {% endfor %}
     </div>
 
     {% if users %}
-    <div class="bg-white rounded-2xl shadow-sm divide-y">
+    <div class="bg-white rounded-2xl shadow-sm divide-y" id="user-list">
         {% for u in users %}
-        <div class="p-4 flex items-center gap-3 hover:bg-sela-50 transition">
-            <!-- 頭像 + 在線狀態（可點擊） -->
-            <a href="/admin/users/{{ u.id }}" class="relative w-10 h-10 flex-shrink-0">
-                <div class="w-10 h-10 bg-sela-100 rounded-full flex items-center justify-center overflow-hidden">
-                    {% if u.picture_url %}
-                    <img src="{{ u.picture_url }}" alt="{{ u.display_name }}" class="w-full h-full object-cover">
-                    {% else %}
-                    <span class="text-lg"><i class="ti ti-user"></i></span>
-                    {% endif %}
-                </div>
-                <!-- 在線指示燈 -->
-                {% if u.is_online %}
-                <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
-                {% endif %}
-            </a>
-            
-            <!-- 資訊（可點擊） -->
-            <a href="/admin/users/{{ u.id }}" class="flex-1 min-w-0">
-                <div class="font-medium text-sela-800 truncate">
+        <a href="/admin/users/{{ u.id }}" class="p-4 flex items-center gap-3 active:bg-sela-50 min-h-[64px]">
+            <span class="relative w-10 h-10 flex-shrink-0">
+                <span class="w-10 h-10 bg-sela-100 rounded-full flex items-center justify-center overflow-hidden">
+                    {% if u.picture_url %}<img src="{{ u.picture_url }}" alt="" class="w-full h-full object-cover">{% else %}<i class="ti ti-user text-lg"></i>{% endif %}
+                </span>
+                {% if u.is_online %}<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>{% endif %}
+            </span>
+            <span class="flex-1 min-w-0">
+                <span class="block text-[15px] font-medium text-sela-900 truncate">
                     {{ u.show_name }}
-                    {% if u.nickname %}
-                    <span class="text-xs text-sela-800/45 font-normal">({{ u.display_name }})</span>
-                    {% endif %}
-                    {% if u.is_admin %}
-                    <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">管理員</span>
-                    {% endif %}
-                    {% if u.is_online %}
-                    <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-1">在線</span>
-                    {% endif %}
-                </div>
-                <div class="text-xs text-sela-800/45 truncate">
-                    {% if u.last_login_at %}
-                    最後登入：{{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}
-                    {% else %}
-                    尚未登入
-                    {% endif %}
-                    ・加入 {{ (u.created_at|taipei).strftime('%Y-%m-%d') }}
-                    ・{{ u.orders|length }} 筆訂單
-                </div>
-            </a>
-            
-            <!-- 操作 -->
-            <div class="flex-shrink-0">
-                {% if u.id != user.id %}
-                <form action="/admin/users/{{ u.id }}/toggle-admin" method="post" class="inline"
-                      onsubmit="return confirm('確定要{{ '移除' if u.is_admin else '設為' }}管理員嗎？')">
-                    <button type="submit" class="text-sm px-3 py-1.5 rounded transition
-                        {% if u.is_admin %}
-                        bg-sela-100 text-sela-800/70 active:bg-sela-100
-                        {% else %}
-                        bg-amber-50 text-amber-600 hover:bg-amber-100
-                        {% endif %}
-                    ">
-                        {% if u.is_admin %}移除管理員{% else %}設為管理員{% endif %}
-                    </button>
-                </form>
-                {% else %}
-                <span class="text-xs text-sela-800/45">（你自己）</span>
-                {% endif %}
-            </div>
-        </div>
+                    {% if u.nickname %}<span class="text-xs text-sela-800/50 font-normal">({{ u.display_name }})</span>{% endif %}
+                    {% if u.is_admin %}<span class="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1">管理員</span>{% endif %}
+                    {% if u.id == user.id %}<span class="text-xs text-sela-800/50 font-normal ml-1">（你）</span>{% endif %}
+                </span>
+                <span class="block text-[13px] text-sela-800/60 truncate">
+                    {% if u.last_login_at %}最後登入 {{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}{% else %}尚未登入{% endif %}
+                    · {{ order_counts.get(u.id, 0) }} 筆訂單
+                </span>
+            </span>
+            <i class="ti ti-chevron-right text-sela-800/35"></i>
+        </a>
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
-        <div class="text-4xl mb-2"><i class="ti ti-users"></i></div>
-        <p>還沒有任何使用者</p>
-    </div>
+    <div class="text-center py-12 text-sela-800/60 bg-white rounded-2xl">還沒有任何使用者</div>
     {% endif %}
+
+    <section id="maintenance" class="pt-4 space-y-2">
+        <h2 class="text-sm font-bold text-sela-800/60 px-1">維護</h2>
+        <div class="bg-white rounded-2xl border border-red-200 p-4 space-y-3">
+            <div>
+                <div class="text-[15px] font-medium text-sela-900">登出所有人</div>
+                <div class="text-sm text-sela-800/70 mt-1">所有人（包括你）下次開啟都要重新用 LINE 登入。現在有 <b id="online-impact">{{ online_count }}</b> 人在線，正在點餐的會被打斷。只在懷疑登入資料外洩時用。</div>
+            </div>
+            <form action="/admin/users/logout-all" method="post" data-n="{{ online_count }}"
+                  onsubmit="return confirm('登出所有人？現在有 ' + this.dataset.n + ' 人在線，大家都要重新登入。')">
+                <button type="submit" class="w-full border border-red-300 text-red-700 min-h-[44px] rounded-xl text-sm font-medium">
+                    <i class="ti ti-logout"></i> 登出所有人
+                </button>
+            </form>
+        </div>
+    </section>
 </div>
 {% endblock %}

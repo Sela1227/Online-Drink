@@ -102,6 +102,33 @@ def check_attr_js():
         print("  OK  屬性內的 JS 插值全部經 tojson 且外層單引號")
 
 
+# V2.28.0（內部審核 P0-1）：JS 反引號字串（template literal）裡的 Jinja 插值。
+# autoescape 逸出 & < > ' " 但不逸出 ` 與 ${，回報內容寫 ${fetch(...)} 就會以管理員身分執行。
+# 規則：模板任何位置（<script> 或屬性）只要反引號字串裡出現 {{ 一律失敗——要嘛 tojson、要嘛放 data-*。
+BACKTICK_INTERP = re.compile(r"`[^`]*\{\{[^`]*`", re.S)
+
+
+def check_backtick():
+    hits = []
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        text = path.read_text(encoding="utf-8")
+        text = re.sub(r"\{#.*?#\}", lambda m: " " * len(m.group(0)), text, flags=re.S)  # Jinja 註解不算
+        text = text.replace("```", "   ")  # 畫面文字裡的 ``` 標記（匯入結果片段）不是 JS
+        # 依序配對反引號（第 1、2 個是一段，第 3、4 個是一段……），不用正則跨段亂配
+        ticks = [i for i, ch in enumerate(text) if ch == "`"]
+        for a, b in zip(ticks[0::2], ticks[1::2]):
+            seg = text[a:b + 1]
+            if "{{" in seg:
+                ln = text[:a].count("\n") + 1
+                hits.append(f"{path.relative_to(ROOT)}:{ln}: 反引號字串裡有 Jinja 插值 → {seg[:80]!r}")
+    if hits:
+        failures.append("反引號字串內的 Jinja 插值（共 %d 處）" % len(hits))
+        for h in hits:
+            print("  !", h)
+    else:
+        print("  OK  沒有反引號字串內的 Jinja 插值")
+
+
 # ---- 【二】渲染目標：模板 → (假 context, 要抽出來檢查的函式名) ----
 
 class Stub:
@@ -284,6 +311,7 @@ def main():
     print("[1] <script> 插值逸出")
     check_escaping()
     check_attr_js()
+    check_backtick()
     print("\n[2] 渲染後 JS 語法")
     check_rendered_js()
 

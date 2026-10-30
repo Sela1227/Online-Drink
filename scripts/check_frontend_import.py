@@ -22,6 +22,7 @@ NODE_SCRIPT = ROOT / "scripts" / "jsdom_import_check.js"
 SORT_SCRIPT = ROOT / "scripts" / "jsdom_store_sort_check.js"  # V2.16.2 店家排序
 GROUP_SCRIPT = ROOT / "scripts" / "jsdom_group_check.js"  # V2.18.0 團頁
 WORKBENCH_SCRIPT = ROOT / "scripts" / "jsdom_workbench_check.js"  # V2.21.0 工作台共用選項
+ANN_SCRIPT = ROOT / "scripts" / "jsdom_announcements_check.js"  # V2.28.0 公告原地展開
 
 os.environ["DATABASE_URL"] = "sqlite:///./_importcheck.db"
 os.environ["SECRET_KEY"] = "template_check_only"
@@ -48,22 +49,22 @@ def _render_pages() -> dict:
     adm.get_admin_user = fake_admin
     c = TestClient(m.app)
     pages = {"store": c.get(f"/admin/import?store_id={st.id}").text, "nostore": c.get("/admin/import").text}
-    # V2.25.0：推薦核准後（ai=1）進匯入頁，Sela 的頁面會自動用推薦照片轉
+    # V2.25.0：從推薦進匯入頁，Sela 的頁面會自動用推薦照片轉（V2.28.0 改 rec_id、還沒建店）
     from app.models.user import StoreRecommendation
     from app.config import get_settings as _gs
     _s = _gs(); _keep = (_s.anthropic_api_key, _s.admin_line_user_id)
     _s.anthropic_api_key, _s.admin_line_user_id = "sk-check", "importcheck"
     try:
         rec = StoreRecommendation(user_id=db.query(User).filter(User.line_user_id == "importcheck").first().id, store_name="檢查店",
-                                  category="meal", status="approved", created_store_id=st.id,
+                                  category="meal", status="pending",  # V2.28.0 B-4：還沒建店的推薦
                                   menu_image_urls=_json_mod.dumps(["https://res.cloudinary.com/x/image/upload/a.jpg"]),
                                   reviewed_at=datetime_mod.utcnow())
         db.add(rec); db.commit()
-        pages["ai"] = c.get(f"/admin/import?store_id={st.id}&ai=1").text
+        pages["ai"] = c.get(f"/admin/import?rec_id={rec.id}").text
         assert "this.runAi(true)" in pages["ai"]
     finally:
         _s.anthropic_api_key, _s.admin_line_user_id = _keep
-        db.query(StoreRecommendation).filter(StoreRecommendation.created_store_id == st.id).delete(); db.commit()
+        db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "檢查店").delete(); db.commit()
     # V2.15.1 審核 P1-1：XHR 假回應改用**真實**的預覽片段，才測得到確認鈕
     import json as _json
     menu = {"menu": {"categories": [{"name": "主食", "items": [{"name": "雞腿飯", "price": 100}]}]}}
@@ -162,6 +163,13 @@ def _render_pages() -> dict:
     adm.get_admin_user = fake_admin
     pages["__workbench__"] = c.get(f"/admin/stores/{ding.id}?tab=options").text
     assert 'id="toppings-form"' in pages["__workbench__"], "工作台應有加料表單"
+    # V2.28.0：公告原地展開編輯
+    from app.models.user import Announcement
+    _me = db.query(User).filter(User.line_user_id == "importcheck").first()
+    a1 = Announcement(title="甲公告", content="內容甲", created_by_id=_me.id)
+    a2 = Announcement(title="乙公告", content="內容乙", created_by_id=_me.id)
+    db.add_all([a1, a2]); db.commit()
+    pages["__ann__"] = (c.get(f"/admin/announcements?open={a1.id}").text, str(a1.id), str(a2.id))
     db.close()
     return pages
 
@@ -189,6 +197,7 @@ def main():
                       "catalog_city": pages.pop("__catalog_city__"), "picker_city": pages.pop("__picker_city__")}
         group_pages = {k: (pages.pop(f"__group_{k}__"), pages.pop(f"__group_{k}_mine__"), pages.pop(f"__group_{k}_wall__")) for k in ("member", "owner")}
         workbench_page = pages.pop("__workbench__")
+        ann_page = pages.pop("__ann__")
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -219,7 +228,7 @@ def main():
             if res.get("ok") and mode.endswith("_city"):
                 print(f"  OK  {mode}：只顯示我的縣市（沒設縣市／不分縣市照樣顯示）、看全部可切回、最新加入排序與卡片小字")
             elif res.get("ok"):
-                print(f"  OK  {mode}：預設熱門、排序順序正確、卡片小字、選擇有記住{'；無巢狀連結、篩選收合、沒菜單標記可篩可點' if mode == 'admin' else ''}{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
+                print(f"  OK  {mode}：預設熱門、排序順序正確、卡片小字、選擇有記住{'；無巢狀連結、篩選收合、沒菜單標記可篩可點、進頁不沿用上次的問題篩選' if mode == 'admin' else ''}{'；隱藏欄位不送出、甜冰依店家、快捷標籤今天／明天' if mode == 'picker' else ''}{'；收藏區／只看收藏／分類／搜尋攤平' if mode == 'catalog' else ''}")
             else:
                 problems.append(f"sort/{mode}：{res.get('msg')}")
                 print(f"  !   sort/{mode}：{res.get('msg')}")
@@ -254,6 +263,19 @@ def main():
         else:
             problems.append(f"workbench：{res.get('msg')}")
             print(f"  !   workbench：{res.get('msg')}")
+        print("[前端] 公告（jsdom）")
+        p = Path(td) / "ann.html"; p.write_text(ann_page[0], encoding="utf-8")
+        r = subprocess.run(["node", str(ANN_SCRIPT), str(p), ann_page[1], ann_page[2]], env=env, capture_output=True, text=True, timeout=60)
+        line = (r.stdout.strip().splitlines() or [""])[-1]
+        try:
+            res = json.loads(line)
+        except Exception:
+            res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
+        if res.get("ok"):
+            print("  OK  ?open= 那則進頁就展開、點另一則換它展開、再點收合；新增區開關與字數提示")
+        else:
+            problems.append(f"announcements：{res.get('msg')}")
+            print(f"  !   announcements：{res.get('msg')}")
     for f in (ROOT / "_importcheck.db",):
         if f.exists():
             f.unlink()

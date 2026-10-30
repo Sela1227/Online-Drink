@@ -8,6 +8,7 @@
   B. 候補連點：同一品項候補上限 1，兩個請求同時新增 → 只留 1 筆，順位不重複
   C. LINE 登入回呼重複：兩個行程同時搶同一組 state＋code → 只有一個去跟 LINE 換，另一個等到結果沿用
   D. 遷移：新庫 3 個行程同時跑 → 全部 0 錯誤；之後再跑一次 → 變更 0 項
+  E. 推薦確認連按（V2.28.0）：同一筆推薦、同一份新店家資料兩個請求同時確認 → 只建 1 家店，推薦核准並連到它
 
 用法（資料庫名稱必須含 test 或 check，會整個清空）：
     PG_TEST_URL="postgresql://postgres@/race_check?host=/tmp&port=55432" PYTHONPATH=. python scripts/pg_concurrency_check.py [輪數]
@@ -101,6 +102,22 @@ def _child_claim(role, start_at, q):
         db.expire_all()
         row = db.query(LoginAttempt).filter_by(attempt_key="pg-check-key").first()
     q.put((role, f"沿用 {row.status}"))
+
+
+def _child_rec_import(rec_id, payload, start_at, q):
+    _env()
+    import app.routers.admin as adm
+    from app.models.user import User
+    from fastapi.testclient import TestClient
+
+    async def fake(request, db):
+        return db.query(User).filter(User.line_user_id == "rec-admin").first()
+    adm.get_admin_user = fake
+    from app.main import app
+    c = TestClient(app)
+    _wait(start_at)
+    r = c.post("/admin/import", data={"json_str": payload, "rec_id": str(rec_id)}, headers={"HX-Request": "true"})
+    q.put((r.status_code, bool(r.headers.get("HX-Redirect"))))
 
 
 def _child_migrate(start_at, q):
@@ -216,6 +233,30 @@ def main():
     print(f"[C] 登入回呼重複：第一個 {res.get('first')}、第二個 {res.get('second')} → {'通過' if ok else '失敗'}")
     if not ok:
         failures.append("C")
+
+    # E. 推薦確認連按（V2.28.0 B-4）
+    import json as _json
+    from app.models.user import StoreRecommendation
+    adm_u = User(line_user_id="rec-admin", display_name="管理", nickname="管理", is_admin=True); db.add(adm_u); db.commit()
+    exact = 0
+    for i in range(rounds):
+        name = f"並行推薦店{i}"
+        rec = StoreRecommendation(user_id=adm_u.id, store_name=name, category="meal"); db.add(rec); db.commit()
+        payload = _json.dumps({"store": {"name": name, "category": "meal"},
+                               "menu": {"categories": [{"name": "麵", "items": [{"name": "陽春麵", "price": 40}]}]}}, ensure_ascii=False)
+        res = _run(_child_rec_import, [(rec.id, payload), (rec.id, payload)])
+        db.expire_all()
+        stores = db.query(Store).filter(Store.name == name).all()
+        rec = db.get(StoreRecommendation, rec.id)
+        good = len(stores) == 1 and rec.status == "approved" and rec.created_store_id == stores[0].id \
+            and sum(1 for _, redir in res if redir) == 1
+        exact += good
+        if not good:
+            print(f"    第 {i + 1} 輪：{len(stores)} 家店、推薦 {rec.status}／{rec.created_store_id}，回應 {res}")
+    ok = exact == rounds
+    print(f"[E] 推薦確認連按：{rounds} 輪中 {exact} 輪只建 1 家且推薦核准 → {'通過' if ok else '失敗'}")
+    if not ok:
+        failures.append("E")
 
     db.close()
     print("\n全部通過" if not failures else f"\n失敗：{', '.join(failures)}")

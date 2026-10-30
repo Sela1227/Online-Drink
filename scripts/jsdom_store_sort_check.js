@@ -30,7 +30,10 @@ const html = `<html><head></head><body>${rawBody}<script>${alpineSrc}</script></
 const vc = new VirtualConsole();
 const jsErrors = [];
 vc.on("jsdomError", (e) => jsErrors.push(String((e && e.message) || e).split("\n")[0].slice(0, 160)));
-const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/x", pretendToBeVisual: true, virtualConsole: vc });
+const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/x", pretendToBeVisual: true, virtualConsole: vc,
+  // V2.28.0 P1-3：上一版把「只看沒菜單」記在 sessionStorage，回到列表就只剩那幾家（補好菜單後甚至是空的）。
+  // 預放舊資料，驗證進頁不會被它篩掉
+  beforeParse(win) { if (mode === "admin") win.sessionStorage.setItem("admin_store_list_state", JSON.stringify({ sort: "hot", issue: "nomenu" })); } });
 const w = dom.window;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fail = (msg) => { console.log(JSON.stringify({ ok: false, mode, msg })); process.exit(1); };
@@ -259,6 +262,10 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     // V2.27.0：列不再是整列 <a>；店名是 [data-store-name]，排序收進「篩選」
     if (d.querySelector("a a")) fail("不能有巢狀連結（a 裡面又有 a）");
     const readOrder = () => [...d.querySelectorAll("[data-store-row] [data-store-name]")].map(e => e.textContent.trim()).filter(n => names.includes(n));
+    // 這組固定資料三家都算沒菜單，篩了也是 3 家——所以看標記狀態，不看列數
+    const issueHint = () => { const sp = d.querySelector("#issue-chips > span"); return sp ? sp.textContent.trim() : ""; };
+    if (issueHint() !== "點了只看這些") fail("進頁不能沿用上次的「只看問題」篩選（sessionStorage 舊資料）：" + issueHint());
+    if (readOrder().length !== 3) fail("進頁應列出全部 3 家，實際 " + readOrder().length);
     const panel = d.getElementById("filter-panel");
     if (!panel || panel.style.display !== "none") fail("篩選面板預設應收合");
     d.getElementById("filter-toggle").click(); await sleep(60);
@@ -291,6 +298,7 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     let st = {};
     try { st = JSON.parse(w.sessionStorage.getItem("admin_store_list_state") || "{}"); } catch (e) {}
     if (st.sort !== "hot") fail("排序選擇應記在 sessionStorage（" + JSON.stringify(st) + "）");
+    if ("issue" in st) fail("問題標記不該記進 sessionStorage（" + JSON.stringify(st) + "）");
     console.log(JSON.stringify({ ok: true, mode }));
     process.exit(0);
   }

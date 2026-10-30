@@ -28,9 +28,6 @@
             <div class="flex items-center justify-between p-3 bg-sela-50 rounded-lg">
                 <div>
                     <span class="font-medium text-sela-800">{{ ud.department.name }}</span>
-                    {% if ud.role.value == 'leader' %}
-                    <span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded ml-2">小組長</span>
-                    {% endif %}
                 </div>
                 <form action="/my-departments/{{ ud.department_id }}/leave" method="POST"
                       onsubmit="return confirm('確定要離開此部門？')">

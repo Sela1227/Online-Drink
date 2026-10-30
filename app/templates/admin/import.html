@@ -20,7 +20,7 @@
                     {{ recommendation.user.show_name }} 於 {{ (recommendation.created_at|taipei).strftime('%Y-%m-%d') }} 推薦{% if recommendation.menu_images %} · {{ recommendation.menu_images | length }} 張菜單照片{% endif %}
                 </div>
             </div>
-            <a href="/admin/recommendations" class="text-xs text-sela-700 underline whitespace-nowrap">稍後再匯入</a>
+            <a href="/admin/recommendations" class="text-sm text-sela-700 underline whitespace-nowrap">稍後再說</a>
         </div>
         {# V2.16.2：多張照片縱向等寬排列，各自可放大 #}
         {% for u in recommendation.menu_images %}
@@ -91,6 +91,10 @@
           @htmx:response-error="resultFailed($event)"
           class="bg-white rounded-2xl shadow-sm p-4 space-y-4">
 
+        {% if pending_rec is defined and pending_rec %}
+        {# V2.28.0（B-4）：確認建立時才把推薦標成核准 #}
+        <input type="hidden" name="rec_id" value="{{ pending_rec.id }}">
+        {% endif %}
         <!-- 匯入至 -->
         <div class="flex items-center gap-3">
             {% if selected_store %}
@@ -282,8 +286,9 @@ function importForm() {
         storeQuery: '',
         pickerOpen: false,
         ignoreSimilar: false,
-        newName: '',
-        newCat: '',
+        // V2.28.0（B-4）：從推薦進來時，店名類別先帶推薦的
+        newName: {{ (pending_rec.store_name if pending_rec is defined and pending_rec else '') | tojson }},
+        newCat: {{ (pending_rec.category if pending_rec is defined and pending_rec and pending_rec.category in ('drink', 'meal', 'group_buy') else '') | tojson }},
         promptText: '',
         photoUrl: '',
         photoName: '',

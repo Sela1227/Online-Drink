@@ -112,6 +112,11 @@ def visible_stores_for(db: Session, user):
     ).order_by(Store.name).all()
     if user.is_admin:
         return all_stores
+    # V2.28.0 P2-7：團員看不到「還沒有使用中菜單」的店——點進去開不了團、店家頁也是空的。
+    # 管理員照樣看得到（要去補菜單）。
+    from app.models.menu import Menu
+    with_menu = {sid for (sid,) in db.query(Menu.store_id).filter(Menu.is_active == True).distinct().all()}
+    all_stores = [s for s in all_stores if s.id in with_menu]
     user_dept_ids = {ud.department_id for ud in db.query(UserDepartment).filter(
         UserDepartment.user_id == user.id
     ).all()}
@@ -327,7 +332,8 @@ async def update_profile(
     user = await get_current_user(request, db)
     
     # 更新暱稱（系統顯示名）
-    user.nickname = nickname.strip() if nickname else None
+    from app.services.validation import clean_text
+    user.nickname = clean_text(nickname, 100, field="暱稱")  # V2.28.0 P2-1
     db.commit()
     
     return RedirectResponse(url="/profile?success=1", status_code=302)
@@ -738,6 +744,11 @@ async def submit_recommendation(
     
     from app.models.user import StoreRecommendation
     from app.services.upload_service import upload_image
+    from app.services.validation import clean_text
+    # V2.28.0 P2-1：先擋長度再上傳照片（店名 100、連結與備註 500），PostgreSQL 才不會 500 且不留孤兒照片
+    _name = clean_text(store_name, 100, field="店名", required=True)
+    _url = clean_text(menu_url, 500, field="菜單連結")
+    _note = clean_text(note, 500, field="備註")
     files = [f for f in (menu_image or []) if f and f.filename]
     if len(files) > RECOMMEND_MAX_PHOTOS:
         raise HTTPException(status_code=400, detail=f"菜單照片最多 {RECOMMEND_MAX_PHOTOS} 張")
@@ -750,12 +761,12 @@ async def submit_recommendation(
 
     recommendation = StoreRecommendation(
         user_id=user.id,
-        store_name=store_name.strip(),
+        store_name=_name,
         category=category,
-        menu_url=menu_url.strip() if menu_url else None,
+        menu_url=_url,
         menu_image_url=urls[0] if urls else None,
         menu_image_urls=json.dumps(urls) if urls else None,
-        note=note.strip() if note else None,
+        note=_note,
     )
     db.add(recommendation)
     db.commit()

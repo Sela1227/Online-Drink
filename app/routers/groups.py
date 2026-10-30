@@ -196,31 +196,10 @@ async def new_group_page(request: Request, store_id: int = None, db: Session = D
     """開團頁面"""
     user = await get_current_user(request, db)
     
-    # 取得用戶的部門 IDs
-    from app.models.department import Department, UserDepartment, StoreDepartment
-    user_dept_ids = [ud.department_id for ud in db.query(UserDepartment).filter(
-        UserDepartment.user_id == user.id
-    ).all()]
-    
-    # 取得啟用中的店家（含分店）
-    all_stores = db.query(Store).filter(Store.is_personal != True).options(
-        joinedload(Store.branches)
-    ).filter(Store.is_active == True).all()
-    
-    # 過濾用戶可見的店家
-    visible_stores = []
-    for s in all_stores:
-        if s.is_public:
-            visible_stores.append(s)
-        elif user.is_admin:
-            visible_stores.append(s)
-        else:
-            store_dept_ids = {sd.department_id for sd in db.query(StoreDepartment).filter(
-                StoreDepartment.store_id == s.id
-            ).all()}
-            if store_dept_ids & set(user_dept_ids):
-                visible_stores.append(s)
-    stores = visible_stores
+    # V2.28.0 P2-7：改用店家頁同一個 visible_stores_for（原本這裡逐店查部門，而且有自己一套規則）
+    from app.models.department import Department
+    from app.routers.home import visible_stores_for
+    stores = visible_stores_for(db, user)
     
     # 取得啟用中的部門
     departments = db.query(Department).filter(Department.is_active == True).all()
@@ -1261,8 +1240,9 @@ async def copy_group_page(group_id: int, request: Request, db: Session = Depends
     if not group.is_visible_to(user, db):
         raise HTTPException(status_code=403, detail="您無權查看此團單")
     
-    # 取得店家選項
-    stores = db.query(Store).filter(Store.is_active == True, Store.is_personal != True).all()
+    # V2.28.0 P2-7：複製開團原本列出所有啟用店家（不看部門），改成跟開團頁同一個規則
+    from app.routers.home import visible_stores_for
+    stores = visible_stores_for(db, user)
     
     # 取得啟用中的部門
     from app.models.department import Department
@@ -1520,110 +1500,10 @@ async def export_receipt_png(request: Request, group_id: int, db: Session = Depe
     )
 
 
-# ============ 訪客模式（已停用，本系統只用 LINE 登入）============
-# V1.19.2：訪客功能會建立空殼帳號污染用戶列表，且本系統只需 LINE 登入，故停用。
-# 路由保留但回傳停用訊息，避免舊訪客連結被點到時建立新帳號。
-GUEST_MODE_ENABLED = False
-
-
-@router.post("/{group_id}/guest-link")
-async def generate_guest_link(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """產生分享連結（點連結的人需用自己的 LINE 登入才能跟團）"""
-    import hashlib
-    user = await get_current_user(request, db)
-
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    if group.owner_id != user.id and not user.is_admin:
-        raise HTTPException(status_code=403, detail="只有團主可以產生分享連結")
-
-    secret = settings.secret_key or "default-secret"
-    raw = f"{group_id}-{secret}-guest"
-    token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    base_url = str(request.base_url).rstrip("/")
-    link = f"{base_url}/groups/{group_id}/guest?token={token}"
-    return {"link": link}
-
-
+# ============ 訪客模式（V2.28.0 內部審核 A-1：整套拿掉）============
+# V1.19.2 起就關閉（三支路由回 410），只剩死碼；本系統只用 LINE 登入。
+# 舊的訪客連結（/groups/{id}/guest?token=…）可能還在 LINE 聊天紀錄裡——
+# 照坑 #88「舊網址永遠公開」轉到團頁，沒登入的會被導去 LINE 登入。
 @router.get("/{group_id}/guest")
-async def guest_access(group_id: int, token: str, request: Request, db: Session = Depends(get_db)):
-    """分享連結存取：驗證 token 後，未登入導去 LINE 登入、登入後回團單"""
-    import hashlib
-
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-
-    # 驗證 token
-    secret = settings.secret_key or "default-secret"
-    raw = f"{group_id}-{secret}-guest"
-    expected_token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    if token != expected_token:
-        raise HTTPException(status_code=403, detail="無效的連結")
-
-    # 已登入 → 直接進團單
-    from app.services.auth import get_current_user_optional
-    user, _ = await get_current_user_optional(request, db)
-    if user:
-        return RedirectResponse(url=f"/groups/{group_id}", status_code=302)
-
-    # 未登入 → 導去 LINE 登入，登入後回團單頁（要跟團一定要用自己的 LINE）
-    resp = RedirectResponse(url=f"/auth/login?next=/groups/{group_id}", status_code=302)
-    return resp
-
-
-@router.post("/{group_id}/guest")
-async def guest_enter(
-    group_id: int,
-    token: str = Form(...),
-    guest_name: str = Form(...),
-    request: Request = None,
-    db: Session = Depends(get_db)
-):
-    """訪客輸入名字進入團單（已停用）"""
-    if not GUEST_MODE_ENABLED:
-        raise HTTPException(status_code=410, detail="訪客功能已停用，請使用 LINE 登入")
-    import hashlib
-    import secrets
-    from app.models.user import User
-    
-    group = db.query(Group).filter(Group.id == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="團單不存在")
-    
-    # 驗證 token
-    secret = settings.secret_key or "default-secret"
-    raw = f"{group_id}-{secret}-guest"
-    expected_token = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    
-    if token != expected_token:
-        raise HTTPException(status_code=403, detail="無效的訪客連結")
-    
-    # 建立訪客帳號
-    guest_line_id = f"guest_{secrets.token_hex(8)}"
-    guest_user = User(
-        line_user_id=guest_line_id,
-        display_name=guest_name.strip(),
-        nickname=guest_name.strip(),
-        is_guest=True,
-    )
-    db.add(guest_user)
-    db.commit()
-    db.refresh(guest_user)
-    
-    # 建立 JWT token
-    from app.services.auth import create_access_token
-    access_token = create_access_token(data={"sub": guest_line_id})
-    
-    response = RedirectResponse(url=f"/groups/{group_id}", status_code=302)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=86400  # 24 小時
-    )
-    
-    return response
+async def guest_access(group_id: int):
+    return RedirectResponse(url=f"/groups/{group_id}", status_code=302)

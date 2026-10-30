@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class DeptRole(str, enum.Enum):
     """部門角色"""
     MEMBER = "member"      # 一般成員
-    LEADER = "leader"      # 小組長（可管理成員）
+    LEADER = "leader"      # V2.28.0 起畫面不再使用（欄位與值保留，舊資料不動）
 
 
 class Department(Base):
@@ -35,10 +35,6 @@ class Department(Base):
     @property
     def member_count(self) -> int:
         return len(self.members)
-    
-    @property
-    def leader_count(self) -> int:
-        return len([m for m in self.members if m.role == DeptRole.LEADER])
 
 
 class UserDepartment(Base):

@@ -21,6 +21,7 @@ from app.services.store_match import similar_stores as _similar_stores  # V2.16.
 from app.schemas.menu import UNCLEAR_PRICE_MSG  # V2.16.1 B-7
 from app.services.menu_prompt import PROMPT_LINES  # V2.25.0
 from app.services.ai_menu import can_use_ai  # V2.25.0
+from app.services.validation import clean_text, parse_department_ids  # V2.28.0
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -154,7 +155,8 @@ async def admin_home(request: Request, db: Session = Depends(get_db)):
     from app.models.user import User, Announcement
     from datetime import datetime, timedelta
     
-    store_count = db.query(Store).filter(Store.is_personal != True).count()
+    # V2.28.0 P3：只算啟用的店（「N 家 · M 家沒菜單」的 M 也只算啟用的，兩個數字口徑一致）
+    store_count = db.query(Store).filter(Store.is_personal != True, Store.is_active == True).count()
     group_count = db.query(Group).count()
     user_count = db.query(User).filter(User.is_guest == False).count()
     
@@ -274,7 +276,8 @@ async def activate_menu(store_id: int, menu_id: int, request: Request, db: Sessi
 
 
 @router.get("/import")
-async def import_page(request: Request, store_id: int = None, load: str = None, ai: str = None, db: Session = Depends(get_db)):
+async def import_page(request: Request, store_id: int = None, load: str = None, ai: str = None, rec_id: int = None,
+                      db: Session = Depends(get_db)):
     """匯入頁面。V2.16.1：`load=current` 進頁就帶入使用中菜單（工作台「改幾個價格」）"""
     user = await get_admin_user(request, db)
     
@@ -286,6 +289,22 @@ async def import_page(request: Request, store_id: int = None, load: str = None, 
     # 如果有指定 store_id，取得該店家
     selected_store = None
     recommendation = None
+    pending_rec = None
+    # V2.28.0（內部審核 P1-2／B-4）：推薦的「建立店家與菜單」只是打開這頁（GET 不寫資料）。
+    # 匯入至預設「新增一家店」、店名類別從推薦帶入；按確認那一刻才建店、推薦才算核准（do_import 收 rec_id）。
+    # 中途離開什麼都沒建，推薦仍是待審——原本「核准」先建空店：中途離開留下空店、連按兩下建出兩家。
+    if rec_id and not store_id:
+        from app.models.user import StoreRecommendation
+        _rec = db.query(StoreRecommendation).options(joinedload(StoreRecommendation.user)).filter(
+            StoreRecommendation.id == rec_id).first()
+        if not _rec:
+            return RedirectResponse(url="/admin/recommendations", status_code=302)
+        if _rec.status != "pending":
+            # 別人已經處理掉了：建好的就帶去那家店，否則回推薦列表
+            if _rec.created_store_id and db.query(Store).filter(Store.id == _rec.created_store_id).first():
+                return RedirectResponse(url=f"/admin/import?store_id={_rec.created_store_id}", status_code=302)
+            return RedirectResponse(url="/admin/recommendations", status_code=302)
+        pending_rec = recommendation = _rec
     if store_id:
         selected_store = db.query(Store).filter(Store.id == store_id).first()
     
@@ -321,7 +340,9 @@ async def import_page(request: Request, store_id: int = None, load: str = None, 
         # V2.25.0：AI 指令單一來源；站內拍照轉換（只有 Sela）；推薦核准過來且有照片 → 進頁自動轉
         "prompt_lines": PROMPT_LINES,
         "can_ai": can_use_ai(user),
-        "auto_ai": bool(ai == "1" and can_use_ai(user) and recommendation is not None and recommendation.menu_images),
+        "auto_ai": bool((ai == "1" or pending_rec is not None) and can_use_ai(user)
+                        and recommendation is not None and recommendation.menu_images),
+        "pending_rec": pending_rec,  # V2.28.0：從推薦進來、還沒建店
     })
 
 
@@ -677,6 +698,22 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
 
 
 
+def _mark_recommendation_approved(db, rec_id: int, store_id: int, user):
+    """V2.28.0：推薦 → 核准，連到實際寫入的店家；推薦網址補進店家官網（只補空白）。已處理過的不動"""
+    from app.models.user import StoreRecommendation
+    rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec_id).with_for_update().populate_existing().first()
+    if not rec or rec.status != "pending":
+        return
+    rec.status = "approved"
+    rec.reviewed_at = datetime.utcnow()
+    rec.reviewer_id = user.id
+    rec.created_store_id = store_id
+    st = db.query(Store).filter(Store.id == store_id).first()
+    if st is not None and not st.website_url:
+        st.website_url = _safe_url_or_none(rec.menu_url)
+    db.commit()
+
+
 def _reject_blockers(menu_content):
     """V2.12.0 的 blockers 後端也要擋。V2.14.1 P1-4：**必須在 import_* 之前呼叫**——
     import_menu / import_store_and_menu 內部會 commit，放在之後等於資料已寫入、舊版已停用，
@@ -704,6 +741,7 @@ async def do_import(
     store_id: str = Form(None),
     new_store_name: str = Form(None),
     new_store_category: str = Form(None),
+    rec_id: int = Form(None),
     db: Session = Depends(get_db),
 ):
     """執行匯入（V2.15.0：htmx 送出；版本被別人更新 → 回傳重新比對的片段；成功 → HX-Redirect）"""
@@ -786,6 +824,11 @@ async def do_import(
             store = import_store_and_menu(db, validated)
             target_store_id = store.id
         
+        # V2.28.0（B-4）：從推薦來的，匯入成功這一刻才把推薦標成核准、連到這家店（鎖住推薦列，
+        # 兩次確認不會重複處理；店本身的重複由上面的同名 advisory lock＋版本核對擋）
+        if rec_id:
+            _mark_recommendation_approved(db, rec_id, target_store_id, user)
+
         # V2.10.0：匯完直接去工作台驗收，不再丟回儀表板
         cat_count, item_count = _count_import(validated.menu)
         _ver = db.query(Menu).filter(Menu.store_id == target_store_id).count()
@@ -799,29 +842,50 @@ async def do_import(
 
 
 @router.get("/groups")
-async def group_list(request: Request, db: Session = Depends(get_db)):
-    """所有團單"""
+async def group_list(request: Request, all: int = 0, db: Session = Depends(get_db)):
+    """所有團單。
+    V2.28.0（內部審核 C-1）：預設只列近 14 天建立的或還沒截止的團，`?all=1` 列全部——
+    一年多的團單全列在一頁，每列還逐團載入店家、團主、訂單（P2-5，改 eager load）。"""
     user = await get_admin_user(request, db)
-    
-    groups = db.query(Group).order_by(Group.created_at.desc()).all()
-    
+    from sqlalchemy.orm import selectinload
+    q = db.query(Group).options(
+        joinedload(Group.store), joinedload(Group.owner), selectinload(Group.orders)
+    )
+    total_count = db.query(Group).count()
+    if not all:
+        # created_at 存 UTC、deadline 存台北牆上時間（坑 #25），兩個條件各用各的「現在」
+        q = q.filter(or_(
+            Group.created_at >= datetime.utcnow() - timedelta(days=RECENT_GROUP_DAYS),
+            (Group.is_closed == False) & (Group.deadline > taipei_now()),
+        ))
+    groups = q.order_by(Group.created_at.desc()).all()
     return templates.TemplateResponse(request, "admin/groups.html", {
         "request": request,
         "user": user,
         "groups": groups,
+        "show_all": bool(all),
+        "total_count": total_count,
+        "recent_days": RECENT_GROUP_DAYS,
         "test_groups": _test_group_candidates(db),  # V2.27.0：先看會刪哪些
     })
 
 
+RECENT_GROUP_DAYS = 14
+
+
 def _test_group_candidates(db: Session) -> list:
-    """V2.27.0（UI 審稿 P0-2）：清除測試團的對象——已截止（或已關閉）、而且沒人下單或只有團主自己下單。
-    頁面先列出來給人看，清除時用同一個函式，看到的和刪掉的一定一致。"""
+    """清除測試團的對象：已截止（或已關閉）、而且**沒有任何已送出的訂單**（修改中也算送出過）。
+    V2.28.0（內部審核 P1-1，Sela 決定）：原本「只有團主自己下單」也算——團主替大家代點、自己訂便當都是真單，
+    會連訂單、請客、統計一起刪掉。現在團主自己送出過的就不算；真的是測試就用單團「刪除」。
+    只有草稿（DRAFT，沒送出）的團照樣算測試團。"""
     # V2.10.1：deadline 是台北牆上時間，用 utcnow() 比會差 8 小時（坑 #25）
     now = taipei_now()
-    groups = db.query(Group).filter(
+    from sqlalchemy.orm import selectinload
+    groups = db.query(Group).options(selectinload(Group.orders)).filter(
         or_(Group.is_closed == True, Group.deadline <= now)
     ).order_by(Group.created_at.desc()).all()
-    return [g for g in groups if all(o.user_id == g.owner_id for o in g.orders)]
+    from app.models.order import OrderStatus as _OS
+    return [g for g in groups if not any(o.status in (_OS.SUBMITTED, _OS.EDITING) for o in g.orders)]
 
 
 def _delete_group_cascade(db: Session, group: Group):
@@ -842,7 +906,7 @@ def _delete_group_cascade(db: Session, group: Group):
 
 
 @router.post("/groups/cleanup-test")
-async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
+async def cleanup_test_groups(request: Request, ids: list[int] = Form(default=[]), db: Session = Depends(get_db)):
     """清除測試團：已截止、且沒有人下單（或只有團主自己下單）的團。
 
     V2.10.0：加上「僅限已截止」條件。原本查詢不篩團單狀態，而
@@ -850,7 +914,10 @@ async def cleanup_test_groups(request: Request, db: Session = Depends(get_db)):
     會被當成測試團實體刪除且不可復原。
     """
     user = await get_admin_user(request, db)
-    targets = _test_group_candidates(db)
+    # V2.28.0（內部審核 P1-1）：只刪「頁面上列出、而且現在仍符合」的交集。
+    # 原本按下當下重算——打開頁面到按下之間剛截止的團也會一起被刪（看到的跟刪掉的不一致）
+    allowed = {g.id: g for g in _test_group_candidates(db)}
+    targets = [allowed[i] for i in dict.fromkeys(ids) if i in allowed]
     ids = [g.id for g in targets]
     for g in targets:
         _delete_group_cascade(db, g)
@@ -1006,17 +1073,17 @@ async def update_store_visibility(
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
-    # 更新公開狀態
+    # V2.28.0 P2-2：部門編號走 parse_department_ids（原本 int() 非數字 500、不存在的編號外鍵 500）；
+    # 選了「限定部門」卻一個都沒勾，原本會存成「非公開且零部門」＝只有管理員看得到
+    if visibility not in ("public", "departments"):
+        raise HTTPException(status_code=400, detail="可見範圍只能是公開或限定部門")
+    ids = parse_department_ids(department_ids, db) if visibility == "departments" else []
+    if visibility == "departments" and not ids:
+        raise HTTPException(status_code=400, detail="請至少勾一個部門，或改成公開")
     store.is_public = (visibility == "public")
-    
-    # 清除舊的部門關聯
     db.query(StoreDepartment).filter(StoreDepartment.store_id == store_id).delete()
-    
-    # 如果是限定部門，新增關聯
-    if visibility == "departments" and department_ids:
-        for dept_id in department_ids:
-            sd = StoreDepartment(store_id=store_id, department_id=int(dept_id))
-            db.add(sd)
+    for dept_id in ids:
+        db.add(StoreDepartment(store_id=store_id, department_id=dept_id))
     
     db.commit()
     
@@ -1287,6 +1354,10 @@ async def user_list(request: Request, sort: str = "created", db: Session = Depen
     if sort not in sort_map:
         sort = "created"
     users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort]).all()
+    # V2.28.0 P2-5：訂單數一次 GROUP BY（原本模板 u.orders|length 每人載入全部訂單）
+    from app.models.order import Order
+    from sqlalchemy import func
+    order_counts = dict(db.query(Order.user_id, func.count(Order.id)).group_by(Order.user_id).all())
     
     # 計算在線人數（30分鐘內有活動）
     online_threshold = datetime.utcnow() - timedelta(minutes=30)
@@ -1295,15 +1366,12 @@ async def user_list(request: Request, sort: str = "created", db: Session = Depen
         User.last_active_at > online_threshold
     ).count()
     
-    # 取得系統設定
-    system_setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
-    
     return templates.TemplateResponse(request, "admin/users.html", {
         "request": request,
         "user": user,
         "users": users,
         "online_count": online_count,
-        "system_setting": system_setting,
+        "order_counts": order_counts,
         "sort": sort,
     })
 
@@ -1330,105 +1398,10 @@ async def toggle_user_admin(user_id: int, request: Request, db: Session = Depend
 
 @router.get("/users-duplicates")
 async def users_duplicates(request: Request, db: Session = Depends(get_db)):
-    """診斷：找出同名用戶（判斷是否真重複帳號）"""
-    admin = await get_admin_user(request, db)
-
-    from app.models.user import User
-    from app.models.order import Order
-    from collections import defaultdict
-
-    all_users = db.query(User).filter(User.is_guest == False).all()
-    # 依 show_name 分組（排除訪客帳號）
-    by_name = defaultdict(list)
-    for u in all_users:
-        by_name[u.show_name].append(u)
-
-    # 只保留有重複名稱的組
-    dup_groups = []
-    for name, users in by_name.items():
-        if len(users) > 1:
-            rows = []
-            for u in users:
-                order_count = db.query(Order).filter(Order.user_id == u.id).count()
-                rows.append({
-                    "id": u.id,
-                    "line_tail": u.line_user_id[-6:] if u.line_user_id else "（無）",
-                    "line_full": u.line_user_id or "",
-                    "display_name": u.display_name,
-                    "nickname": u.nickname,
-                    "created_at": u.created_at,
-                    "last_active_at": u.last_active_at,
-                    "order_count": order_count,
-                    "has_picture": bool(u.picture_url),
-                })
-            # 同組內若有「相同 line_user_id」才是真重複（理論上 unique 不該發生）
-            line_ids = [u.line_user_id for u in users]
-            true_dup = len(line_ids) != len(set(line_ids))
-            dup_groups.append({
-                "name": name,
-                "count": len(users),
-                "rows": sorted(rows, key=lambda r: r["order_count"], reverse=True),
-                "true_dup": true_dup,
-            })
-
-    dup_groups.sort(key=lambda g: g["count"], reverse=True)
-
-    return templates.TemplateResponse(request, "admin/users_duplicates.html", {
-        "request": request,
-        "user": admin,
-        "dup_groups": dup_groups,
-        "total_users": len(all_users),
-        "guest_count": db.query(User).filter(User.is_guest == True).count(),
-    })
-
-
-@router.post("/users-cleanup-guests")
-async def cleanup_guest_users(request: Request, db: Session = Depends(get_db)):
-    """清理訪客空殼帳號（徹底刪除，含其訂單；使用者確認舊訪客訂單不重要）"""
-    admin = await get_admin_user(request, db)
-
-    from app.models.user import User
-    from app.models.group import Group
-    from sqlalchemy import text as _sql, bindparam
-
-    # 找出所有訪客帳號 id（排除有開團的，避免動到團單擁有權）
-    all_guest_ids = [g.id for g in db.query(User).filter(User.is_guest == True).all()]
-    owner_ids = {gid for (gid,) in db.query(Group.owner_id).filter(Group.owner_id.in_(all_guest_ids)).all()} if all_guest_ids else set()
-    guest_ids = [gid for gid in all_guest_ids if gid not in owner_ids]
-    if not guest_ids:
-        return RedirectResponse(url="/admin/users-duplicates?cleaned=0", status_code=302)
-
-    params = {"ids": tuple(guest_ids)}
-    def _exec(sql):
-        db.execute(_sql(sql).bindparams(bindparam("ids", expanding=True)), params)
-
-    # 依子→父順序斷鏈刪除（訪客的訂單樹）
-    _exec("""
-        DELETE FROM order_item_toppings WHERE order_item_id IN (
-            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
-            WHERE o.user_id IN :ids
-        )
-    """)
-    _exec("""
-        DELETE FROM order_item_options WHERE order_item_id IN (
-            SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id
-            WHERE o.user_id IN :ids
-        )
-    """)
-    _exec("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN :ids)")
-    _exec("DELETE FROM orders WHERE user_id IN :ids")
-    for tbl in ["user_departments", "user_favorites", "user_presets"]:
-        try:
-            _exec(f"DELETE FROM {tbl} WHERE user_id IN :ids")
-        except Exception:
-            pass
-    _exec("DELETE FROM users WHERE id IN :ids")
-    db.commit()
-
-    return RedirectResponse(
-        url=f"/admin/users-duplicates?cleaned={len(guest_ids)}",
-        status_code=302
-    )
+    """V2.28.0（內部審核 A-1）：重複用戶診斷與清理訪客拿掉——訪客 V1.19.2 就停用、V1.19.3 清光；
+    line_user_id 唯一，「同名」本來就不是重複。舊網址 302 回人員頁。"""
+    await get_admin_user(request, db)
+    return RedirectResponse(url="/admin/users", status_code=302)
 
 
 @router.get("/users/{user_id}")
@@ -1504,11 +1477,11 @@ async def add_branch(
     if not store:
         raise HTTPException(status_code=404, detail="店家不存在")
     
-    branch = StoreBranch(
+    branch = StoreBranch(  # V2.28.0 P2-1：依欄位長度擋（分店名 100、電話 50、地址 200）
         store_id=store_id,
-        name=name.strip(),
-        phone=phone.strip() if phone else None,
-        address=address.strip() if address else None,
+        name=clean_text(name, 100, field="分店名稱", required=True),
+        phone=clean_text(phone, 50, field="分店電話"),
+        address=clean_text(address, 200, field="分店地址"),
     )
     db.add(branch)
     db.commit()
@@ -1539,32 +1512,7 @@ async def delete_branch(
     return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
 
 
-@router.post("/stores/{store_id}/branches/{branch_id}")
-async def update_branch(
-    store_id: int,
-    branch_id: int,
-    request: Request,
-    name: str = Form(...),
-    phone: str = Form(None),
-    address: str = Form(None),
-    db: Session = Depends(get_db),
-):
-    """編輯分店"""
-    from app.models.store import StoreBranch
-    user = await get_admin_user(request, db)
-    
-    branch = db.query(StoreBranch).filter(
-        StoreBranch.id == branch_id,
-        StoreBranch.store_id == store_id
-    ).first()
-    
-    if branch:
-        branch.name = name.strip()
-        branch.phone = phone.strip() if phone else None
-        branch.address = address.strip() if address else None
-        db.commit()
-    
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)
+# V2.28.0（內部審核 A-3）：編輯分店路由拿掉——畫面從來沒有入口，分店改名就刪掉重加。
 
 
 @router.post("/stores/{store_id}/branches/{branch_id}/toggle")
@@ -1698,15 +1646,15 @@ async def feedback_list(request: Request, db: Session = Depends(get_db)):
         Feedback.created_at.desc()
     ).all()
     
-    # 分離最近 5 筆和歷史
-    recent_feedbacks = all_feedbacks[:5]
-    history_feedbacks = all_feedbacks[5:]
-    
+    # V2.28.0（內部審核 P2-6／B-3）：依狀態分，不依筆數分
+    pending = [f for f in all_feedbacks if f.status == "pending"]
+    resolved = [f for f in all_feedbacks if f.status != "pending"][:50]
+
     return templates.TemplateResponse(request, "admin/feedbacks.html", {
         "request": request,
         "user": user,
-        "recent_feedbacks": recent_feedbacks,
-        "history_feedbacks": history_feedbacks,
+        "pending": pending,
+        "resolved": resolved,
     })
 
 
@@ -1755,18 +1703,15 @@ async def create_department(
     description: str = Form(""),
     db: Session = Depends(get_db)
 ):
-    """新增部門"""
+    """新增部門（V2.28.0 P2-1：名稱 100 字、說明 500 字，超過回 400 而不是 PostgreSQL 500）"""
     user = await get_admin_user(request, db)
-    
     from app.models.department import Department
-    
     dept = Department(
-        name=name.strip(),
-        description=description.strip() if description else None
+        name=clean_text(name, 100, field="部門名稱", required=True),
+        description=clean_text(description, 500, field="部門說明"),
     )
     db.add(dept)
     db.commit()
-    
     return RedirectResponse(url="/admin/departments", status_code=302)
 
 
@@ -1826,18 +1771,16 @@ async def update_department(
     is_public: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """更新部門"""
+    """更新部門（V2.28.0 P2-1：長度驗證）"""
     user = await get_admin_user(request, db)
-    
     from app.models.department import Department
-    
     dept = db.query(Department).filter(Department.id == dept_id).first()
-    if dept:
-        dept.name = name.strip()
-        dept.description = description.strip() if description else None
-        dept.is_public = is_public == "1"
-        db.commit()
-    
+    if not dept:
+        raise HTTPException(status_code=404, detail="部門不存在")
+    dept.name = clean_text(name, 100, field="部門名稱", required=True)
+    dept.description = clean_text(description, 500, field="部門說明")
+    dept.is_public = is_public == "1"
+    db.commit()
     return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
 
 
@@ -1846,49 +1789,24 @@ async def add_department_member(
     request: Request,
     dept_id: int,
     user_id: int = Form(...),
-    role: str = Form("member"),
     db: Session = Depends(get_db)
 ):
-    """新增部門成員"""
+    """新增部門成員（V2.28.0 P2-4／A-2：先確認部門與人員存在、不是訪客；一律一般成員——「小組長」拿掉）"""
     user = await get_admin_user(request, db)
-    
-    from app.models.department import UserDepartment, DeptRole
-    
-    # 檢查是否已存在
+    from app.models.department import Department, UserDepartment, DeptRole
+    from app.models.user import User
+    if not db.query(Department).filter(Department.id == dept_id).first():
+        raise HTTPException(status_code=404, detail="部門不存在")
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target or target.is_guest:
+        raise HTTPException(status_code=400, detail="找不到這位人員")
     existing = db.query(UserDepartment).filter(
         UserDepartment.user_id == user_id,
         UserDepartment.department_id == dept_id
     ).first()
-    
     if not existing:
-        ud = UserDepartment(
-            user_id=user_id,
-            department_id=dept_id,
-            role=DeptRole.LEADER if role == "leader" else DeptRole.MEMBER
-        )
-        db.add(ud)
+        db.add(UserDepartment(user_id=user_id, department_id=dept_id, role=DeptRole.MEMBER))
         db.commit()
-    
-    return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
-
-
-@router.post("/departments/{dept_id}/members/{member_id}/toggle-role")
-async def toggle_member_role(
-    request: Request,
-    dept_id: int,
-    member_id: int,
-    db: Session = Depends(get_db)
-):
-    """切換成員角色"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.department import UserDepartment, DeptRole
-    
-    ud = db.query(UserDepartment).filter(UserDepartment.id == member_id).first()
-    if ud:
-        ud.role = DeptRole.MEMBER if ud.role == DeptRole.LEADER else DeptRole.LEADER
-        db.commit()
-    
     return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
 
 
@@ -1899,180 +1817,110 @@ async def remove_department_member(
     member_id: int,
     db: Session = Depends(get_db)
 ):
-    """移除部門成員"""
+    """移除部門成員（V2.28.0 P2-4：只刪這個部門的成員列——原本只看 member_id，網址換別的部門也刪得到）"""
     user = await get_admin_user(request, db)
-    
     from app.models.department import UserDepartment
-    
-    ud = db.query(UserDepartment).filter(UserDepartment.id == member_id).first()
+    ud = db.query(UserDepartment).filter(
+        UserDepartment.id == member_id, UserDepartment.department_id == dept_id
+    ).first()
     if ud:
         db.delete(ud)
         db.commit()
-    
     return RedirectResponse(url=f"/admin/departments/{dept_id}", status_code=302)
 
 
 # ============ 公告管理 ============
 
 @router.get("/announcements")
-async def announcements_page(request: Request, db: Session = Depends(get_db)):
-    """公告管理頁面"""
+async def announcements_page(request: Request, open: str = None, saved: int = 0, db: Session = Depends(get_db)):
+    """公告（V2.28.0 內部審核 B-1）：一份清單，點一下原地展開編輯；新增用同一個編輯區。
+    原本每列 4 顆按鈕（編輯／停用／置頂／刪除）＋另一頁編輯（又有同樣的顯示、置頂勾選）＋頁首一份新增表單。"""
     user = await get_admin_user(request, db)
-    
     from app.models.user import Announcement
-    
     announcements = db.query(Announcement).options(
         joinedload(Announcement.created_by)
     ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).all()
-    
+    now = datetime.utcnow()  # expires_at 存 UTC（V2.10.0）
     return templates.TemplateResponse(request, "admin/announcements.html", {
         "request": request,
         "user": user,
         "announcements": announcements,
+        "now_utc": now,
+        "open_id": open if (open == "new" or (open or "").isdigit()) else "",
+        "saved": bool(saved),
     })
+
+
+def _announcement_fields(title, content, expires_at):
+    """V2.28.0（內部審核 P2-1）：標題 100、內容 500（資料表長度），超過回 400 而不是 PostgreSQL 500"""
+    from app.services.validation import clean_text
+    return (clean_text(title, 100, field="公告標題", required=True),
+            clean_text(content, 500, field="公告內容", required=True),
+            _parse_taipei_to_utc(expires_at))
 
 
 @router.post("/announcements")
 async def create_announcement(
     request: Request,
-    title: str = Form(...),
-    content: str = Form(...),
+    title: str = Form(None),
+    content: str = Form(None),
     is_pinned: bool = Form(False),
+    is_active: bool = Form(False),
     expires_at: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """新增公告"""
     user = await get_admin_user(request, db)
-    
     from app.models.user import Announcement
-    
-    expires_dt = _parse_taipei_to_utc(expires_at)
-    
-    ann = Announcement(
-        title=title.strip(),
-        content=content.strip(),
-        is_pinned=is_pinned,
-        expires_at=expires_dt,
-        created_by_id=user.id,
-    )
+    t, c, exp = _announcement_fields(title, content, expires_at)
+    ann = Announcement(title=t, content=c, is_pinned=is_pinned, is_active=is_active,
+                       expires_at=exp, created_by_id=user.id)
     db.add(ann)
-    
     db.commit()
-    
-    return RedirectResponse(url="/admin/announcements", status_code=302)
-
-
-@router.post("/announcements/{ann_id}/toggle")
-async def toggle_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
-    """啟用/停用公告"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import Announcement
-    
-    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
-    if ann:
-        ann.is_active = not ann.is_active
-        db.commit()
-    
-    return RedirectResponse(url="/admin/announcements", status_code=302)
-
-
-@router.post("/announcements/{ann_id}/pin")
-async def pin_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
-    """置頂公告"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import Announcement
-    
-    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
-    if ann:
-        ann.is_pinned = True
-        db.commit()
-    
-    return RedirectResponse(url="/admin/announcements", status_code=302)
-
-
-@router.post("/announcements/{ann_id}/unpin")
-async def unpin_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
-    """取消置頂"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import Announcement
-    
-    ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
-    if ann:
-        ann.is_pinned = False
-        db.commit()
-    
-    return RedirectResponse(url="/admin/announcements", status_code=302)
+    return RedirectResponse(url=f"/admin/announcements?saved=1#ann-{ann.id}", status_code=302)
 
 
 @router.post("/announcements/{ann_id}/delete")
 async def delete_announcement(ann_id: int, request: Request, db: Session = Depends(get_db)):
     """刪除公告"""
-    user = await get_admin_user(request, db)
-    
+    await get_admin_user(request, db)
     from app.models.user import Announcement
-    
     ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
     if ann:
         db.delete(ann)
         db.commit()
-    
     return RedirectResponse(url="/admin/announcements", status_code=302)
 
 
 @router.get("/announcements/{ann_id}/edit")
 async def edit_announcement_page(ann_id: int, request: Request, db: Session = Depends(get_db)):
-    """編輯公告頁面"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import Announcement
-    
-    ann = db.query(Announcement).options(
-        joinedload(Announcement.created_by)
-    ).filter(Announcement.id == ann_id).first()
-    
-    if not ann:
-        raise HTTPException(status_code=404, detail="公告不存在")
-    
-    return templates.TemplateResponse(request, "admin/announcement_edit.html", {
-        "request": request,
-        "user": user,
-        "announcement": ann,
-    })
+    """V2.28.0：獨立編輯頁拿掉，舊網址轉到清單並展開那一則（坑 #88：舊網址不留 404）"""
+    await get_admin_user(request, db)
+    return RedirectResponse(url=f"/admin/announcements?open={ann_id}#ann-{ann_id}", status_code=302)
 
 
 @router.post("/announcements/{ann_id}")
 async def update_announcement(
     ann_id: int,
     request: Request,
-    title: str = Form(...),
-    content: str = Form(...),
+    title: str = Form(None),
+    content: str = Form(None),
     is_pinned: bool = Form(False),
     is_active: bool = Form(False),
     expires_at: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """更新公告"""
-    user = await get_admin_user(request, db)
-    
+    """更新公告（顯示在首頁、置頂都在這裡改；原本的 toggle／pin／unpin 三支路由拿掉）"""
+    await get_admin_user(request, db)
     from app.models.user import Announcement
-    
     ann = db.query(Announcement).filter(Announcement.id == ann_id).first()
     if not ann:
         raise HTTPException(status_code=404, detail="公告不存在")
-    
-    ann.title = title.strip()
-    ann.content = content.strip()
+    ann.title, ann.content, ann.expires_at = _announcement_fields(title, content, expires_at)
     ann.is_pinned = is_pinned
     ann.is_active = is_active
-    
-    ann.expires_at = _parse_taipei_to_utc(expires_at)
-    
     db.commit()
-    
-    return RedirectResponse(url="/admin/announcements", status_code=302)
+    return RedirectResponse(url=f"/admin/announcements?saved=1#ann-{ann.id}", status_code=302)
 
 
 def _safe_url_or_none(value):
@@ -2147,52 +1995,11 @@ async def recommendation_list(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/recommendations/{rec_id}/approve")
-async def approve_recommendation(
-    rec_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """核准店家推薦"""
-    user = await get_admin_user(request, db)
-    
-    from app.models.user import StoreRecommendation
-    
-    rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec_id).first()
-    if not rec:
-        raise HTTPException(status_code=404, detail="推薦不存在")
-    
-    if rec.status != "pending":
-        return RedirectResponse(url="/admin/recommendations", status_code=302)
-    
-    # 建立新店家
-    category_map = {
-        "drink": CategoryType.DRINK,
-        "meal": CategoryType.MEAL,
-        "group_buy": CategoryType.GROUP_BUY,
-    }
-    
-    new_store = Store(
-        name=rec.store_name,
-        category=category_map.get(rec.category, CategoryType.MEAL),
-        # V2.11.1 P0-06：舊資料可能是核准前就存進去的惡意協定，複製時再驗一次；
-        # 擋不過就留空而不是讓整個核准失敗（推薦本身沒問題，只是網址不能用）
-        website_url=_safe_url_or_none(rec.menu_url),
-    )
-    db.add(new_store)
-    db.flush()  # 取得新店家 ID
-    
-    # 更新推薦狀態
-    rec.status = "approved"
-    rec.reviewed_at = datetime.utcnow()
-    rec.reviewer_id = user.id
-    rec.created_store_id = new_store.id
-    
-    db.commit()
-    
-    # V2.10.0：核准是起點不是終點 — 直接送到菜單匯入頁（該頁有「稍後再匯入」出口）
-    # V2.25.0：有照片又能用 AI（只有 Sela）→ 進匯入頁自動用推薦照片轉
-    _ai = "&ai=1" if (rec.menu_images and can_use_ai(user)) else ""
-    return RedirectResponse(url=f"/admin/import?store_id={new_store.id}{_ai}", status_code=302)
+async def approve_recommendation(rec_id: int, request: Request, db: Session = Depends(get_db)):
+    """V2.28.0（內部審核 P1-2／B-4）：不再在這裡建店。舊分頁送出時轉到匯入頁（避免 405），
+    確認匯入那一刻才建店並把推薦標成核准。"""
+    await get_admin_user(request, db)
+    return RedirectResponse(url=f"/admin/import?rec_id={rec_id}", status_code=303)
 
 
 @router.post("/recommendations/{rec_id}/reject")
@@ -2217,7 +2024,7 @@ async def reject_recommendation(
     rec.status = "rejected"
     rec.reviewed_at = datetime.utcnow()
     rec.reviewer_id = user.id
-    rec.reject_reason = reject_reason.strip() if reject_reason else None
+    rec.reject_reason = clean_text(reject_reason, 200, field="不收原因")  # V2.28.0 P2-1
     
     db.commit()
     

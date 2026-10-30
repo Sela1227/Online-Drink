@@ -47,15 +47,6 @@ class User(Base):
         """取得用戶所屬的部門"""
         from app.models.department import UserDepartment
         return db.query(UserDepartment).filter(UserDepartment.user_id == self.id).all()
-    
-    def is_leader_of(self, department_id: int, db) -> bool:
-        """檢查是否為該部門的小組長"""
-        from app.models.department import UserDepartment, DeptRole
-        ud = db.query(UserDepartment).filter(
-            UserDepartment.user_id == self.id,
-            UserDepartment.department_id == department_id
-        ).first()
-        return ud and ud.role == DeptRole.LEADER
 
 
 class UserPreset(Base):

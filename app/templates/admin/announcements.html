@@ -1,119 +1,83 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
 
-{% block title %}公告管理 - SELA 快點來點餐{% endblock %}
+{% block title %}公告 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/admin', '管理後台') }}
-<div class="space-y-4">
-    <!-- 標題列 -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-speakerphone"></i> 公告管理</h1>
-        
+{{ nav.back('/admin', '後台管理') }}
+{# V2.28.0（內部審核 B-1）：一份清單，點一下原地展開編輯；「顯示在首頁」「置頂」是編輯區的兩個開關。
+   原本每列 4 顆按鈕＋獨立編輯頁（同樣的開關又一份）＋頁首另一份新增表單。
+   狀態跟首頁一致：過期的寫「已過期」（原本只看 is_active，過期了還寫顯示中——內部審核 P3-1）。 #}
+{% macro ann_form(action, a=None) -%}
+<form action="{{ action }}" method="POST" class="space-y-3 mt-3" x-data='{ n: {{ ((a.content if a else "") | length) | tojson }} }'>
+    <input type="text" name="title" required maxlength="100" value="{{ a.title if a else '' }}" placeholder="公告標題"
+           aria-label="公告標題" class="w-full border border-sela-300 rounded-xl px-3 py-2.5 text-base">
+    <div>
+        <textarea name="content" rows="4" required maxlength="500" placeholder="公告內容" aria-label="公告內容"
+                  @input="n = $el.value.length"
+                  class="w-full border border-sela-300 rounded-xl px-3 py-2.5 text-base">{{ a.content if a else '' }}</textarea>
+        <div class="text-right text-xs" :class="n > 480 ? 'text-amber-700' : 'text-sela-800/50'"><span x-text="n"></span>／500 字</div>
     </div>
-    
-    <!-- 新增公告 -->
-    <div class="bg-white rounded-2xl shadow-sm p-4">
-        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 新增公告</h2>
-        <form action="/admin/announcements" method="POST" class="space-y-3">
-            <div>
-                <input type="text" name="title" required placeholder="公告標題"
-                       class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent">
-            </div>
-            <div>
-                <textarea name="content" rows="3" required placeholder="公告內容..."
-                          class="w-full border border-sela-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sela-500 focus:border-transparent"></textarea>
-            </div>
-            <div class="flex flex-wrap gap-4 text-sm">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="is_pinned" value="true">
-                    <span class="text-sela-800/70"><i class="ti ti-pin"></i> 置頂</span>
-                </label>
-                <div class="flex items-center gap-2">
-                    <span class="text-sela-800/70">過期時間（選填）</span>
-                    <input type="datetime-local" name="expires_at"
-                           class="border border-sela-300 rounded px-2 py-1 text-sm">
-                </div>
-            </div>
-            <div class="flex justify-end">
-                <button type="submit" class="bg-sela-500 text-sela-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-sela-600">
-                    發布公告
-                </button>
-            </div>
-        </form>
+    <div class="flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-sela-800">
+        <label class="flex items-center gap-2 min-h-[36px]"><input type="checkbox" name="is_active" value="true" class="w-5 h-5"
+               {% if not a or a.is_active %}checked{% endif %}> 顯示在首頁</label>
+        <label class="flex items-center gap-2 min-h-[36px]"><input type="checkbox" name="is_pinned" value="true" class="w-5 h-5"
+               {% if a and a.is_pinned %}checked{% endif %}> <i class="ti ti-pin"></i> 置頂</label>
     </div>
-    
-    <!-- 公告列表 -->
-    <div class="bg-white rounded-2xl shadow-sm">
-        <div class="p-4 border-b">
-            <h2 class="font-medium text-sela-800">公告列表</h2>
-        </div>
-        
-        {% if announcements %}
-        <div class="divide-y">
-            {% for ann in announcements %}
-            <div class="p-4 {% if not ann.is_active %}opacity-50{% endif %}">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
-                            {% if ann.is_pinned %}
-                            <span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded"><i class="ti ti-pin"></i> 置頂</span>
-                            {% endif %}
-                            {% if ann.is_active %}
-                            <span class="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded">顯示中</span>
-                            {% else %}
-                            <span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded">已停用</span>
-                            {% endif %}
-                            <span class="font-medium text-sela-800">{{ ann.title }}</span>
-                        </div>
-                        <div class="text-sm text-sela-800/70 whitespace-pre-line">{{ ann.content }}</div>
-                        <div class="text-xs text-sela-800/45 mt-2">
-                            {{ ann.created_by.show_name }} · {{ (ann.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}
-                            {% if ann.expires_at %}
-                            · 過期：{{ (ann.expires_at|taipei).strftime('%m/%d %H:%M') }}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="flex flex-col gap-1">
-                        <a href="/admin/announcements/{{ ann.id }}/edit" 
-                           class="text-xs px-3 py-1 rounded border hover:bg-sela-50 w-full text-center">
-                            <i class="ti ti-pencil"></i> 編輯
-                        </a>
-                        <form action="/admin/announcements/{{ ann.id }}/toggle" method="POST">
-                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-sela-50 w-full">
-                                {% if ann.is_active %}停用{% else %}啟用{% endif %}
-                            </button>
-                        </form>
-                        {% if ann.is_active and not ann.is_pinned %}
-                        <form action="/admin/announcements/{{ ann.id }}/pin" method="POST">
-                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-sela-50 w-full">
-                                <i class="ti ti-pin"></i> 置頂
-                            </button>
-                        </form>
-                        {% elif ann.is_pinned %}
-                        <form action="/admin/announcements/{{ ann.id }}/unpin" method="POST">
-                            <button type="submit" class="text-xs px-3 py-1 rounded border hover:bg-sela-50 w-full">
-                                取消置頂
-                            </button>
-                        </form>
-                        {% endif %}
-                        <form action="/admin/announcements/{{ ann.id }}/delete" method="POST"
-                              onsubmit="return confirm('確定要刪除此公告嗎？')">
-                            <button type="submit" class="text-xs px-3 py-1 rounded border text-red-500 hover:bg-red-50 w-full">
-                                刪除
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+    <label class="flex items-center gap-2 text-sm text-sela-800/70">到期（選填）
+        <input type="datetime-local" name="expires_at" value="{{ (a.expires_at|taipei).strftime('%Y-%m-%dT%H:%M') if a and a.expires_at else '' }}"
+               class="flex-1 border border-sela-300 rounded-xl px-3 py-2 text-base"></label>
+    <div class="flex items-center gap-3 pt-1">
+        {% if a %}
+        <button type="submit" form="del-{{ a.id }}" class="text-sm text-red-600 min-h-[40px] px-1">刪除</button>
         {% else %}
-        <div class="p-8 text-center text-sela-800/60">
-            <div class="text-4xl mb-2"><i class="ti ti-speakerphone"></i></div>
-            <p>尚未發布任何公告</p>
-        </div>
+        <button type="button" @click="open = ''" class="text-sm text-sela-800/60 min-h-[40px] px-1">取消</button>
         {% endif %}
+        <button type="submit" class="ml-auto bg-sela-700 text-white px-6 min-h-[44px] rounded-xl text-base font-medium">{{ '儲存' if a else '發布' }}</button>
     </div>
+</form>
+{% if a %}
+<form id="del-{{ a.id }}" action="/admin/announcements/{{ a.id }}/delete" method="POST" data-name="{{ a.title }}"
+      onsubmit="return confirm('刪除公告「' + this.dataset.name + '」？')"></form>
+{% endif %}
+{%- endmacro %}
+<div class="space-y-3" x-data='{ open: {{ open_id | tojson }} }'>
+    <div class="flex items-center justify-between gap-3">
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-speakerphone"></i> 公告</h1>
+        <button type="button" id="ann-new-btn" @click="open = open === 'new' ? '' : 'new'"
+                class="bg-sela-700 text-white px-4 min-h-[40px] rounded-xl text-sm font-medium"><i class="ti ti-plus"></i> 新增公告</button>
+    </div>
+    {% if saved %}
+    <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"><i class="ti ti-circle-check"></i> 已儲存</div>
+    {% endif %}
+
+    <div id="ann-new" x-show="open === 'new'" x-cloak class="bg-white rounded-2xl shadow-sm border-2 border-sela-300 p-4">
+        <div class="text-base font-bold text-sela-900">新增公告</div>
+        {{ ann_form('/admin/announcements') }}
+    </div>
+
+    {% for a in announcements %}
+    {% set expired = a.expires_at and a.expires_at <= now_utc %}
+    <div id="ann-{{ a.id }}" class="bg-white rounded-2xl shadow-sm p-4 {{ 'opacity-60' if (not a.is_active or expired) else '' }}"
+         :class='open === {{ (a.id | string) | tojson }} ? "border-2 border-sela-300 opacity-100" : ""'>
+        <button type="button" class="w-full flex items-center gap-2 text-left min-h-[36px]"
+                @click='open = open === {{ (a.id | string) | tojson }} ? "" : {{ (a.id | string) | tojson }}'
+                :aria-expanded='open === {{ (a.id | string) | tojson }} ? "true" : "false"'>
+            {% if expired %}<span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-0.5 rounded-lg whitespace-nowrap" data-status="expired">已過期</span>
+            {% elif a.is_active %}<span class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-lg whitespace-nowrap" data-status="active">顯示中</span>
+            {% else %}<span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-0.5 rounded-lg whitespace-nowrap" data-status="off">已停用</span>{% endif %}
+            {% if a.is_pinned %}<span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded-lg whitespace-nowrap"><i class="ti ti-pin"></i> 置頂</span>{% endif %}
+            <span class="text-[15px] font-medium text-sela-900 truncate flex-1">{{ a.title }}</span>
+            <i class="ti text-sela-800/40" :class='open === {{ (a.id | string) | tojson }} ? "ti-chevron-up" : "ti-chevron-down"'></i>
+        </button>
+        <div x-show='open !== {{ (a.id | string) | tojson }}' class="text-sm text-sela-800/60 mt-1 line-clamp-2">{{ a.content }}</div>
+        <div x-show='open === {{ (a.id | string) | tojson }}' x-cloak>
+            <div class="text-xs text-sela-800/50 mt-1">{{ a.created_by.show_name if a.created_by else '' }} · {{ (a.created_at|taipei).strftime('%Y/%m/%d %H:%M') }} 建立</div>
+            {{ ann_form('/admin/announcements/' ~ a.id, a) }}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-10 text-sela-800/60 bg-white rounded-2xl" x-show="open !== 'new'">還沒有公告，按右上「新增公告」</div>
+    {% endfor %}
 </div>
 {% endblock %}

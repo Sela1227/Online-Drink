@@ -57,13 +57,13 @@
 
     {# 需要修正的：點了只看這些 #}
     <div x-show="issueCount('nomenu') || issueCount('nocity')" x-cloak id="issue-chips" class="flex items-center gap-2 flex-wrap">
-        <button type="button" x-show="issueCount('nomenu')" @click="issue = issue === 'nomenu' ? '' : 'nomenu'"
-                :class="issue === 'nomenu' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-300'"
+        <button type="button" x-show="issueCount('nomenu')" @click="issue = activeIssue === 'nomenu' ? '' : 'nomenu'"
+                :class="activeIssue === 'nomenu' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-300'"
                 class="px-3 min-h-[36px] rounded-full border text-sm"><i class="ti ti-alert-triangle"></i> 沒菜單 <span x-text="issueCount('nomenu')"></span></button>
-        <button type="button" x-show="issueCount('nocity')" @click="issue = issue === 'nocity' ? '' : 'nocity'"
-                :class="issue === 'nocity' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-300'"
+        <button type="button" x-show="issueCount('nocity')" @click="issue = activeIssue === 'nocity' ? '' : 'nocity'"
+                :class="activeIssue === 'nocity' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-300'"
                 class="px-3 min-h-[36px] rounded-full border text-sm"><i class="ti ti-map-pin"></i> 未設縣市 <span x-text="issueCount('nocity')"></span></button>
-        <span class="text-sm text-sela-800/50" x-text="issue ? '只看這些 · 再按一次取消' : '點了只看這些'"></span>
+        <span class="text-sm text-sela-800/50" x-text="activeIssue ? '只看這些 · 再按一次取消' : '點了只看這些'"></span>
         <span class="ml-auto text-sm text-sela-800/50" x-text="filtered.length + ' 家'"></span>
     </div>
 
@@ -138,29 +138,30 @@ function storeList() {
                 if (st.cat) this.cat = st.cat;
                 if (st.showInactive) this.showInactive = true;
                 if (['hot', 'name', 'recent', 'new'].includes(st.sort)) this.sort = st.sort;
-                if (['nomenu', 'nocity'].includes(st.issue)) this.issue = st.issue;
             } catch (e) {}
             this.$watch('q', () => this.save());
             this.$watch('cat', () => this.save());
             this.$watch('showInactive', () => this.save());
             this.$watch('sort', () => this.save());
-            this.$watch('issue', () => this.save());
         },
         save() {
-            try { sessionStorage.setItem(KEY, JSON.stringify({ q: this.q, cat: this.cat, showInactive: this.showInactive, sort: this.sort, issue: this.issue })); } catch (e) {}
+            try { sessionStorage.setItem(KEY, JSON.stringify({ q: this.q, cat: this.cat, showInactive: this.showInactive, sort: this.sort })); } catch (e) {}
         },
         icon(c) { return { drink: 'ti-cup', meal: 'ti-bowl', group_buy: 'ti-shopping-cart' }[c] || 'ti-building-store'; },
         catLabel(c) { return { drink: '飲料', meal: '餐廳', group_buy: '團購' }[c] || ''; },
         // V2.27.0：「篩選」有改過預設就加點標示；問題標記只算顯示中的店（停用的不算沒菜單）
         get filterActive() { return this.sort !== 'hot' || this.showInactive; },
         hasIssue(s, k) { return k === 'nomenu' ? (s.active && s.items === 0) : (k === 'nocity' ? !s.city : true); },
+        // V2.28.0（內部審核 P1-3）：問題標記是「這一趟要處理的事」，不存 sessionStorage；
+        // 而且那類問題已經沒有了（補完菜單回來）就自動失效，不會剩下一個看不到、取消不了的篩選
+        get activeIssue() { return this.issue && this.issueCount(this.issue) ? this.issue : ''; },
         issueCount(k) { return this.stores.filter(s => (this.showInactive || s.active) && this.hasIssue(s, k)).length; },
         countCat(c) { return this.stores.filter(s => (c === 'all' || s.category === c) && (this.showInactive || s.active)).length; },
         get filtered() {
             const kw = this.q.trim().toLowerCase();
             return this.stores
                 .filter(s => (this.cat === 'all' || s.category === this.cat) && (this.showInactive || s.active)
-                    && (!this.issue || this.hasIssue(s, this.issue))
+                    && (!this.activeIssue || this.hasIssue(s, this.activeIssue))
                     && (!kw || s.name.toLowerCase().includes(kw) || s.phone.includes(kw) || s.address.toLowerCase().includes(kw) || s.city.includes(kw)))
                 .sort((a, b) => this.cmp(a, b));
         },

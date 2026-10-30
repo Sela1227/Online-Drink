@@ -54,11 +54,10 @@
                 {% if rec.note %}
                 <div class="text-sm text-sela-800 bg-sela-50 rounded-xl p-3 whitespace-pre-line">「{{ rec.note }}」</div>
                 {% endif %}
-                <form action="/admin/recommendations/{{ rec.id }}/approve" method="POST">
-                    <button type="submit" class="w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base active:bg-sela-800">核准並建立店家</button>
-                </form>
-                <div class="text-xs text-sela-800/50 text-center -mt-1">
-                    {% if can_ai and imgs %}建好後自動用這 {{ imgs | length }} 張照片轉成菜單，看過預覽再確認{% else %}建好後直接進匯入頁，照片就在旁邊對照{% endif %}
+                {# V2.28.0（內部審核 P1-2／B-4）：只是打開匯入頁（GET，不寫資料）；匯入確認那一刻才建店、推薦才算核准 #}
+                <a href="/admin/import?rec_id={{ rec.id }}" class="block w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base text-center active:bg-sela-800">建立店家與菜單</a>
+                <div class="text-sm text-sela-800/55 text-center -mt-1">
+                    {% if can_ai and imgs %}打開後自動用這 {{ imgs | length }} 張照片轉成菜單；{% endif %}按「確認建立店家」才會建店，中途離開什麼都不會留下
                 </div>
                 <div x-data="{ showReject: false }">
                     <button @click="showReject = !showReject" type="button" class="w-full py-2.5 rounded-xl border border-sela-200 text-sm text-red-600 bg-white">不收</button>

@@ -27,10 +27,6 @@
                 <option value="{{ user.id }}">{{ user.show_name }}</option>
                 {% endfor %}
             </select>
-            <select name="role" class="border border-sela-300 rounded-lg px-3 py-2 text-sm">
-                <option value="member">成員</option>
-                <option value="leader">小組長</option>
-            </select>
             <button type="submit" class="bg-sela-500 text-sela-800 px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
                 新增
             </button>
@@ -51,28 +47,16 @@
                 <div>
                     <div class="font-medium text-sela-800">{{ m.user.show_name }}</div>
                     <div class="text-xs text-sela-800/45">
-                        {% if m.role.value == 'leader' %}
-                        <span class="text-sela-800"><i class="ti ti-star"></i> 小組長</span>
-                        {% else %}
-                        成員
-                        {% endif %}
-                        · 加入於 {{ (m.joined_at|taipei).strftime('%Y/%m/%d') }}
+                        加入於 {{ (m.joined_at|taipei).strftime('%Y/%m/%d') }}
                     </div>
                 </div>
             </div>
             
             <div class="flex items-center gap-2">
-                <!-- 切換角色 -->
-                <form action="/admin/departments/{{ department.id }}/members/{{ m.id }}/toggle-role" method="POST" class="inline">
-                    <button type="submit" class="text-sm text-blue-500 hover:text-blue-600">
-                        {% if m.role.value == 'leader' %}降為成員{% else %}升為小組長{% endif %}
-                    </button>
-                </form>
-                
                 <!-- 移除 -->
                 <form action="/admin/departments/{{ department.id }}/members/{{ m.id }}/remove" method="POST" class="inline"
-                      onsubmit="return confirm('確定要移除此成員？')">
-                    <button type="submit" class="text-sm text-red-500 hover:text-red-600">移除</button>
+                      data-name="{{ m.user.show_name }}" onsubmit="return confirm('把「' + this.dataset.name + '」移出這個部門？')">
+                    <button type="submit" class="text-sm text-red-600 min-h-[40px] px-2">移除</button>
                 </form>
             </div>
         </div>

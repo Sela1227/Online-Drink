@@ -6,9 +6,13 @@
 {% block content %}
 {{ nav.back('/admin', '管理後台') }}
 <div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800">所有團單</h1>
-        
+    <div class="flex items-end justify-between gap-3">
+        <h1 class="text-xl font-bold text-sela-800">團單</h1>
+        {# V2.28.0（內部審核 C-1）：預設只列近 14 天或還沒截止的 #}
+        <div class="text-sm text-sela-800/60 text-right" id="groups-range">
+            {% if show_all %}全部 {{ groups|length }} 團 · <a href="/admin/groups" class="text-sela-800 underline">只看近 {{ recent_days }} 天</a>
+            {% else %}近 {{ recent_days }} 天 {{ groups|length }} 團{% if total_count > groups|length %} · <a href="/admin/groups?all=1" id="groups-show-all" class="text-sela-800 underline">看全部 {{ total_count }} 團</a>{% endif %}{% endif %}
+        </div>
     </div>
 
     {% if request.query_params.get('cleaned') %}
@@ -17,6 +21,7 @@
     </div>
     {% endif %}
 
+    {% set test_ids = test_groups | map(attribute='id') | list %}
     {% if groups %}
     <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for group in groups %}
@@ -53,8 +58,8 @@
                     {% else %}
                     <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">進行中</span>
                     {% endif %}
-                    {% set others = group.orders | rejectattr('user_id', 'equalto', group.owner_id) | list %}
-                    {% if others | length == 0 %}
+                    {# V2.28.0：跟「清除測試團」同一個定義（沒有任何已送出的訂單、已截止） #}
+                    {% if group.id in test_ids %}
                     <span class="text-xs bg-sela-100 text-sela-800/60 px-1.5 py-0.5 rounded">測試團</span>
                     {% endif %}
                     {# V2.14.1 P0-1：名稱放 data-*，屬性內的 JS 字串不能直接插值（坑 #37） #}
@@ -70,7 +75,7 @@
     {% else %}
     <div class="text-center py-12 text-sela-800/60 bg-white rounded-lg">
         <div class="text-4xl mb-2"><i class="ti ti-clipboard-list"></i></div>
-        <p>還沒有任何團單</p>
+        <p>{% if show_all %}還沒有任何團單{% else %}近 {{ recent_days }} 天沒有團單{% endif %}</p>
     </div>
     {% endif %}
 
@@ -79,7 +84,7 @@
     <section id="maintenance" class="bg-white rounded-2xl border border-red-200 p-4 space-y-2 mt-6">
         <h2 class="font-bold text-red-700"><i class="ti ti-tool"></i> 維護</h2>
         <div class="text-[15px] font-medium text-sela-900">清除測試團</div>
-        <p class="text-sm text-sela-800/70">已截止、而且沒人下單（或只有團主自己點）的團。刪除後無法復原。</p>
+        <p class="text-sm text-sela-800/70">已截止、而且沒有任何人送出訂單的團（團主自己送出過的不算，要刪請用該團的「刪除」）。只會刪下面列出的這幾團，刪除後無法復原。</p>
         {% if test_groups %}
         <details class="text-sm">
             <summary class="cursor-pointer text-sela-800 min-h-[36px] flex items-center">目前符合：<b class="mx-1">{{ test_groups | length }}</b> 個（展開看清單）</summary>
@@ -91,6 +96,8 @@
         </details>
         <form action="/admin/groups/cleanup-test" method="post" data-n="{{ test_groups | length }}"
               onsubmit="return confirm('確定清除這 ' + this.dataset.n + ' 個測試團嗎？\n此動作無法復原。')">
+            {# V2.28.0：把看到的 id 一起送，後端只刪交集 #}
+            {% for g in test_groups %}<input type="hidden" name="ids" value="{{ g.id }}">{% endfor %}
             <button type="submit" class="w-full min-h-[44px] rounded-xl border border-red-300 text-red-700 font-medium bg-white active:bg-red-50">
                 <i class="ti ti-trash"></i> 清除這 {{ test_groups | length }} 個
             </button>

@@ -79,6 +79,10 @@ const fail = (msg) => { console.log(JSON.stringify({ ok: false, mode, msg, posts
     if (!posts.length || !posts[0].u.endsWith("/admin/import/ai")) fail("進頁沒有自動送 /admin/import/ai：" + JSON.stringify(posts.map(p => p.u)));
     const b = posts[0].b;
     if (!b || typeof b.get !== "function" || !b.get("rec_id")) fail("轉換請求沒帶 rec_id");
+    // V2.28.0 B-4：還沒建店，店名從推薦帶入；確認匯入時要帶 rec_id（才會標核准）
+    if (b.get("new_store_name") !== "檢查店") fail("店名沒從推薦帶入：" + b.get("new_store_name"));
+    const recInput = w.document.querySelector('input[type=hidden][name=rec_id]');
+    if (!recInput || !recInput.value) fail("匯入表單沒有 rec_id");
     await sleep(50);
     if (!ta.value.includes("AI炒麵")) fail("轉換結果沒填進輸入框");
     const box = w.document.querySelector("#ai-convert");

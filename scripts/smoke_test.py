@@ -1571,13 +1571,14 @@ def main():
     try:
         r = _c.get("/admin/recommendations")
         t = _T(r)
-        assert r.status_code == 200 and r.text.count('alt="菜單照片 ') >= 2 and r.text.count("https://cdn/m") >= 2 and "核准並建立店家" in t
-        # 核准後匯入頁推薦卡：全部照片
+        assert r.status_code == 200 and r.text.count('alt="菜單照片 ') >= 2 and r.text.count("https://cdn/m") >= 2 and "建立店家與菜單" in t
+        # V2.28.0 B-4：按下去只進匯入頁（rec_id），還沒建店；匯入頁推薦卡列出全部照片
         rec = db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "多圖店").first()
         r = _c.post(f"/admin/recommendations/{rec.id}/approve", follow_redirects=False)
+        assert r.headers["location"] == f"/admin/import?rec_id={rec.id}"
         db.expire_all(); rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec.id).first()
-        assert rec.created_store_id, "核准後應建立店家"
-        r = _c.get(f"/admin/import?store_id={rec.created_store_id}")
+        assert not rec.created_store_id and rec.status == "pending", "還沒確認匯入前不建店、不核准"
+        r = _c.get(f"/admin/import?rec_id={rec.id}")
         assert r.text.count('alt="菜單照片 ') == 2 and "2 張菜單照片" in _T(r) and "一起丟給 AI" in r.text  # B-3 的對照照片 alt 沒有序號
         check("後台推薦列表縮圖列、核准後匯入頁推薦卡列出全部照片")
 
@@ -2564,15 +2565,17 @@ def main():
 
             # 推薦照片：Cloudinary 轉 JPEG 抓回來送；核准後帶 ai=1，匯入頁自動轉
             assert _ai38.cloudinary_jpg("https://res.cloudinary.com/x/image/upload/v1/a.heic") == "https://res.cloudinary.com/x/image/upload/f_jpg,q_85,w_1600,h_1600,c_limit/v1/a.heic"
+            # V2.28.0 B-4：按「建立店家與菜單」只進匯入頁（rec_id），確認匯入時才建店
             r = _c.post(f"/admin/recommendations/{_r38.id}/approve", follow_redirects=False)
-            assert r.status_code == 302 and r.headers["location"].endswith("&ai=1"), r.headers["location"]
-            db.expire_all(); _sid38 = db.query(_SR38).filter(_SR38.id == _r38.id).one().created_store_id
+            assert r.status_code == 303 and r.headers["location"] == f"/admin/import?rec_id={_r38.id}", r.headers["location"]
+            db.expire_all(); assert db.query(_SR38).filter(_SR38.id == _r38.id).one().created_store_id is None
             r = _c.get(r.headers["location"])
             assert "this.runAi(true)" in r.text and "用推薦的 2 張照片轉成菜單" in r.text
-            r = _c.post("/admin/import/ai", data={"rec_id": str(_r38.id), "store_id": str(_sid38)})
+            assert 'name="rec_id"' in r.text and ("newName: " + json.dumps("鹿港阿嬤炒麵")) in r.text, "店名要從推薦帶入"
+            r = _c.post("/admin/import/ai", data={"rec_id": str(_r38.id), "new_store_name": "鹿港阿嬤炒麵"})
             assert r.status_code == 200 and r.json()["photos"] == 2
-            assert "店名：鹿港阿嬤炒麵（這家店已在系統裡" in _sent[-1]["messages"][0]["content"][-1]["text"]
-            check("推薦核准：建店後帶 ai=1 進匯入頁自動用推薦照片轉（Cloudinary 轉 JPEG）；指令帶既有店名")
+            assert "店名：鹿港阿嬤炒麵。" in _sent[-1]["messages"][0]["content"][-1]["text"]
+            check("推薦：進匯入頁（還沒建店）自動用推薦照片轉（Cloudinary 轉 JPEG）；店名從推薦帶入")
         finally:
             _ai38.httpx.AsyncClient = _RealAC
 
@@ -2580,8 +2583,10 @@ def main():
         _r38b = db.query(_SR38).filter(_SR38.store_name == "茶の魔手").one()
         _who38["u"] = _adm2_38.id
         r = _c.post(f"/admin/recommendations/{_r38b.id}/approve", follow_redirects=False)
-        assert r.status_code == 302 and "ai=1" not in r.headers["location"]
-        check("別的管理員核准推薦：照舊進匯入頁，不自動轉")
+        assert r.status_code == 303 and r.headers["location"] == f"/admin/import?rec_id={_r38b.id}"
+        r = _c.get(r.headers["location"])
+        assert r.status_code == 200 and "this.runAi(true)" not in r.text and 'name="rec_id"' in r.text
+        check("別的管理員按推薦：照舊進匯入頁（帶 rec_id），不自動轉")
     finally:
         _home38.get_current_user = _orig_cu38
         _adm.get_admin_user = _orig
@@ -2750,8 +2755,9 @@ def main():
         assert ("清除這 %d 個" % _n40) in r.text
         import io as _io40, contextlib as _cl40
         _buf = _io40.StringIO()
-        with _cl40.redirect_stdout(_buf):
-            r = _c.post("/admin/groups/cleanup-test", follow_redirects=False)
+        _ids40 = [g.id for g in _adm._test_group_candidates(db)]
+        with _cl40.redirect_stdout(_buf):  # V2.28.0 P1-1：送出畫面上列的 ids
+            r = _c.post("/admin/groups/cleanup-test", data={"ids": [str(i) for i in _ids40]}, follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"].endswith("cleaned=%d" % _n40)
         assert "清除測試團：" in _buf.getvalue() and str(_gt_id) in _buf.getvalue(), _buf.getvalue()
         db.expire_all()
@@ -2772,6 +2778,207 @@ def main():
         r = _c.get(f"/admin/stores/{_g40.id}")
         assert "go('options'" not in r.text and "未設縣市" in r.text.split('id="wb-summary"')[1][:2000]
         check("工作台：更新菜單全寬；摘要（縣市／分店／可見範圍／甜冰加料／電話）可點跳到欄位；團購店沒有甜冰加料")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 41. V2.28.0 內部審核 V2.27.0 ----------
+    print("\n[41] 內部審核 V2.27.0")
+    from app.models.user import Feedback as _FB41, Announcement as _AN41, StoreRecommendation as _SR41
+    from app.models.order import Order as _O41, OrderStatus as _OS41
+    from app.models.department import Department as _D41, UserDepartment as _UD41, DeptRole as _DR41
+    from app.models.store import StoreBranch as _SB41
+    import app.routers.home as _home41
+    _adm.get_admin_user = _fake_admin
+    try:
+        # P0-1：回報頁——內容含反引號與 ${} 也不壞；分待處理／已處理；複製文字放 data-copy
+        _fb = _FB41(user_id=_uid, content="價格 `${x}` 不對\n第二行", status="pending")
+        _fbr = _FB41(user_id=_uid, content="舊的已處理", status="resolved")
+        db.add_all([_fb, _fbr]); db.commit()
+        r = _c.get("/admin/feedbacks")
+        t = r.text
+        assert r.status_code == 200 and 'id="fb-pending"' in t and 'id="fb-resolved"' in t
+        assert t.index("價格") < t.index('id="fb-resolved"') < t.index("舊的已處理"), "待處理在前、已處理收在後面"
+        assert "data-copy=" in t and "$root.dataset.copy" in t
+        class _JsAttr41(_HP40):
+            bad = 0
+            def handle_starttag(self, tag, attrs):
+                for k, v in attrs:
+                    if (k.startswith(("@", "x-", ":", "on")) and v and "${x}" in v):
+                        _JsAttr41.bad += 1
+        _JsAttr41().feed(t)
+        assert _JsAttr41.bad == 0, "使用者文字不能進 JS 屬性"
+        check("回報頁：待處理／已處理（最近 50 筆）分開；複製內容放 data-copy，反引號與 ${} 不會弄壞頁面")
+
+        # P1-1：清除測試團——團主自己送出過的不算；只刪畫面清單與後端候選的交集
+        _now41 = taipei_now()
+        _ga = Group(owner_id=_uid, store_id=None, menu_id=None, name="四一團主自點", category=CategoryType.MEAL,
+                    deadline=_now41 - timedelta(hours=1), is_public=True)
+        _gb = Group(owner_id=_uid, store_id=None, menu_id=None, name="四一只有草稿", category=CategoryType.MEAL,
+                    deadline=_now41 - timedelta(hours=1), is_public=True)
+        _gc = Group(owner_id=_uid, store_id=None, menu_id=None, name="四一後來才截止", category=CategoryType.MEAL,
+                    deadline=_now41 - timedelta(hours=1), is_public=True)
+        db.add_all([_ga, _gb, _gc]); db.commit()
+        db.add_all([_O41(group_id=_ga.id, user_id=_uid, status=_OS41.SUBMITTED),
+                    _O41(group_id=_gb.id, user_id=_uid, status=_OS41.DRAFT)]); db.commit()
+        _cand = {g.id for g in _adm._test_group_candidates(db)}
+        assert _ga.id not in _cand and _gb.id in _cand and _gc.id in _cand
+        _ga_id, _gb_id, _gc_id = _ga.id, _gb.id, _gc.id
+        r = _c.post("/admin/groups/cleanup-test", data={"ids": [str(_gb_id), str(_ga_id)]}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("cleaned=1")
+        db.expire_all()
+        assert db.get(Group, _gb_id) is None and db.get(Group, _ga_id) is not None, "送出過的團不能刪"
+        assert db.get(Group, _gc_id) is not None, "畫面沒列（ids 沒帶）的不能刪"
+        r = _c.post("/admin/groups/cleanup-test", follow_redirects=False)
+        db.expire_all(); assert db.get(Group, _gc_id) is not None, "沒帶 ids 一團都不刪"
+        check("清除測試團：團主自己送出過的不算；只刪畫面清單（ids）與後端候選的交集，沒帶 ids 不刪")
+
+        # C-1／P2-5：團單頁預設近 14 天（舊的已截止團不列，進行中照列）
+        _old41 = Group(owner_id=_uid, store_id=None, menu_id=None, name="四一很久以前", category=CategoryType.MEAL,
+                       deadline=_now41 - timedelta(days=40), is_public=True, created_at=datetime.utcnow() - timedelta(days=40))
+        _oldopen = Group(owner_id=_uid, store_id=None, menu_id=None, name="四一舊但開著", category=CategoryType.MEAL,
+                         deadline=_now41 + timedelta(days=1), is_public=True, created_at=datetime.utcnow() - timedelta(days=40))
+        db.add_all([_old41, _oldopen]); db.commit()
+        r = _c.get("/admin/groups")
+        _list = r.text.split('id="maintenance"')[0]
+        assert "四一很久以前" not in _list and "四一舊但開著" in _list and 'id="groups-show-all"' in r.text
+        r = _c.get("/admin/groups?all=1")
+        assert "四一很久以前" in r.text.split('id="maintenance"')[0]
+        check("團單頁：預設只列近 14 天建立或還沒截止的團，「看全部」列全部")
+
+        # B-4：推薦 → 匯入頁（rec_id）→ 確認時才建店並標核准；確認兩次只建一家
+        _rec = _SR41(user_id=_uid, store_name="四一推薦麵店", category="meal"); db.add(_rec); db.commit()
+        _rid = _rec.id
+        r = _c.post(f"/admin/recommendations/{_rid}/approve", follow_redirects=False)
+        assert r.headers["location"] == f"/admin/import?rec_id={_rid}"
+        db.expire_all(); assert db.query(Store).filter(Store.name == "四一推薦麵店").count() == 0
+        _menu41 = {"categories": [{"name": "麵", "items": [{"name": "陽春麵", "price": 40}]}]}
+        _data41 = {"json_str": _J({"store": {"name": "四一推薦麵店", "category": "meal"}, "menu": _menu41}), "rec_id": str(_rid)}  # 預覽正規化後的形狀
+        r = _c.post("/admin/import", data=_data41, headers=_H)
+        assert r.status_code == 200 and r.headers.get("HX-Redirect"), r.text[:300]
+        db.expire_all()
+        _rec = db.get(_SR41, _rid)
+        _st41 = db.query(Store).filter(Store.name == "四一推薦麵店").all()
+        assert len(_st41) == 1 and _rec.status == "approved" and _rec.created_store_id == _st41[0].id
+        r = _c.post("/admin/import", data=_data41, headers=_H)
+        db.expire_all(); assert db.query(Store).filter(Store.name == "四一推薦麵店").count() == 1, "同名再確認走合併，不會多一家"
+        r = _c.get(f"/admin/import?rec_id={_rid}", follow_redirects=False)
+        assert r.status_code in (302, 303), "已處理的推薦再進來要轉走"
+        _rec2 = _SR41(user_id=_uid, store_name="四一稍後再說", category="drink"); db.add(_rec2); db.commit()
+        r = _c.get(f"/admin/import?rec_id={_rec2.id}")
+        assert "稍後再說" in r.text and "核准並建立店家" not in _c.get("/admin/recommendations").text
+        db.expire_all(); assert db.get(_SR41, _rec2.id).status == "pending" and db.query(Store).filter(Store.name == "四一稍後再說").count() == 0
+        check("推薦：「建立店家與菜單」進匯入頁、店名類別帶入，確認匯入時才建店並標核准；只看不建就不留空殼店；再確認不多建")
+
+        # B-1：公告原地展開編輯；過期顯示「已過期」；舊的編輯頁／停用／置頂路由
+        r = _c.post("/admin/announcements", data={"title": "四一公告", "content": "內容", "is_active": "true"}, follow_redirects=False)
+        assert r.status_code in (302, 303)
+        _a41 = db.query(_AN41).filter(_AN41.title == "四一公告").one()
+        r = _c.post("/admin/announcements", data={"title": "x" * 101, "content": "內容"})
+        assert r.status_code == 400
+        r = _c.post(f"/admin/announcements/{_a41.id}", data={"title": "四一公告改", "content": "內容二", "is_pinned": "true",
+                                                         "expires_at": "2020-01-01T08:00"}, follow_redirects=False)
+        db.expire_all(); _a41 = db.get(_AN41, _a41.id)
+        assert _a41.title == "四一公告改" and _a41.is_pinned and not _a41.is_active, "沒勾「顯示在首頁」＝停用"
+        r = _c.get(f"/admin/announcements?open={_a41.id}")
+        t = r.text
+        assert f'id="ann-{_a41.id}"' in t and 'data-status="expired"' in t.split(f'id="ann-{_a41.id}"')[1][:1500]
+        assert "ann_form" not in t and 'id="ann-new"' in t
+        r = _c.get(f"/admin/announcements/{_a41.id}/edit", follow_redirects=False)
+        assert r.status_code == 302 and f"open={_a41.id}" in r.headers["location"]
+        for _old in ("toggle", "pin", "unpin"):
+            assert _c.post(f"/admin/announcements/{_a41.id}/{_old}").status_code in (404, 405)
+        _a41_id = _a41.id
+        r = _c.post(f"/admin/announcements/{_a41_id}/delete", follow_redirects=False)
+        db.expire_all(); assert db.get(_AN41, _a41_id) is None
+        check("公告：一份清單原地展開編輯（顯示／置頂是開關）、過期寫「已過期」、長度 400；舊編輯頁轉回清單，停用／置頂舊路由拿掉")
+
+        # A-1：訪客全套與重複用戶診斷
+        r = _c.get(f"/groups/{_ga_id}/guest?token=abc", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == f"/groups/{_ga_id}"
+        assert _c.post(f"/groups/{_ga_id}/guest-link").status_code in (404, 405)
+        assert _c.post(f"/groups/{_ga_id}/guest", data={"guest_name": "x", "token": "y"}).status_code in (404, 405)
+        r = _c.get("/admin/users-duplicates", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/admin/users"
+        assert _c.post("/admin/users-cleanup-guests").status_code in (404, 405)
+        from pathlib import Path as _P41
+        assert not _P41("app/templates/guest_entry.html").exists() and not _P41("app/templates/admin/users_duplicates.html").exists()
+        assert not _P41("app/models/feedback.py").exists(), "A-4：沒人用的 feedback model 拿掉"
+        check("訪客全套拿掉：舊訪客連結轉到團頁；重複用戶診斷轉回人員頁；死碼 model 刪除")
+
+        # B-2：人員頁——登出所有人在最下面維護區、寫出在線人數；列表沒有「設為管理員」
+        r = _c.get("/admin/users")
+        t = r.text
+        assert 'id="maintenance"' in t and t.index('id="user-list"') < t.index('id="maintenance"')
+        assert 'id="online-impact"' in t and "toggle-admin" not in t and "Token 版本" not in t and "檢查重複用戶" not in t
+        check("人員頁：登出所有人移到最下面並寫出影響（在線人數）；列表不能直接設管理員；訂單數用 GROUP BY")
+
+        # A-2／P2-1／P2-4：部門
+        r = _c.post("/admin/departments", data={"name": "x" * 101})
+        assert r.status_code == 400
+        r = _c.post("/admin/departments", data={"name": "四一部門", "description": "d" * 500}, follow_redirects=False)
+        assert r.status_code == 302
+        _d1 = db.query(_D41).filter(_D41.name == "四一部門").one()
+        _d2 = _D41(name="四一別的部門"); db.add(_d2); db.commit()
+        assert _c.post(f"/admin/departments/{_d1.id}/update", data={"name": "四一部門", "description": "d" * 501}).status_code == 400
+        assert _c.post(f"/admin/departments/{_d1.id}/members", data={"user_id": "999999"}).status_code == 400
+        _gu = User(line_user_id="guest_41", display_name="訪客四一", is_guest=True); db.add(_gu); db.commit()
+        assert _c.post(f"/admin/departments/{_d1.id}/members", data={"user_id": str(_gu.id)}).status_code == 400
+        r = _c.post(f"/admin/departments/{_d1.id}/members", data={"user_id": str(_uid), "role": "leader"}, follow_redirects=False)
+        _ud = db.query(_UD41).filter(_UD41.department_id == _d1.id, _UD41.user_id == _uid).one()
+        assert _ud.role == _DR41.MEMBER, "一律一般成員"
+        _ud_id = _ud.id
+        r = _c.post(f"/admin/departments/{_d2.id}/members/{_ud_id}/remove", follow_redirects=False)
+        db.expire_all(); assert db.get(_UD41, _ud_id) is not None, "換別的部門網址不能刪"
+        assert _c.post(f"/admin/departments/{_d1.id}/members/{_ud_id}/toggle-role").status_code in (404, 405)
+        r = _c.get(f"/admin/departments/{_d1.id}")
+        assert "小組長" not in r.text and "toggle-role" not in r.text and 'name="role"' not in r.text
+        assert "小組長" not in _c.get("/admin/departments").text
+        r = _c.post(f"/admin/departments/{_d1.id}/members/{_ud_id}/remove", follow_redirects=False)
+        db.expire_all(); assert db.get(_UD41, _ud_id) is None
+        check("部門：名稱 100／說明 500 字；加成員要真的人且不是訪客；移除只看這個部門；小組長拿掉（欄位保留）")
+
+        # P2-2：店家可見範圍；P2-1／A-3：分店
+        _s41 = Store(name="四一店", category=CategoryType.MEAL, is_active=True); db.add(_s41); db.commit()
+        _sid41 = _s41.id
+        assert _c.post(f"/admin/stores/{_sid41}/visibility", data={"visibility": "departments"}).status_code == 400
+        assert _c.post(f"/admin/stores/{_sid41}/visibility", data={"visibility": "departments", "department_ids": ["abc"]}).status_code == 400
+        assert _c.post(f"/admin/stores/{_sid41}/visibility", data={"visibility": "departments", "department_ids": ["999999"]}).status_code == 400
+        db.expire_all(); assert db.get(Store, _sid41).is_public, "被擋下時不能改到一半"
+        r = _c.post(f"/admin/stores/{_sid41}/visibility", data={"visibility": "departments", "department_ids": [str(_d1.id)]}, follow_redirects=False)
+        db.expire_all(); assert r.status_code == 302 and not db.get(Store, _sid41).is_public
+        assert _c.post(f"/admin/stores/{_sid41}/branches", data={"name": "一店", "phone": "0" * 51}).status_code == 400
+        r = _c.post(f"/admin/stores/{_sid41}/branches", data={"name": "一店", "phone": "04-1"}, follow_redirects=False)
+        _b41 = db.query(_SB41).filter(_SB41.store_id == _sid41).one()
+        assert _c.post(f"/admin/stores/{_sid41}/branches/{_b41.id}", data={"name": "改"}).status_code in (404, 405)
+        check("店家可見範圍：限定部門卻沒勾／編號亂填回 400 且不改；分店電話 50 字；分店編輯路由拿掉")
+
+        # P2-7：團員看不到沒有使用中菜單的店（店家頁、開團頁）；管理員看得到
+        _mem41 = User(line_user_id="mem_41", display_name="團員四一"); db.add(_mem41)
+        _nm41 = Store(name="四一沒菜單", category=CategoryType.MEAL, is_active=True, is_public=True); db.add(_nm41); db.commit()
+        assert all(s.id != _nm41.id for s in _home41.visible_stores_for(db, _mem41))
+        assert any(s.id == _nm41.id for s in _home41.visible_stores_for(db, db.get(User, _uid)))
+        _grp41_cu = _grp.get_current_user
+        async def _fake_mem41(request, db_):
+            return db_.get(User, _mem41.id)
+        _grp.get_current_user = _fake_mem41
+        try:
+            assert "四一沒菜單" not in _c.get("/groups/new").text
+        finally:
+            _grp.get_current_user = _grp41_cu
+        check("團員的店家頁與開團頁看不到沒有使用中菜單的店（管理員看得到）；開團頁改用同一個可見規則")
+
+        # B-5／P3：後台首頁
+        db.query(_SR41).filter(_SR41.status == "pending").update({"status": "rejected"})
+        db.query(_FB41).filter(_FB41.status == "pending").update({"status": "resolved"})
+        _off41 = Store(name="四一停用店", category=CategoryType.MEAL, is_active=False); db.add(_off41); db.commit()
+        r = _c.get("/admin")
+        assert 'id="go-records"' in r.text and r.text.count("沒有待") == 0
+        _n_active = db.query(Store).filter(Store.is_personal != True, Store.is_active == True).count()
+        assert f"{_n_active} 家" in r.text, "店家數只算啟用的"
+        _w41 = Store(name="四一餐廳", category=CategoryType.MEAL, is_active=True); db.add(_w41); db.commit()
+        r = _c.get(f"/admin/stores/{_w41.id}")
+        assert "甜度 0" not in r.text.split('id="wb-summary"')[1][:3000] and "按上方「更新菜單」" in r.text
+        check("後台首頁：沒有待處理時推薦與回報合成一列；店家數只算啟用的；餐廳摘要只寫加料、沒菜單提示寫「按上方」")
     finally:
         _adm.get_admin_user = _orig
 

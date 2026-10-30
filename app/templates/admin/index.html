@@ -42,8 +42,19 @@
         <h2 class="text-sm font-bold text-sela-800/60 px-1">管理</h2>
         {{ row('/admin/users', 'ti-user', '人員', user_count ~ ' 人 · 在線 ' ~ online_count, id='go-users') }}
         {{ row('/admin/departments', 'ti-users', '部門', department_count ~ ' 個', id='go-departments') }}
-        {% if not recommendation_count %}{{ row('/admin/recommendations', 'ti-bulb', '推薦紀錄', '沒有待審', id='go-recs') }}{% endif %}
-        {% if not feedback_count %}{{ row('/admin/feedbacks', 'ti-mailbox', '問題回報', '沒有待處理', id='go-feedback') }}{% endif %}
+        {# V2.28.0（內部審核 B-5）：沒有待處理時，兩列「沒有待審」「沒有待處理」合成一列，兩個小連結各自進去 #}
+        {% if not recommendation_count and not feedback_count %}
+        <div id="go-records" class="flex items-center gap-3 rounded-2xl px-4 py-3 min-h-[56px] border bg-white border-sela-100">
+            <span class="w-9 h-9 rounded-xl bg-sela-100 flex items-center justify-center flex-shrink-0"><i class="ti ti-history text-lg text-sela-800"></i></span>
+            <span class="text-base font-medium text-sela-900">推薦與回報紀錄</span>
+            <span class="ml-auto flex items-center gap-1 text-sm">
+                <a href="/admin/recommendations" id="go-recs" class="px-2 min-h-[40px] flex items-center text-sela-800 underline-offset-2 underline">推薦</a>
+                <span class="text-sela-800/30">·</span>
+                <a href="/admin/feedbacks" id="go-feedback" class="px-2 min-h-[40px] flex items-center text-sela-800 underline-offset-2 underline">回報</a>
+            </span>
+        </div>
+        {% elif not recommendation_count %}{{ row('/admin/recommendations', 'ti-bulb', '推薦紀錄', '沒有待審', id='go-recs') }}
+        {% elif not feedback_count %}{{ row('/admin/feedbacks', 'ti-mailbox', '問題回報', '沒有待處理', id='go-feedback') }}{% endif %}
     </section>
 </div>
 {% endblock %}
