@@ -41,6 +41,42 @@
     </div>
     {% endif %}
 
+    {% if can_ai %}
+    {# V2.25.0：站內拍照轉成菜單（只有 Sela）。結果只填進下面的輸入框，照舊自動檢查→預覽→確認 #}
+    <div id="ai-convert" class="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+            <div class="text-base font-bold text-sela-800"><i class="ti ti-sparkles"></i> 拍菜單，自動轉成菜單</div>
+            <span class="text-xs text-sela-800/45">只有你看得到</span>
+        </div>
+        {% if recommendation and recommendation.menu_images %}
+        <button type="button" @click="runAi(true)" :disabled="aiBusy"
+                class="w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base disabled:opacity-50">
+            用推薦的 {{ recommendation.menu_images | length }} 張照片轉成菜單
+        </button>
+        <div class="text-xs text-sela-800/50 text-center">或另外拍照／選照片：</div>
+        {% endif %}
+        <div class="flex gap-2 flex-wrap">
+            <template x-for="(t, i) in aiThumbs" :key="i">
+                <div class="relative w-20 h-20 rounded-xl overflow-hidden border border-sela-200">
+                    <img :src="t" alt="" class="w-full h-full object-cover">
+                    <button type="button" @click="removeAiPhoto(i)" :disabled="aiBusy" aria-label="移除這張"
+                            class="absolute top-0.5 right-0.5 w-6 h-6 rounded-full bg-black/55 text-white text-sm leading-6">×</button>
+                </div>
+            </template>
+            <label x-show="aiThumbs.length < 5" class="w-20 h-20 rounded-xl border-2 border-dashed border-sela-300 flex flex-col items-center justify-center text-sela-500 cursor-pointer active:bg-sela-50">
+                <i class="ti ti-camera-plus text-2xl"></i><span class="text-[11px]">加照片</span>
+                <input type="file" accept="image/*" multiple class="hidden" @change="addAiPhotos($event.target.files); $event.target.value = ''">
+            </label>
+        </div>
+        <button type="button" x-show="aiThumbs.length" x-cloak @click="runAi(false)" :disabled="aiBusy"
+                class="w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base disabled:opacity-50">轉成菜單</button>
+        <div x-show="aiBusy" x-cloak class="text-sm text-sela-800 text-center"><i class="ti ti-loader-2 animate-spin"></i> AI 正在讀菜單…<span x-text="aiSec"></span> 秒（約 20～60 秒）</div>
+        <div x-show="aiErr" x-cloak class="text-sm text-red-600 bg-red-50 rounded-xl p-3" x-text="aiErr"></div>
+        <div x-show="aiDone" x-cloak class="text-sm text-green-700"><i class="ti ti-circle-check"></i> 轉好了，已填進下方並自動檢查；看過預覽再按確認</div>
+        <div class="text-xs text-sela-800/45">最多 5 張，一張拍一面最清楚。店名、類別、電話、地址、甜冰、加料、品項都從照片讀。</div>
+    </div>
+    {% endif %}
+
     <form hx-post="/admin/import/preview"
           hx-target="#import-result"
           hx-swap="innerHTML"
@@ -48,7 +84,7 @@
              - `changed` 修飾不能用：它比對的是掛 hx-trigger 的元素（form）的 value，永遠 undefined，事件永遠不發
              - `from:find select` 在找不到元素時 htmx 直接拋錯，所以沒選店家時才加
              - 清空時不發：filter 看 textarea 的值 #}
-          hx-trigger="input[event.target.tagName === 'TEXTAREA' && this.elements.json_text.value.trim().length > 0] delay:700ms{% if not selected_store %}, store-changed[this.elements.json_text.value.trim().length > 0], change[this.elements.json_text.value.trim().length > 0] from:find input[name=new_store_category]{% endif %}"
+          hx-trigger="input[(event.target.tagName === 'TEXTAREA' || event.target.name === 'new_store_name') && this.elements.json_text.value.trim().length > 0] delay:700ms{% if not selected_store %}, store-changed[this.elements.json_text.value.trim().length > 0], change[this.elements.json_text.value.trim().length > 0] from:find input[name=new_store_category]{% endif %}"
           hx-indicator="#import-loading"
           @submit.prevent
           @htmx:after-swap.window="resultFresh()"
@@ -105,12 +141,12 @@
         {# V2.15.1 審核 P2-9：新增一家店時，店名與類別在畫面上填（AI 指令要求店名留空） #}
         <div x-show="!storeSel" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-                <label class="block text-xs text-sela-800/55 mb-1">店名 <span class="text-red-500">*</span></label>
+                <label class="block text-xs text-sela-800/55 mb-1">店名 <span class="text-sela-800/40">（留空就用資料裡的店名）</span></label>
                 <input type="text" name="new_store_name" maxlength="100" placeholder="例：可不可熟成紅茶" x-model="newName"
                        class="w-full border border-sela-300 rounded-xl px-3 py-2 text-base">
             </div>
             <div>
-                <label class="block text-xs text-sela-800/55 mb-1">類別 <span class="text-red-500">*</span></label>
+                <label class="block text-xs text-sela-800/55 mb-1">類別 <span class="text-sela-800/40">（不選就用資料裡的）</span></label>
                 <div class="grid grid-cols-3 gap-1.5">
                     {% for val, label, icon in [('drink','飲料','ti-cup'), ('meal','餐廳','ti-bowl'), ('group_buy','團購','ti-shopping-cart')] %}
                     <label class="flex items-center justify-center gap-1 py-2 rounded-xl border-2 cursor-pointer text-sm"
@@ -190,10 +226,13 @@
         <div class="px-4 pb-4 space-y-4">
             <div>
                 <div class="text-sm font-medium text-sela-800/70 mb-2">新增店家（含菜單）</div>
+                <div class="text-xs text-sela-800/60 mb-2">phone、address 可省略；更新既有店家時，只會補上店家原本空白的電話地址，不會覆蓋。</div>
                 <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
   "store": {
     "name": "可不可熟成紅茶",
     "category": "drink",
+    "phone": "04-2345-6789",
+    "address": "彰化縣鹿港鎮中山路 100 號",
     "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],
     "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"]
   },
@@ -229,6 +268,7 @@
 {% block scripts %}
 {# V2.16.1 B-10：店家清單放 JSON script，不塞屬性（坑 #37）；tojson 逸出 <>& 所以放 <script> 安全（坑 #29） #}
 <script type="application/json" id="import-stores">{{ stores_json | tojson }}</script>
+<script type="application/json" id="import-prompt">{{ (prompt_lines or []) | tojson }}</script>
 <script>
 function importForm() {
     return {
@@ -249,6 +289,14 @@ function importForm() {
         photoOpen: true,
         loadingCurrent: false,
         loadedNote: '',
+        // V2.25.0：站內 AI 轉換
+        aiBlobs: [],
+        aiThumbs: [],
+        aiBusy: false,
+        aiErr: '',
+        aiDone: false,
+        aiSec: 0,
+        aiRecId: {{ (recommendation.id if recommendation else none) | tojson }},
         init() {
             // V2.15.1 審核 P3-6：注音序（PostgreSQL 的 ORDER BY name 對中文是碼位序）
             try {
@@ -260,6 +308,71 @@ function importForm() {
             // 工作台「改幾個價格」進來：直接帶入使用中菜單
             this.$nextTick(() => this.loadCurrentMenu(false, this.$refs.ta));
             {% endif %}
+            {% if auto_ai %}
+            // 推薦「核准並建立店家」過來：直接用推薦照片轉
+            this.$nextTick(() => this.runAi(true));
+            {% endif %}
+        },
+        // ---- V2.25.0 站內 AI 轉換 ----
+        _shrink(file) {
+            // 瀏覽器端縮成 JPEG、長邊 1600：上傳快、不超過 API 單張上限；解不開的格式回 null
+            return new Promise((resolve) => {
+                let url;
+                try { url = URL.createObjectURL(file); } catch (e) { resolve(null); return; }
+                const img = new Image();
+                img.onload = () => {
+                    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+                    const c = document.createElement('canvas');
+                    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+                    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                    try { URL.revokeObjectURL(url); } catch (e) {}
+                    c.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+                };
+                img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} resolve(null); };
+                img.src = url;
+            });
+        },
+        async addAiPhotos(files) {
+            this.aiErr = '';
+            for (const f of Array.from(files || [])) {
+                if (this.aiBlobs.length >= 5) { this.aiErr = '最多 5 張'; break; }
+                const b = await this._shrink(f);
+                if (!b) { this.aiErr = '有照片讀不出來（格式不支援），請改拍 JPG'; continue; }
+                this.aiBlobs.push(b);
+                this.aiThumbs.push(URL.createObjectURL(b));
+            }
+        },
+        removeAiPhoto(i) {
+            try { URL.revokeObjectURL(this.aiThumbs[i]); } catch (e) {}
+            this.aiBlobs.splice(i, 1); this.aiThumbs.splice(i, 1);
+        },
+        runAi(useRec) {
+            if (this.aiBusy) return;
+            if (this.jsonText.trim() && !confirm('輸入框已有內容，要用 AI 轉出來的覆蓋嗎？')) return;
+            const fd = new FormData();
+            if (useRec && this.aiRecId) fd.append('rec_id', String(this.aiRecId));
+            if (!useRec) this.aiBlobs.forEach((b, i) => fd.append('photos', b, 'menu' + (i + 1) + '.jpg'));
+            fd.append('store_id', this.storeSel || '');
+            fd.append('new_store_name', this.newName || '');
+            this.aiBusy = true; this.aiErr = ''; this.aiDone = false; this.aiSec = 0;
+            const tick = setInterval(() => { this.aiSec++; }, 1000);
+            const x = new XMLHttpRequest();
+            x.open('POST', '/admin/import/ai');
+            x.timeout = 200000;
+            const end = (msg) => { clearInterval(tick); this.aiBusy = false; if (msg) this.aiErr = msg; };
+            x.onload = () => {
+                let d = {};
+                try { d = JSON.parse(x.responseText); } catch (e) { end('AI 轉換失敗，請再試一次'); return; }
+                if (x.status !== 200 || !d.text) { end(d.error || 'AI 轉換失敗，請再試一次'); return; }
+                end('');
+                const el = this.$refs.ta;
+                this.jsonText = d.text; if (el) el.value = d.text;
+                this.aiDone = true;
+                if (el) setTimeout(() => el.dispatchEvent(new Event('input', { bubbles: true })), 0);
+            };
+            x.onerror = () => end('連線中斷，請再試一次');
+            x.ontimeout = () => end('等太久了，請再試一次（照片少一點會比較快）');
+            x.send(fd);
         },
         // ---- B-10 搜尋選店 ----
         _norm(t) { return String(t || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase(); },
@@ -334,7 +447,7 @@ function importForm() {
             const name = this.storeSel ? this.storeName : '';
             const tail = name
                 ? ['==== 開始 ====', '店名：' + name + '（這家店已在系統裡，store.name 照填這個即可）。菜單照片如下，請依規範輸出 JSON：']
-                : ['==== 開始 ====', '菜單照片如下，請依規範輸出 JSON。店名我會在系統裡填，若照片沒有店名請把 name 留成空字串：', '店名：'];
+                : ['==== 開始 ====', '菜單照片如下，請依規範輸出 JSON。照片上有店名就填進 store.name，沒有就留空字串：'];
             return this.promptBody.concat(tail).join('\n');
         },
         // V2.15.1 審核 P1-1：內容一變，舊的檢查結果立刻失效（按鈕停用、變灰），等重新檢查換進新片段
@@ -385,120 +498,8 @@ function importForm() {
         },
 
         // V2.16.1 B-6：三份指令合成一份。既有店家時 store 區塊系統會忽略，所以同一份能用；B-7 看不清填 "?"
-        promptBody: [
-            '你是專業的菜單數位化助手。我會給你店家菜單照片，請依照以下「嚴格規範」轉成 JSON。',
-            '',
-            '==== 嚴格規範（務必全部遵守）====',
-            '1. 只輸出 JSON 本身，不要任何說明文字，不要 markdown 的三個反引號標記。',
-            '2. 最外層必須有兩個鍵：store 與 menu。（若這份菜單是給系統裡已經有的店家，store 會被系統忽略，照填即可。）',
-            '3. store.category 只能填 "drink"、"meal" 或 "group_buy" 三者之一：',
-            '   - 飲料、茶飲、咖啡店 → "drink"',
-            '   - 便當、餐廳、小吃、麵食、漢堡等現做餐點 → "meal"',
-            '   - 團購、預購、宅配、農場直送、箱購商品 → "group_buy"',
-            '4. 所有價格欄位（price、price_l、price_diff、加料 price）一律純數字，不可有「元」「$」「NT」或任何文字。',
-            '   - 菜單寫「時價」「市價」的品項，price 填字串 "時價"（不要填 0——0 代表免費）。',
-            '   - 真的看不清、被遮住、模糊到無法確定的價格，price 填字串 "?"——不要猜、不要填 0。我會對照照片自己補。',
-            '5. store 各欄位規則：',
-            '   - name：店名字串（菜單上常沒有店名，若看不到，先用空字串 ""，我會在系統裡填）。',
-            '   - logo_url：一律填 null（圖片我自己上傳）。',
-            '   - sugar_options：飲料店填甜度字串陣列（如 ["正常糖","少糖","半糖","微糖","無糖"]）；非飲料店填 null。',
-            '   - ice_options：飲料店填冰塊字串陣列（如 ["正常冰","少冰","微冰","去冰","熱"]）；非飲料店填 null。',
-            '   - toppings：全店通用的加料（如珍珠、椰果），每個是 {"name":"珍珠","price":10}；沒有就填 null。',
-            '6. menu.categories 是陣列，每個分類有 name 與 items；依菜單的分區整理。',
-            '7. 每個品項（item）規則：',
-            '   - name：品項名稱（字串）。',
-            '   - price：基本價（純數字）。飲料若有中/大杯，price 放中杯（或預設杯），price_l 放大杯；沒有大杯就把 price_l 設為 null。',
-            '   - options：該品項專屬的加價選項，每個是 {"name":"加蛋","price_diff":10}；price_diff 是加價金額，不加價填 0；沒有選項就設為 null。',
-            '   - is_available：菜單上劃掉、寫「售完」「暫停供應」的品項，加 "is_available": false，仍要列出；正常供應的不要加這個欄位。',
-            '   - note：品項旁的小字說明（例：「限午間」「需提前預訂」「辣」），放 "note"，最多 200 字；沒有就不要這個欄位。',
-            '8. 欄位名稱、巢狀結構、引號、逗號都必須完全符合下方範例，不要自創欄位、不要漏逗號、不要多逗號。',
-            '',
-            '==== 完整範例（請完全照這個結構輸出）====',
-            '{',
-            '  "store": {',
-            '    "name": "可不可熟成紅茶",',
-            '    "category": "drink",',
-            '    "logo_url": null,',
-            '    "sugar_options": ["正常糖", "少糖", "半糖", "微糖", "無糖"],',
-            '    "ice_options": ["正常冰", "少冰", "微冰", "去冰", "熱"],',
-            '    "toppings": [',
-            '      { "name": "珍珠", "price": 10 },',
-            '      { "name": "椰果", "price": 10 }',
-            '    ]',
-            '  },',
-            '  "menu": {',
-            '    "categories": [',
-            '      {',
-            '        "name": "熟成紅茶系列",',
-            '        "items": [',
-            '          { "name": "熟成紅茶", "price": 30, "price_l": 35, "options": null },',
-            '          { "name": "熟成奶茶", "price": 45, "price_l": 55, "options": [',
-            '            { "name": "換燕麥奶", "price_diff": 15 }',
-            '          ] },',
-            '          { "name": "季節限定果茶", "price": "?", "price_l": null, "options": null, "note": "價格被貼紙遮住" }',
-            '        ]',
-            '      },',
-            '      {',
-            '        "name": "鮮奶茶系列",',
-            '        "items": [',
-            '          { "name": "鮮奶茶", "price": 55, "price_l": 65, "options": null }',
-            '        ]',
-            '      }',
-            '    ]',
-            '  }',
-            '}',
-            '',
-            '==== 非飲料店（meal）範例 ====',
-            '{',
-            '  "store": {',
-            '    "name": "美式漢堡",',
-            '    "category": "meal",',
-            '    "logo_url": null,',
-            '    "sugar_options": null,',
-            '    "ice_options": null,',
-            '    "toppings": null',
-            '  },',
-            '  "menu": {',
-            '    "categories": [',
-            '      {',
-            '        "name": "漢堡",',
-            '        "items": [',
-            '          { "name": "牛肉起司堡", "price": 140, "price_l": null, "options": [',
-            '            { "name": "加蛋", "price_diff": 15 },',
-            '            { "name": "不要洋蔥", "price_diff": 0 }',
-            '          ] },',
-            '          { "name": "清蒸魚", "price": "時價", "price_l": null, "options": null },',
-            '          { "name": "炸蝦捲", "price": 80, "price_l": null, "options": null, "is_available": false }',
-            '        ]',
-            '      }',
-            '    ]',
-            '  }',
-            '}',
-            '',
-            '==== 團購店（group_buy）範例 ====',
-            '{',
-            '  "store": {',
-            '    "name": "三隻小豬生活農場",',
-            '    "category": "group_buy",',
-            '    "logo_url": null,',
-            '    "sugar_options": null,',
-            '    "ice_options": null,',
-            '    "toppings": null',
-            '  },',
-            '  "menu": {',
-            '    "categories": [',
-            '      {',
-            '        "name": "團購商品",',
-            '        "items": [',
-            '          { "name": "鮮乳一箱（24瓶）", "price": 600, "price_l": null, "options": null },',
-            '          { "name": "優格禮盒", "price": 350, "price_l": null, "options": null }',
-            '        ]',
-            '      }',
-            '    ]',
-            '  }',
-            '}',
-            ''
-        ]
+        // V2.25.0：指令搬到 app/services/menu_prompt.py（站內 AI 轉換共用同一份）
+        promptBody: JSON.parse(document.getElementById('import-prompt').textContent || '[]'),
     }
 }
 </script>

@@ -68,6 +68,13 @@ JWT_SECRET_KEY=xxx
 CLOUDINARY_CLOUD_NAME=xxx
 CLOUDINARY_API_KEY=xxx
 CLOUDINARY_API_SECRET=xxx
+
+# 管理員（LINE userId；也是唯一能用「拍照轉成菜單」的人）
+ADMIN_LINE_USER_ID=Uxxxx
+
+# 站內拍照轉成菜單（V2.25.0，可選；沒設就只能複製指令到 ChatGPT／Claude）
+ANTHROPIC_API_KEY=sk-ant-xxx
+# ANTHROPIC_MODEL=claude-sonnet-5-5   # 預設值，要換模型才設
 ```
 
 ---
@@ -152,4 +159,4 @@ restartPolicyMaxRetries = 3
 
 ---
 
-> Made by **SELA** · V2.23.2 · 對齊 SELA-Starter-Kit V1.36.0
+> Made by **SELA** · V2.25.0 · 對齊 SELA-Starter-Kit V1.36.0

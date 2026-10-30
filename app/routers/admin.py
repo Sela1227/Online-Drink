@@ -19,6 +19,8 @@ from app.services.import_analysis import analyze_menu_content, describe_loc, jso
 from app.services.menu_diff import diff_menu
 from app.services.store_match import similar_stores as _similar_stores  # V2.16.1 B-8
 from app.schemas.menu import UNCLEAR_PRICE_MSG  # V2.16.1 B-7
+from app.services.menu_prompt import PROMPT_LINES  # V2.25.0
+from app.services.ai_menu import can_use_ai  # V2.25.0
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,7 +45,7 @@ templates.env.filters['taipei'] = to_taipei_time
 # ===== 匯入錯誤中文化（V1.7.0）=====
 _FIELD_NAMES = {
     "store": "店家", "name": "名稱", "category": "分類", "logo_url": "logo 網址",
-    "sugar_options": "甜度選項", "ice_options": "冰塊選項", "toppings": "加料",
+    "sugar_options": "甜度選項", "ice_options": "冰塊選項", "toppings": "加料", "phone": "電話", "address": "地址",
     "menu": "菜單", "categories": "分類", "items": "品項", "uncategorized": "未分類品項",
     "price": "價格", "price_l": "大杯價格", "options": "加購選項",
     "price_diff": "加購價差", "store_id": "店家編號", "mode": "匯入模式",
@@ -115,7 +117,7 @@ def _render_import_result(request, user, *, error_messages=None, data=None,
                           error_context=None, ignored_store_block=False,
                           diff=None, existing_version=0, conflict=False, next_version=0,
                           stale=False, src_digest=None, cleaned_note=False,
-                          unclear_items=None, similar=None):
+                          unclear_items=None, similar=None, contact=None):
     """render 匯入結果片段（htmx 用），錯誤或成功預覽二擇一"""
     return templates.TemplateResponse(request, "admin/partials/import_result.html", {
         "request": request,
@@ -128,6 +130,7 @@ def _render_import_result(request, user, *, error_messages=None, data=None,
         "json_str": json_str,
         "target_store": target_store,
         "source_label": source_label,
+        "contact": contact or [],
         "analysis": analysis,
         "error_context": error_context,
         "ignored_store_block": ignored_store_block,
@@ -263,7 +266,7 @@ async def activate_menu(store_id: int, menu_id: int, request: Request, db: Sessi
 
 
 @router.get("/import")
-async def import_page(request: Request, store_id: int = None, load: str = None, db: Session = Depends(get_db)):
+async def import_page(request: Request, store_id: int = None, load: str = None, ai: str = None, db: Session = Depends(get_db)):
     """匯入頁面。V2.16.1：`load=current` 進頁就帶入使用中菜單（工作台「改幾個價格」）"""
     user = await get_admin_user(request, db)
     
@@ -307,7 +310,52 @@ async def import_page(request: Request, store_id: int = None, load: str = None, 
         "active_item_count": active_item_count,
         "stores_json": stores_json,
         "load_current": (load == "current" and selected_store is not None),
+        # V2.25.0：AI 指令單一來源；站內拍照轉換（只有 Sela）；推薦核准過來且有照片 → 進頁自動轉
+        "prompt_lines": PROMPT_LINES,
+        "can_ai": can_use_ai(user),
+        "auto_ai": bool(ai == "1" and can_use_ai(user) and recommendation is not None and recommendation.menu_images),
     })
+
+
+@router.post("/import/ai")
+async def import_ai_convert(
+    request: Request,
+    photos: list[UploadFile] = File(None),
+    rec_id: int = Form(None),
+    store_id: str = Form(None),
+    new_store_name: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    """V2.25.0：照片 → AI → 匯入格式文字（只回文字，填進輸入框後照舊自動檢查、預覽、確認）。
+    只有 ADMIN_LINE_USER_ID 那位能用；其他管理員 403。"""
+    from fastapi.responses import JSONResponse
+    from app.services import ai_menu
+    user = await get_admin_user(request, db)
+    if not ai_menu.can_use_ai(user):
+        return JSONResponse({"error": "這個功能目前只開放給系統負責人"}, status_code=403)
+
+    images = []
+    try:
+        if rec_id:
+            from app.models.user import StoreRecommendation
+            rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec_id).first()
+            if not rec or not rec.menu_images:
+                return JSONResponse({"error": "這筆推薦沒有菜單照片"}, status_code=400)
+            images += await ai_menu.fetch_images(rec.menu_images)
+        for f in (photos or []):
+            if not f or not f.filename:
+                continue
+            if f.content_type not in ai_menu.ALLOWED_TYPES:
+                return JSONResponse({"error": "照片僅支援 JPG／PNG／WebP"}, status_code=400)
+            data = await f.read(ai_menu.MAX_BYTES + 1)
+            images.append((data, f.content_type))
+        sid = _parse_store_id(store_id)
+        st = db.query(Store).filter(Store.id == sid).first() if sid else None
+        text = await ai_menu.convert_menu(images, store_name=(st.name if st else new_store_name), existing=st is not None)
+    except ai_menu.AIMenuError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    print(f"AI 轉換完成：{len(images)} 張照片，{len(text)} 字（{user.show_name}）")
+    return JSONResponse({"text": text, "photos": len(images)})
 
 
 def _stores_for_picker(db, stores):
@@ -501,10 +549,17 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
     ignored_store_block = False
     if store_id_int:
         menu_data = data.get("menu", data)
+        _contact = None
         if isinstance(data, dict) and "store" in data:
             # 使用者選了店家，卻貼了「新增店家」格式的 JSON：以畫面選的為準，但要告訴他
             ignored_store_block = True
+            # V2.24.0：store 區塊其餘忽略，只留電話地址（之後只補店家空白欄位）
+            _sb = data.get("store") if isinstance(data.get("store"), dict) else {}
+            _c = {k: _sb.get(k) for k in ("phone", "address") if _sb.get(k) not in (None, "")}
+            _contact = _c or None
         data = {"store_id": store_id_int, "mode": "new", "menu": menu_data}
+        if _contact:
+            data["contact"] = _contact
         json_str = json.dumps(data, ensure_ascii=False)
         is_full_import = False
     elif "store" in data:
@@ -566,6 +621,14 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
                 Menu.is_active == True
             ).first()
 
+    # V2.24.0：電話地址的處理方式（新店家一起建立／既有店家只補空白）
+    from app.services.import_service import contact_plan
+    if is_full_import:
+        contact = contact_plan(duplicate_store, validated.store.phone, validated.store.address)
+    else:
+        _ct = validated.contact
+        contact = contact_plan(target_store, _ct.phone, _ct.address) if _ct else []
+
     # V2.13.1：有使用中版本就算差異，讓管理員按確認前看到這版會改掉什麼
     diff = None
     existing_version = 0
@@ -600,6 +663,7 @@ def _preview_from_data(request, user, db, data, store_id_int, source_label=None,
         src_digest=src_digest,
         cleaned_note=cleaned_note,
         similar=similar,
+        contact=contact,
     )
 
 
@@ -666,7 +730,8 @@ async def do_import(
             validated = MenuImport(
                 store_id=data["store_id"],
                 mode="new",  # V2.11.1 P1-04：忽略外部送進來的 mode
-                menu=menu_data
+                menu=menu_data,
+                contact=data.get("contact"),  # V2.24.0：只補店家空白的電話地址
             )
             # V2.12.1：店家必須存在，否則 import_menu 會在外鍵上 500
             # V2.15.1 審核 P2-10：鎖住店家列，兩個同時進來的確認會排隊，後者會看到前者建的新版本
@@ -945,43 +1010,11 @@ async def update_store_visibility(
 
 @router.get("/stores/new")
 async def new_store_page(request: Request, db: Session = Depends(get_db)):
-    """手動新增店家（V2.13.0；上一輪管理後台審稿的提案 2）。
-
-    原本新增店家只能靠 JSON 匯入帶 store 區塊、或核准推薦。只填店名與類別就建，
-    建好直接進工作台，頂部就有「更新菜單」。
-    注意：這條路由必須排在 /stores/{store_id} 之前，否則 "new" 會被當成 store_id 而 422。
-    """
-    user = await get_admin_user(request, db)
-    existing = [s.name for s in db.query(Store.name).filter(Store.is_personal != True).all()]
-    return templates.TemplateResponse(request, "admin/store_new.html", {
-        "request": request, "user": user, "existing_names": existing,
-    })
-
-
-@router.post("/stores/new")
-async def create_store_manual(
-    request: Request,
-    name: str = Form(...),
-    category: str = Form(...),
-    phone: str = Form(None),
-    address: str = Form(None),
-    db: Session = Depends(get_db),
-):
-    user = await get_admin_user(request, db)
-    from app.services.validation import clean_text
-    name = clean_text(name, 100, field="店名", required=True)
-    if category not in ("drink", "meal", "group_buy"):
-        raise HTTPException(status_code=400, detail="類別錯誤")
-    store = Store(
-        name=name,
-        category=CategoryType(category),
-        phone=clean_text(phone, 50, field="電話"),
-        address=clean_text(address, 300, field="地址"),
-        is_active=True,
-    )
-    db.add(store)
-    db.commit()
-    return RedirectResponse(url=f"/admin/stores/{store.id}?tab=menu&created=1", status_code=302)
+    """V2.25.0：新增店家一律走匯入（Sela：「不會再自己建了，都會統一由匯入的」）。
+    舊的手動表單（V2.13.0）拿掉，舊網址 302 到匯入頁的「新增一家店」。
+    這條路由仍須排在 /stores/{store_id} 之前，否則 "new" 會進 int 路由 422。"""
+    await get_admin_user(request, db)
+    return RedirectResponse(url="/admin/import", status_code=302)
 
 
 @router.get("/stores/{store_id}")
@@ -2040,6 +2073,20 @@ def _parse_taipei_to_utc(value: str):
 
 # ============== 店家推薦審核 ==============
 
+@router.get("/recommendations/badge")
+async def recommendation_badge(request: Request, db: Session = Depends(get_db)):
+    """V2.25.0：底部導航「我的」的新推薦紅點（htmx 載入；沒有就回空）"""
+    user = await get_admin_user(request, db)
+    from app.routers.home import pending_recommendations
+    n = pending_recommendations(db, user, limit=0)[0]
+    if not n:
+        return Response("", media_type="text/html")
+    return Response(
+        f'<span id="nav-rec-badge" class="absolute -top-1 -right-2 min-w-[18px] h-[18px] px-1 rounded-full '
+        f'bg-red-500 text-white text-[10px] leading-[18px] text-center font-bold" aria-label="{n} 家新推薦">{min(n, 99)}</span>',
+        media_type="text/html")
+
+
 @router.get("/recommendations")
 async def recommendation_list(request: Request, db: Session = Depends(get_db)):
     """店家推薦審核列表"""
@@ -2066,6 +2113,7 @@ async def recommendation_list(request: Request, db: Session = Depends(get_db)):
         "user": user,
         "pending": pending,
         "processed": processed,
+        "can_ai": can_use_ai(user),  # V2.25.0
     })
 
 
@@ -2113,7 +2161,9 @@ async def approve_recommendation(
     db.commit()
     
     # V2.10.0：核准是起點不是終點 — 直接送到菜單匯入頁（該頁有「稍後再匯入」出口）
-    return RedirectResponse(url=f"/admin/import?store_id={new_store.id}", status_code=302)
+    # V2.25.0：有照片又能用 AI（只有 Sela）→ 進匯入頁自動用推薦照片轉
+    _ai = "&ai=1" if (rec.menu_images and can_use_ai(user)) else ""
+    return RedirectResponse(url=f"/admin/import?store_id={new_store.id}{_ai}", status_code=302)
 
 
 @router.post("/recommendations/{rec_id}/reject")

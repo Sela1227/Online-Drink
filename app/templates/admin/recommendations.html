@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
 
-{% block title %}店家推薦審核 - SELA 快點來點餐{% endblock %}
+{% block title %}新推薦 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
-{{ nav.back('/admin', '管理後台') }}
+{{ nav.back('/home', '今天') }}
 <div class="space-y-4">
     <!-- 標題列 -->
     <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-bulb"></i> 店家推薦審核</h1>
+        <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-bulb"></i> 新推薦</h1>
         
     </div>
     
@@ -20,78 +20,53 @@
         </div>
         
         {% if pending %}
+        {# V2.25.0：一筆一張卡——照片放大、推薦說明、核准鈕全寬；核准後直接進匯入（Sela 會自動用照片轉） #}
         <div class="divide-y">
             {% for rec in pending %}
-            <div class="p-4">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1 flex-wrap">
-                            <span class="font-bold text-sela-800 text-lg">{{ rec.store_name }}</span>
-                            <span class="text-xs px-1.5 py-0.5 rounded
-                                {% if rec.category == 'drink' %}bg-amber-100 text-amber-600
-                                {% elif rec.category == 'meal' %}bg-green-100 text-green-600
-                                {% else %}bg-blue-100 text-blue-600{% endif %}">
-                                {% if rec.category == 'drink' %}<i class="ti ti-cup"></i> 飲料
-                                {% elif rec.category == 'meal' %}<i class="ti ti-bowl"></i> 餐廳
-                                {% else %}<i class="ti ti-shopping-cart"></i> 團購{% endif %}
-                            </span>
-                        </div>
-                        
-                        {% if rec.menu_url %}
-                        <div class="mb-2">
-                            <a href="{{ rec.menu_url }}" target="_blank" 
-                               class="text-sm text-blue-600 hover:underline break-all">
-                                <i class="ti ti-link"></i> {{ rec.menu_url[:50] }}{% if rec.menu_url|length > 50 %}...{% endif %}
-                            </a>
-                        </div>
-                        {% endif %}
-                        
-                        {% set imgs = rec.menu_images %}
-                        {% if imgs %}
-                        {# V2.16.2：多張縮圖橫列，點開新分頁 #}
-                        <div class="mb-1 flex gap-2 overflow-x-auto">
-                            {% for u in imgs %}
-                            <a href="{{ u }}" target="_blank" rel="noopener" class="flex-shrink-0">
-                                <img src="{{ u }}" alt="菜單照片 {{ loop.index }}" loading="lazy" class="w-24 h-24 object-cover rounded-lg border shadow-sm">
-                            </a>
-                            {% endfor %}
-                        </div>
-                        <div class="text-xs text-sela-800/45 mb-2">{{ imgs | length }} 張菜單照片，點縮圖開新分頁放大</div>
-                        {% endif %}
-                        
-                        {% if rec.note %}
-                        <div class="text-sm text-sela-800/70 mb-2 bg-sela-50 rounded p-2">
-                            <i class="ti ti-message"></i> {{ rec.note }}
-                        </div>
-                        {% endif %}
-                        
-                        <div class="text-xs text-sela-800/45">
-                            推薦人：{{ rec.user.show_name }} · {{ (rec.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}
-                        </div>
+            <div class="p-4 space-y-3" id="rec-{{ rec.id }}">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-bold text-sela-900 text-lg leading-snug">{{ rec.store_name }}</div>
+                        <div class="text-xs text-sela-800/55 mt-0.5">{{ rec.user.show_name }} 推薦 · {{ (rec.created_at|taipei).strftime('%Y/%m/%d %H:%M') }}</div>
                     </div>
-                    
-                    <div class="flex flex-col gap-2 flex-shrink-0">
-                        <form action="/admin/recommendations/{{ rec.id }}/approve" method="POST">
-                            <button type="submit" class="w-full px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
-                                <i class="ti ti-check"></i> 核准
-                            </button>
-                        </form>
-                        
-                        <div x-data="{ showReject: false }">
-                            <button @click="showReject = !showReject" type="button" 
-                                    class="w-full px-4 py-2 border border-red-300 text-red-500 rounded-lg text-sm hover:bg-red-50">
-                                <i class="ti ti-x"></i> 拒絕
-                            </button>
-                            <form x-show="showReject" x-collapse
-                                  action="/admin/recommendations/{{ rec.id }}/reject" method="POST" class="mt-2">
-                                <input type="text" name="reject_reason" placeholder="拒絕原因（選填）"
-                                       class="w-full border border-sela-300 rounded px-2 py-1 text-sm mb-1">
-                                <button type="submit" class="w-full px-3 py-1 bg-red-500 text-white rounded text-sm">
-                                    確認拒絕
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-lg flex-shrink-0
+                        {% if rec.category == 'drink' %}bg-amber-100 text-amber-700
+                        {% elif rec.category == 'meal' %}bg-green-100 text-green-700
+                        {% else %}bg-blue-100 text-blue-700{% endif %}">
+                        {% if rec.category == 'drink' %}飲料{% elif rec.category == 'meal' %}餐點{% else %}團購{% endif %}
+                    </span>
+                </div>
+                {% set imgs = rec.menu_images %}
+                {% if imgs %}
+                <div class="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+                    {% for u in imgs %}
+                    <a href="{{ u }}" target="_blank" rel="noopener" class="flex-shrink-0">
+                        <img src="{{ u }}" alt="菜單照片 {{ loop.index }}" loading="lazy" class="w-32 h-32 object-cover rounded-xl border border-sela-100">
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if rec.menu_url %}
+                <a href="{{ rec.menu_url }}" target="_blank" rel="noopener" class="block text-sm text-sela-700 underline break-all">
+                    <i class="ti ti-link"></i> {{ rec.menu_url[:60] }}{% if rec.menu_url|length > 60 %}…{% endif %}
+                </a>
+                {% endif %}
+                {% if rec.note %}
+                <div class="text-sm text-sela-800 bg-sela-50 rounded-xl p-3 whitespace-pre-line">「{{ rec.note }}」</div>
+                {% endif %}
+                <form action="/admin/recommendations/{{ rec.id }}/approve" method="POST">
+                    <button type="submit" class="w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base active:bg-sela-800">核准並建立店家</button>
+                </form>
+                <div class="text-xs text-sela-800/50 text-center -mt-1">
+                    {% if can_ai and imgs %}建好後自動用這 {{ imgs | length }} 張照片轉成菜單，看過預覽再確認{% else %}建好後直接進匯入頁，照片就在旁邊對照{% endif %}
+                </div>
+                <div x-data="{ showReject: false }">
+                    <button @click="showReject = !showReject" type="button" class="w-full py-2.5 rounded-xl border border-sela-200 text-sm text-red-600 bg-white">不收</button>
+                    <form x-show="showReject" x-cloak action="/admin/recommendations/{{ rec.id }}/reject" method="POST" class="mt-2 flex gap-2">
+                        <input type="text" name="reject_reason" maxlength="200" placeholder="原因（選填，推薦人看得到）"
+                               class="flex-1 min-w-0 border border-sela-300 rounded-xl px-3 py-2 text-base">
+                        <button type="submit" class="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium">確認</button>
+                    </form>
                 </div>
             </div>
             {% endfor %}

@@ -43,6 +43,13 @@
         <p x-show="editing" x-cloak class="text-[11px] text-sela-800/45 mt-1.5">留空就用 LINE 名稱（{{ user.display_name }}）；這個名稱會出現在訂單牆與團單</p>
     </div>
 
+    {% if user.is_admin and new_rec_count %}
+    {# V2.25.0：底部「我的」紅點點進來，第一眼就是這列 #}
+    <a href="/admin/recommendations" id="profile-new-recs" class="flex items-center justify-between bg-amber-50 rounded-2xl px-4 py-3.5 border border-amber-300 text-sm text-sela-900 active:bg-amber-100">
+        <span class="font-bold"><i class="ti ti-bulb text-amber-600"></i> 有 {{ new_rec_count }} 家新推薦</span>
+        <span class="flex items-center gap-1"><span class="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs leading-5 text-center">{{ new_rec_count }}</span><i class="ti ti-chevron-right text-sela-800/35"></i></span>
+    </a>
+    {% endif %}
     {% if user.is_admin %}
     <a href="/admin" class="flex items-center justify-between bg-sela-50 rounded-2xl px-4 py-3.5 border border-sela-200 text-sm text-sela-800 active:bg-sela-100">
         <span class="font-medium"><i class="ti ti-shield"></i> 管理後台</span>

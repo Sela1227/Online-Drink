@@ -11,11 +11,9 @@
     <div class="flex items-center justify-between gap-3 flex-wrap">
         <h1 class="text-xl font-bold text-sela-800">店家管理</h1>
         <div class="flex items-center gap-2">
-            <a href="/admin/stores/new" class="bg-sela-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+            {# V2.25.0：新增店家一律走匯入（貼資料或拍照轉換），不再有手動表單 #}
+            <a href="/admin/import" class="bg-sela-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
                 <i class="ti ti-plus"></i> 新增店家
-            </a>
-            <a href="/admin/import" class="bg-white border border-sela-200 px-3 py-1.5 rounded-lg text-sm text-sela-800/80">
-                <i class="ti ti-inbox"></i> 匯入
             </a>
         </div>
     </div>
@@ -81,7 +79,7 @@
         </template>
         <div x-show="!filtered.length" class="py-10 text-center text-sm text-sela-800/50">
             <span x-show="stores.length">找不到符合的店家</span>
-            <span x-show="!stores.length">還沒有店家，先「新增店家」或「匯入」</span>
+            <span x-show="!stores.length">還沒有店家，按「新增店家」匯入第一家</span>
         </div>
     </div>
 </div>

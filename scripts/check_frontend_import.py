@@ -29,6 +29,8 @@ sys.path.insert(0, str(ROOT))
 
 
 def _render_pages() -> dict:
+    import json as _json_mod
+    from datetime import datetime as datetime_mod
     from app.database import Base, engine, SessionLocal
     from app.models.user import User
     from app.models.store import Store, CategoryType
@@ -46,6 +48,22 @@ def _render_pages() -> dict:
     adm.get_admin_user = fake_admin
     c = TestClient(m.app)
     pages = {"store": c.get(f"/admin/import?store_id={st.id}").text, "nostore": c.get("/admin/import").text}
+    # V2.25.0：推薦核准後（ai=1）進匯入頁，Sela 的頁面會自動用推薦照片轉
+    from app.models.user import StoreRecommendation
+    from app.config import get_settings as _gs
+    _s = _gs(); _keep = (_s.anthropic_api_key, _s.admin_line_user_id)
+    _s.anthropic_api_key, _s.admin_line_user_id = "sk-check", "importcheck"
+    try:
+        rec = StoreRecommendation(user_id=db.query(User).filter(User.line_user_id == "importcheck").first().id, store_name="檢查店",
+                                  category="meal", status="approved", created_store_id=st.id,
+                                  menu_image_urls=_json_mod.dumps(["https://res.cloudinary.com/x/image/upload/a.jpg"]),
+                                  reviewed_at=datetime_mod.utcnow())
+        db.add(rec); db.commit()
+        pages["ai"] = c.get(f"/admin/import?store_id={st.id}&ai=1").text
+        assert "this.runAi(true)" in pages["ai"]
+    finally:
+        _s.anthropic_api_key, _s.admin_line_user_id = _keep
+        db.query(StoreRecommendation).filter(StoreRecommendation.created_store_id == st.id).delete(); db.commit()
     # V2.15.1 審核 P1-1：XHR 假回應改用**真實**的預覽片段，才測得到確認鈕
     import json as _json
     menu = {"menu": {"categories": [{"name": "主食", "items": [{"name": "雞腿飯", "price": 100}]}]}}
@@ -166,7 +184,9 @@ def main():
                 res = json.loads(line)
             except Exception:
                 res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
-            if res.get("ok"):
+            if res.get("ok") and mode == "ai":
+                print(f"  OK  ai：推薦核准進來自動送 /admin/import/ai（帶 rec_id）→ 結果填進輸入框 → 自動檢查；轉完按鈕恢復（{res.get('posts')} 次請求）")
+            elif res.get("ok"):
                 print(f"  OK  {mode}：貼上自動檢查、清空不發、拖檔去 BOM、拖文字、拖圖片當對照、確認鈕會送、改內容後舊鈕失效{'、搜尋選店重查、帶入目前菜單、近似店名切換' if mode == 'nostore' else '、帶入鈕、單一指令鈕'}（{res.get('posts')} 次請求）")
             else:
                 problems.append(f"{mode}：{res.get('msg')}")

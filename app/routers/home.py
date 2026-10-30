@@ -198,7 +198,22 @@ def _home_context(request: Request, db: Session, user):
 async def home(request: Request, db: Session = Depends(get_db)):
     """首頁「今天」（V2.17.0 IA）：公告一則＋投票卡（有才出現）＋要你處理的＋開放中"""
     user = await get_current_user(request, db)
-    return templates.TemplateResponse(request, "home.html", _home_context(request, db, user))
+    ctx = _home_context(request, db, user)
+    # V2.25.0：管理員首頁最上面看得到新推薦（原本要「我的 → 管理後台 → 推薦」才看得到）
+    ctx["new_rec_count"], ctx["new_recs"] = pending_recommendations(db, user)
+    return templates.TemplateResponse(request, "home.html", ctx)
+
+
+def pending_recommendations(db, user, limit: int = 3):
+    """V2.25.0：待審核推薦（只給管理員）→ (總數, 最新 limit 筆)"""
+    if not user or not user.is_admin:
+        return 0, []
+    from app.models.user import StoreRecommendation
+    q = db.query(StoreRecommendation).filter(StoreRecommendation.status == "pending")
+    n = q.count()
+    if not n:
+        return 0, []
+    return n, q.options(joinedload(StoreRecommendation.user)).order_by(StoreRecommendation.created_at.desc()).limit(limit).all()
 
 
 @router.get("/home/groups")
@@ -235,6 +250,7 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         "order_count": order_count,
         "group_count": group_count,
         "dept_names": dept_names,
+        "new_rec_count": pending_recommendations(db, user, limit=0)[0],  # V2.25.0
     })
 
 

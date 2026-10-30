@@ -193,8 +193,12 @@
             </a>
             {% else %}
             <a href="{{ it[0] }}" class="flex flex-col items-center gap-1 {{ 'text-sela-800' if it[3] else 'text-sela-400' }}">
-                <div class="w-9 h-9 {{ 'bg-sela-100' if it[3] else '' }} rounded-xl flex items-center justify-center">
+                <div class="relative w-9 h-9 {{ 'bg-sela-100' if it[3] else '' }} rounded-xl flex items-center justify-center">
                     <i class="ti {{ it[1] }}" style="font-size: 22px;" aria-hidden="true"></i>
+                    {% if it[0] == '/profile' and user.is_admin %}
+                    {# V2.25.0：新推薦紅點（只有管理員；頁面載入後才去問，不拖慢每一頁） #}
+                    <span id="nav-rec-badge" hx-get="/admin/recommendations/badge" hx-trigger="load" hx-swap="outerHTML"></span>
+                    {% endif %}
                 </div>
                 <span class="text-[10px] {{ 'font-medium' if it[3] else '' }}">{{ it[2] }}</span>
             </a>

@@ -46,6 +46,8 @@
   34. V2.23.0 遷移：可重複跑、只補缺的、錯誤記錄
   35. V2.23.1 LINE 登入回呼重複送出：只換一次授權碼、沿用結果
   36. V2.23.2 外部審核：我的訂單可見性、跨站寫入、同名店家、候補順位、遷移錯誤不啟動
+  37. V2.24.0 匯入店家電話地址：新店家一起建立、既有店家只補空白、清理與驗證、AI 指令
+  38. V2.25.0 新推薦提醒（首頁卡／我的紅點）、站內拍照轉成菜單（只有 Sela）、新增店家走匯入
 
 新增或改動上述邏輯時，請一併更新這支測試。
 """
@@ -646,8 +648,9 @@ def main():
     _adm.get_admin_user = _fake_admin
     try:
         r = _c.get("/admin/stores")
-        assert r.status_code == 200 and "/admin/stores/new" in r.text and "lastGroup" in r.text
-        check("列表 200，含新增店家入口與上次開團欄")
+        assert r.status_code == 200 and 'href="/admin/import"' in r.text and "新增店家" in r.text and "lastGroup" in r.text
+        assert "/admin/stores/new" not in r.text, "V2.25.0：新增店家直接進匯入"
+        check("列表 200，含新增店家入口（V2.25.0 起直接進匯入）與上次開團欄")
 
         r = _c.get(f"/admin/stores/{store.id}")
         assert r.status_code == 200 and "店家設定" in r.text and "營運設定" not in r.text and "基本資料" in r.text
@@ -664,13 +667,10 @@ def main():
         assert db.query(Store).filter(Store.id == store.id).first() is not None
         check("刪除店家：店名不符回 400，店家仍在")
 
-        r = _c.post("/admin/stores/new", data={"name": "煙霧新店", "category": "meal"}, follow_redirects=False)
-        assert r.status_code == 302 and "created=1" in r.headers["location"]
-        check("手動新增店家 → 導向工作台並帶 created")
-
-        r = _c.get("/admin/stores/new")
-        assert r.status_code == 200, "/stores/new 必須排在 /stores/{id} 之前，否則 'new' 進 int 路由 422"
-        check("/stores/new 路由順序正確")
+        r = _c.get("/admin/stores/new", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/admin/import", "/stores/new 必須排在 /stores/{id} 之前，否則 'new' 進 int 路由 422"
+        assert _c.post("/admin/stores/new", data={"name": "煙霧新店", "category": "meal"}).status_code in (404, 405)
+        check("V2.25.0：手動新增店家表單拿掉，舊網址 302 到匯入頁")
     finally:
         _adm.get_admin_user = _orig
 
@@ -923,9 +923,6 @@ def main():
         r = _c.get(f"/admin/stores/{store.id}?tab=info")  # 舊分頁名 → 店家設定（V2.21.0）
         xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "tab:" in v]
         assert xd and 'tab: "settings"' in xd[0] and "confirmName" in xd[0], xd
-        r = _c.get("/admin/stores/new")
-        xd = [v for k, v in _attrs(r.text) if k == "x-data" and v and "existing" in v]
-        assert xd and "existing: [" in xd[0] and xd[0].rstrip().endswith("}"), xd
         check("P1-2：tojson 放單引號屬性，x-data 不再被雙引號截斷（V2.13.0 的工作台分頁因此失效）")
     finally:
         _adm.get_admin_user = _orig
@@ -1497,7 +1494,10 @@ def main():
     # B-6：只剩一份指令，且含 "?" 規則
     r = _c.get("/admin/import")
     assert r.text.count("AI 轉換指令") == 1 and "promptMenuForStore" not in r.text and "promptNewStore" not in r.text
-    assert "price 填字串 \"?\"" in r.text
+    # V2.25.0：指令搬到 app/services/menu_prompt.py，頁面用 tojson 放進 <script id="import-prompt">
+    import re as _re25, html as _h25
+    _pl = json.loads(_h25.unescape(_re25.search(r'<script type="application/json" id="import-prompt">(.*?)</script>', r.text, _re25.S).group(1)))
+    assert any('price 填字串 "?"' in l for l in _pl), "頁面上的指令要含 ? 規則"
     check("B-10／B-6：選店清單帶版號項數、沒有原生下拉、load=current 帶入、工作台「改幾個價格」、單一 AI 指令含 ? 規則")
     _adm.get_admin_user = _orig
 
@@ -1569,7 +1569,7 @@ def main():
     try:
         r = _c.get("/admin/recommendations")
         t = _T(r)
-        assert r.status_code == 200 and "2 張菜單照片" in t and r.text.count("https://cdn/m") >= 2
+        assert r.status_code == 200 and r.text.count('alt="菜單照片 ') >= 2 and r.text.count("https://cdn/m") >= 2 and "核准並建立店家" in t
         # 核准後匯入頁推薦卡：全部照片
         rec = db.query(StoreRecommendation).filter(StoreRecommendation.store_name == "多圖店").first()
         r = _c.post(f"/admin/recommendations/{rec.id}/approve", follow_redirects=False)
@@ -2396,6 +2396,194 @@ def main():
         _mg36.run_migrations = _orig_run
         _s36.line_channel_id, _s36.line_channel_secret, _s36.secret_key = _keep
     check("遷移有錯誤 → 拒絕啟動（Railway 繼續跑舊版）；MIGRATIONS_ALLOW_ERRORS=1 可強制啟動")
+
+    # ---------- 37. V2.24.0 匯入店家電話地址 ----------
+    print("\n[37] 匯入店家電話地址")
+    from app.schemas.store import StoreImport as _SI37
+    from pydantic import ValidationError as _VE37
+    _b = {"name": "電話店", "category": "meal"}
+    _v = _SI37(**_b, phone=" ０４－２３４５－６７８９ ", address="  彰化縣  鹿港鎮中山路 100 號 ")
+    assert _v.phone == "04-2345-6789" and _v.address == "彰化縣 鹿港鎮中山路 100 號", (_v.phone, _v.address)
+    for _nv in ("無", "?", "？", "N/A", "", "null"):
+        assert _SI37(**_b, phone=_nv, address=_nv).phone is None
+    assert _SI37(**_b).phone is None and _SI37(**_b).address is None, "舊格式沒有這兩欄要能照樣匯入"
+    for _bad in ({"phone": 423456789}, {"phone": "1" * 51}, {"address": "路" * 301}):
+        try:
+            _SI37(**_b, **_bad); raise AssertionError(f"應該擋下 {_bad}")
+        except _VE37:
+            pass
+    check("電話地址清理：全形轉半形、去多餘空白；「無／?／N/A」當沒有；數字電話（會掉 0）與超長擋下；舊格式相容")
+
+    _adm.get_admin_user = _fake_admin
+    _HX = {"HX-Request": "true"}
+    _menu37 = {"items": [{"name": "滷肉飯", "price": 35}]}
+    try:
+        # 新店家：預覽寫「一起建立」，確認後店家有電話地址
+        _j = json.dumps({"store": {"name": "", "category": "meal", "phone": "04-1111-2222", "address": "鹿港鎮民族路 1 號"},
+                         "menu": _menu37}, ensure_ascii=False)
+        _r = _c.post("/admin/import/preview", data={"store_id": "", "new_store_name": "電話三十七店",
+                     "new_store_category": "meal", "json_text": _j}, headers=_HX)
+        assert 'id="contact-plan"' in _r.text and "04-1111-2222" in _r.text and "一起建立" in _r.text, _r.text[:500]
+        _full = {"store": {"name": "電話三十七店", "category": "meal", "phone": "04-1111-2222", "address": "鹿港鎮民族路 1 號"}, "menu": _menu37}
+        _r = _c.post("/admin/import", data={"json_str": json.dumps(_full, ensure_ascii=False)}, headers=_HX)
+        assert _r.status_code == 200, _r.text[:300]
+        db.expire_all()
+        _s37 = db.query(Store).filter(Store.name == "電話三十七店").one()
+        assert (_s37.phone, _s37.address) == ("04-1111-2222", "鹿港鎮民族路 1 號")
+        check("新店家匯入：電話地址一起建立，預覽標「一起建立」")
+
+        # 既有店家（畫面選店）：空白的補上、已有的不覆蓋
+        _e37 = Store(name="既有三十七店", category=CategoryType.MEAL, is_active=True, address="原本的地址"); db.add(_e37); db.commit()
+        _j = json.dumps({"store": {"name": "隨便", "category": "drink", "phone": "02-3333-4444", "address": "照片上的地址"},
+                         "menu": _menu37}, ensure_ascii=False)
+        _r = _c.post("/admin/import/preview", data={"store_id": str(_e37.id), "json_text": _j}, headers=_HX)
+        assert "02-3333-4444" in _r.text and "會補上" in _r.text and "不會覆蓋" in _r.text and "電話、地址除外" in _r.text, _r.text[:600]
+        import html as _h37, re as _re37
+        _js = json.loads(_h37.unescape(_re37.search(r'name="json_str" value="([^"]*)"', _r.text).group(1)))
+        assert _js.get("contact") == {"phone": "02-3333-4444", "address": "照片上的地址"}, _js
+        _r = _c.post("/admin/import", data={"json_str": json.dumps({"store_id": _e37.id, "mode": "new", "menu": _menu37,
+                     "contact": {"phone": "02-3333-4444", "address": "照片上的地址"}}, ensure_ascii=False)}, headers=_HX)
+        assert _r.status_code == 200, _r.text[:300]
+        db.expire_all()
+        _e37 = db.query(Store).filter(Store.id == _e37.id).one()
+        assert (_e37.phone, _e37.address) == ("02-3333-4444", "原本的地址"), (_e37.phone, _e37.address)
+        check("既有店家更新菜單：店家空白的電話補上、已有的地址不覆蓋；預覽逐欄說明")
+
+        # 同名店家（完整匯入）一樣只補空白；沒帶電話地址的資料不動店家
+        _r = _c.post("/admin/import", data={"json_str": json.dumps({"store": {"name": "既有三十七店", "category": "meal",
+                     "phone": "09-9999-9999", "address": "另一個地址"}, "menu": {"items": [{"name": "肉圓", "price": 50}]}},
+                     ensure_ascii=False), "base_menu_id": str(db.query(_M36).filter(_M36.store_id == _e37.id, _M36.is_active == True).one().id)}, headers=_HX)
+        assert _r.status_code == 200, _r.text[:300]
+        db.expire_all()
+        _e37 = db.query(Store).filter(Store.id == _e37.id).one()
+        assert (_e37.phone, _e37.address) == ("02-3333-4444", "原本的地址")
+        check("同名店家完整匯入：已有電話地址不覆蓋")
+    finally:
+        _adm.get_admin_user = _orig
+
+    from app.services.menu_prompt import PROMPT_LINES as _PL37  # V2.25.0：指令唯一來源
+    _tpl37 = "\n".join(_PL37)
+    assert "   - phone：照片上的店家電話" in _PL37[_PL37.index(next(l for l in _PL37 if l.startswith("   - phone")))] and any(l.startswith("   - address：照片上的店家地址") for l in _PL37) and "phone 與 address 都填 null" in _tpl37
+    assert sum(1 for l in _PL37 if l.startswith('    "phone": ')) == 3, "三個範例都要有 phone"
+    check("AI 指令：phone／address 規則、多分店填 null、三個範例都有欄位")
+
+    # ---------- 38. V2.25.0 新推薦提醒＋站內 AI 轉換 ----------
+    print("\n[38] 新推薦提醒、站內 AI 轉換")
+    import asyncio as _aio38, base64 as _b6438
+    import httpx as _hx38
+    import app.routers.home as _home38
+    import app.services.ai_menu as _ai38
+    from app.models.user import StoreRecommendation as _SR38
+    from app.config import get_settings as _gs38
+    _set38 = _gs38()
+    _keep38 = (_set38.anthropic_api_key, _set38.admin_line_user_id)
+    _sela38 = User(line_user_id="U_sela38", display_name="Sela", is_admin=True)
+    _adm2_38 = User(line_user_id="U_other38", display_name="別的管理員", is_admin=True)
+    _mem38 = User(line_user_id="U_mem38", display_name="團員", is_admin=False)
+    db.add_all([_sela38, _adm2_38, _mem38]); db.commit()
+    db.query(_SR38).filter(_SR38.status == "pending").update({"status": "rejected"}); db.commit()
+    _who38 = {"u": _sela38.id}
+    async def _cu38(request, db_):
+        return db_.query(User).filter(User.id == _who38["u"]).first()
+    _orig_cu38 = _home38.get_current_user
+    _home38.get_current_user = _cu38
+    _adm.get_admin_user = _cu38
+    try:
+        # 沒有待審 → 首頁沒有卡、紅點空白
+        r = _c.get("/home")
+        assert r.status_code == 200 and 'id="home-new-recs"' not in r.text and 'hx-get="/admin/recommendations/badge"' in r.text
+        assert _c.get("/admin/recommendations/badge").text == ""
+        _r38 = _SR38(user_id=_mem38.id, store_name="鹿港阿嬤炒麵", category="meal",
+                     menu_image_urls=json.dumps(["https://res.cloudinary.com/x/image/upload/v1/a.heic", "https://res.cloudinary.com/x/image/upload/v1/b.jpg"]))
+        db.add_all([_r38, _SR38(user_id=_mem38.id, store_name="茶の魔手", category="drink")]); db.commit()
+        r = _c.get("/home")
+        assert 'id="home-new-recs"' in r.text and "有 2 家新推薦" in r.text and "鹿港阿嬤炒麵" in r.text and "2 張照片" in r.text
+        b = _c.get("/admin/recommendations/badge").text
+        assert 'id="nav-rec-badge"' in b and ">2<" in b
+        r = _c.get("/profile")
+        assert 'id="profile-new-recs"' in r.text and "有 2 家新推薦" in r.text
+        _who38["u"] = _mem38.id
+        r = _c.get("/home")
+        assert 'id="home-new-recs"' not in r.text and "recommendations/badge" not in r.text, "一般團員看不到"
+        assert 'id="profile-new-recs"' not in _c.get("/profile").text
+        check("新推薦：管理員首頁最上面一張卡（店名／照片數）、「我的」紅點與入口；沒有待審不顯示；一般團員看不到")
+
+        # 權限：只有 ADMIN_LINE_USER_ID 那位，且要有金鑰
+        _set38.admin_line_user_id = "U_sela38"; _set38.anthropic_api_key = ""
+        assert not _ai38.can_use_ai(_sela38), "沒金鑰不能用"
+        _set38.anthropic_api_key = "sk-test"
+        assert _ai38.can_use_ai(_sela38) and not _ai38.can_use_ai(_adm2_38) and not _ai38.can_use_ai(None)
+        _who38["u"] = _adm2_38.id
+        r = _c.post("/admin/import/ai", files={"photos": ("m.jpg", b"\xff\xd8x", "image/jpeg")})
+        assert r.status_code == 403 and "系統負責人" in r.json()["error"]
+        assert 'id="ai-convert"' not in _c.get("/admin/import").text
+        check("站內 AI 轉換只有 ADMIN_LINE_USER_ID 那位能用（沒金鑰、別的管理員都不行；路由 403、頁面不顯示）")
+
+        # 呼叫 Claude API：模擬回覆（帶 ``` 包裝），檢查送出的內容與解析結果
+        _sent = []
+        def _handler(req):
+            if str(req.url).startswith("https://res.cloudinary.com/"):
+                assert "/f_jpg," in str(req.url), "推薦照片要取 JPEG 版本"
+                return _hx38.Response(200, content=b"\xff\xd8img", headers={"content-type": "image/jpeg"})
+            _sent.append(json.loads(req.content))
+            assert req.headers["x-api-key"] == "sk-test" and req.headers["anthropic-version"]
+            if "fail401" in req.content.decode("utf-8", "ignore"):
+                return _hx38.Response(401, json={"error": {}})
+            reply = '```json\n{"store": {"name": "鹿港阿嬤炒麵", "category": "meal", "phone": "04-777-1234"}, "menu": {"items": [{"name": "炒麵", "price": 70}]}}\n```'
+            return _hx38.Response(200, json={"content": [{"type": "text", "text": reply}], "stop_reason": "end_turn"})
+        _RealAC = _hx38.AsyncClient
+        class _MockAC(_RealAC):
+            def __init__(self, *a, **k):
+                k.pop("follow_redirects", None)
+                super().__init__(*a, transport=_hx38.MockTransport(_handler), **k)
+        _ai38.httpx.AsyncClient = _MockAC
+        try:
+            _who38["u"] = _sela38.id
+            r = _c.get("/admin/import")
+            assert 'id="ai-convert"' in r.text and "this.runAi(true)" not in r.text
+            r = _c.post("/admin/import/ai", files=[("photos", ("m1.jpg", b"\xff\xd8one", "image/jpeg")), ("photos", ("m2.jpg", b"\xff\xd8two", "image/jpeg"))],
+                        data={"store_id": "", "new_store_name": ""})
+            assert r.status_code == 200, r.text
+            d = r.json(); _parsed = json.loads(d["text"])
+            assert d["photos"] == 2 and _parsed["store"]["phone"] == "04-777-1234" and d["text"].startswith("{\n"), "去掉 ``` 並排版"
+            _msg = _sent[-1]["messages"][0]["content"]
+            assert [c["type"] for c in _msg] == ["image", "image", "text"]
+            assert _b6438.b64decode(_msg[0]["source"]["data"]) == b"\xff\xd8one" and _msg[0]["source"]["media_type"] == "image/jpeg"
+            from app.services.menu_prompt import PROMPT_LINES as _PL38
+            assert _msg[2]["text"].startswith(_PL38[0]) and "照片上有店名就填進 store.name" in _msg[2]["text"]
+            assert _sent[-1]["model"] == _set38.anthropic_model
+            r = _c.post("/admin/import/ai", files={"photos": ("m.gif", b"GIF89a", "image/gif")})
+            assert r.status_code == 400 and "JPG" in r.json()["error"]
+            r = _c.post("/admin/import/ai", data={"store_id": ""})
+            assert r.status_code == 400 and "照片" in r.json()["error"]
+            r = _c.post("/admin/import/ai", files={"photos": ("m.jpg", b"\xff\xd8x", "image/jpeg")}, data={"new_store_name": "fail401"})
+            assert r.status_code == 400 and "金鑰無效" in r.json()["error"]
+            check("AI 轉換：照片＋同一份指令送 Claude API、回覆去包裝排版；非 JPG/PNG/WebP、沒照片、金鑰無效都回中文錯誤")
+
+            # 推薦照片：Cloudinary 轉 JPEG 抓回來送；核准後帶 ai=1，匯入頁自動轉
+            assert _ai38.cloudinary_jpg("https://res.cloudinary.com/x/image/upload/v1/a.heic") == "https://res.cloudinary.com/x/image/upload/f_jpg,q_85,w_1600,h_1600,c_limit/v1/a.heic"
+            r = _c.post(f"/admin/recommendations/{_r38.id}/approve", follow_redirects=False)
+            assert r.status_code == 302 and r.headers["location"].endswith("&ai=1"), r.headers["location"]
+            db.expire_all(); _sid38 = db.query(_SR38).filter(_SR38.id == _r38.id).one().created_store_id
+            r = _c.get(r.headers["location"])
+            assert "this.runAi(true)" in r.text and "用推薦的 2 張照片轉成菜單" in r.text
+            r = _c.post("/admin/import/ai", data={"rec_id": str(_r38.id), "store_id": str(_sid38)})
+            assert r.status_code == 200 and r.json()["photos"] == 2
+            assert "店名：鹿港阿嬤炒麵（這家店已在系統裡" in _sent[-1]["messages"][0]["content"][-1]["text"]
+            check("推薦核准：建店後帶 ai=1 進匯入頁自動用推薦照片轉（Cloudinary 轉 JPEG）；指令帶既有店名")
+        finally:
+            _ai38.httpx.AsyncClient = _RealAC
+
+        # 別的管理員核准：不帶 ai=1（照舊手動）
+        _r38b = db.query(_SR38).filter(_SR38.store_name == "茶の魔手").one()
+        _who38["u"] = _adm2_38.id
+        r = _c.post(f"/admin/recommendations/{_r38b.id}/approve", follow_redirects=False)
+        assert r.status_code == 302 and "ai=1" not in r.headers["location"]
+        check("別的管理員核准推薦：照舊進匯入頁，不自動轉")
+    finally:
+        _home38.get_current_user = _orig_cu38
+        _adm.get_admin_user = _orig
+        _set38.anthropic_api_key, _set38.admin_line_user_id = _keep38
 
     db.close()
     print(f"\n全部通過（{len(passed)} 項）")

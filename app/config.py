@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # Admin
     admin_line_user_id: str = ""
     
+    # V2.25.0：站內「拍照轉成菜單」（Claude API）。沒設金鑰就不顯示這個功能；
+    # 只有 ADMIN_LINE_USER_ID 那位能用（Sela 指定），其他管理員照舊複製指令
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5-5"
+
     # Base URL (for QR code)
     base_url: str = "http://localhost:8000"
     

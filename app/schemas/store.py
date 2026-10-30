@@ -39,6 +39,43 @@ def _clean_logo_url(v):
     return t
 
 
+# V2.24.0：照片上的店家電話、地址。AI 看不到時常填「無」「?」「N/A」，一律當沒有
+_NO_VALUE = {"", "?", "？", "無", "没有", "沒有", "n/a", "na", "none", "null", "-", "—", "未提供", "不詳"}
+
+
+def _clean_contact(v, what: str, maxlen: int):
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        # 電話寫成數字 0423456789 會變 423456789，開頭的 0 不見——要求加引號
+        raise ValueError(f"{what}要用引號包成文字（例如 \"04-2345-6789\"）")
+    t = " ".join(str(v).split())
+    if what == "電話":
+        import unicodedata
+        t = unicodedata.normalize("NFKC", t)  # 全形數字、全形括號 → 半形
+    if t.lower() in _NO_VALUE:
+        return None
+    if len(t) > maxlen:
+        raise ValueError(f"{what}最多 {maxlen} 字（目前 {len(t)} 字）")
+    return t
+
+
+class StoreContact(BaseModel):
+    """V2.24.0：既有店家更新菜單時，從資料帶過來的電話、地址（只補空白，不覆蓋）"""
+    phone: str | None = None
+    address: str | None = None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _phone(cls, v):
+        return _clean_contact(v, "電話", 50)
+
+    @field_validator("address", mode="before")
+    @classmethod
+    def _address(cls, v):
+        return _clean_contact(v, "地址", 300)
+
+
 class ToppingImport(BaseModel):
     """加料匯入格式"""
     name: str
@@ -93,6 +130,8 @@ class StoreImport(BaseModel):
     name: str
     category: Literal["drink", "meal", "group_buy"]
     logo_url: str | None = None
+    phone: str | None = None    # V2.24.0：照片上的店家電話
+    address: str | None = None  # V2.24.0：照片上的店家地址
     sugar_options: list[str] | None = None
     ice_options: list[str] | None = None
     toppings: list[ToppingImport] | None = None
@@ -111,3 +150,13 @@ class StoreImport(BaseModel):
     @classmethod
     def _logo(cls, v):
         return _clean_logo_url(v)
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _phone(cls, v):
+        return _clean_contact(v, "電話", 50)
+
+    @field_validator("address", mode="before")
+    @classmethod
+    def _address(cls, v):
+        return _clean_contact(v, "地址", 300)

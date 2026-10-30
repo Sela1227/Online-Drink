@@ -52,6 +52,8 @@ w.XMLHttpRequest = class {
   open(m, u) { this._m = m; this._u = u;
     if (u.endsWith("/admin/import")) { this.responseText = "<div id='imported'>done</div>"; }
     // V2.16.1 B-5：帶入目前菜單的 JSON 端點
+    // V2.25.0：站內 AI 轉換
+    if (u.endsWith("/admin/import/ai")) { this.responseText = JSON.stringify({ photos: 1, text: '{\n  "menu": {"items": [{"name": "AI炒麵", "price": 70}]}\n}' }); }
     if (u.includes("/menu-json")) { this.responseText = JSON.stringify({ version: 1, items: 1, text: '{\n  "menu": {"categories": [{"name": "主食", "items": [{"name": "雞腿飯", "price": 100}]}]}\n}' }); }
     this.response = this.responseText; }
   setRequestHeader() {}
@@ -59,7 +61,8 @@ w.XMLHttpRequest = class {
   getResponseHeader() { return null; }
   overrideMimeType() {}
   addEventListener(ev, fn) { this._l[ev] = fn; }
-  send(body) { posts.push({ m: this._m, u: this._u }); this.readyState = 4; const s = this;
+  // V2.25.0：底部導航的新推薦紅點（管理員每頁載入一次）不算匯入頁的請求
+  send(body) { if (!String(this._u).includes("/recommendations/badge")) posts.push({ m: this._m, u: this._u, b: body }); this.readyState = 4; const s = this;
     setTimeout(() => { s.onload && s.onload(); s._l.load && s._l.load(); s.onloadend && s.onloadend(); }, 0); }
   abort() {}
 };
@@ -71,6 +74,22 @@ const fail = (msg) => { console.log(JSON.stringify({ ok: false, mode, msg, posts
   if (jsErrors.length) fail("頁面初始化有未攔截的 JS 錯誤：" + jsErrors.join(" | "));
   const ta = w.document.querySelector("textarea[name=json_text]");
   if (!ta) fail("找不到 textarea[name=json_text]");
+  if (mode === "ai") {
+    // V2.25.0：ai=1 進頁 → 自動送推薦照片轉換 → 填進輸入框 → 自動檢查
+    if (!posts.length || !posts[0].u.endsWith("/admin/import/ai")) fail("進頁沒有自動送 /admin/import/ai：" + JSON.stringify(posts.map(p => p.u)));
+    const b = posts[0].b;
+    if (!b || typeof b.get !== "function" || !b.get("rec_id")) fail("轉換請求沒帶 rec_id");
+    await sleep(50);
+    if (!ta.value.includes("AI炒麵")) fail("轉換結果沒填進輸入框");
+    const box = w.document.querySelector("#ai-convert");
+    if (!box || !box.textContent.includes("轉好了")) fail("沒有顯示「轉好了」");
+    await sleep(1000);
+    if (!posts.some(p => p.u.endsWith("/admin/import/preview"))) fail("填入後沒有自動檢查");
+    const btn = Array.from(w.document.querySelectorAll("#ai-convert button")).find(x => x.textContent.includes("用推薦的"));
+    if (!btn || btn.disabled) fail("轉完後按鈕應恢復可按");
+    console.log(JSON.stringify({ ok: true, mode, posts: posts.length }));
+    process.exit(0);
+  }
   const form = ta.closest("form");
   ta.value = '{"menu": {}}';
   ta.dispatchEvent(new w.Event("input", { bubbles: true }));

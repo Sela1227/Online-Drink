@@ -18,6 +18,40 @@ def same_name_store(db: Session, name: str):
     ).order_by(Store.id).first()
 
 
+def fill_contact(store: Store, phone, address) -> list[str]:
+    """V2.24.0：把資料裡的電話、地址補進店家。**只補空白，不覆蓋**——
+    店家設定裡人工填過的電話比照片辨識可靠，菜單照片也可能是別家分店的。
+    回傳實際補上的欄位（給預覽與提示用）。"""
+    filled = []
+    if phone and not (store.phone or "").strip():
+        store.phone = phone
+        filled.append("phone")
+    if address and not (store.address or "").strip():
+        store.address = address
+        filled.append("address")
+    return filled
+
+
+def contact_plan(store, phone, address) -> list[dict]:
+    """V2.24.0：預覽用——每個有值的欄位會怎麼處理。store=None 代表新店家。
+    action：new（新店家一起建立）／fill（既有店家空白，會補上）／keep（既有店家已有值，不覆蓋）／same（一樣）"""
+    out = []
+    for key, label, val in (("phone", "電話", phone), ("address", "地址", address)):
+        if not val:
+            continue
+        cur = (getattr(store, key, None) or "").strip() if store is not None else ""
+        if store is None:
+            action = "new"
+        elif not cur:
+            action = "fill"
+        elif cur == val:
+            action = "same"
+        else:
+            action = "keep"
+        out.append({"key": key, "label": label, "value": val, "current": cur, "action": action})
+    return out
+
+
 def import_store_and_menu(db: Session, data: FullImport) -> Store:
     """匯入店家 + 菜單
 
@@ -34,6 +68,7 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
     if existing_store:
         # 同名店家已存在 → 把舊菜單全部停用（保留為舊版本），建立新菜單啟用
         db.query(Menu).filter(Menu.store_id == existing_store.id).update({"is_active": False})
+        fill_contact(existing_store, data.store.phone, data.store.address)
         db.flush()
         _create_menu(db, existing_store.id, data.menu, is_active=True)
         db.commit()
@@ -44,6 +79,8 @@ def import_store_and_menu(db: Session, data: FullImport) -> Store:
         name=data.store.name,
         category=CategoryType(data.store.category),
         logo_url=data.store.logo_url,
+        phone=data.store.phone,
+        address=data.store.address,
         is_active=True,
     )
     db.add(store)
@@ -116,6 +153,10 @@ def import_menu(db: Session, data: MenuImport) -> Menu:
     #
     # 改成一律新增版本後：進行中的團仍指向舊 menu_id 不受影響，新開的團才用新菜單。
     db.query(Menu).filter(Menu.store_id == store_id).update({"is_active": False})
+    if data.contact:
+        _st = db.query(Store).filter(Store.id == store_id).first()
+        if _st is not None:
+            fill_contact(_st, data.contact.phone, data.contact.address)
 
     menu = _create_menu(db, store_id, content, is_active=True)
     db.commit()

@@ -103,7 +103,7 @@ _FIELD = {
     "price": "價格", "price_l": "L 尺寸價格", "options": "選項", "price_diff": "價差",
     "store": "店家", "store_id": "店家編號", "category": "類別", "mode": "模式",
     "logo_url": "商標網址", "sugar_options": "甜度選項", "ice_options": "冰塊選項",
-    "toppings": "加料",
+    "toppings": "加料", "phone": "電話", "address": "地址",
 }
 
 

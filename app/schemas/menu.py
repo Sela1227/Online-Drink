@@ -202,6 +202,7 @@ class MenuImport(BaseModel):
     store_id: int
     mode: Literal["new", "replace"] = "new"
     menu: MenuContent
+    contact: "StoreContact | None" = None  # V2.24.0：資料裡的電話地址，只補店家空白欄位
 
 
 class FullImport(BaseModel):
@@ -211,5 +212,6 @@ class FullImport(BaseModel):
 
 
 # Avoid circular import
-from app.schemas.store import StoreImport
+from app.schemas.store import StoreImport, StoreContact  # noqa: E402
 FullImport.model_rebuild()
+MenuImport.model_rebuild()

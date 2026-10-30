@@ -121,9 +121,24 @@
         </div>
     </div>
     {% endif %}
+    {% if contact %}
+    {# V2.24.0：照片上的電話地址。新店家一起建立；既有店家只補空白，已有的不覆蓋 #}
+    <div class="mt-2 pt-2 border-t border-green-200 text-xs space-y-1" id="contact-plan">
+        {% for c in contact %}
+        <div class="{{ 'text-sela-800/60' if c.action in ('keep', 'same') else 'text-sela-800' }}">
+            <i class="ti {{ 'ti-phone' if c.key == 'phone' else 'ti-map-pin' }}"></i>
+            {{ c.label }}：{{ c.value }}
+            {% if c.action == 'new' %}<span class="text-green-700">（一起建立）</span>
+            {% elif c.action == 'fill' %}<span class="text-green-700">（店家原本沒填，會補上）</span>
+            {% elif c.action == 'same' %}（跟店家設定一樣）
+            {% else %}（店家已有「{{ c.current }}」，不會覆蓋；要改請到店家設定）{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
     {% if ignored_store_block %}
     <div class="mt-2 pt-2 border-t border-green-200 text-xs text-amber-700">
-        <i class="ti ti-info-circle"></i> 資料裡的店家資訊已忽略，以上方選的店家為準；若是要新增一家店，請把「匯入至」改成「新增一家店」
+        <i class="ti ti-info-circle"></i> 資料裡的店家資訊已忽略（電話、地址除外），以上方選的店家為準；若是要新增一家店，請把「匯入至」改成「新增一家店」
     </div>
     {% endif %}
 </div>
