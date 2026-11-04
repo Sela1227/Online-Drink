@@ -55,6 +55,8 @@ def analyze_menu_content(content) -> dict:
                 warnings.append(f"{where}「{iname}」L 尺寸價（{item.price_l}）低於 M 尺寸價（{price}），請確認沒填反")
             elif item.price_l == price:
                 warnings.append(f"{where}「{iname}」L 尺寸價與 M 尺寸價相同（{price}），可考慮只填 price")
+        if getattr(item, "ignored_price_l", False):
+            warnings.append(f"{where}「{iname}」同時有 variants 和 price_l——以 variants 為準，price_l 會被忽略")
         # V2.31.0：規格價格由小到大才合理；倒過來多半是填反或欄位錯位（只提醒）
         _vs = getattr(item, "variants", None) or []
         for a, b in zip(_vs, _vs[1:]):

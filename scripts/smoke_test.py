@@ -3167,7 +3167,8 @@ def main():
                 {"name": "香橙果粒茶", "variants": [{"label": "L杯", "price": 75}, {"label": "瓶裝", "price": 105}]},
                 {"name": "凝綠厚抹", "variants": [{"label": "中杯", "price": 55}]},
                 {"name": "三窨十五茉", "variants": [{"label": "大杯", "price": 45}], "allow_toppings": False},
-                {"name": "紅茶", "price": 30, "price_l": 35}]}]}
+                {"name": "紅茶", "price": 30, "price_l": 35},
+                {"name": "奶茶", "price": 40, "price_l": 45}]}]}
         _v46 = _MI46(store_id=_sid46, mode="new", menu=_menu46)
         _im46(db, _v46)
         _m46 = db.query(_M46).filter(_M46.store_id == _sid46, _M46.is_active == True).one()
@@ -3224,6 +3225,7 @@ def main():
         assert _add46("濃縮咖啡", size="Doppio").status_code == 200
         assert _add46("凝綠厚抹").status_code == 200
         assert _add46("紅茶", size="L").status_code == 200
+        assert _add46("奶茶", size="L").status_code == 200
         assert _add46("那堤", size="XL").status_code == 400, "不屬於這個品項的規格要擋"
         _top = db.query(_ST46).filter(_ST46.store_id == _sid46).first()
         r = _add46("三窨十五茉", size="大杯", toppings=str(_top.id))
@@ -3232,7 +3234,7 @@ def main():
         db.expire_all()
         _ord = db.query(_O46).filter(_O46.group_id == _g46_id).one()
         _got = sorted((oi.item_name, oi.size, float(oi.unit_price)) for oi in _ord.items)
-        assert _got == sorted([("那堤", "特大杯", 155), ("濃縮咖啡", "Doppio", 100), ("凝綠厚抹", "中杯", 55), ("紅茶", "L", 35), ("那堤", "大杯", 140)]), _got
+        assert _got == sorted([("那堤", "特大杯", 155), ("濃縮咖啡", "Doppio", 100), ("凝綠厚抹", "中杯", 55), ("紅茶", "L", 35), ("奶茶", "L", 45), ("那堤", "大杯", 140)]), _got
         check("點餐：特大杯 155、Doppio 100、單一規格記下「中杯」、舊菜單 L 35；不存在的規格 400；不加料品項送加料 400")
 
         # 核對單依規格彙總（驗收 8）——只算已送出的
@@ -3242,7 +3244,11 @@ def main():
         check("核對單：依規格分開彙總（那堤(特大杯)／那堤(大杯)、單一規格也印標籤）")
 
         # 跨版本複製上次訂單：規格名同就沿用、價格用新版本；新版本沒有的規格改第一個
-        _menu46b = json.loads(json.dumps(_menu46, ensure_ascii=False).replace('"price": 155', '"price": 160').replace('{"label": "Doppio", "price": "100元"}', '{"label": "雙份", "price": 100}'))
+        _menu46b = json.loads(json.dumps(_menu46, ensure_ascii=False).replace('"price": 155', '"price": 160').replace('{"label": "Doppio", "price": "100元"}', '{"label": "雙份", "price": 100}')
+                              .replace('{"name": "紅茶", "price": 30, "price_l": 35}', '{"name": "紅茶", "variants": [{"label": "中杯", "price": 30}, {"label": "大杯", "price": 35}]}')
+                              .replace('{"name": "奶茶", "price": 40, "price_l": 45}', '{"name": "奶茶", "variants": [{"label": "中杯", "price": 40}, {"label": "大杯", "price": 45}, {"label": "特大杯", "price": 55}]}')
+                              .replace('{"name": "凝綠厚抹", "variants": [{"label": "中杯", "price": 55}]}', '{"name": "凝綠厚抹", "variants": [{"label": "小杯", "price": 50}, {"label": "大罐", "price": 90}]}'))
+        assert '"紅茶", "variants"' in json.dumps(_menu46b, ensure_ascii=False) and "大罐" in json.dumps(_menu46b, ensure_ascii=False), "替換沒生效"
         _im46(db, _MI46(store_id=_sid46, mode="new", menu=_menu46b))
         _m46b = db.query(_M46).filter(_M46.store_id == _sid46, _M46.is_active == True).one()
         _g46b = Group(owner_id=_uid, store_id=_sid46, menu_id=_m46b.id, name="四六團二", category=CategoryType.DRINK,
@@ -3254,10 +3260,16 @@ def main():
         db.expire_all()
         _o2 = db.query(_O46).filter(_O46.group_id == _g46b_id).one()
         _got2 = sorted((oi.item_name, oi.size, float(oi.unit_price)) for oi in _o2.items)
-        assert ("那堤", "特大杯", 160) in _got2 and ("濃縮咖啡", "Solo", 85) in _got2 and ("紅茶", "L", 35) in _got2, _got2
+        # V2.31.1（內部審核 V-1）：同名 → 別名（M＝中杯、L＝大杯）→ 同位置（新舊規格數相同）→ 才退第一個，而且要告訴使用者
+        assert ("那堤", "特大杯", 160) in _got2, _got2
+        assert ("濃縮咖啡", "雙份", 100) in _got2, f"Doppio 改名雙份：同位置對到雙份，不能退回 Solo：{_got2}"
+        assert ("紅茶", "大杯", 35) in _got2, f"舊 M／L 店重匯成中杯／大杯：L 要對到大杯：{_got2}"
+        assert ("奶茶", "大杯", 45) in _got2, f"舊 M／L 重匯成三杯型（規格數不同、同位置用不上）：L 靠別名對到大杯：{_got2}"
+        assert ("凝綠厚抹", "小杯", 50) in _got2, _got2
+        assert "resized=1" in r.headers.get("location", ""), f"對不上的規格要告訴使用者：{r.headers.get('location')}"
         _pri = db.query(_OI46).filter(_OI46.order_id == _ord.id, _OI46.size == "特大杯").one()
         assert float(_pri.unit_price) == 155, "舊團的訂單金額不變"
-        check("複製上次訂單跨版本：特大杯沿用並用新價 160、Doppio 改名後退回第一個規格 Solo、舊菜單 L 照舊；舊團金額不變")
+        check("複製上次訂單跨版本：特大杯沿用新價 160；Doppio→雙份（同位置）；舊 L→大杯（別名）；對不上的退第一個並帶 resized=1；舊團金額不變")
 
         # 工作台改價：每個規格一格，存新版後規格與不加料原樣保留
         r = _c.get(f"/admin/stores/{_sid46}?tab=menu&edit=price")
@@ -3287,6 +3299,126 @@ def main():
         _adm.get_admin_user = _orig
         _ord46.get_current_user = _o46cu
         _grp.get_current_user, _grp.get_current_user_optional = _o46g, _o46go
+
+    # ---------- 47. V2.31.1 內部審核 V2.31.0 ----------
+    print("\n[47] 內部審核 V2.31.0（B-1 事件、V-2 N+1、V-4 匯入容錯）")
+    # B-1：htmx 回應後元素常被 hx-swap 換掉，從它身上 $dispatch 的事件傳不到 body（訂單牆、我的訂單不更新）
+    import pathlib as _pl47, re as _re47
+    _bad47 = []
+    for _tp in _pl47.Path("app/templates").rglob("*.html"):
+        for _m in _re47.finditer(r'@htmx:after-(?:request|swap|settle)="([^"]*)"', _tp.read_text(encoding="utf-8")):
+            if "$dispatch(" in _m.group(1):
+                _bad47.append(f"{_tp.name}: {_m.group(1)[:60]}")
+    assert not _bad47, "htmx 回應後的事件要從 body 發（document.body.dispatchEvent），不能用 $dispatch：" + "；".join(_bad47)
+    check("htmx 回應後的事件一律從 body 發（B-1：被換掉的按鈕 $dispatch 傳不到 body）")
+
+    # V-4：匯入容錯四個小縫
+    from app.schemas.menu import MenuItemImport as _MII47
+    from app.services.import_analysis import analyze_menu_content as _amc47
+    from app.schemas.menu import MenuContent as _MC47
+    assert _MII47.model_validate({"name": "a", "price": 1, "allow_toppings": ""}).allow_toppings is True, "空字串＝沒給，預設可加料"
+    assert _MII47.model_validate({"name": "a", "price": 1, "allow_toppings": "false"}).allow_toppings is False
+    for _bad in ({"name": "a", "variants": [{"label": "M", "price": 1}, {"label": "m", "price": 2}]},
+                 {"name": "a", "variants": [{"label": "Ｌ", "price": 1}, {"label": "L ", "price": 2}]},
+                 {"name": "a", "variants": [{"label": f"規格{i}", "price": i + 1} for i in range(9)]}):
+        try:
+            _MII47.model_validate(_bad); raise AssertionError(f"應擋下：{str(_bad)[:60]}")
+        except _VE:
+            pass
+    assert len(_MII47.model_validate({"name": "a", "variants": [{"label": f"規格{i}", "price": i + 1} for i in range(8)]}).variants) == 8
+    _w47 = _amc47(_MC47.model_validate({"items": [{"name": "那堤", "price_l": 140, "variants": [{"label": "中杯", "price": 125}, {"label": "大杯", "price": 140}]}]}))
+    assert any("price_l" in x and "忽略" in x for x in _w47["warnings"]), _w47
+    check("匯入：allow_toppings 空字串＝可加料；規格名不分大小寫全半形查重；最多 8 個規格；variants 與 price_l 同時給會提醒 price_l 被忽略")
+
+    # V-2：團頁與工作台每個品項各查一次 variants、一次 options（N+1）。60 個品項的菜單，SQL 條數要有上限
+    from sqlalchemy import event as _ev47
+    from app.schemas.menu import MenuImport as _MI47
+    from app.services.import_service import import_menu as _im47
+    from app.models.menu import Menu as _M47
+    import app.routers.orders as _ord47
+    async def _f47(request, db_):
+        return db_.query(User).filter(User.id == _uid).first()
+    async def _f47o(request, db_):
+        return (db_.query(User).filter(User.id == _uid).first(), None)
+    _o47 = (_grp.get_current_user, _grp.get_current_user_optional, _ord47.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _ord47.get_current_user = _f47, _f47o, _f47
+    _adm.get_admin_user = _fake_admin
+    try:
+        _s47 = Store(name="六十品項店", category=CategoryType.DRINK, is_active=True, is_public=True); db.add(_s47); db.commit()
+        _items47 = []
+        for _i in range(60):
+            _it = {"name": f"品項{_i}", "options": [{"name": "加珍珠", "price_diff": 10}]}
+            if _i % 3 == 0:
+                _it["variants"] = [{"label": "中杯", "price": 40}, {"label": "大杯", "price": 50}]
+            elif _i % 3 == 1:
+                _it.update(price=40, price_l=50)
+            else:
+                _it["price"] = 40
+            _items47.append(_it)
+        _im47(db, _MI47(store_id=_s47.id, mode="new", menu={"categories": [{"name": f"分類{k}", "items": _items47[k*10:(k+1)*10]} for k in range(6)]}))
+        _m47 = db.query(_M47).filter(_M47.store_id == _s47.id, _M47.is_active == True).one()
+        _g47 = Group(owner_id=_uid, store_id=_s47.id, menu_id=_m47.id, name="六十品項團", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
+        db.add(_g47); db.commit()
+        _n47 = [0]
+        _sql47 = []
+        def _cnt47(conn, cur, stmt, *a, **k):
+            _n47[0] += 1
+            _sql47.append(stmt.split("FROM")[1].split()[0] if "FROM" in stmt else stmt[:30])
+        _ev47.listen(engine, "before_cursor_execute", _cnt47)
+        try:
+            _c.get(f"/groups/{_g47.id}")  # 暖身（第一次會載入其他東西）
+            _n47[0] = 0
+            _sql47.clear()
+            r = _c.get(f"/groups/{_g47.id}")
+            _grp_n = _n47[0]
+            if os.environ.get("SQL47"):
+                from collections import Counter as _C47; print(_C47(_sql47).most_common(12))
+            _n47[0] = 0
+            r2 = _c.get(f"/admin/stores/{_s47.id}?tab=menu")
+            _wb_n = _n47[0]
+        finally:
+            _ev47.remove(engine, "before_cursor_execute", _cnt47)
+        assert r.status_code == 200 and r2.status_code == 200
+        assert _grp_n <= 30, f"60 個品項的團頁 {_grp_n} 條 SQL（每個品項各查 variants／options＝N+1，relationship 要 selectin）"
+        assert _wb_n <= 30, f"60 個品項的工作台 {_wb_n} 條 SQL"
+        check(f"60 個品項：團頁 {_grp_n} 條 SQL、工作台 {_wb_n} 條（上限 30；V2.31.0 是 145／135）")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _ord47.get_current_user = _o47
+        _adm.get_admin_user = _orig
+
+    # ---------- 48. V2.31.2 未完成事項總表第一批 ----------
+    print("\n[48] 未完成事項總表第一批（S-1、B-7、P2-17、P2-F6）")
+    _mo48 = open("app/templates/partials/my_order.html", encoding="utf-8").read()
+    _sub48 = _mo48[_mo48.index('hx-post="/groups/{{ group.id }}/orders/submit"'):][:900]
+    _sub48 = _sub48[:_sub48.index(">")]
+    assert "hx-confirm" not in _sub48, "S-1：送出是可逆的（截止前能改），不要確認框"
+    assert "截止前都能改" in _sub48
+    assert "點了直接加" not in open("app/templates/group.html", encoding="utf-8").read(), "B-7：常點其實會開彈窗"
+    import pathlib as _pl48, re as _re48
+    _float48 = [f"{p.name}: {m.group(0)}" for p in _pl48.Path("app/templates").rglob("*.html")
+                for m in _re48.finditer(r"(?:unpkg\.com|cdn\.jsdelivr\.net/npm)/[^\"'\s]*@(?:latest|\d+\.x(?:\.x)?|\d+)(?=/|[\"'])", p.read_text(encoding="utf-8"))]
+    assert not _float48, "P2-F6：CDN 要鎖到確切版本：" + "；".join(_float48)
+    from app.services.excel_service import export_orders_to_excel as _xl48
+    from openpyxl import load_workbook as _lw48
+    class _O: pass
+    _u48 = _O(); _u48.show_name = "=1+1"
+    _it48 = _O(); _it48.item_name = "=HYPERLINK(\"http://x\",\"點我\")"; _it48.quantity = 1; _it48.size = None; _it48.sugar = None; _it48.ice = None
+    _it48.note = "=cmd|' /C calc'!A0"; _it48.selected_options = []; _it48.selected_toppings = []; _it48.subtotal = 30; _it48.unit_price = 30
+    _st48 = _O(); _st48.value = "submitted"
+    _o48 = _O(); _o48.user = _u48; _o48.items = [_it48]; _o48.final_amount = 30; _o48.total_amount = 30; _o48.discount_amount = 0
+    _o48.discount_note = "=SUM(1)"; _o48.status = _st48
+    _g48 = _O(); _g48.name = "=團名"; _g48.store_name = "店"; _g48.store = None; _g48.deadline = taipei_now(); _g48.delivery_fee = 0
+    _g48.store_display_name = "店"
+    try:
+        _wb48 = _lw48(_xl48(_g48, [_o48]))
+    except AttributeError as _e:
+        raise AssertionError(f"Excel 測試夾具少欄位：{_e}")
+    _cells48 = [c for ws in _wb48.worksheets for row in ws.iter_rows() for c in row if c.value is not None]
+    assert not [c.coordinate for c in _cells48 if c.data_type == "f"], "P2-17：使用者的字不能變成 Excel 公式"
+    _vals48 = [c.value for c in _cells48]
+    assert "=1+1" in _vals48 and any(str(v).startswith("=HYPERLINK") for v in _vals48), "內容照原樣顯示（不加 '）"
+    check("S-1 送出不跳確認框；B-7 常點文案；P2-17 Excel 不會把使用者的字當公式；P2-F6 CDN 全部鎖確切版本")
 
     print(f"\n全部通過（{len(passed)} 項）")
 

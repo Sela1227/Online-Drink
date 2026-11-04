@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, model_validator, field_validator, Field
 from typing import Literal
 from decimal import Decimal, InvalidOperation
 import re
@@ -69,6 +69,7 @@ def parse_price_input(v):
 
 
 PRICE_MAX = Decimal("999999")
+VARIANTS_MAX = 8  # V2.31.1：點餐彈窗一列放得下的上限；超過多半是 AI 把價目表塞進同一個品項
 
 
 def _check_name(v, what="名稱"):
@@ -147,6 +148,7 @@ class MenuItemImport(BaseModel):
     # V2.31.0：杯型／規格。有給就以它為準：price＝第一個規格、price_l 清空
     variants: list[ItemVariantImport] | None = None
     allow_toppings: bool = True  # V2.31.0：false＝不提供店家加料
+    ignored_price_l: bool = Field(default=False, exclude=True)  # V2.31.1：同時給 variants 與 price_l，price_l 被忽略（分析器提醒用）
     price_tbd: bool = False  # V2.14.0：時價（price 以 0 佔位，截止後團主定價回寫本團）
     is_available: bool = True  # V2.14.0：停售（團員看不到，但品項保留）
     note: str | None = None  # V2.14.0：品項說明（存 MenuItem.description，≤200 字）
@@ -166,7 +168,9 @@ class MenuItemImport(BaseModel):
         # V2.14.1 P1-5：price_tbd 可能是字串 "false"（AI 常把布林寫成字串），truthy 判斷會把價格清成 0
         data["price_tbd"] = _to_bool(data.get("price_tbd"))
         data["is_available"] = _to_bool(data.get("is_available"), default=True)
-        data["allow_toppings"] = _to_bool(data.get("allow_toppings"), default=True)
+        # V2.31.1（內部審核 V-4）：空字串當「沒給」——_to_bool 把 "" 當 false，品項會被誤設成不加料
+        _at = data.get("allow_toppings")
+        data["allow_toppings"] = _to_bool(None if (isinstance(_at, str) and not _at.strip()) else _at, default=True)
         # V2.31.0：variants 優先。空陣列當沒給
         vs = data.get("variants")
         if vs is not None and not isinstance(vs, list):
@@ -180,6 +184,9 @@ class MenuItemImport(BaseModel):
                 _p = None
             if data["price_tbd"] or _p is TBD:
                 raise ValueError("時價品項不能有 variants——時價就只填 price: \"時價\"")
+            if len(vs) > VARIANTS_MAX:
+                raise ValueError(f"規格最多 {VARIANTS_MAX} 個（目前 {len(vs)} 個）——多半是把整份價目表塞進同一個品項，請拆成多個品項")
+            data["ignored_price_l"] = data.get("price_l") not in (None, "")
             data["price"] = Decimal("0")
             data["price_l"] = None
             return data
@@ -212,8 +219,10 @@ class MenuItemImport(BaseModel):
     @model_validator(mode="after")
     def _variants_after(self):
         if self.variants:
-            labels = [v.label for v in self.variants]
-            dup = sorted({x for x in labels if labels.count(x) > 1})
+            # V2.31.1（內部審核 V-4）：不分全半形大小寫、去頭尾空白後比（「M」與「m」、「Ｌ」與「L」算重複）
+            import unicodedata as _ud
+            labels = [_ud.normalize("NFKC", v.label).strip().casefold() for v in self.variants]
+            dup = sorted({v.label for v, k in zip(self.variants, labels) if labels.count(k) > 1})
             if dup:
                 raise ValueError(f"規格名稱重複：{'、'.join(dup)}")
             self.price = self.variants[0].price

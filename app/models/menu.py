@@ -37,8 +37,9 @@ class MenuCategory(Base):
     
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="categories")
+    # V2.31.1：selectin——團頁逐分類讀品項，lazy 時每個分類各查一次（再各觸發一次規格／選項的 selectin）
     items: Mapped[list["MenuItem"]] = relationship(
-        back_populates="category", order_by=lambda: (MenuItem.sort_order, MenuItem.id))
+        back_populates="category", lazy="selectin", order_by=lambda: (MenuItem.sort_order, MenuItem.id))
 
 
 class MenuItem(Base):
@@ -62,13 +63,14 @@ class MenuItem(Base):
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="items")
     category: Mapped["MenuCategory | None"] = relationship(back_populates="items")
+    # V2.31.1（內部審核 V-2）：selectin——團頁／工作台每個品項都讀，預設 lazy 是每項各查一次（60 項＝60 條）
     options: Mapped[list["ItemOption"]] = relationship(
-        back_populates="menu_item", cascade="all, delete-orphan",
+        back_populates="menu_item", cascade="all, delete-orphan", lazy="selectin",
         order_by=lambda: (ItemOption.sort_order, ItemOption.id))
     order_items: Mapped[list["OrderItem"]] = relationship(back_populates="menu_item")
     # V2.31.0：杯型／規格。沒有列的舊品項用 price／price_l（app/services/variants.py）
     variants: Mapped[list["MenuItemVariant"]] = relationship(
-        back_populates="menu_item", cascade="all, delete-orphan",
+        back_populates="menu_item", cascade="all, delete-orphan", lazy="selectin",
         order_by=lambda: (MenuItemVariant.sort_order, MenuItemVariant.id))
 
     @property

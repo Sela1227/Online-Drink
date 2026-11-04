@@ -1125,6 +1125,7 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
             {o.option_value for o in group.store.options if o.option_type == _OT.ICE},
         )
     _skipped_opt = False
+    _resized = 0  # V2.31.1：杯型在新菜單對不上、改成第一個的品項數
     
     _copied = 0
     for old_item, _mi in _plan:
@@ -1154,7 +1155,11 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
         # V2.11.3 R-05 → V2.31.0：舊規格標籤在新版本品項找得到就沿用、找不到用第一個規格，
         # 單價一律以新版本的規格價重算（原本只處理「新版本沒有 L」這一種）
         from app.services.variants import carry_over as _carry
-        _size, _unit = _carry(_mi, old_item.size)
+        # V2.31.1（內部審核 V-1）：帶舊版本品項的規格清單（舊版本的菜單列還在），才能用「同位置」對到改名的規格
+        _old_chs = old_item.menu_item.size_choices if old_item.menu_item is not None else None
+        _size, _unit, _exact = _carry(_mi, old_item.size, _old_chs)
+        if not _exact and old_item.size:
+            _resized += 1
         # 甜冰若已不在店家現行選項中（店家改過選項），改為不指定而不是照抄舊值
         if group.category == CategoryType.DRINK and _store_opts is not None:
             if _sugar and _store_opts[0] and _sugar not in _store_opts[0]:
@@ -1230,7 +1235,9 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
     db.commit()
     
     return RedirectResponse(
-        url=f"/groups/{group_id}?copied={_copied}&skipped={_skipped}",
+        # V2.31.1（內部審核 V-1）：杯型換了、甜冰被清掉都要讓使用者知道（原本 _skipped_opt 算了沒帶出去）
+        url=f"/groups/{group_id}?copied={_copied}&skipped={_skipped}"
+            + (f"&resized={_resized}" if _resized else "") + ("&optreset=1" if _skipped_opt else ""),
         status_code=302,
     )
 

@@ -30,7 +30,7 @@ PROMPT_LINES = [
     '   - name：品項名稱（字串）。',
     '   - price：只有一個價格、也沒標杯型或份量的品項，填這個價格（純數字）。',
     '   - variants：品項有杯型或規格之分（中杯／大杯／特大杯、M／L、Solo／Doppio、L杯／瓶裝、碗裝／分享號、小份／大份…）就用 variants，不要填 price，也不要用 price_l：',
-    '     每個規格是 {"label":"中杯","price":125}，label 照菜單原文、由小到大排；菜單只標一種杯型（例：只有大杯）也要用 variants 放一個元素，例：[{"label":"大杯","price":45}]——不要在品名後面補「(大杯)」。',
+    '     每個規格是 {"label":"中杯","price":125}，label 照菜單原文、由小到大排、最多 8 個；菜單只標一種杯型（例：只有大杯）也要用 variants 放一個元素，例：[{"label":"大杯","price":45}]——不要在品名後面補「(大杯)」。',
     '     某個規格的價格看不清，那一格 price 填 "?"；時價品項不要用 variants，price 填 "時價"。',
     '   - allow_toppings：菜單寫這個品項「不提供客製化」「不可加料」時，加 "allow_toppings": false；其他品項不要加這個欄位。',
     '   - options：該品項專屬的加價選項，每個是 {"name":"加蛋","price_diff":10}；price_diff 是加價金額，不加價填 0；沒有選項就設為 null。',

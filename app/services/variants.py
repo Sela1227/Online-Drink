@@ -49,13 +49,39 @@ def resolve(item, label):
     return None
 
 
-def carry_over(item, old_label):
-    """複製訂單／開團：舊規格標籤套到新版本品項——同名就沿用，找不到就用第一個規格。"""
+# V2.31.1（內部審核 V-1）：舊菜單 M／L 重匯成「中杯／大杯」後，複製上次訂單要對得上
+_ALIASES = [{"m", "中杯", "中", "中份"}, {"l", "大杯", "大", "大份"}]
+
+
+def _norm(lb):
+    import unicodedata
+    return unicodedata.normalize("NFKC", lb or "").strip().casefold()
+
+
+def carry_over(item, old_label, old_choices=None):
+    """複製上次訂單：舊規格標籤套到新版本品項，回傳 (label, price, exact)。
+
+    順序：同名（不分全半形大小寫）→ 別名（M＝中杯、L＝大杯）→ 同位置（新舊規格數相同，Doppio 改名「雙份」）
+    → 都對不上才用第一個規格，exact=False 讓呼叫端告訴使用者「杯型換了」。
+    V2.31.0 原本找不到就默默退第一個（最小杯、較低價），舊店重匯後點大杯的人全被改成中杯（內部審核實測）。
+    """
     chs = item_choices(item)
+    o = _norm(old_label)
     for lb, p in chs:
-        if lb == old_label:
-            return lb, p
-    return chs[0]
+        if _norm(lb) == o:
+            return lb, p, True
+    for grp in _ALIASES:
+        if o in grp:
+            for lb, p in chs:
+                if _norm(lb) in grp:
+                    return lb, p, True
+    if old_choices and len(old_choices) == len(chs):
+        olds = [_norm(lb) for lb, _ in old_choices]
+        if o in olds:
+            lb, p = chs[olds.index(o)]
+            return lb, p, True
+    lb, p = chs[0]
+    return lb, p, not old_label  # 原本沒記規格（單一價）→ 沒什麼要說；有記卻對不上 → 要說
 
 
 def fmt(chs, money=lambda d: f"{d.normalize():f}") -> str:

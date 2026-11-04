@@ -654,7 +654,7 @@
         {% if my_frequent or favorite_items %}
         <div id="quick-mine" class="mb-4 scroll-mt-32 category-section">
             {% if my_frequent %}
-            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2"><i class="ti ti-rotate-clockwise"></i> 你的常點 <span class="text-xs font-normal text-sela-800/45">點了直接加</span></h3>
+            <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2"><i class="ti ti-rotate-clockwise"></i> 你的常點 <span class="text-xs font-normal text-sela-800/45">點了帶入選項</span></h3>
             <div class="flex flex-wrap gap-2">
                 {% for item in my_frequent %}
                 <button @click='openAddItem({ id: {{ item.id }}, name: {{ item.name | tojson }}, description: {{ (item.description or "") | tojson }}, price: {{ item.price }}, tbd: {{ "true" if item.price_tbd else "false" }}, sizes: [{% for lb, p in item.size_choices %}{ label: {{ (lb or "") | tojson }}, price: {{ p }} }{% if not loop.last %},{% endif %}{% endfor %}], no_top: {{ "true" if item.allow_toppings is sameas false else "false" }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })'
@@ -770,7 +770,7 @@
                     <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-0 top-10 z-10 w-40 bg-white border border-sela-200 rounded-xl shadow-lg text-sm overflow-hidden">
                         <button type="button" id="clear-cart"
                                 hx-delete="/groups/{{ group.id }}/orders" hx-target="#cart-content" hx-swap="innerHTML" hx-confirm="確定要清空購物車嗎？"
-                                @htmx:after-request="menu = false; if ($event.detail.successful) { $dispatch('orderUpdated'); orderStatus = 'none'; cartCount = 0; showCart = false; window.toast('已清空購物車') }"
+                                @htmx:after-request="menu = false; if ($event.detail.successful) { document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus = 'none'; cartCount = 0; showCart = false; window.toast('已清空購物車') }"
                                 class="w-full text-left px-3 py-2.5 text-red-600 active:bg-red-50"><i class="ti ti-trash"></i> 清空購物車</button>
                     </div>
                 </div>
@@ -1074,11 +1074,17 @@
     var skipped = parseInt(q.get('skipped') || '0', 10);
     var msg = copied > 0 ? ('已複製 ' + copied + ' 項') : '沒有可複製的品項';
     if (skipped > 0) msg += '，' + skipped + ' 項無法複製';
+    // V2.31.1（內部審核 V-1）：杯型在新菜單找不到改成第一個、甜冰已不在店家選項被清掉——都要說
+    var resized = parseInt(q.get('resized') || '0', 10);
+    if (resized > 0) msg += '；' + resized + ' 項的杯型新菜單沒有，已改成第一個，請確認';
+    if (q.get('optreset')) msg += '；部分甜度冰塊店家已改，請重選';
     // V2.11.3 R-04：不再用 setTimeout 賭 Alpine 已經載好，window.toast 會自己排隊
     if (window.toast) { window.toast(msg, copied > 0 ? 'ok' : 'error'); }
     // 清掉網址參數，重新整理時不會再跳一次
     q.delete('copied');
     q.delete('skipped');
+    q.delete('resized');
+    q.delete('optreset');
     var url = window.location.pathname + (q.toString() ? '?' + q.toString() : '');
     window.history.replaceState({}, '', url);
 })();
@@ -1222,7 +1228,9 @@ function orderPage() {
                 const pref = JSON.parse(localStorage.getItem('selapref_{{ store.id if store else 0 }}') || '{}');
                 // V2.20.0：帶入了什麼就顯示一行「已帶入上次：…」（原本悄悄帶入，看不出來）
                 const applied = [];
-                if (pref.size && this.selectedItem && (this.selectedItem.sizes || []).length > 1 && this.selectedItem.sizes.some(z => z.label === pref.size)) { this.selectedSize = pref.size; applied.push(pref.size); }
+                // V2.31.1：同名找不到時用別名（舊 M／L ↔ 中杯／大杯），跟複製上次訂單同一套
+                const _sz = (this.selectedItem && (this.selectedItem.sizes || []).length > 1) ? this.matchSize(this.selectedItem.sizes, pref.size) : null;
+                if (_sz) { this.selectedSize = _sz; applied.push(_sz); }
                 if (pref.sugar) { const r = document.querySelector(`#add-item-sheet input[name=sugar][value="${pref.sugar}"]`); if (r) { r.checked = true; applied.push(pref.sugar); } }
                 if (pref.ice)   { const r = document.querySelector(`#add-item-sheet input[name=ice][value="${pref.ice}"]`);   if (r) { r.checked = true; applied.push(pref.ice); } }
                 this.lastPrefNote = applied.join('・');
@@ -1231,10 +1239,27 @@ function orderPage() {
 
         saveLastPref() {
             try {
+                const key = 'selapref_{{ store.id if store else 0 }}';
                 const sugar = document.querySelector('input[name=sugar]:checked')?.value;
                 const ice   = document.querySelector('input[name=ice]:checked')?.value;
-                localStorage.setItem('selapref_{{ store.id if store else 0 }}', JSON.stringify({ size: this.selectedSize, sugar, ice }));
+                // V2.31.1（內部審核 V-3）：只有一種杯型的品項沒選杯型（selectedSize 是空的），不能把上次的「特大杯」蓋掉
+                const prev = JSON.parse(localStorage.getItem(key) || '{}');
+                const size = (this.selectedItem && (this.selectedItem.sizes || []).length > 1) ? this.selectedSize : prev.size;
+                localStorage.setItem(key, JSON.stringify({ size, sugar, ice }));
             } catch (e) {}
+        },
+
+        // V2.31.1：上次的杯型對到這個品項的規格——同名（不分大小寫全半形）→ 別名 M＝中杯、L＝大杯；對不到回 null
+        matchSize(sizes, want) {
+            if (!want) return null;
+            const n = (t) => String(t || '').normalize('NFKC').trim().toLowerCase();
+            const w = n(want);
+            const hit = sizes.find(z => n(z.label) === w);
+            if (hit) return hit.label;
+            const groups = [['m', '中杯', '中', '中份'], ['l', '大杯', '大', '大份']];
+            const g = groups.find(x => x.includes(w));
+            const alias = g ? sizes.find(z => g.includes(n(z.label))) : null;
+            return alias ? alias.label : null;
         },
         
         // V2.20.0：加點按鈕直接帶金額；候補模式帶價差

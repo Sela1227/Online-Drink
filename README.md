@@ -94,10 +94,10 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 │   ├── schemas/             Pydantic Schema
 │   ├── templates/           Jinja2 模板（含 partials、admin、votes）
 │   └── static/              CSS / JS / images / sela.svg / favicon/
-├── docs/                    預設 Logo 功能說明（架構／部署／匯入規範等背景文件在 Claude Project「快點來點餐」，V2.16.1 起不再放 zip）
+├── docs/                    CHANGELOG.md（V2.24.0 以前的版本歷程，V2.31.1 從 CLAUDE.md 搬出）、預設 Logo 功能說明（架構／部署／匯入規範等背景文件在 Claude Project「快點來點餐」，V2.16.1 起不再放 zip）
 ├── examples/                範例 JSON
 ├── menu/                    各店家菜單 JSON 範本
-├── scripts/                 煙霧測試與七支檢查（smoke_test／check_*／jsdom_*）、種子資料、專案匯整
+├── scripts/                 煙霧測試與各支檢查（smoke_test／check_*／jsdom_*）、種子資料、專案匯整
 ├── requirements.txt         依賴（== 鎖版本，坑 #10）
 ├── railway.toml             舊的 Railway 設定檔（對照用；2026-12-01 起不再被讀，以服務設定為準）
 ├── Dockerfile
@@ -159,4 +159,4 @@ restartPolicyMaxRetries = 3
 
 ---
 
-> Made by **SELA** · V2.31.0 · 對齊 SELA-Starter-Kit V2.3.0
+> Made by **SELA** · V2.31.2 · 對齊 SELA-Starter-Kit V2.3.0

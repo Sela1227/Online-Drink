@@ -5,6 +5,22 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 
+def _no_formulas(wb) -> int:
+    """V2.31.2（內部審核 V2.14.0 P2-17）：使用者寫的字（顯示名稱、品名、備註、團名）不能變成 Excel 公式。
+
+    openpyxl 看到開頭是 "=" 的字串會存成公式，團員在備註寫 `=HYPERLINK(...)`、`=cmd|...`，
+    團主打開檔案就會執行。這裡把所有字串儲存格強制存成文字（顯示不變，不會多一個 '）；
+    "+" "-" "@" 開頭在 xlsx 本來就是文字。回傳改了幾格（測試用）。"""
+    n = 0
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                if c.data_type == "f" or (isinstance(c.value, str) and c.value[:1] == "="):
+                    c.data_type = "s"
+                    n += 1
+    return n
+
+
 def export_orders_to_excel(group, orders) -> BytesIO:
     """匯出團單訂單為 Excel"""
     wb = Workbook()
@@ -121,6 +137,7 @@ def export_orders_to_excel(group, orders) -> BytesIO:
     
     # 儲存到 BytesIO
     output = BytesIO()
+    _no_formulas(wb)
     wb.save(output)
     output.seek(0)
     

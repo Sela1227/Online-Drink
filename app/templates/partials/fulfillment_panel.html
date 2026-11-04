@@ -23,7 +23,7 @@
                     {% if not t.pending %}<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">已定 ${{ t.current_price|money }}</span>{% endif %}
                 </div>
                 <form hx-post="/groups/{{ group.id }}/tbd-price/{{ t.item.id }}" hx-target="#fulfillment-content" hx-swap="innerHTML"
-                      @htmx:after-request="$dispatch('orderUpdated')" class="flex items-center gap-1.5">
+                      @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))" class="flex items-center gap-1.5">
                     <span class="text-sm text-sela-800/60">$</span>
                     <input type="number" name="price" min="1" max="1000000" step="1" required placeholder="單價"
                            value="{% if not t.pending %}{{ t.current_price|int }}{% endif %}"

@@ -38,7 +38,9 @@
         }
     </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {# V2.31.2（內部審核 V2.14.0 P2-F6）：鎖版——原本 @3.x.x 浮動，unpkg 一發新的 3.x 就直接上線、沒經過測試。
+       版本跟 scripts/ 的 jsdom 測試用的一樣（3.17.4）；升版時兩邊一起改 #}
+    <script defer src="https://unpkg.com/alpinejs@3.17.4/dist/cdn.min.js"></script>
     <!-- Tabler Icons（北歐極簡線條圖示，V1.1.0 引入 / V1.1.1 修正 CDN URL）-->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
     <style>

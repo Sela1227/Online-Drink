@@ -50,7 +50,7 @@
                             hx-post="/groups/{{ group.id }}/orders/follow/{{ item.id }}"
                             hx-target="#cart-content" hx-swap="innerHTML"
                             x-show="orderStatus !== 'submitted'"
-                            @htmx:after-request="if ($event.detail.successful) { $dispatch('orderUpdated'); if (orderStatus === 'none') orderStatus = 'draft'; window.toast('已跟單，加進購物車了'); }"
+                            @htmx:after-request="if ($event.detail.successful) { document.body.dispatchEvent(new CustomEvent('orderUpdated')); if (orderStatus === 'none') orderStatus = 'draft'; window.toast('已跟單，加進購物車了'); }"
                             class="flex-shrink-0 text-[11px] px-2 py-0.5 rounded-full border border-sela-300 bg-white text-sela-800 active:bg-sela-50"><i class="ti ti-plus"></i> 跟單</button>
                     {% endif %}
                 </div>

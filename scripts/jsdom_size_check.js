@@ -8,6 +8,7 @@
  *   伯爵茶（只有大杯、不提供加料）：不顯示杯型列、不顯示加料列、主鈕 $95；上一個品項勾的加料要清掉
  *   紅茶（舊菜單 M／L）：兩顆 M $30／L $35
  *   記住上次：選過特大杯 → 再開那堤帶入特大杯；紅茶沒有特大杯就不帶
+ *   V2.31.1：中間點單一杯型品項不會蓋掉上次的杯型；上次存 L、新菜單中杯／大杯 → 帶入大杯
  *
  * 用法：node scripts/jsdom_size_check.js <團頁html>
  */
@@ -109,9 +110,16 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
   if (comp.selectedSize !== "M") fail("紅茶沒有特大杯，不該帶入上次的特大杯（" + comp.selectedSize + "）");
   sheet.querySelector("button[aria-label='關閉']").click(); await sleep(60);
 
+  // V2.31.1（內部審核 V-3）：中間點了只有一種杯型的品項並存檔，不能把上次的特大杯蓋掉
+  await open("伯爵茶"); comp.saveLastPref(); sheet.querySelector("button[aria-label='關閉']").click(); await sleep(60);
   await open("那堤");
-  if (comp.selectedSize !== "特大杯" || !chips()[2].checked) fail("再開那堤應帶入上次的特大杯");
-  if (!text(d.getElementById("last-pref-note")).includes("特大杯")) fail("「已帶入上次」應寫特大杯");
+  if (comp.selectedSize !== "特大杯" || !chips()[2].checked) fail("再開那堤應帶入上次的特大杯（中間點過單一杯型的伯爵茶也一樣）");
+  // 別名：上次存的是舊菜單的 L，新菜單是中杯／大杯 → 帶入大杯
+  w.localStorage.setItem(Object.keys(w.localStorage).find(k => k.startsWith("selapref_")), JSON.stringify({ size: "L" }));
+  sheet.querySelector("button[aria-label='關閉']").click(); await sleep(60);
+  await open("那堤");
+  if (comp.selectedSize !== "大杯") fail("上次存 L、新菜單是中杯／大杯，應帶入大杯（" + comp.selectedSize + "）");
+  if (!text(d.getElementById("last-pref-note")).includes("大杯")) fail("「已帶入上次」應寫帶入的杯型");
   if (jsErrors.length) fail("操作過程有 JS 錯誤：" + jsErrors.join(" | "));
   console.log(JSON.stringify({ ok: true }));
   process.exit(0);

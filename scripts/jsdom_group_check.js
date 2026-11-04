@@ -145,6 +145,21 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     const wallBtn = wallCard.querySelector("button");
     wallBtn.click(); await sleep(60);
     if (!wallCard.querySelector("[hx-post*='/orders/follow/']")) fail("訂單牆展開後應有跟單鈕");
+    // 6) V2.31.1（內部審核 B-1）：購物車裡的按鈕回應後會被 hx-swap 換掉，按鈕已離開 DOM，
+    //    從它身上 $dispatch 的事件傳不到 body——訂單牆、我的訂單、結帳列都不會更新。要從 body 發
+    const count = (k) => reqs.filter(r => r.m === "GET" && r.u.includes(k)).length;
+    const cartBtn = (pred) => [...d.querySelectorAll("#cart-content button")].find(pred);
+    let w0 = count("/orders/wall"), m0 = count("/orders/mine");
+    const plusBtn = cartBtn(b => b.getAttribute("aria-label") === "增加數量");
+    if (!plusBtn) fail("購物車找不到 ＋ 鈕");
+    plusBtn.click(); await sleep(250);
+    if (count("/orders/wall") <= w0 || count("/orders/mine") <= m0) fail("購物車按 ＋ 之後訂單牆與我的訂單沒有重新載入（$dispatch 從被換掉的按鈕發出，傳不到 body）");
+    w0 = count("/orders/wall");
+    const subBtn = cartBtn(b => (b.getAttribute("hx-post") || "").endsWith("/orders/submit"));
+    if (!subBtn) fail("購物車重新載入後找不到「送出訂單」鈕");
+    subBtn.click(); await sleep(250);
+    if (count("/orders/wall") <= w0) fail("送出訂單後訂單牆沒有重新載入（B-1）");
+    if (comp.orderStatus !== "submitted") fail("送出後 orderStatus 應為 submitted");
     console.log(JSON.stringify({ ok: true, mode }));
     process.exit(0);
   }
