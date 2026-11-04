@@ -45,9 +45,10 @@ def _validate_item_spec(group, store, size, sugar, ice, quantity, options, note)
     """
     from app.models.store import OptionType
 
-    if size not in (None, "", "M", "L"):
+    # V2.31.0：規格標籤由菜單決定（中杯／Doppio／瓶裝…），這裡只擋長度；是否屬於這個品項在計價時對 variants 驗
+    size = (size or "").strip() or None
+    if size is not None and len(size) > 30:
         raise HTTPException(status_code=400, detail="尺寸錯誤")
-    size = size or None
 
     if group.category == CategoryType.DRINK and store is not None:
         sugars = {o.option_value for o in store.options if o.option_type == OptionType.SUGAR}
@@ -334,13 +335,16 @@ async def add_item(
         if _rem is not None and quantity > _rem:
             raise HTTPException(status_code=400, detail=f"「{menu_item.name}」只剩 {_rem} 份" if _rem > 0 else f"「{menu_item.name}」已售完")
     
-    # 決定單價（根據尺寸）
-    if size == 'L' and menu_item.price_l:
-        unit_price = menu_item.price_l
-    else:
-        unit_price = menu_item.price
-        if not menu_item.price_l:
-            size = None  # 沒有 L 價格就不記錄尺寸
+    # 決定單價（根據規格）——V2.31.0：查品項的規格清單（舊菜單 M／L、新菜單照 variants）。
+    # 單一規格也保留標籤（核對單印得出「大杯」）；沒有標籤的單一價記 None，跟以前一樣
+    from app.services.variants import resolve as _resolve_size
+    _rs = _resolve_size(menu_item, size)
+    if _rs is None:
+        raise HTTPException(status_code=400, detail="這個品項沒有這個尺寸")
+    size, unit_price = _rs
+    # V2.31.0（回饋 3-2）：品項設成不提供加料
+    if toppings and menu_item.allow_toppings is False:
+        raise HTTPException(status_code=400, detail=f"「{menu_item.name}」不提供加料")
     
     # 數量已在 _validate_item_spec 驗過（V2.11.1 P1-05）
     
@@ -971,8 +975,9 @@ async def follow_item(
         )
         db.add(order_item_option)
     
-    # 複製加料
-    for topping in source_item.selected_toppings:
+    # 複製加料（V2.31.0：品項後來設成不提供加料就不跟）
+    _src_mi = source_item.menu_item
+    for topping in (source_item.selected_toppings if not (_src_mi and _src_mi.allow_toppings is False) else []):
         from app.models.order import OrderItemTopping
         order_item_topping = OrderItemTopping(
             order_item_id=order_item.id,
@@ -1146,9 +1151,10 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
         # 否則等於從這條路徑繞過 P1-05 的鎖定
         _sugar = group.default_sugar if group.lock_sugar else old_item.sugar
         _ice = group.default_ice if group.lock_ice else old_item.ice
-        # V2.11.3 R-05：新版本品項若沒有 price_l，單價會以 M 價算，但 size 仍記成
-        # "L"，核對單就顯示 L。add_item 在同樣情況會把 size 清成 None，比照處理。
-        _size = old_item.size if (old_item.size != 'L' or _mi.price_l) else None
+        # V2.11.3 R-05 → V2.31.0：舊規格標籤在新版本品項找得到就沿用、找不到用第一個規格，
+        # 單價一律以新版本的規格價重算（原本只處理「新版本沒有 L」這一種）
+        from app.services.variants import carry_over as _carry
+        _size, _unit = _carry(_mi, old_item.size)
         # 甜冰若已不在店家現行選項中（店家改過選項），改為不指定而不是照抄舊值
         if group.category == CategoryType.DRINK and _store_opts is not None:
             if _sugar and _store_opts[0] and _sugar not in _store_opts[0]:
@@ -1167,7 +1173,7 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
             quantity=_copy_qty,
             # V2.11.1 P1-01：原本沿用 old_item.unit_price。店家在後台改價時
             # menu_item 的 id 不變，複製過來的就是舊價，結帳金額直接錯。
-            unit_price=(_mi.price_l if (_size == 'L' and _mi.price_l) else _mi.price),
+            unit_price=_unit,
             note=old_item.note,
         )
         db.add(new_item)
@@ -1194,8 +1200,8 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
                 price_diff=_cur_opt.price_diff,
             ))
         
-        # 複製加料（同上，以現行 StoreTopping 重新取價）
-        for old_topping in old_item.selected_toppings:
+        # 複製加料（同上，以現行 StoreTopping 重新取價）；V2.31.0：新版本品項不提供加料就不複製
+        for old_topping in (old_item.selected_toppings if _mi.allow_toppings is not False else []):
             # V2.11.3 R-05：原本沒有排除已停用的加料
             _cur_top = db.query(StoreTopping).filter(
                 StoreTopping.id == old_topping.store_topping_id,

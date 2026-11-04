@@ -114,10 +114,39 @@ class ItemOptionImport(BaseModel):
         return r
 
 
+class ItemVariantImport(BaseModel):
+    """V2.31.0：一個規格（杯型）。label 照菜單原文：中杯／大杯／特大杯、Solo／Doppio、L杯／瓶裝…"""
+    label: str
+    price: Decimal
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, v):
+        v = (str(v) if v is not None else "").strip()
+        if not v:
+            raise ValueError("規格名稱（label）不能是空白——例：中杯、大杯、瓶裝")
+        if len(v) > 30:
+            raise ValueError(f"規格名稱最多 30 字（目前 {len(v)} 字）")
+        return v
+
+    @field_validator("price", mode="before")
+    @classmethod
+    def _price(cls, v):
+        r = parse_price_input(v)
+        if r is TBD:
+            raise ValueError("規格價格不能是時價——整個品項是時價就不要用 variants，price 填 \"時價\"")
+        if r is None:
+            raise ValueError("規格價格不能空白")
+        return _check_price_range(r, "規格價格")
+
+
 class MenuItemImport(BaseModel):
     name: str
     price: Decimal
-    price_l: Decimal | None = None  # L 尺寸價格
+    price_l: Decimal | None = None  # L 尺寸價格（舊格式；有 variants 時不用）
+    # V2.31.0：杯型／規格。有給就以它為準：price＝第一個規格、price_l 清空
+    variants: list[ItemVariantImport] | None = None
+    allow_toppings: bool = True  # V2.31.0：false＝不提供店家加料
     price_tbd: bool = False  # V2.14.0：時價（price 以 0 佔位，截止後團主定價回寫本團）
     is_available: bool = True  # V2.14.0：停售（團員看不到，但品項保留）
     note: str | None = None  # V2.14.0：品項說明（存 MenuItem.description，≤200 字）
@@ -137,6 +166,24 @@ class MenuItemImport(BaseModel):
         # V2.14.1 P1-5：price_tbd 可能是字串 "false"（AI 常把布林寫成字串），truthy 判斷會把價格清成 0
         data["price_tbd"] = _to_bool(data.get("price_tbd"))
         data["is_available"] = _to_bool(data.get("is_available"), default=True)
+        data["allow_toppings"] = _to_bool(data.get("allow_toppings"), default=True)
+        # V2.31.0：variants 優先。空陣列當沒給
+        vs = data.get("variants")
+        if vs is not None and not isinstance(vs, list):
+            raise ValueError("variants 要是陣列，例：[{\"label\":\"中杯\",\"price\":125}]")
+        if vs:
+            # 規格逐一驗證交給欄位（錯誤位置才會指到「variants[2] → price」，看不清的 "?" 也走同一張紅卡）；
+            # price 先放佔位，_variants_after 再改成第一個規格的價格
+            try:
+                _p = parse_price_input(data.get("price"))
+            except ValueError:
+                _p = None
+            if data["price_tbd"] or _p is TBD:
+                raise ValueError("時價品項不能有 variants——時價就只填 price: \"時價\"")
+            data["price"] = Decimal("0")
+            data["price_l"] = None
+            return data
+        data["variants"] = None
         # 價格容錯
         tbd_keys = []
         for key in ("price", "price_l"):
@@ -161,6 +208,17 @@ class MenuItemImport(BaseModel):
     @classmethod
     def _name(cls, v):
         return _check_name(v, "品項名稱")
+
+    @model_validator(mode="after")
+    def _variants_after(self):
+        if self.variants:
+            labels = [v.label for v in self.variants]
+            dup = sorted({x for x in labels if labels.count(x) > 1})
+            if dup:
+                raise ValueError(f"規格名稱重複：{'、'.join(dup)}")
+            self.price = self.variants[0].price
+            self.price_l = None
+        return self
 
     @field_validator("price", "price_l")
     @classmethod

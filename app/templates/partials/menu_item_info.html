@@ -15,11 +15,17 @@
 {% macro item_price(item, personal=False) -%}
 {% if item.price_tbd %}
 <span class="text-xs text-sela-800/50 bg-sela-100 px-2 py-1 rounded-full">{% if personal %}價格未訂{% else %}時價{% endif %}</span>
-{% elif item.price_l %}
-{# V2.16.0 A-1：「$35/$40」第一次用的人不知道哪個是大杯，改兩行 M／L #}
-<div class="text-right leading-tight"><div>M ${{ item.price|money }}</div><div class="text-xs text-sela-800/60">L ${{ item.price_l|money }}</div></div>
+{% else %}
+{# V2.16.0 A-1：多規格一行一個（第一個大字、其餘小字）；V2.31.0（Sela 選 1A）規格標籤照菜單，
+   只有一種規格但有標籤的寫「大杯 $45」，沒有標籤的照舊「$45」 #}
+{% set chs = item.size_choices %}
+{% if chs|length > 1 %}
+<div class="text-right leading-tight" data-sizes>{% for lb, p in chs %}{% if loop.first %}<div>{{ lb }} ${{ p|money }}</div>{% else %}<div class="text-xs text-sela-800/60">{{ lb }} ${{ p|money }}</div>{% endif %}{% endfor %}</div>
+{% elif chs[0][0] %}
+<span data-sizes><span class="text-xs text-sela-800/60 font-normal">{{ chs[0][0] }}</span> ${{ chs[0][1]|money }}</span>
 {% else %}
 ${{ item.price|money }}
+{% endif %}
 {% endif %}
 {%- endmacro %}
 

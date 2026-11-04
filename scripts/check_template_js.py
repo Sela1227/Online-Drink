@@ -277,6 +277,11 @@ def check_rendered_js():
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), undefined=StrictUndefined)
     env.filters["taipei"] = lambda d: d
     env.filters["money"] = lambda v: v
+    # V2.30.0：base.html 頁首用 app_version（正式環境由 templating.register_filters 註冊）
+    from app.version import APP_VERSION
+    env.globals["app_version"] = APP_VERSION
+    from app.templating import size_choices as _sc
+    env.globals["size_choices"] = _sc
 
     for name, ctx_fn, func_name in RENDER_TARGETS:
         try:

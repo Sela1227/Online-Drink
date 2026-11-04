@@ -24,6 +24,7 @@ GROUP_SCRIPT = ROOT / "scripts" / "jsdom_group_check.js"  # V2.18.0 團頁
 WORKBENCH_SCRIPT = ROOT / "scripts" / "jsdom_workbench_check.js"  # V2.21.0 工作台共用選項
 ANN_SCRIPT = ROOT / "scripts" / "jsdom_announcements_check.js"  # V2.28.0 公告原地展開
 PRICE_SCRIPT = ROOT / "scripts" / "jsdom_price_check.js"  # V2.29.0 工作台直接改價
+SIZE_SCRIPT = ROOT / "scripts" / "jsdom_size_check.js"  # V2.31.0 點餐彈窗杯型規格
 
 os.environ["DATABASE_URL"] = "sqlite:///./_importcheck.db"
 os.environ["SECRET_KEY"] = "template_check_only"
@@ -157,6 +158,21 @@ def _render_pages() -> dict:
     pages["__group_owner_mine__"] = c.get(f"/groups/{g_owner.id}/orders/mine").text
     pages["__group_owner_wall__"] = c.get(f"/groups/{g_owner.id}/orders/wall").text
     assert 'data-cart-count="1"' in pages["__group_member_mine__"], "member 購物車片段應有 1 件"
+    # V2.31.0：杯型規格——飲料店、一項加料、三種品項（三杯型／單一規格不加料／舊 M／L）
+    from app.models.store import StoreTopping as _ST
+    from app.schemas.menu import MenuImport as _MIv
+    from app.services.import_service import import_menu as _imv
+    sz = Store(name="杯型店", category=CategoryType.DRINK, is_active=True, is_public=True); db.add(sz); db.commit()
+    db.add(_ST(store_id=sz.id, name="燕麥奶", price=20, sort_order=0, is_active=True)); db.commit()
+    _imv(db, _MIv(store_id=sz.id, mode="new", menu={"categories": [{"name": "咖啡", "items": [
+        {"name": "那堤", "variants": [{"label": "中杯", "price": 125}, {"label": "大杯", "price": 140}, {"label": "特大杯", "price": 155}]},
+        {"name": "伯爵茶", "variants": [{"label": "大杯", "price": 95}], "allow_toppings": False},
+        {"name": "紅茶", "price": 30, "price_l": 35}]}]}))
+    mn_sz = db.query(Menu).filter(Menu.store_id == sz.id, Menu.is_active == True).first()
+    g_sz = Group(owner_id=other.id, store_id=sz.id, menu_id=mn_sz.id, name="杯型團", category=CategoryType.DRINK,
+                 deadline=taipei_now() + timedelta(hours=2), is_public=True)
+    db.add(g_sz); db.commit()
+    pages["__size__"] = c.get(f"/groups/{g_sz.id}").text
     # V2.21.0 工作台共用選項：丁店（飲料，甜度 全糖／半糖）加兩項加料，第二項停用
     from app.models.store import StoreTopping
     db.add_all([StoreTopping(store_id=ding.id, name="珍珠", price=10, sort_order=0, is_active=True),
@@ -176,7 +192,7 @@ def _render_pages() -> dict:
     from app.services.import_service import import_menu as _im
     pst = Store(name="改價店", category=CategoryType.DRINK); db.add(pst); db.commit()
     _im(db, _MI(store_id=pst.id, mode="new", menu={"categories": [{"name": "茶", "items": [
-        {"name": "紅茶", "price": 30, "price_l": 35}, {"name": "綠茶", "price": 25}, {"name": "季節茶", "price": "時價"}]}]}))
+        {"name": "紅茶", "price": 30, "price_l": 35, "options": [{"name": "大杯升級特大杯", "price_diff": 15}, {"name": "去冰", "price_diff": 0}]}, {"name": "綠茶", "price": 25}, {"name": "季節茶", "price": "時價"}]}]}))
     pages["__price__"] = c.get(f"/admin/stores/{pst.id}?tab=menu&edit=price").text
     db.close()
     return pages
@@ -207,6 +223,7 @@ def main():
         workbench_page = pages.pop("__workbench__")
         ann_page = pages.pop("__ann__")
         price_page = pages.pop("__price__")
+        size_page = pages.pop("__size__")
         for mode, html in pages.items():
             p = Path(td) / f"import_{mode}.html"
             p.write_text(html, encoding="utf-8")
@@ -281,10 +298,23 @@ def main():
         except Exception:
             res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
         if res.get("ok"):
-            print("  OK  ?edit=price 進頁就是改價模式；改價變色、改了 N 項、送出的 JSON 只有改的那項；非數字擋下；時價沒輸入框；搜尋；取消還原")
+            print("  OK  ?edit=price 進頁就是改價模式；改價變色、改了 N 項、送出的 JSON 只有改的那項；非數字擋下；時價沒輸入框；搜尋；取消還原；加價選項列在品名下（V2.30.1）")
         else:
             problems.append(f"price：{res.get('msg')}")
             print(f"  !   price：{res.get('msg')}")
+        print("[前端] 點餐彈窗杯型規格（jsdom）")
+        p = Path(td) / "size.html"; p.write_text(size_page, encoding="utf-8")
+        r = subprocess.run(["node", str(SIZE_SCRIPT), str(p)], env=env, capture_output=True, text=True, timeout=60)
+        line = (r.stdout.strip().splitlines() or [""])[-1]
+        try:
+            res = json.loads(line)
+        except Exception:
+            res = {"ok": False, "msg": (r.stdout + r.stderr)[-300:]}
+        if res.get("ok"):
+            print("  OK  那堤三顆杯型、預設中杯、特大杯 $155、加料 $175、表單送 size=特大杯；單一規格不顯示杯型列與加料列、加料清掉；舊菜單 M／L；記住上次只在有同名杯型時帶入")
+        else:
+            problems.append(f"size：{res.get('msg')}")
+            print(f"  !   size：{res.get('msg')}")
         print("[前端] 公告（jsdom）")
         p = Path(td) / "ann.html"; p.write_text(ann_page[0], encoding="utf-8")
         r = subprocess.run(["node", str(ANN_SCRIPT), str(p), ann_page[1], ann_page[2]], env=env, capture_output=True, text=True, timeout=60)

@@ -55,6 +55,13 @@ def analyze_menu_content(content) -> dict:
                 warnings.append(f"{where}「{iname}」L 尺寸價（{item.price_l}）低於 M 尺寸價（{price}），請確認沒填反")
             elif item.price_l == price:
                 warnings.append(f"{where}「{iname}」L 尺寸價與 M 尺寸價相同（{price}），可考慮只填 price")
+        # V2.31.0：規格價格由小到大才合理；倒過來多半是填反或欄位錯位（只提醒）
+        _vs = getattr(item, "variants", None) or []
+        for a, b in zip(_vs, _vs[1:]):
+            if b.price < a.price:
+                warnings.append(f"{where}「{iname}」規格「{b.label}」（{b.price}）比「{a.label}」（{a.price}）便宜，請確認沒填反")
+        if any(v.price == 0 for v in _vs[1:]):
+            warnings.append(f"{where}「{iname}」有規格價格是 0——會當成免費")
         for opt in (item.options or []):
             if opt.price_diff is not None and opt.price_diff < 0:
                 warnings.append(f"{where}「{iname}」的選項「{opt.name}」價差為負（{opt.price_diff}），請確認是否為折扣")
@@ -101,6 +108,7 @@ def analyze_menu_content(content) -> dict:
 _FIELD = {
     "menu": "菜單", "categories": "分類", "items": "品項", "name": "名稱",
     "price": "價格", "price_l": "L 尺寸價格", "options": "選項", "price_diff": "價差",
+    "variants": "規格", "label": "規格名稱", "allow_toppings": "可加料",
     "store": "店家", "store_id": "店家編號", "category": "類別", "mode": "模式",
     "logo_url": "商標網址", "sugar_options": "甜度選項", "ice_options": "冰塊選項",
     "toppings": "加料", "phone": "電話", "address": "地址",
@@ -125,7 +133,7 @@ def describe_loc(loc: tuple, raw: dict) -> str:
             child = node.get(key) if isinstance(node, dict) else None
             if isinstance(nxt, int):
                 elem = child[nxt] if isinstance(child, list) and nxt < len(child) else None
-                nm = elem.get("name") if isinstance(elem, dict) else None
+                nm = (elem.get("name") or elem.get("label")) if isinstance(elem, dict) else None  # V2.31.0：規格用 label
                 parts.append(f"{label}[{nxt + 1}]" + (f"「{nm}」" if nm else ""))
                 node = elem
                 i += 2

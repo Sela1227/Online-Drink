@@ -1,7 +1,7 @@
 # CLAUDE.md — SELA 快點來點餐（線上訂餐）
 
 > **⚠ 給同時拿到 SELA-Starter-Kit 的 Claude：**
-> 這是**已對齊 Kit V1.36.0 的成熟線上專案**（30 人團隊每日使用），不是新專案。
+> 這是**已對齊 Kit V2.3.0 的成熟線上專案**（V2.30.0 落差對齊）（30 人團隊每日使用），不是新專案。
 >
 > 衝突仲裁規則：
 > 1. **以本專案 CLAUDE.md 為主、Kit 為輔**
@@ -13,8 +13,9 @@
 > 3. **不要為對齊 Kit 而動既有設計** — 已驗證的就是事實標準
 > 4. 版號規則照 Kit（部署版無後綴、備份版 -source）
 > 5. **下次完成版本時記得評估 SELA-handoff.md**（鐵律 #0 — 完整見 Kit master CLAUDE.md）
-> 6. **優化體檢**：V1.16.0 對照 4 條 OPT 無中招；V2.17.0 補看 V1.18→V1.36 新增的 OPT-5（雙版同構重構）／OPT-6（LLM 預填 `{`）——本專案沒有雙版、沒有呼叫 LLM，技術不適用。6 條中 6 條不適用或已等效，0 項可升級。
-> 7. **對齊歷程**：V1.0.0 首次對齊 Kit V1.9.0；V1.16.0 升級至 Kit V1.18.0；**V2.17.0 落差評估 Kit V1.18.0→V1.36.0（18 個 b 版，走 claude-init 二章「已對齊過但 Kit 跳版」）**——區間新坑逐條核對本專案：#61 UI 改名只改顯示文字（V2.17.0 用語統一照此做：`pending_count`／`DRAFT` 等變數不動）；#64/#65 測試 baseline（煙霧測試每版先跑原始檔）；#81 假完成訊號（jsdom 檢查「跳過」不算通過，已在 handoff 列為防線）；#86 外部輸入過 schema（匯入已走 Pydantic）；#88 舊網址永遠公開（V2.17.0 舊路由一律 302 轉址、不留裸頁）；#90 自我描述文案同步（**這次真正撿到的舊債**：README 還寫 `docs/` 有四份規範、版尾停在 V1.0.0／Kit V1.9.0，已修；自我描述清單＝README 功能段＋目錄樹＋版尾，升版 SOP 第 10 步）；#92 `async def` 裡同步 DB 呼叫——本專案全站如此（審核 P2-F3 已列），3 workers／30 人規模可承受，列為「不做，理由：改法是全站 `def` 或 threadpool，屬長工重構」。交付格式改用 Kit V1.36.0 的回報格式（✓ 已交付／技術棧／主要功能／下版第一優先／§3 鐵律逐條核對／handoff 評估）。
+> 6. **優化體檢**：V1.16.0 對照 4 條 OPT 無中招；V2.17.0 補看 OPT-5／OPT-6 當時不適用。**V2.30.0 重看**（V2.25.0 起有呼叫 LLM，OPT-6 變成技術相關）：**OPT-6「assistant 預填 `{`」刻意不做**——`claude-sonnet-5-5` 等 Claude 4.6 以後的模型會拒絕最後一則是 assistant 的請求（400），照做整個拍照轉換會壞；現有做法是 `extract_json_text()` 去圍籬＋匯入 Pydantic 驗證＋預覽，等效。OPT-4（生成後自我驗證）已等效（AI 結果照舊走自動檢查、`"?"` 擋下、人看預覽才確認）。OPT-3（outbox）不適用：AI 轉換與照片上傳都要同步拿結果。OPT-1／2／5 不適用。**6 條中 0 項可升級**，下次 Claude 不要「補上」預填。
+> 7. **對齊歷程**：V1.0.0 首次對齊 Kit V1.9.0；V1.16.0 升級至 Kit V1.18.0；**V2.17.0 落差評估 Kit V1.18.0→V1.36.0（18 個 b 版，走 claude-init 二章「已對齊過但 Kit 跳版」）**——區間新坑逐條核對本專案：#61 UI 改名只改顯示文字（V2.17.0 用語統一照此做：`pending_count`／`DRAFT` 等變數不動）；#64/#65 測試 baseline（煙霧測試每版先跑原始檔）；#81 假完成訊號（jsdom 檢查「跳過」不算通過，已在 handoff 列為防線）；#86 外部輸入過 schema（匯入已走 Pydantic）；#88 舊網址永遠公開（V2.17.0 舊路由一律 302 轉址、不留裸頁）；#90 自我描述文案同步（**這次真正撿到的舊債**：README 還寫 `docs/` 有四份規範、版尾停在 V1.0.0／Kit V1.9.0，已修；自我描述清單＝README 功能段＋目錄樹＋版尾，升版 SOP 第 10 步）；#92 `async def` 裡同步 DB 呼叫——本專案全站如此（審核 P2-F3 已列），3 workers／30 人規模可承受，列為「不做，理由：改法是全站 `def` 或 threadpool，屬長工重構」。交付格式改用 Kit V1.36.0 的回報格式（✓ 已交付／技術棧／主要功能／下版第一優先／§3 鐵律逐條核對／handoff 評估）。**V2.30.0 落差評估 Kit V1.36.0→V2.3.0**：區間新坑 #93～#112 逐條核對——**#108**（相容轉址用 302）中了兩處 301（`/admin/stores/{id}/edit`、`/menus`），已改 302；**#111**（模型 ID 會過期）已集中在 `config.anthropic_model`（可用 Railway `ANTHROPIC_MODEL` 換），補坑 #52 記查證日；#112（非同步回應寫回時對象已換人）——匯入預覽有 `src_digest` 核對（坑 #41）、AI 結果只填輸入框還要人確認，等效；#95（SPA 換頁回頂）、#105（狀態 class 撞名）——SSR 多頁＋Tailwind 工具類，不適用；#93／#94／#96～#104／#106／#107／#109／#110 是 Cloudflare、外掛化、爬蟲、Web Push 情境，不適用。新鐵律「版號在 logo／app 名稱旁」→ Sela 選加回頁首小字（V2.17.0 曾拿掉）；「直接部署的專案要同步本機 source」→ 本專案走 Git Pusher→GitHub→Railway，不適用。營運 log 用 `print`（Deploy Logs 直接看、9 處都是刻意的上線紀錄）→ 不改，不算 debug print。
+> 8. **英文程式名** = Online-Drink、中文俗稱 = 快點來點餐；app logo = ORDER 奶茶版（V1.20.1，`SELA-logo-prompt.md`）；品牌仍算 SELA 個人專案（未交醫院 IT）。
 
 > **這份文件是給下次 Claude 看的工作上下文，不是文件。**
 > 判斷標準：下次 Claude 讀完，能不能直接動手？
@@ -25,7 +26,7 @@
 
 ## 〇、當前狀態
 
-- **版本：** V2.29.0（刪除店家改確認框〔不用再輸入店名〕；外部審稿 V2.28.0：工作台直接改價〔存成新版本〕、摘要只留三顆、切分頁保留網址 #欄位、存檔回到卡片並寫已儲存、改了沒存就離開會提醒、手機店家列表加「菜單」鈕、問題數跟著分類搜尋算。前一版 V2.28.1：PWA 名稱改「快點來點餐」；Railway develop 環境移除〔待 Sela 在網頁按套用〕。前一版 V2.28.0：內部審核 V2.27.0 全部處理：回報頁可複製並分待處理／已處理、清除測試團改「沒有已送出訂單」並以畫面清單為準、推薦改「建立店家與菜單」確認時才建店、公告原地展開編輯、拿掉訪客／重複用戶診斷／部門小組長／分店編輯、團單頁預設近 14 天、長度與部門驗證。前一版 V2.27.0：外部 UI 審稿：後台首頁改待處理／常用／管理、店家列表拿掉巢狀連結、清除測試團移到維護區並先列清單、工作台加可點摘要。前一版 V2.26.0：版本號改單一來源 app/version.py；店家縣市＋「我會訂的縣市」篩選；排序加「最新加入」。前一版 V2.25.0：新推薦提醒：管理員首頁卡＋「我的」紅點；站內拍照轉成菜單〔Claude API，只有 ADMIN_LINE_USER_ID 能用〕；新增店家一律走匯入。前一版 V2.24.0：匯入時一併建立照片上的店家電話與地址；既有店家只補空白、不覆蓋。前一版 V2.23.2：外部審核修正：我的訂單可見性、跨站寫入檢查、同名店家排除代購店、候補順位鎖＋唯一約束、遷移錯誤不啟動、PostgreSQL 並行測試腳本。前一版 V2.23.1：LINE 登入迴圈）
+- **版本：** V2.31.0（杯型規格 variants：品項可有任意個規格〔中杯／大杯／特大杯、Solo／Doppio、L杯／瓶裝〕、標籤照菜單；舊菜單維持 M／L；品項可設不提供加料；與 V2.30.1 一起上線。前一版 V2.30.1：菜單匯入回饋 2026-11-04 小修：改價模式列出加價選項、AI 指令補「只有大杯」、坑 #9 改寫。下一版 V2.31.0 杯型規格〔variants〕重構，見第七章。前一版 V2.30.0：對齊 SELA Kit V2.3.0：頁首 app 名稱旁加回版號、相容轉址 301→302〔Kit 坑 #108〕、AI 模型 ID 查證〔坑 #52〕、Kit 反饋 handoff。前一版 V2.29.0：刪除店家改確認框〔不用再輸入店名〕；外部審稿 V2.28.0：工作台直接改價〔存成新版本〕、摘要只留三顆、切分頁保留網址 #欄位、存檔回到卡片並寫已儲存、改了沒存就離開會提醒、手機店家列表加「菜單」鈕、問題數跟著分類搜尋算。前一版 V2.28.1：PWA 名稱改「快點來點餐」；Railway develop 環境移除〔待 Sela 在網頁按套用〕。前一版 V2.28.0：內部審核 V2.27.0 全部處理：回報頁可複製並分待處理／已處理、清除測試團改「沒有已送出訂單」並以畫面清單為準、推薦改「建立店家與菜單」確認時才建店、公告原地展開編輯、拿掉訪客／重複用戶診斷／部門小組長／分店編輯、團單頁預設近 14 天、長度與部門驗證。前一版 V2.27.0：外部 UI 審稿：後台首頁改待處理／常用／管理、店家列表拿掉巢狀連結、清除測試團移到維護區並先列清單、工作台加可點摘要。前一版 V2.26.0：版本號改單一來源 app/version.py；店家縣市＋「我會訂的縣市」篩選；排序加「最新加入」。前一版 V2.25.0：新推薦提醒：管理員首頁卡＋「我的」紅點；站內拍照轉成菜單〔Claude API，只有 ADMIN_LINE_USER_ID 能用〕；新增店家一律走匯入。前一版 V2.24.0：匯入時一併建立照片上的店家電話與地址；既有店家只補空白、不覆蓋。前一版 V2.23.2：外部審核修正：我的訂單可見性、跨站寫入檢查、同名店家排除代購店、候補順位鎖＋唯一約束、遷移錯誤不啟動、PostgreSQL 並行測試腳本。前一版 V2.23.1：LINE 登入迴圈）
 - **狀態：** 上線中（30 人團隊每日使用）
 - **線上網址：** https://online-drink-production.up.railway.app
 - **一句話定位：** LINE Login 認證的團體飲料／餐點/團購訂餐系統，給彰濱秀傳特定團隊每日揪團用。
@@ -137,10 +138,9 @@
    - 原因：曾從 `sqlalchemy.ext` 誤匯入，正確是 `sqlalchemy.orm`
    - 做法：`from sqlalchemy.orm import joinedload`
 
-9. **菜單分類目前不支援 `group_buy`**
-   - 症狀：JSON 匯入時 `Input should be 'drink' or 'meal'`
-   - 原因：Pydantic schema 還沒開放 `group_buy` 給匯入端點
-   - 做法：團購店家先用 `meal` 匯入，再到後台手動改 category；下版可考慮放開
+9. **~~菜單分類不支援 `group_buy`~~（V1.10.2 已解；V2.30.1 依菜單匯入回饋改寫，避免下次 Claude 照舊條目叫人先用 meal 匯入）**
+   - 當時症狀：JSON 匯入 `Input should be 'drink' or 'meal'`；原因是 `StoreImport.category` 的 Literal 漏了 `group_buy`
+   - 現況：三種分類都能直接匯入，`group_buy` 不用再繞 meal（煙霧第 45 節守這行不再寫成現況）
 
 10. **`requirements.txt` 浮動版本造成 Starlette 新版破壞 API**（⚠ **強烈建議回流 Kit**）
     - 症狀：2026-05-28 Railway 自行 rebuild 時，所有 HTTP 請求 500；log 顯示 `TypeError: unhashable type: 'dict'`，發生在 jinja2 `_load_template`，呼叫處是 `templates.TemplateResponse("login.html", {"request": request})`
@@ -464,6 +464,18 @@
     - 做法：使用者文字一律放 `data-*`（`data-copy="{{ ... }}"`），JS 讀 `$root.dataset.copy`／`this.dataset.x`。`check_template_js.py` 新增 `check_backtick()`：依序配對反引號（先把 Markdown 的 ``` 換掉，略過 Jinja 註解），反引號字串內出現 `{{` 就紅
     - 第一版用正則 `` `[^`]*\{\{[^`]*` `` 會跨段配對（前一段的結尾反引號配到下一段的開頭），在 group.html 誤報；改成依序配對才準
 
+52. **呼叫 LLM 的模型 ID 會過期；「預填 `{`」在新模型會 400**（V2.30.0 對齊 Kit 坑 #111／OPT-6 時查證）
+    - 症狀（別的專案踩過）：模型退役後 API 回 `model not found`，程式沒動過、沒有任何建置期警告；照 Kit OPT-6 在請求最後加 assistant `{` 預填，Claude 4.6 以後的模型直接 400（`does not support assistant message prefill`）
+    - 本專案現況：模型 ID 只在 `app/config.py::anthropic_model`（預設 `claude-sonnet-5-5`，Railway `ANTHROPIC_MODEL` 可覆蓋）；`ai_menu.py` 不寫死（煙霧第 44 節守）；不用預填，靠 `extract_json_text()`＋Pydantic 驗證＋預覽
+    - **查證紀錄**：2026-11-02 Anthropic 模型淘汰頁——`claude-sonnet-5-5` Active，最早 2027-09-28 退役（同頁 `claude-sonnet-4-5-20250929` 2026-11-30 退役）。預填限制出自第三方整理文（官方頁未逐條列），標「待官方確認」
+    - 做法：**升版 SOP 第 13 步每次查淘汰頁並更新這行日期**；查不到第一手證據的寫「未確認」，不寫「仍可用」
+
+53. **規格標籤由菜單決定之後，所有「size == 'L'」的寫法都要改查規格清單**（V2.31.0）
+    - 症狀（改之前盤點出來的）：計價、複製上次訂單、改價、菜單呈現、差異比對、匯入預覽各自寫死 M／L；只改其中幾處，特大杯會被當成 M 價、跨版本複製會把 Doppio 記成 L
+    - 做法：規格一律走 `app/services/variants.py`（`item_choices`／`resolve`／`carry_over`）或 `item.size_choices`／Jinja `size_choices()`；**不要再新增讀 `price_l` 的程式**（只有 variants.py 與匯入相容層可以）。`grep -rn "price_l" app` 只該剩 schema、匯入、variants.py、遷移、`_menu_to_import_json`
+    - 新增指向 `menu_items` 的表（這次的 `menu_item_variants`）要回頭改刪店家流程——煙霧第 7 節會紅（坑 #6 系列）
+    - `order_items.size` 是規格標籤字串，長度 30；舊訂單仍是 M／L，統計與核對單照字串分組即可
+
 ---
 
 ## 五、煙霧測試（可貼上執行）
@@ -502,6 +514,9 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 | 版本 | 重點 |
 |------|------|
+| V2.31.0 | **杯型規格（variants）＋品項不提供加料（Sela：「配合星巴克的改版，改完再一次上線」；畫面稿選 1A 每個杯型一行、舊菜單維持 M／L）**。來源：菜單匯入回饋 2026-11-04 第二節（Project 文件 `claude/SELA-菜單匯入待辦-杯型規格.md`），`MenuItem` 只有 `price`／`price_l` 裝不下星巴克三杯型、Solo／Doppio、麻古 L杯／瓶裝、UG 只有大杯。**資料**：新表 `menu_item_variants(menu_item_id, label VARCHAR(30), price, sort_order)`（create_all 建）；`menu_items.allow_toppings BOOLEAN DEFAULT TRUE`；`order_items.size`／`order_item_backups.size` VARCHAR(10)→(30)（遷移新增 WIDEN 步驟，PostgreSQL 加寬 varchar 只改目錄不重寫表）。**不變式**：有 variants 的品項 `price`＝第一個規格、`price_l`＝NULL——只讀 price 的地方（時價、統計、最低價）不用改。**單一來源** `app/services/variants.py`：`choices_from`／`item_choices`（有列→照列；舊菜單 price_l→`[("M",p),("L",pl)]`；單一價→`[(None,p)]`）、`resolve`（點餐：標籤要屬於品項，單一規格自動帶標籤，核對單印得出「大杯」）、`carry_over`（複製上次訂單跨版本：同名沿用、找不到退第一個，價格一律新版本）；`MenuItem.size_choices`、Jinja `size_choices()`（ORM 與匯入預覽的 Pydantic 都吃）。**匯入**：`variants: [{label, price}]`（價格容錯、`?` 進看不清紅卡且位置寫出規格名、重複標籤／空標籤／時價＋variants 擋下、規格價由小到大不符只提醒）、`allow_toppings`；舊 `price`／`price_l` 照收。差異比對改比 `sizes`（舊價格文字從「$30/$35」變「M $30／L $35」）、加料開關變更列在說明。**AI 指令**改教 variants（V2.30.1 的「note 註明僅大杯」過渡寫法改成單一元素 variants）。**點餐**：彈窗杯型列依規格數動態產生（`x-for`，只有一種不顯示）、主鈕金額看選中的規格、記住上次只在有同名規格時帶入、換品項清掉加料勾選；不加料品項整列加料不出現、後端也擋（400）。**菜單**：多規格每個一行（Sela 選 1A），單一規格寫「大杯 $45」。**工作台改價**：每個規格一格（標籤照菜單），送 `prices` 陣列（舊頁面的 price／price_l 也收），規格數不符 400；存新版本時規格標籤與不加料照抄；**行為改變**：V2.29.0 可以清空 L 價來拿掉大杯，現在不行（要改規格數走「更新菜單」）。刪店家多刪 `menu_item_variants`（煙霧第 7 節外鍵檢查當場抓到）。**實測**：本機 PostgreSQL 16 用 V2.30.1 建庫塞舊菜單與 L 訂單 → V2.31.0 遷移變更 3 項（加欄位＋兩欄加寬）、再跑 0 項、舊品項 allow_toppings=true、舊訂單 L 不變、長標籤「盒裝分享號（3-4 人份）」寫得進去；並行 A～E 通過。真瀏覽器截圖（本機編 Tailwind）看過四個畫面，修了「特大杯 $155」按鈕換行。**測試**：煙霧 240 → **248 項**（第 46 節＝回饋驗收八條：匯入、預覽、團頁、點餐計價、核對單依規格彙總、複製跨版本、改價保留規格、刪店；第 1 節「XL 尺寸」改成「超長標籤」、第 43 節改價改成 prices 陣列與規格數不符擋下）；新 jsdom `jsdom_size_check.js`（十支）。**改壞驗證十三處都會紅**：計價不看規格／複製不沿用規格／不加料不擋／改價丟規格／刪店不刪規格／差異只比第一價／單一規格不寫標籤／price 不同步第一規格／單一規格也顯示杯型列／不加料仍顯示加料／換品項不清加料／主鈕不看規格價／改價只送第一格。WIDEN 只在 PostgreSQL 生效，SQLite 煙霧測不到，靠上面的 PG 遷移實測。路由不變（133）。 |
+| V2.30.1 | **菜單匯入回饋 2026-11-04 小修（Sela：「先小版再大版」）**。回饋來源：菜單數位化 Project 兩個月轉檔十餘家店，Project 文件 `claude/SELA-菜單匯入待辦-杯型規格.md`。**逐條對 V2.30.0 程式碼查證屬實**：(1) 工作台「改價格」模式只畫 M／L 輸入框、看不到加價選項（一般菜單檢視看得到）——星巴克用「大杯升級特大杯 +15」頂特大杯，管理者在改價畫面以為特大杯沒匯進去；(2) AI 指令第 7 條只教「中杯放 price」，只有大杯的店會被當成 M；(3) 坑 #9「group_buy 不支援」V1.10.2 已解但條目還寫成現況。**改動**：(1) 改價模式每個品項品名下一行小字列「+ 名稱 +價差、…」（Sela 看三張畫面稿選 A；後端 `price_items` 多 `opts` 字串、模板 `x-text`，不碰 innerHTML）；(2) AI 指令補「若菜單只有大杯一種杯型，price 填該價、price_l 填 null，並在 note 註明『僅大杯』」——variants 做好前至少資訊不遺失；(3) 坑 #9 改寫成已解（編號不重排）。不動資料表、路由不變（133）。**測試**：煙霧第 45 節 239 → **240 項**；jsdom 改價檢查加「紅茶品名下有 `+ 大杯升級特大杯 +15、去冰`、綠茶沒有選項行」。 |
+| V2.30.0 | **對齊 SELA Kit V1.36.0 → V2.3.0（落差評估；Sela：「對齊 SELA 開發專案」）**。走 sela-align-project 落差情境：區間新坑 #93～#112 逐條核對、優化體檢重看、需 Sela 決策的新規範用選擇題問、再把專案當第一次看跑一次鐵律。結論寫在開頭仲裁區塊第 6～8 點。**改動**：(1) 新鐵律「版號在 logo／app 名稱旁」→ 頁首「快點來點餐」旁加 10px 小字 `#app-version`（Sela 選；V2.17.0 頁首只留 logo 時拿掉過，「我的」頁底保留）。(2) Kit 坑 #108：`/admin/stores/{id}/edit`、`/menus` 兩處 301 改 302（301 會被瀏覽器永久記住，以後要改轉址目標就改不動）。(3) Kit 坑 #111：模型 ID 本來就只在 `config.anthropic_model`；**2026-11-02 查 Anthropic 模型淘汰頁：`claude-sonnet-5-5` Active，最早 2027-09-28 才退役**，記成坑 #52 並把「查淘汰頁」加進升版 SOP 第 13 步。(4) OPT-6 刻意不做（新模型拒絕 prefill，見仲裁區塊第 6 點）。(5) `SELA-handoff.md`（Kit 反饋檔）改用 Kit V2.3.0 範本重寫（舊的 V1.0.0／V1.16.0 內容 Kit 已整合）：建議 Kit 改 railway.md（Config as Code 2026-12-01 停讀）、OPT-6 取捨補「Claude 4.6 起拒絕 prefill」、坑 #1／#18／#78 補強、LINE 回呼重複、危險操作取交集；第五節列業務規則不回流（Sela 確認分類）。路由不變（133）。**測試**：煙霧第 44 節 238 → **239 項**（頁首有版號、轉址沒有 301、ai_menu 沒寫死模型 ID），第 9 節兩條轉址斷言 301→302。 |
 | V2.29.0 | **刪除店家改確認框＋外部審稿《V2.28.0 管理介面與流程》**（Sela：「刪除店家的步驟太麻煩了，頂多二次確認就很多了」→ 選 A 確認框；審稿小問題「全部一起修」；大建議 P1-B／P2-B／P2-C 都做、同頁改價選 A；畫面稿 d1／d2／d3 先給看過）。**逐條查證**：P1-A（`$watch` 用 `replaceState(?tab=)` 洗掉 #欄位）、P1-C（`issueCount` 只看停用）、P2-A（手機 `hidden sm:inline-flex`）、P3 三項（膠囊 34px、Logo 連結 `tabindex=-1` 仍可點、問題標記不清）屬實；P2-D 部分屬實（存檔回 `?tab=settings` 但沒錨點、沒「已儲存」；甜冰加料本來就有）；P1-B／P2-B／P2-C 是設計建議。**(1) 刪除店家**：「停用／刪除」分頁一顆「刪除這家店」→ 確認框（菜單版本數、歷史團數、**進行中的團**紅字、「只是暫時不用可以改停用」）→「確定刪除」；後端 `confirm_name` 改成 `confirm=yes`（不帶仍 400）。**(2) P1-B 工作台直接改價**：頂部「改幾個價格」（進匯入頁改文字資料）→「改價格」按鈕，菜單分頁變成每項 M／L 輸入框＋搜尋，改過的變色，底部釘「改了 N 項＋摘要｜取消｜存成第 N 版」；`?edit=price` 進頁直接改價（店家列表「菜單」用）。後端 `POST /admin/stores/{id}/menu/prices`（`base_menu_id`＋`changes_json`）：鎖店家列、版本不符 409、時價／非數字／負數／不在菜單 400、沒變更 400；`_menu_to_import_json(menu, overrides)` 照抄使用中版本只換價（清空 L＝拿掉大杯價），走 `MenuImport`＋`import_menu` 存新版本——**進行中的團釘著舊 menu_id 不受影響**；完成提示「已改 N 項價格…進行中的團照舊用原本的價格」、log 記誰改了幾項。**(3) P2-B** 摘要只留縣市／分店／可見範圍三顆、44px。**(4) P1-A** `url(t, anchor)`：摘要跳轉寫 `?tab=settings#store-city`，點分頁鈕拿掉 #，順手清掉 saved／imported 等一次性參數；同分頁跳別的欄位也更新 #（第一版漏了，jsdom 抓到）。**(5) P2-D** 基本資料／分店（新增・刪除・停用）／可見範圍存檔導回 `&saved=…#卡片`，卡片頂端「已儲存」。**(6) P2-C** 工作台表單（`data-track`）有輸入就記 `unsaved`，`beforeunload` 提醒；送出時（沒被取消）不提醒。**(7) 店家列表** 每列「菜單」（有菜單→`?tab=menu&edit=price`、沒菜單→匯入）手機也有；Logo 改成裝飾 `div`；`matchBase()` 讓問題數跟著分類／搜尋／停用一起算；`x-effect` 問題歸零就清掉標記。路由 132 → **133**。**測試**：煙霧第 43 節 235 → **238 項**（第 2、9、16、32、40 節改確認框／改價格／三顆摘要／錨點導回）；jsdom：工作台加網址錨點、刪除確認框、離開提醒；新增 `jsdom_price_check.js`（改價模式、變色、送出 JSON、非數字、時價、搜尋、取消還原）；admin 模式加問題數跟搜尋、歸零清標記；改壞十處都會紅。 |
 | V2.28.1 | **PWA 名稱＋develop 環境移除**（Sela 選「快點來點餐」、「不需要 develop 了 → 幫我刪掉」）。**(1) PWA**：手機「加到主畫面」顯示「SELA」——Android／Chrome 讀 `site.webmanifest` 的 `short_name`（寫死 SELA），iPhone 不讀 manifest、讀 `apple-mobile-web-app-title`（沒寫就用當頁 `<title>`，各頁不同）。manifest `name`／`short_name` 改「快點來點餐」、補 `start_url: /home`（原本沒寫，從哪頁加就開哪頁）、`scope`、`lang`；`theme_color` 從 #C9A977 改 #E8D9C0，跟 base.html 的 theme-color 與頁首底色一致；base.html 加 `apple-mobile-web-app-title`、`application-name`。**已加到主畫面的要刪掉重加才會變**（系統快取安裝當下的名稱）。煙霧第 42 節 234 → **235 項**（改壞驗證：manifest 改回 SELA 會紅）。**(2) develop 環境**：Railway「線上點餐系統」的 develop 環境（Online-Drink develop 分支、Postgres＋磁碟，最後部署 2026-02-21）——**跟 production 共用同一組 service／volume id**，所以每一步都帶 `environmentId=develop` 並先 staged、讀回 develop 的待套用清單（只有那三項）與 production（無待套用）再 commit。commit 被 Railway 擋：刪除要兩步驟驗證，API token 做不到——**待 Sela 到 Railway 網頁 develop 環境按套用，或直接 Settings 刪整個環境**。production 讀回正常（online、0 issue）。路由不變（132）。 |
 | V2.28.0 | **內部審核《Online-Drink V2.27.0 內部審核》全部處理**（Sela：「一次全做」；測試團定義選「沒有任何已送出訂單」、分店選「拿掉編輯，刪掉重加」、畫面稿選「照畫面稿做」）。**逐條查證全部屬實**。**P0-1** 回報頁「複製」把回報內容插進 JS 反引號字串（任何團員都能寫）→ 內容放 `data-copy`、讀 `$root.dataset.copy`；`check_template_js` 加反引號規則（坑 #51）；回報頁分「待處理（N）」與收合的「已處理（最近 50 筆）」。**P1-1** 清除測試團：定義改「已截止且沒有任何已送出（含修改中）訂單」（原本「只有團主下單」會刪掉團主替大家代點的真單）；表單帶畫面清單的 `ids`，後端只刪 `ids ∩ 候選`，沒帶 ids 一團都不刪（原本按下去刪的是「按下那一刻」的候選，可能比畫面多）；列標記改用同一份清單。**P1-3** 店家列表「只看沒菜單／未設縣市」不再記 sessionStorage（補完菜單回來列表變空），`activeIssue` 數量 0 就自動失效。**B-4 推薦**：「核准並建立店家」→「建立店家與菜單」，只帶 `rec_id` 進匯入頁（店名類別帶入、Sela 自動拍照轉換），**確認匯入成功時才建店並標核准**（`_mark_recommendation_approved`：鎖推薦列、只處理 pending、補 website_url）——原本一按就建空殼店，匯入沒做完就留一家沒菜單的店；已處理的推薦再進來轉走；「稍後再匯入」→「稍後再說」。**B-1 公告**：一份清單點一下原地展開編輯（顯示在首頁／置頂是兩個開關、標題 100／內容 500 字＋字數提示、到期），過期寫「已過期」（原本過期仍寫顯示中）；`announcement_edit.html` 刪除、`GET /{id}/edit` 302 回 `?open=id`；toggle／pin／unpin 三支路由拿掉。**A-1** 訪客全套（V1.19.2 起回 410 的三支路由、`guest_entry.html`、`GUEST_MODE_ENABLED`）與重複用戶診斷／清理訪客拿掉；`GET /groups/{id}/guest` 302 到團頁、`/admin/users-duplicates` 302 到人員頁（坑 #88）。**A-2** 部門「小組長」拿掉（角色選單、升降鈕、toggle-role 路由、計數、我的部門標籤、`is_leader_of`／`leader_count`）；`role` 欄位與 enum 保留，新成員一律 MEMBER。**A-3** 分店編輯路由（無入口）拿掉。**A-4** 沒人 import 的 `app/models/feedback.py` 刪除。**B-2 人員頁**：「登出所有人」從頁首紅框移到最下面 `#maintenance`，寫出「現在有 N 人在線，正在點餐的會被打斷」並在確認框帶人數、拿掉 token 版本；列表拿掉「設為管理員」（個人頁仍可改）。**B-5** 後台首頁沒有待處理時「推薦紀錄」「問題回報」合成一列「推薦與回報紀錄」。**C-1** 團單頁預設只列近 14 天建立或還沒截止的團，`?all=1` 看全部。**P2-1** 長度驗證改 `clean_text`：部門名稱 100／說明 500、分店名 100／電話 50／地址 200、推薦店名 100／連結與備註 500（**上傳照片前**先擋）、暱稱 100、不收原因 200，表單補 maxlength。**P2-2** 店家可見範圍走 `parse_department_ids`，限定部門卻沒勾 400「請至少勾一個部門，或改成公開」（原本存成非公開零部門），亂填編號 400 且不改到一半。**P2-4** 移除部門成員多比對 `department_id`（原本換別的部門網址也刪得到）；加成員先確認人存在且不是訪客。**P2-5** 人員頁訂單數改 GROUP BY、團單頁 joinedload／selectinload。**P2-7** 開團頁與複製開團改用 `visible_stores_for`（複製開團原本不看部門、列出所有店）；`visible_stores_for` 對非管理員排除沒有使用中菜單的店（店家頁、開團、縣市計數一起）。**P3** 首頁店家數只算啟用的；工作台沒菜單提示改「按上方」；餐廳摘要只寫加料。路由 140 → **132**。**測試**：煙霧第 41 節 223 → **234 項**（第 26、38、40 節改新推薦流程與 ids）；jsdom：ai 模式改 rec_id（店名帶入、表單有 rec_id）、admin 模式預放舊 sessionStorage 篩選驗證不沿用、新增 `jsdom_announcements_check.js`（?open 展開、切換、新增區、字數）；PostgreSQL 並行加 **E 項**（同一推薦同時確認兩次 → 只建 1 家、推薦核准，5 輪全過）；pip-audit 0 條；改壞八處都會紅（見 handoff）。 |
@@ -615,6 +630,8 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 七、下版候選工作（按優先序）
 
+> **V2.31.0 杯型規格（variants）——已完成**（見版本歷程）。**後續候選**（來源 Project 文件 `claude/SELA-菜單匯入待辦-杯型規格.md`）：3-1 區間價（`price_min`／`price_max`，比照時價由團主定價）、3-3 `store.currency`（只顯示不換匯）；工作台「改價格」目前只能改價、不能增減規格（增減走「更新菜單」），若常用再加。
+
 > **V2.28.0 內部審核延伸（未做）**：部門 `role` 欄位與 `DeptRole.LEADER` 值仍在資料表（畫面不用了，要真的刪得動 enum，坑 #2，不划算）；`SystemSetting.token_version` 仍在用（登出所有人靠它），只是畫面不顯示；~~PWA 名稱~~（✅ V2.28.1 改「快點來點餐」）；Railway develop 環境的刪除已 staged，待 Sela 在網頁套用（API 不能過兩步驟驗證）。
 > **V2.27.0 外部 UI 審稿未做**：首頁頂部跨類別搜尋（沒有 API，審稿也說可延後）；桌機左側導覽；後台其他頁（人員、部門、公告、回報、匯入頁）的字級與點擊範圍統一（這版只做首頁、店家列表、團單、工作台）；成功／錯誤訊息逐一寫明作用對象。
 > **V2.26.0 延伸（未做）**：後台店家列表加縣市篩選（目前只顯示＋可搜尋）；首頁「今天」的開放中團不依縣市篩（團是人開的，不是店）。
@@ -656,7 +673,7 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 ### 版本號管理（V2.26.0 起改單一來源）
 
 - 版本號定義在 **`app/version.py` 的 `APP_VERSION`**（V2.26.0 前寫死在 `base.html`，V2.24／V2.25 都忘了改，坑 #47）
-- 顯示在「我的」頁最下面；啟動 log 印「SELA 快點來點餐 VX.Y.Z 啟動完成」——Sela 靠這兩處確認部署成功
+- 顯示在頁首 app 名稱旁（V2.30.0 對齊 Kit 鐵律加回）與「我的」頁最下面；啟動 log 印「SELA 快點來點餐 VX.Y.Z 啟動完成」——Sela 靠這幾處確認部署成功
 - 煙霧第 39 節核對 CLAUDE.md 狀態行、README 版尾、handoff「目前版本」跟它一致，漏改就紅
 - **升版 SOP：**
   1. 改 `app/version.py` 的 `APP_VERSION`（**取代**舊的「改 base.html」）
@@ -679,6 +696,8 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
      - 這四份背景 md **不再放在 zip 的 `docs/`**（V2.16.1 移除，避免兩邊漂移）；zip 裡只留 CLAUDE.md 與 handoff。
   12. **動到庫存、候補、登入、遷移時跑 `scripts/pg_concurrency_check.py`**（V2.23.2 起；需要拋棄式 PostgreSQL：`PG_TEST_URL=postgresql://…/xxx_check`，名稱要含 test／check）。本機沙盒有 `/usr/lib/postgresql/16/bin`，用非 root 帳號 `initdb` 起一個即可（見 handoff）
   11. **跑 `pip-audit -r requirements.txt`**（V2.22.0 起；要網路，會查 PyPI 的漏洞資料庫）。有新漏洞且有修正版就升到修正版並全跑一次；沒有修正版的寫進交班文件說明為什麼不影響本專案。動到 requirements 後也要看 `check_routes.py` 數到的條數還對不對（坑 #43）
+  13. **查 Anthropic 模型淘汰頁**（V2.30.0 起，Kit 坑 #111）：platform.claude.com/docs/en/about-claude/model-deprecations，確認 `config.anthropic_model` 還是 Active，並更新坑 #52 的查證日期；快退役就改預設值並提醒 Sela 改 Railway `ANTHROPIC_MODEL`
+  14. **完成版本評估 `SELA-handoff.md`**（Kit 反饋檔，Kit 鐵律 #0）：達標（≥3 條坑／≥2 條選型決策／距上次 ≥5 版／對齊 Kit）就照 Kit 範本只寫本次新增；連著 Sela 的 Mac 時另存 `~/Downloads/Kit反饋/Online-Drink VX.Y.Z-handoff.md`
   10. **自我描述文案同步**（Kit 坑 #90，V2.17.0 起）：README 的「主要功能」「專案結構」目錄樹、版尾「Made by … 對齊 Kit Vx」、本檔第三章路徑表——動到導航／頁面／目錄就一併改。V2.17.0 對齊時發現 README 版尾停在 V1.0.0、`docs/` 說明是 V2.16.1 之前的，沒有任何測試抓得到這種腐化。
 - 未來若要做 `/version` API endpoint，把 `APP_VERSION` 移到 `app/config.py` 並用 context_processor 注入 templates
 
@@ -705,4 +724,4 @@ grep -E "^[a-zA-Z].*>=" requirements.txt && echo "❌ 有 >= 沒鎖版本！" ||
 
 ## 九、一句話總結
 
-V1.0.0~V1.5.0 完成了從「對齊 Kit」到「全站 emoji 北歐風 Tabler 化」的完整視覺升級，途中救了多個生產 bug（Starlette 版本破壞、CDN URL 錯誤、登入路由前後端兩面、底部導航對齊與 active）。**全站零裝飾 emoji 達成**，標題列有版本號可即時辨識運行版本。下一步建議轉向功能性 backlog（#1 TemplateResponse 新 API 最優先，解除版本鎖）。
+V2.x 把一個 30 人每天在用的訂餐站從「功能堆疊」整理成「物件各歸其頁」（V2.17～V2.21 IA 與團頁重排），再用四輪內外部審核把可提權的 XSS、超賣、時區、並行與遷移風險一條條補上，並為每一類建了會紅的檢查（煙霧 248 項、十支 jsdom、PostgreSQL 並行 A～E）。V2.30.0 對齊 Kit V2.3.0；V2.31.0 把「兩個價格欄位」換成照菜單的規格（variants）。下一步沒有排定的大包，候選在第七章。

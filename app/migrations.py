@@ -26,7 +26,7 @@ LOCK_WAIT_SECONDS = 120
 
 # (資料表, 欄位, 型別) —— 依加入的版本順序；新欄位加在最後
 COLUMNS = [
-    ("order_items", "size", "VARCHAR(10)"),
+    ("order_items", "size", "VARCHAR(30)"),
     ("order_items", "created_at", "TIMESTAMP DEFAULT NOW()"),
     ("orders", "discount_amount", "NUMERIC(10,2) DEFAULT 0"),
     ("orders", "discount_note", "VARCHAR(100)"),
@@ -81,6 +81,14 @@ COLUMNS = [
     ("system_settings", "announcement", "VARCHAR(500)"),
     ("stores", "city", "VARCHAR(10)"),   # V2.26.0
     ("users", "cities", "TEXT"),         # V2.26.0
+    ("menu_items", "allow_toppings", "BOOLEAN DEFAULT TRUE"),  # V2.31.0
+]
+
+# V2.31.0：規格標籤變長（「盒裝分享號」「特大杯」），原本 VARCHAR(10)。
+# PostgreSQL 加寬 varchar 只改目錄、不重寫資料表；SQLite 不檢查長度，略過
+WIDEN = [
+    ("order_items", "size", 30),
+    ("order_item_backups", "size", 30),
 ]
 
 # V1.10.0：刪店家改成斷開連結保留歷史，這些外鍵要可為 NULL
@@ -199,6 +207,22 @@ def run_migrations(engine, log=print) -> _Result:
             except Exception as e:
                 r.errors.append(f"{table}.{column} nullable：{e}")
                 log(f"!! {table}.{column} 改可空失敗：{e}")
+
+        # 2b. 欄位加寬（V2.31.0）
+        for table, column, length in WIDEN:
+            info = columns(table).get(column)
+            cur = getattr(info.get("type"), "length", None) if info else None
+            if info is None or not pg or cur is None or cur >= length:
+                r.ok += 1
+                continue
+            try:
+                _ddl(engine, f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR({length})")
+                col_cache.pop(table, None)
+                r.changed.append(f"{table}.{column} VARCHAR({length})")
+                log(f"Widened column: {table}.{column} VARCHAR({cur}) -> VARCHAR({length})")
+            except Exception as e:
+                r.errors.append(f"{table}.{column} 加寬：{e}")
+                log(f"!! {table}.{column} 加寬失敗：{e}")
 
         def indexes(table):
             if table not in tables:

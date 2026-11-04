@@ -10,7 +10,8 @@
             description: {{ (item.description or "") | tojson }},
             price: {{ item.price }},
             tbd: {{ "true" if item.price_tbd else "false" }},
-            price_l: {{ item.price_l if item.price_l else "null" }},
+            sizes: [{% for lb, p in item.size_choices %}{ label: {{ (lb or "") | tojson }}, price: {{ p }} }{% if not loop.last %},{% endif %}{% endfor %}],
+            no_top: {{ "true" if item.allow_toppings is sameas false else "false" }},
             remaining: {{ rem if rem is not none else "null" }},
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
         })'{% else %}disabled{% endif %}

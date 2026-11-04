@@ -56,6 +56,8 @@ class MenuItem(Base):
     stock_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 數量上限（NULL=不限，已送出佔用）
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)  # 上/下架
     price_tbd: Mapped[bool] = mapped_column(Boolean, default=False)  # 價格未訂（V2.9.0 代購：定價後回寫訂單）
+    # V2.31.0（菜單匯入回饋 3-2）：false＝這個品項不提供店家加料（星巴克純茶「不提供客製化」）
+    allow_toppings: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     
     # Relationships
     menu: Mapped["Menu"] = relationship(back_populates="items")
@@ -64,6 +66,29 @@ class MenuItem(Base):
         back_populates="menu_item", cascade="all, delete-orphan",
         order_by=lambda: (ItemOption.sort_order, ItemOption.id))
     order_items: Mapped[list["OrderItem"]] = relationship(back_populates="menu_item")
+    # V2.31.0：杯型／規格。沒有列的舊品項用 price／price_l（app/services/variants.py）
+    variants: Mapped[list["MenuItemVariant"]] = relationship(
+        back_populates="menu_item", cascade="all, delete-orphan",
+        order_by=lambda: (MenuItemVariant.sort_order, MenuItemVariant.id))
+
+    @property
+    def size_choices(self):
+        """[(label, price)]——模板與計價都只看這個"""
+        from app.services.variants import item_choices
+        return item_choices(self)
+
+
+class MenuItemVariant(Base):
+    """V2.31.0：品項規格（中杯／大杯／特大杯、Solo／Doppio、L杯／瓶裝…），標籤由匯入資料決定"""
+    __tablename__ = "menu_item_variants"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    menu_item_id: Mapped[int] = mapped_column(ForeignKey("menu_items.id"), index=True)
+    label: Mapped[str] = mapped_column(String(30))
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    menu_item: Mapped["MenuItem"] = relationship(back_populates="variants")
 
 
 class ItemOption(Base):

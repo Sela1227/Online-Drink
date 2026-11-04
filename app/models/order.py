@@ -106,7 +106,7 @@ class OrderItem(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     menu_item_id: Mapped[int | None] = mapped_column(ForeignKey("menu_items.id"), nullable=True)
     item_name: Mapped[str] = mapped_column(String(100))  # 冗餘存儲（菜單刪除後仍保留顯示）
-    size: Mapped[str | None] = mapped_column(String(10), nullable=True)  # M 或 L
+    size: Mapped[str | None] = mapped_column(String(30), nullable=True)  # 規格標籤：舊菜單 M／L，V2.31.0 起照菜單（中杯、Doppio、瓶裝…）
     sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
@@ -205,7 +205,7 @@ class OrderItemBackup(Base):
     priority: Mapped[int] = mapped_column(Integer, default=1)  # 順位 1-3
     menu_item_id: Mapped[int | None] = mapped_column(ForeignKey("menu_items.id"), nullable=True)
     item_name: Mapped[str] = mapped_column(String(100))  # 快照
-    size: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    size: Mapped[str | None] = mapped_column(String(30), nullable=True)  # V2.31.0 加寬
     sugar: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ice: Mapped[str | None] = mapped_column(String(50), nullable=True)
     extras_text: Mapped[str | None] = mapped_column(String(300), nullable=True)  # 加料/加購摘要

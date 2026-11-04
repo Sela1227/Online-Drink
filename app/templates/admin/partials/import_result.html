@@ -274,8 +274,10 @@
     {% if item.price_tbd %}
     <span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">時價</span>
     {% else %}
-    <span class="{% if item.is_available is false %}text-sela-800/45{% else %}text-sela-800{% endif %}">${{ item.price|money }}{% if item.price_l %}/${{ item.price_l|money }}{% endif %}</span>
+    {# V2.31.0：規格逐一列出（中杯 $125／大杯 $140／特大杯 $155；舊格式 M／L） #}
+    <span class="{% if item.is_available is false %}text-sela-800/45{% else %}text-sela-800{% endif %}">{% for lb, p in size_choices(item) %}{% if lb %}{{ lb }} {% endif %}${{ p|money }}{% if not loop.last %}／{% endif %}{% endfor %}</span>
     {% endif %}
+    {% if item.allow_toppings is sameas false %}<span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">不加料</span>{% endif %}
     {% if item.is_available is false %}<span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full">停售</span>{% endif %}
     {% if item.options %}
     <span class="text-xs text-sela-800/45">({% for opt in item.options %}{{ opt.name }}{% if opt.price_diff > 0 %}+${{ opt.price_diff|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %})</span>

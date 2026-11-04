@@ -193,6 +193,13 @@ def _create_menu(db: Session, store_id: int, content: MenuContent, is_active: bo
     return menu
 
 
+def _add_variants(db: Session, item: MenuItem, item_data):
+    """V2.31.0：杯型／規格列"""
+    from app.models.menu import MenuItemVariant
+    for i, v in enumerate(item_data.variants or []):
+        db.add(MenuItemVariant(menu_item_id=item.id, label=v.label, price=v.price, sort_order=i))
+
+
 def _populate_menu(db: Session, menu: Menu, content: MenuContent):
     """填充菜單內容"""
     item_sort = 0
@@ -218,11 +225,13 @@ def _populate_menu(db: Session, menu: Menu, content: MenuContent):
                     price_tbd=item_data.price_tbd,
                     is_available=item_data.is_available,
                     description=item_data.note,
+                    allow_toppings=item_data.allow_toppings,
                     sort_order=item_sort,
                 )
                 db.add(item)
                 db.flush()
                 item_sort += 1
+                _add_variants(db, item, item_data)
 
                 # 項目選項
                 if item_data.options:
@@ -247,11 +256,13 @@ def _populate_menu(db: Session, menu: Menu, content: MenuContent):
                 price_tbd=item_data.price_tbd,
                 is_available=item_data.is_available,
                 description=item_data.note,
+                allow_toppings=item_data.allow_toppings,
                 sort_order=item_sort,
             )
             db.add(item)
             db.flush()
             item_sort += 1
+            _add_variants(db, item, item_data)
 
             # 項目選項
             if item_data.options:

@@ -37,9 +37,17 @@ def money(v) -> str:
     return f"{whole}.{frac}" if frac else whole
 
 
+def size_choices(item):
+    """V2.31.0：品項規格 [(label, price)]——ORM MenuItem 與匯入預覽的 Pydantic 物件都吃"""
+    from app.services.variants import choices_from
+    vs = getattr(item, "variants", None) or []
+    return choices_from(item.price, getattr(item, "price_l", None), [(v.label, v.price) for v in vs])
+
+
 def register_filters(env):
     env.filters["taipei"] = to_taipei_time
     env.filters["money"] = money
-    # V2.26.0：版本號（base.html「我的」頁最下面），唯一來源 app/version.py
+    # V2.26.0：版本號（V2.30.0 起頁首 app 名稱旁＋「我的」頁最下面），唯一來源 app/version.py
     from app.version import APP_VERSION
     env.globals["app_version"] = APP_VERSION
+    env.globals["size_choices"] = size_choices  # V2.31.0

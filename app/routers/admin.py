@@ -49,6 +49,7 @@ _FIELD_NAMES = {
     "sugar_options": "甜度選項", "ice_options": "冰塊選項", "toppings": "加料", "phone": "電話", "address": "地址",
     "menu": "菜單", "categories": "分類", "items": "品項", "uncategorized": "未分類品項",
     "price": "價格", "price_l": "大杯價格", "options": "加購選項",
+    "variants": "規格", "label": "規格名稱", "allow_toppings": "可加料",
     "price_diff": "加購價差", "store_id": "店家編號", "mode": "匯入模式",
 }
 
@@ -255,7 +256,7 @@ async def store_list(request: Request, db: Session = Depends(get_db)):
 async def menu_list(store_id: int, imported: int = 0, cats: int = 0, items: int = 0):
     """V2.13.0：菜單版本頁併入工作台的「菜單」分頁"""
     q = f"?tab=menu&imported={imported}&cats={cats}&items={items}" if imported else "?tab=menu"
-    return RedirectResponse(url=f"/admin/stores/{store_id}{q}", status_code=301)
+    return RedirectResponse(url=f"/admin/stores/{store_id}{q}", status_code=302)  # V2.30.0 Kit 坑 #108：301 會被瀏覽器永久記住
 
 
 @router.post("/stores/{store_id}/menus/{menu_id}/activate")
@@ -415,8 +416,9 @@ def _stores_for_picker(db, stores):
 
 def _menu_to_import_json(menu, overrides: dict | None = None) -> dict:
     """V2.16.1 B-5：使用中版本 → 匯入格式（只放匯入會讀的欄位；時價寫 "時價"、停售／說明有才帶）。
-    V2.29.0：`overrides` = {item_id: (price, price_l)}，工作台直接改價用——其他內容原封不動照抄，
-    再走跟匯入同一條路存成新版本（進行中的團釘著舊 menu_id，不受影響）。"""
+    V2.29.0：`overrides` = {item_id: [每個規格的新價]}（順序同 item.size_choices），工作台直接改價用——
+    其他內容原封不動照抄，再走跟匯入同一條路存成新版本（進行中的團釘著舊 menu_id，不受影響）。
+    V2.31.0：有 variants 的品項輸出 variants；不提供加料的帶 allow_toppings: false。"""
     overrides = overrides or {}
 
     def _num(d):
@@ -427,15 +429,19 @@ def _menu_to_import_json(menu, overrides: dict | None = None) -> dict:
 
     def _item(it):
         o = {"name": it.name, "price": "時價" if it.price_tbd else _num(it.price)}
-        if it.price_l is not None and not it.price_tbd:
-            o["price_l"] = _num(it.price_l)
-        if it.id in overrides and not it.price_tbd:
-            _p, _pl = overrides[it.id]
-            o["price"] = _num(_p)
-            if _pl is None:
-                o.pop("price_l", None)
+        if not it.price_tbd:
+            prices = [p for _, p in it.size_choices]
+            if it.id in overrides:
+                prices = list(overrides[it.id])
+            if it.variants:
+                o["variants"] = [{"label": v.label, "price": _num(pr)} for v, pr in zip(it.variants, prices)]
+                o["price"] = _num(prices[0])
             else:
-                o["price_l"] = _num(_pl)
+                o["price"] = _num(prices[0])
+                if len(prices) > 1:
+                    o["price_l"] = _num(prices[1])
+        if it.allow_toppings is False:
+            o["allow_toppings"] = False
         if it.options:
             o["options"] = [{"name": op.name, "price_diff": _num(op.price_diff) or 0} for op in it.options]
         if it.is_available is False:
@@ -491,16 +497,24 @@ async def update_menu_prices(
             raise HTTPException(status_code=400, detail="品項不在使用中的菜單裡，請重新整理")
         if it.price_tbd:
             raise HTTPException(status_code=400, detail=f"「{it.name}」是時價，這裡不能改")
-        try:
-            p = parse_price_input(str(r.get("price", "")))
-            pl = parse_price_input(str(r.get("price_l") or ""))
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"「{it.name}」：{e}")
-        if p is None or p is TBD or pl is TBD:
-            raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要填數字")
-        if p < 0 or p > 999999 or (pl is not None and (pl < 0 or pl > 999999)):
-            raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要在 0～999,999 之間")
-        overrides[iid] = (p, pl)
+        # V2.31.0：每個規格一格，送 prices（順序同 size_choices）；舊頁面送 price／price_l 也收
+        raw = r.get("prices")
+        if raw is None:
+            raw = [r.get("price", "")] + ([r.get("price_l")] if r.get("price_l") not in (None, "") else [])
+        if not isinstance(raw, list) or len(raw) != len(it.size_choices):
+            raise HTTPException(status_code=400, detail=f"「{it.name}」的規格數跟菜單不同，請重新整理")
+        vals = []
+        for x in raw:
+            try:
+                v = parse_price_input(str(x if x is not None else ""))
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"「{it.name}」：{e}")
+            if v is None or v is TBD:
+                raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要填數字")
+            if v < 0 or v > 999999:
+                raise HTTPException(status_code=400, detail=f"「{it.name}」的價格要在 0～999,999 之間")
+            vals.append(v)
+        overrides[iid] = vals
     data = _menu_to_import_json(menu, overrides)
     try:
         validated = MenuImport(store_id=store_id, mode="new", menu=data["menu"])
@@ -1102,7 +1116,12 @@ async def delete_store(store_id: int, request: Request, confirm: str = Form(""),
         )
     """), {"sid": sid})
     
-    # 刪菜單樹（item_options → menu_items → menu_categories → menus）
+    # 刪菜單樹（item_options／menu_item_variants → menu_items → menu_categories → menus）
+    db.execute(_sql("""
+        DELETE FROM menu_item_variants WHERE menu_item_id IN (
+            SELECT mi.id FROM menu_items mi JOIN menus m ON mi.menu_id = m.id WHERE m.store_id = :sid
+        )
+    """), {"sid": sid})  # V2.31.0
     db.execute(_sql("""
         DELETE FROM item_options WHERE menu_item_id IN (
             SELECT mi.id FROM menu_items mi JOIN menus m ON mi.menu_id = m.id WHERE m.store_id = :sid
@@ -1250,18 +1269,27 @@ async def store_workbench(
             return None
         f = float(d)
         return str(int(f)) if f == int(f) else str(f)
+    def _opts(it):
+        # V2.30.1（菜單匯入回饋 2026-11-04 2-6，Sela 選 A）：改價模式也列出加價選項，
+        # 不然用加價頂著的特大杯在這裡看不到，會誤判沒匯進去
+        from app.templating import money as _money
+        return "、".join(f"{o.name} +{_money(o.price_diff)}" if o.price_diff and o.price_diff > 0 else o.name
+                        for o in (it.options or []))
+    def _pitem(it, cat):
+        # V2.31.0：每個規格一格（labels 為空字串＝單一價沒有標籤）
+        chs = it.size_choices
+        return {"id": it.id, "cat": cat, "name": it.name, "tbd": bool(it.price_tbd),
+                "available": it.is_available is not False, "no_top": it.allow_toppings is False,
+                "labels": [lb or "" for lb, _ in chs], "orig": [_pstr(p) or "0" for _, p in chs],
+                "opts": _opts(it)}
     price_items = []
     if active_menu:
         for c in active_menu.categories:
             for it in c.items:
-                price_items.append({"id": it.id, "cat": c.name, "name": it.name, "tbd": bool(it.price_tbd),
-                                    "available": it.is_available is not False,
-                                    "orig": _pstr(it.price) or "0", "orig_l": _pstr(it.price_l)})
+                price_items.append(_pitem(it, c.name))
         for it in active_menu.items:
             if it.category_id is None:
-                price_items.append({"id": it.id, "cat": "其他", "name": it.name, "tbd": bool(it.price_tbd),
-                                    "available": it.is_available is not False,
-                                    "orig": _pstr(it.price) or "0", "orig_l": _pstr(it.price_l)})
+                price_items.append(_pitem(it, "其他"))
 
     from app.services.city import CITY_GROUPS, NO_CITY
     return templates.TemplateResponse(request, "admin/store_workbench.html", {
@@ -1297,7 +1325,7 @@ async def store_workbench(
 @router.get("/stores/{store_id}/edit")
 async def edit_store_page(store_id: int):
     """V2.13.0：編輯頁併入工作台，舊連結與書籤轉過去"""
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=301)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings", status_code=302)  # V2.30.0 Kit 坑 #108
 
 
 def _parse_option_values(raw: str) -> list[str]:

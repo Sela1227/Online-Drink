@@ -112,7 +112,8 @@
 {# V2.15.1 審核 P3-8：工作台品項一行——時價標籤、停售、選項、說明 #}
 {% macro wb_item(item) -%}
 <div>{{ item.name }}
-    {% if item.price_tbd %}<span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">時價</span>{% else %}${{ item.price|money }}{% if item.price_l %} / L ${{ item.price_l|money }}{% endif %}{% endif %}
+    {% if item.price_tbd %}<span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">時價</span>{% else %}{% for lb, p in item.size_choices %}{% if lb %}{{ lb }} {% endif %}${{ p|money }}{% if not loop.last %} / {% endif %}{% endfor %}{% endif %}
+    {% if item.allow_toppings is sameas false %}<span class="text-xs bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">不加料</span>{% endif %}
     {% if item.is_available is sameas false %}<span class="text-xs text-sela-800/45">（停售）</span>{% endif %}
     {% if item.options %}<span class="text-xs text-sela-800/45">（{% for o in item.options %}{{ o.name }}{% if o.price_diff and o.price_diff > 0 %} +${{ o.price_diff|money }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}）</span>{% endif %}
     {% if item.description %}<span class="text-xs text-sela-800/45"><i class="ti ti-note"></i> {{ item.description }}</span>{% endif %}
@@ -132,24 +133,26 @@
                     <div>
                         <div class="text-xs text-sela-800/55 pt-3 pb-1" x-text="g.cat"></div>
                         <template x-for="it in g.items" :key="it.id">
-                            <div class="flex items-center gap-2 py-2 border-b border-sela-100 last:border-0" :data-item="it.id">
-                                <span class="flex-1 min-w-0 text-[15px] text-sela-900 truncate"><span x-text="it.name"></span><span x-show="!it.available" class="text-xs text-sela-800/45">（停售）</span></span>
-                                <template x-if="it.tbd"><span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-0.5 rounded-full">時價</span></template>
-                                <template x-if="!it.tbd">
-                                    <span class="flex items-center gap-1.5">
-                                        <span class="text-xs text-sela-800/50" x-show="it.orig_l !== null">M</span>
-                                        <input type="text" inputmode="decimal" x-model="it.price" :aria-label="it.name + ' 價格'"
-                                               :class="bad(it.price, false) ? 'border-red-400 bg-red-50' : (it.price !== it.orig ? 'border-sela-700 bg-amber-50 font-bold' : 'border-sela-200')"
-                                               class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
-                                        <template x-if="it.orig_l !== null">
+                            <div class="py-2 border-b border-sela-100 last:border-0" :data-item="it.id">
+                                {# V2.31.0（Sela 選畫面稿 3）：每個規格一格、標籤照菜單；品名一行、輸入框換到下一行 #}
+                                <div class="flex items-center gap-2">
+                                    <span class="flex-1 min-w-0 text-[15px] text-sela-900"><span class="block truncate"><span x-text="it.name"></span><span x-show="!it.available" class="text-xs text-sela-800/45">（停售）</span><span x-show="it.no_top" class="ml-1 text-[11px] bg-sela-100 text-sela-800/70 px-1.5 py-0.5 rounded-full">不加料</span></span><span x-show="it.opts" class="block text-xs text-sela-800/50 mt-0.5" data-opts x-text="'+ ' + it.opts"></span></span>
+                                    <template x-if="it.tbd"><span class="text-xs bg-sela-100 text-sela-800/70 px-2 py-0.5 rounded-full">時價</span></template>
+                                    <template x-if="!it.tbd && it.labels.length === 1 && !it.labels[0]">
+                                        <input type="text" inputmode="decimal" x-model="it.prices[0]" :aria-label="it.name + ' 價格'"
+                                               :class="cls(it, 0)" class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
+                                    </template>
+                                </div>
+                                <template x-if="!it.tbd && !(it.labels.length === 1 && !it.labels[0])">
+                                    <div class="flex flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
+                                        <template x-for="(lb, k) in it.labels" :key="k">
                                             <span class="flex items-center gap-1.5">
-                                                <span class="text-xs text-sela-800/50">L</span>
-                                                <input type="text" inputmode="decimal" x-model="it.price_l" :aria-label="it.name + ' 大杯價格'"
-                                                       :class="bad(it.price_l, true) ? 'border-red-400 bg-red-50' : (it.price_l !== it.orig_l ? 'border-sela-700 bg-amber-50 font-bold' : 'border-sela-200')"
-                                                       class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
+                                                <span class="text-xs text-sela-800/50" x-text="lb"></span>
+                                                <input type="text" inputmode="decimal" x-model="it.prices[k]" :aria-label="it.name + ' ' + lb + ' 價格'"
+                                                       :class="cls(it, k)" class="w-[72px] border rounded-lg px-2 min-h-[40px] text-right text-base">
                                             </span>
                                         </template>
-                                    </span>
+                                    </div>
                                 </template>
                             </div>
                         </template>
@@ -545,7 +548,8 @@ function priceEditor() {
     try { src = JSON.parse(document.getElementById('price-items').textContent) || []; } catch (e) {}
     return {
         q: '',
-        items: src.map(it => Object.assign({}, it, { price: it.orig, price_l: it.orig_l })),
+        // V2.31.0：每個規格一格，prices 與 orig／labels 同順序
+        items: src.map(it => Object.assign({}, it, { prices: (it.orig || []).slice() })),
         norm(t) { return String(t || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase(); },
         groups() {
             const kw = this.norm(this.q);
@@ -558,27 +562,28 @@ function priceEditor() {
             }
             return out;
         },
-        bad(v, optional) {
+        bad(v) {
             const t = String(v === null || v === undefined ? '' : v).trim();
-            if (t === '') return !optional;
             return !/^\d{1,6}(\.\d{1,2})?$/.test(t);
         },
-        changed() { return this.items.filter(it => !it.tbd && (it.price !== it.orig || it.price_l !== it.orig_l)); },
-        hasBad() { return this.changed().some(it => this.bad(it.price, false) || (it.orig_l !== null && this.bad(it.price_l, true))); },
-        payload() { return JSON.stringify(this.changed().map(it => ({ id: it.id, price: String(it.price).trim(), price_l: it.price_l === null ? '' : String(it.price_l).trim() }))); },
+        cls(it, k) {
+            return this.bad(it.prices[k]) ? 'border-red-400 bg-red-50' : (it.prices[k] !== it.orig[k] ? 'border-sela-700 bg-amber-50 font-bold' : 'border-sela-200');
+        },
+        changed() { return this.items.filter(it => !it.tbd && it.prices.some((p, k) => p !== it.orig[k])); },
+        hasBad() { return this.changed().some(it => it.prices.some(p => this.bad(p))); },
+        payload() { return JSON.stringify(this.changed().map(it => ({ id: it.id, prices: it.prices.map(p => String(p).trim()) }))); },
         summary() {
             const c = this.changed();
             const parts = c.slice(0, 3).map(it => {
                 const p = [];
-                if (it.price !== it.orig) p.push((it.orig_l !== null ? 'M ' : '') + it.orig + '→' + it.price);
-                if (it.price_l !== it.orig_l) p.push('L ' + it.orig_l + '→' + it.price_l);
+                it.prices.forEach((v, k) => { if (v !== it.orig[k]) p.push((it.labels[k] ? it.labels[k] + ' ' : '') + it.orig[k] + '→' + v); });
                 return it.name + ' ' + p.join('、');
             });
             return parts.join('、') + (c.length > 3 ? ' 等' : '');
         },
         cancel() {
             if (this.changed().length && !confirm('放棄這次改的價格？')) return;
-            this.items.forEach(it => { it.price = it.orig; it.price_l = it.orig_l; });
+            this.items.forEach(it => { it.prices = it.orig.slice(); });
             this.q = ''; this.priceEdit = false; this.unsaved = false;
         },
     };

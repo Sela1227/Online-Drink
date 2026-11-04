@@ -1,6 +1,6 @@
 from app.models.user import User, UserPreset
 from app.models.store import Store, StoreOption
-from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
+from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption, MenuItemVariant
 from app.models.group import Group
 from app.models.order import Order, OrderItem, OrderItemOption
 from app.models.department import Department, UserDepartment, GroupDepartment, DeptRole
@@ -16,6 +16,7 @@ __all__ = [
     "Menu",
     "MenuCategory",
     "MenuItem",
+    "MenuItemVariant",
     "ItemOption",
     "Group",
     "Order",

@@ -329,7 +329,7 @@ def main():
     db.commit()
 
     for bad_kw in ({"sugar": "不存在的甜度"}, {"ice": "不存在的冰"},
-                   {"size": "XL"}, {"quantity": 100000}, {"quantity": 0}):
+                   {"size": "X" * 31}, {"quantity": 100000}, {"quantity": 0}):  # V2.31.0：標籤由菜單決定，這裡只擋超長；不屬於品項的標籤在第 46 節驗
         kw = {"size": "M", "sugar": "半糖", "ice": "少冰", "quantity": 1}
         kw.update(bad_kw)
         try:
@@ -659,9 +659,9 @@ def main():
         check("工作台 200，分頁（V2.27.0 起：菜單／甜冰加料／店家資料／停用／刪除）")
 
         r = _c.get(f"/admin/stores/{store.id}/edit", follow_redirects=False)
-        assert r.status_code == 301 and r.headers["location"].endswith("?tab=settings")
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
         r = _c.get(f"/admin/stores/{store.id}/menus", follow_redirects=False)
-        assert r.status_code == 301 and "tab=menu" in r.headers["location"]
+        assert r.status_code == 302 and "tab=menu" in r.headers["location"]
         check("舊網址 /edit、/menus 轉址到工作台對應分頁")
 
         r = _c.post(f"/admin/stores/{store.id}/delete", data={"confirm_name": store.name})
@@ -1766,8 +1766,10 @@ def main():
         nav = r.text[r.text.index("<nav"):r.text.index("</nav>")]
         assert all(x in nav for x in ("今天", "店家", "紀錄", "我的", 'href="/records"', 'href="/stores"', 'href="/groups/new"')) and "回報" not in nav and "投票" not in nav
         hdr = r.text[r.text.index("<header"):r.text.index("</header>")]
-        assert "/admin" not in hdr and "/profile" not in hdr and "V2." not in hdr, "頁首只留 logo"
-        check("五格導航：今天｜店家｜＋｜紀錄｜我的；頁首只留 logo（⚙／頭像／版號搬到我的）")
+        # V2.30.0 對齊 Kit V2.3.0：版號加回頁首（只准出現在 #app-version，第 44 節另驗）
+        _hdr_wo_ver = _re.sub(r'<span[^>]*id="app-version"[^>]*>[^<]*</span>', "", hdr)
+        assert "/admin" not in hdr and "/profile" not in hdr and "V2." not in _hdr_wo_ver, "頁首只留 logo＋版號"
+        check("五格導航：今天｜店家｜＋｜紀錄｜我的；頁首只留 logo＋app 名稱旁版號（⚙／頭像搬到我的）")
         assert "要你處理的" in t and "開放中" in t and "待點餐" not in t
         # 一個團只出現一次（連結數）
         for g in (ga, gb, gc, gd, ge, gf, gg):
@@ -3029,7 +3031,7 @@ def main():
         assert 'id="price-editor"' in t and "priceEdit: true" in t
         _pi = json.loads(t.split('<script type="application/json" id="price-items">')[1].split("</script>")[0])
         assert [x["name"] for x in _pi] == ["紅茶", "綠茶", "季節茶", "停售茶", "餅乾"] and _pi[-1]["cat"] == "其他"
-        assert _pi[0]["orig"] == "30" and _pi[0]["orig_l"] == "35" and _pi[2]["tbd"] and not _pi[3]["available"]
+        assert _pi[0]["orig"] == ["30", "35"] and _pi[0]["labels"] == ["M", "L"] and _pi[1]["labels"] == [""] and _pi[2]["tbd"] and not _pi[3]["available"]  # V2.31.0：每個規格一格
 
         def _post43(rows, base=None):
             return _c.post(f"/admin/stores/{_sid43}/menu/prices", data={"base_menu_id": str(base or _m1_id), "changes_json": json.dumps(rows)},
@@ -3055,11 +3057,15 @@ def main():
         assert float(_old["紅茶"].price) == 30 and db.get(Group, _g43_id).menu_id == _m1_id, "進行中的團照舊用原本的菜單"
         r = _c.get(r.headers["location"])
         assert "已改 3 項價格" in r.text and "進行中的團照舊用原本的價格" in r.text
-        # 拿掉大杯價
+        # V2.31.0：改價只改價、不改規格數——拿掉大杯要走「更新菜單」；規格數不符一律擋
         r = _post43([{"id": _new["紅茶"].id, "price": "32", "price_l": ""}], base=_m2.id)
+        assert r.status_code == 400 and "規格數" in r.text
+        # 新格式 prices（順序同規格）
+        r = _post43([{"id": _new["紅茶"].id, "prices": ["33", "39"]}], base=_m2.id)
         db.expire_all()
         _m3 = db.query(_M43).filter(_M43.store_id == _sid43, _M43.is_active == True).one()
-        assert r.status_code == 303 and next(i for i in _m3.items if i.name == "紅茶").price_l is None
+        _r3 = next(i for i in _m3.items if i.name == "紅茶")
+        assert r.status_code == 303 and float(_r3.price) == 33 and float(_r3.price_l) == 39 and not _r3.variants, "舊菜單改價後仍是 M／L"
         check("工作台直接改價：只改 M／L、其他照抄、存成新版本（進行中的團不受影響）；時價／非數字／負數／沒變更／別人剛更新過都擋且不多版本")
 
         # 刪除店家：確認框
@@ -3080,7 +3086,208 @@ def main():
     finally:
         _adm.get_admin_user = _orig
 
+    # ---------- 44. V2.30.0 對齊 Kit V2.3.0 ----------
+    print("\n[44] 對齊 Kit V2.3.0")
+    _adm.get_admin_user = _fake_admin
+    _home44 = __import__("app.routers.home", fromlist=["x"])
+    _o44 = _home44.get_current_user
+    async def _fake44(request, db_):
+        return db_.query(User).filter(User.id == _uid).first()
+    _home44.get_current_user = _fake44
+    try:
+        from app.version import APP_VERSION as _V44
+        r = _c.get("/home")
+        _hdr = r.text.split("<header")[1].split("</header>")[0]
+        assert f'id="app-version">{_V44}</span>' in _hdr, "Kit 鐵律：版號要在頁首 app 名稱旁"
+        _src44 = open("app/routers/admin.py", encoding="utf-8").read() + open("app/routers/home.py", encoding="utf-8").read() + open("app/routers/groups.py", encoding="utf-8").read()
+        assert "status_code=301" not in _src44, "Kit 坑 #108：相容轉址用 302，301 會被瀏覽器永久記住"
+        from app.config import get_settings as _gs44
+        import app.services.ai_menu as _ai44
+        assert "claude-" not in open("app/services/ai_menu.py", encoding="utf-8").read(), "Kit 坑 #111：模型 ID 只放 config"
+        assert _gs44().anthropic_model.startswith("claude-")
+        check("對齊 Kit V2.3.0：頁首 app 名稱旁有版號；轉址不用 301；AI 模型 ID 只在 config 一處")
+    finally:
+        _adm.get_admin_user = _orig
+        _home44.get_current_user = _o44
+
+    print("\n[45] 菜單匯入回饋 2026-11-04（V2.30.1）")
+    _adm.get_admin_user = _fake_admin
+    try:
+        from app.models.menu import Menu as _M45, MenuItem as _MI45, ItemOption as _IO45
+        _db45 = SessionLocal()
+        _mi45 = _db45.query(_MI45).join(_M45, _MI45.menu_id == _M45.id).filter(_M45.is_active == True).first()
+        assert _mi45 is not None
+        _db45.add_all([_IO45(menu_item_id=_mi45.id, name="大杯升級特大杯", price_diff=15),
+                       _IO45(menu_item_id=_mi45.id, name="去冰", price_diff=0)]); _db45.commit()
+        _sid45 = _db45.query(_M45).get(_mi45.menu_id).store_id
+        r = _c.get(f"/admin/stores/{_sid45}?tab=menu&edit=price")
+        assert r.status_code == 200
+        _pi45 = json.loads(r.text.split('id="price-items">')[1].split("</script>")[0])
+        _row45 = [x for x in _pi45 if x["id"] == _mi45.id][0]
+        assert _row45["opts"] == "大杯升級特大杯 +15、去冰", _row45
+        assert all("opts" in x for x in _pi45)
+        _db45.query(_IO45).filter(_IO45.menu_item_id == _mi45.id, _IO45.name.in_(["大杯升級特大杯", "去冰"])).delete(synchronize_session=False); _db45.commit(); _db45.close()
+        from app.services.menu_prompt import PROMPT_LINES as _PL45
+        # V2.31.0：「只有大杯」改用 variants 放一個元素（V2.30.1 是 note 註明「僅大杯」的過渡寫法）
+        assert any("只有大杯" in x and "variants" in x and "一個元素" in x for x in _PL45), "AI 指令要教「只有大杯」怎麼填"
+        assert "團購店家先用 `meal` 匯入" not in open("CLAUDE.md", encoding="utf-8").read().split("## 五、")[0], "坑 #9 已於 V1.10.2 解決，不要再寫成現況"
+        check("改價模式的品項帶加價選項文字；AI 指令教只有大杯（V2.31.0 起用單一規格）；坑 #9 不再寫成現況")
+    finally:
+        _adm.get_admin_user = _orig
+
     db.close()
+    # ---------- 46. V2.31.0 杯型規格（variants）＋品項不提供加料 ----------
+    print("\n[46] 杯型規格 variants（菜單匯入回饋驗收八條）")
+    from app.schemas.menu import MenuImport as _MI46
+    from app.services.import_service import import_menu as _im46
+    from app.services.menu_diff import diff_menu as _diff46
+    from app.services.export_service import generate_order_text as _got46
+    from app.models.menu import Menu as _M46, MenuItemVariant as _V46
+    from app.models.order import Order as _O46, OrderItem as _OI46, OrderStatus as _OS46
+    from app.models.store import StoreTopping as _ST46
+    import app.routers.orders as _ord46
+    _adm.get_admin_user = _fake_admin
+    async def _f46(request, db_):
+        return db_.query(User).filter(User.id == _uid).first()
+    async def _f46opt(request, db_):
+        return (db_.query(User).filter(User.id == _uid).first(), None)
+    _o46cu = _ord46.get_current_user
+    _ord46.get_current_user = _f46
+    _o46g, _o46go = _grp.get_current_user, _grp.get_current_user_optional
+    _grp.get_current_user, _grp.get_current_user_optional = _f46, _f46opt
+    try:
+        _s46 = Store(name="星巴克四六", category=CategoryType.DRINK, is_active=True); db.add(_s46); db.commit()
+        _sid46 = _s46.id
+        db.add(_ST46(store_id=_sid46, name="燕麥奶", price=20, sort_order=0, is_active=True)); db.commit()
+        _menu46 = {"categories": [
+            {"name": "濃縮咖啡", "items": [
+                {"name": "那堤", "variants": [{"label": "中杯", "price": 125}, {"label": "大杯", "price": 140}, {"label": "特大杯", "price": 155}]},
+                {"name": "濃縮咖啡", "variants": [{"label": "Solo", "price": 85}, {"label": "Doppio", "price": "100元"}]}]},
+            {"name": "茶", "items": [
+                {"name": "香橙果粒茶", "variants": [{"label": "L杯", "price": 75}, {"label": "瓶裝", "price": 105}]},
+                {"name": "凝綠厚抹", "variants": [{"label": "中杯", "price": 55}]},
+                {"name": "三窨十五茉", "variants": [{"label": "大杯", "price": 45}], "allow_toppings": False},
+                {"name": "紅茶", "price": 30, "price_l": 35}]}]}
+        _v46 = _MI46(store_id=_sid46, mode="new", menu=_menu46)
+        _im46(db, _v46)
+        _m46 = db.query(_M46).filter(_M46.store_id == _sid46, _M46.is_active == True).one()
+        _it = {i.name: i for i in _m46.items}
+        assert [(v.label, float(v.price)) for v in _it["那堤"].variants] == [("中杯", 125), ("大杯", 140), ("特大杯", 155)]
+        assert float(_it["那堤"].price) == 125 and _it["那堤"].price_l is None, "不變式：price＝第一個規格、price_l 清空"
+        assert float(_it["濃縮咖啡"].variants[1].price) == 100, "規格價格也吃價格容錯"
+        assert _it["三窨十五茉"].allow_toppings is False and _it["那堤"].allow_toppings is True
+        assert _it["紅茶"].size_choices == [("M", Decimal("30")), ("L", Decimal("35"))] and not _it["紅茶"].variants, "舊格式照舊 M／L（驗收 6）"
+        assert _diff46(_m46, _v46.menu)["identical"], "同一份重匯＝沒有變更"
+        _ch = _MI46(store_id=_sid46, mode="new", menu=json.loads(json.dumps(_menu46).replace('"price": 155', '"price": 160')))
+        _d = _diff46(_m46, _ch.menu)
+        assert len(_d["changed"]) == 1 and _d["changed"][0]["name"] == "那堤" and "特大杯 $160" in _d["changed"][0]["new_price_text"], _d["changed"]
+        for bad in ({"name": "x", "variants": [{"label": "中杯", "price": 1}, {"label": "中杯", "price": 2}]},
+                    {"name": "x", "price": "時價", "variants": [{"label": "中杯", "price": 1}]},
+                    {"name": "x", "variants": [{"label": "", "price": 1}]}):
+            try:
+                _MI46(store_id=_sid46, mode="new", menu={"items": [bad]}); raise AssertionError(f"應擋下：{bad}")
+            except _VE:
+                pass
+        check("匯入 variants：標籤照菜單、price＝第一個規格、價格容錯、不加料；舊 price／price_l 仍是 M／L；差異比對看規格；重複／時價／空標籤擋下")
+
+        # 預覽頁：規格逐一列出
+        r = _c.post("/admin/import/preview", data={"json_text": json.dumps({"menu": _menu46}), "store_id": str(_sid46)})
+        assert r.status_code == 200 and "中杯 $125／大杯 $140／特大杯 $155" in r.text and "不加料" in r.text, r.text[:300]
+        r = _c.post("/admin/import/preview", data={"json_text": json.dumps({"menu": {"items": [{"name": "那堤", "variants": [{"label": "中杯", "price": "?"}]}]}}), "store_id": str(_sid46)})
+        assert "看不清" in r.text and "規格[1]「中杯」" in r.text, "規格的 ? 也進紅卡、位置寫得出規格名"
+        check("匯入預覽：規格逐一列出、不加料標籤；規格價格 ? 進看不清紅卡並指出哪個規格")
+
+        # 團頁（驗收 1～5）
+        _g46 = Group(owner_id=_uid, store_id=_sid46, menu_id=_m46.id, name="四六團", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
+        db.add(_g46); db.commit(); _g46_id = _g46.id
+        r = _c.get(f"/groups/{_g46_id}")
+        assert r.status_code == 200, r.text[:300]
+        _t = r.text
+        _row = lambda name: _t.split(f'name: {json.dumps(name)}')[1][:900]
+        assert '{ label: "\\u4e2d\\u676f", price: 125.00 }' in _row("那堤") or 'label: "中杯"' in _row("那堤") or "\\u4e2d\\u676f" in _row("那堤"), _row("那堤")[:300]
+        assert _row("那堤").count("label:") == 3 and _row("濃縮咖啡").count("label:") == 2 and _row("凝綠厚抹").count("label:") == 1
+        assert "no_top: true" in _row("三窨十五茉") and "no_top: false" in _row("那堤")
+        _vis = _re.sub(r"<script\b.*?</script>", " ", _t, flags=_re.S)
+        assert "特大杯 $155" in _vis and "Doppio $100" in _vis and "瓶裝 $105" in _vis, "多規格每個一行（驗收 1～3）"
+        assert _re.search(r"大杯</span>\s*\$45", _vis) and _re.search(r"中杯</span>\s*\$55", _vis), "只有一種規格也寫出標籤（驗收 4、5）"
+        assert "M $30" in _vis and "L $35" in _vis, "舊菜單照舊 M／L"
+        assert 'id="size-picker"' in _t and 'id="topping-picker"' in _t
+        check("團頁：那堤三個杯型、Solo／Doppio、L杯／瓶裝每個一行；單一規格寫「大杯 $45」；舊菜單 M／L；不加料品項帶 no_top")
+
+        # 點餐計價
+        def _add46(name, **kw):
+            d = {"menu_item_id": str(_it[name].id), "quantity": "1", "sugar": "", "ice": ""}
+            d.update(kw)
+            return _c.post(f"/groups/{_g46_id}/orders/items", data=d, headers={"HX-Request": "true"})
+        assert _add46("那堤", size="特大杯").status_code == 200
+        assert _add46("濃縮咖啡", size="Doppio").status_code == 200
+        assert _add46("凝綠厚抹").status_code == 200
+        assert _add46("紅茶", size="L").status_code == 200
+        assert _add46("那堤", size="XL").status_code == 400, "不屬於這個品項的規格要擋"
+        _top = db.query(_ST46).filter(_ST46.store_id == _sid46).first()
+        r = _add46("三窨十五茉", size="大杯", toppings=str(_top.id))
+        assert r.status_code == 400 and "不提供加料" in r.text
+        assert _add46("那堤", size="大杯", toppings=str(_top.id)).status_code == 200
+        db.expire_all()
+        _ord = db.query(_O46).filter(_O46.group_id == _g46_id).one()
+        _got = sorted((oi.item_name, oi.size, float(oi.unit_price)) for oi in _ord.items)
+        assert _got == sorted([("那堤", "特大杯", 155), ("濃縮咖啡", "Doppio", 100), ("凝綠厚抹", "中杯", 55), ("紅茶", "L", 35), ("那堤", "大杯", 140)]), _got
+        check("點餐：特大杯 155、Doppio 100、單一規格記下「中杯」、舊菜單 L 35；不存在的規格 400；不加料品項送加料 400")
+
+        # 核對單依規格彙總（驗收 8）——只算已送出的
+        _ord.status = _OS46.SUBMITTED; db.commit()
+        _txt = _got46(db, db.get(Group, _g46_id))
+        assert "那堤 / (特大杯)\n" in _txt and "那堤 / (大杯) / +燕麥奶" in _txt and "凝綠厚抹 / (中杯)" in _txt and "濃縮咖啡 / (Doppio)" in _txt, _txt[:400]
+        check("核對單：依規格分開彙總（那堤(特大杯)／那堤(大杯)、單一規格也印標籤）")
+
+        # 跨版本複製上次訂單：規格名同就沿用、價格用新版本；新版本沒有的規格改第一個
+        _menu46b = json.loads(json.dumps(_menu46, ensure_ascii=False).replace('"price": 155', '"price": 160').replace('{"label": "Doppio", "price": "100元"}', '{"label": "雙份", "price": 100}'))
+        _im46(db, _MI46(store_id=_sid46, mode="new", menu=_menu46b))
+        _m46b = db.query(_M46).filter(_M46.store_id == _sid46, _M46.is_active == True).one()
+        _g46b = Group(owner_id=_uid, store_id=_sid46, menu_id=_m46b.id, name="四六團二", category=CategoryType.DRINK,
+                      deadline=taipei_now() + timedelta(hours=2), is_public=True)
+        db.add(_g46b); db.commit(); _g46b_id = _g46b.id
+        assert db.get(Group, _g46_id).menu_id == _m46.id, "進行中的團釘在原本的版本（驗收 7）"
+        r = _c.post(f"/groups/{_g46b_id}/orders/copy-last", follow_redirects=False)
+        assert r.status_code in (200, 302, 303), (r.status_code, r.text[:200])
+        db.expire_all()
+        _o2 = db.query(_O46).filter(_O46.group_id == _g46b_id).one()
+        _got2 = sorted((oi.item_name, oi.size, float(oi.unit_price)) for oi in _o2.items)
+        assert ("那堤", "特大杯", 160) in _got2 and ("濃縮咖啡", "Solo", 85) in _got2 and ("紅茶", "L", 35) in _got2, _got2
+        _pri = db.query(_OI46).filter(_OI46.order_id == _ord.id, _OI46.size == "特大杯").one()
+        assert float(_pri.unit_price) == 155, "舊團的訂單金額不變"
+        check("複製上次訂單跨版本：特大杯沿用並用新價 160、Doppio 改名後退回第一個規格 Solo、舊菜單 L 照舊；舊團金額不變")
+
+        # 工作台改價：每個規格一格，存新版後規格與不加料原樣保留
+        r = _c.get(f"/admin/stores/{_sid46}?tab=menu&edit=price")
+        _pi = {x["name"]: x for x in json.loads(r.text.split('id="price-items">')[1].split("</script>")[0])}
+        assert _pi["那堤"]["labels"] == ["中杯", "大杯", "特大杯"] and _pi["那堤"]["orig"] == ["125", "140", "160"]
+        assert _pi["三窨十五茉"]["labels"] == ["大杯"] and _pi["三窨十五茉"]["no_top"] is True
+        r = _c.post(f"/admin/stores/{_sid46}/menu/prices", data={"base_menu_id": str(_m46b.id), "changes_json": json.dumps(
+            [{"id": _pi["那堤"]["id"], "prices": ["125", "145", "165"]}])}, follow_redirects=False)
+        assert r.status_code == 303, r.text[:200]
+        r = _c.post(f"/admin/stores/{_sid46}/menu/prices", data={"base_menu_id": str(_m46b.id), "changes_json": "[]"}, follow_redirects=False)
+        assert r.status_code == 409
+        db.expire_all()
+        _m46c = db.query(_M46).filter(_M46.store_id == _sid46, _M46.is_active == True).one()
+        _it3 = {i.name: i for i in _m46c.items}
+        assert [(v.label, float(v.price)) for v in _it3["那堤"].variants] == [("中杯", 125), ("大杯", 145), ("特大杯", 165)]
+        assert _it3["三窨十五茉"].allow_toppings is False and [v.label for v in _it3["三窨十五茉"].variants] == ["大杯"]
+        assert float(_it3["那堤"].price) == 125
+        check("工作台改價：規格一格一個（中杯／大杯／特大杯）；存成新版本後規格標籤、不加料原樣保留")
+
+        # 刪店家連規格一起刪
+        _vcount = db.query(_V46).join(_MIt43, _V46.menu_item_id == _MIt43.id).join(_M46, _MIt43.menu_id == _M46.id).filter(_M46.store_id == _sid46).count()
+        assert _vcount > 0
+        r = _c.post(f"/admin/stores/{_sid46}/delete", data={"confirm": "yes"}, follow_redirects=False)
+        db.expire_all(); assert r.status_code == 302 and db.get(Store, _sid46) is None
+        check("刪除有規格的店家：menu_item_variants 一併刪除")
+    finally:
+        _adm.get_admin_user = _orig
+        _ord46.get_current_user = _o46cu
+        _grp.get_current_user, _grp.get_current_user_optional = _o46g, _o46go
+
     print(f"\n全部通過（{len(passed)} 項）")
 
 

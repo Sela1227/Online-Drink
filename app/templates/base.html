@@ -157,6 +157,9 @@
             <a href="/home" class="flex items-center gap-2">
                 <img src="/static/images/sela-logo.jpg" alt="SELA" class="h-9 w-9 rounded-lg">
                 <span class="font-bold text-sela-800 text-lg tracking-tight">快點來點餐</span>
+                {# V2.30.0（對齊 Kit V2.3.0 鐵律：版號在 app 名稱旁）：V2.17.0 頁首只留 logo，版號只在「我的」頁底；
+                   Sela 選擇加回頁首小字——每頁都看得到部署成功沒（坑 #47） #}
+                <span class="text-[10px] text-sela-800/45 font-mono self-end mb-1.5" id="app-version">{{ app_version }}</span>
             </a>
         </div>
     </header>

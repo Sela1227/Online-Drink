@@ -657,7 +657,7 @@
             <h3 class="text-sm font-medium text-sela-800/70 mb-2 pt-2"><i class="ti ti-rotate-clockwise"></i> 你的常點 <span class="text-xs font-normal text-sela-800/45">點了直接加</span></h3>
             <div class="flex flex-wrap gap-2">
                 {% for item in my_frequent %}
-                <button @click='openAddItem({ id: {{ item.id }}, name: {{ item.name | tojson }}, description: {{ (item.description or "") | tojson }}, price: {{ item.price }}, tbd: {{ "true" if item.price_tbd else "false" }}, price_l: {{ item.price_l if item.price_l else "null" }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })'
+                <button @click='openAddItem({ id: {{ item.id }}, name: {{ item.name | tojson }}, description: {{ (item.description or "") | tojson }}, price: {{ item.price }}, tbd: {{ "true" if item.price_tbd else "false" }}, sizes: [{% for lb, p in item.size_choices %}{ label: {{ (lb or "") | tojson }}, price: {{ p }} }{% if not loop.last %},{% endif %}{% endfor %}], no_top: {{ "true" if item.allow_toppings is sameas false else "false" }}, options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}] })'
                         class="flex items-center gap-1.5 px-3 py-2 bg-sela-800 text-white rounded-full text-sm active:bg-sela-900 transition">
                     <i class="ti ti-plus"></i> {{ item.name }}
                 </button>
@@ -942,22 +942,18 @@
             <div class="overflow-y-auto px-4 pt-3 pb-2 flex-1 min-h-0">
                 <input type="hidden" name="menu_item_id" :value="selectedItem?.id">
                 
-                <!-- 尺寸選擇 -->
-                <div x-show="selectedItem?.price_l" class="mb-4">
+                <!-- 尺寸選擇（V2.31.0：規格標籤照菜單——M／L、中杯／大杯／特大杯、Solo／Doppio、L杯／瓶裝；只有一種規格不顯示） -->
+                <div x-show="selectedItem && selectedItem.sizes && selectedItem.sizes.length > 1" class="mb-4" id="size-picker">
                     <label class="block text-sm font-medium text-sela-800 mb-2">尺寸</label>
-                    <div class="flex gap-2">
-                        <label class="cursor-pointer flex-1">
-                            <input type="radio" name="size" value="M" x-model="selectedSize" class="peer hidden" checked>
-                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 text-center peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
-                                M <span x-text="'$' + selectedItem?.price"></span>
-                            </span>
-                        </label>
-                        <label class="cursor-pointer flex-1">
-                            <input type="radio" name="size" value="L" x-model="selectedSize" class="peer hidden">
-                            <span class="flex items-center justify-center px-4 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 text-center peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
-                                L <span x-text="'$' + selectedItem?.price_l"></span>
-                            </span>
-                        </label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="sz in ((selectedItem && selectedItem.sizes && selectedItem.sizes.length > 1) ? selectedItem.sizes : [])" :key="sz.label">
+                            <label class="cursor-pointer flex-1 min-w-[96px]">
+                                <input type="radio" name="size" :value="sz.label" x-model="selectedSize" class="peer hidden">
+                                <span class="flex items-center justify-center px-2 py-2.5 min-h-[44px] rounded-full border border-sela-300 text-sela-700 text-sm text-center whitespace-nowrap peer-checked:bg-sela-800 peer-checked:text-white peer-checked:border-sela-800">
+                                    <span x-text="sz.label + ' $' + sz.price"></span>
+                                </span>
+                            </label>
+                        </template>
                     </div>
                 </div>
                 
@@ -1004,9 +1000,9 @@
                     {% endif %}
                 </div>
                 
-                <!-- 加料選項（飲料店） -->
+                <!-- 加料選項（飲料店）；V2.31.0：品項設成不提供加料就整列不出現 -->
                 {% if store.toppings %}
-                <div class="mb-4">
+                <div class="mb-4" x-show="!(selectedItem && selectedItem.no_top)" id="topping-picker">
                     <label class="block text-sm font-medium text-sela-800 mb-2">加料</label>
                     <div class="flex flex-wrap gap-2">
                         {% for topping in store.toppings if topping.is_active %}
@@ -1129,7 +1125,7 @@ function orderPage() {
         moreTab: 'settings',
         menuOpen: false,       // V2.18.0 已送出後菜單收合，「再加點」展開
         selectedItem: null,
-        selectedSize: 'M',
+        selectedSize: '',
         quantity: 1,
         extraToppings: 0,
         backupMode: null,
@@ -1181,9 +1177,11 @@ function orderPage() {
             }
             
             this.selectedItem = item;
-            this.selectedSize = 'M';
+            // V2.31.0：預設第一個規格；只有一種規格時後端自己帶標籤
+            this.selectedSize = (item.sizes && item.sizes.length > 1) ? item.sizes[0].label : '';
             this.quantity = 1;
             this.extraToppings = 0;
+            document.querySelectorAll('#add-item-sheet input[name=toppings]').forEach(c => { c.checked = false; });
             this.noteOpen = false;      // V2.20.0：備註收合
             this.lastPrefNote = '';
             this.showAddItem = true;
@@ -1224,7 +1222,7 @@ function orderPage() {
                 const pref = JSON.parse(localStorage.getItem('selapref_{{ store.id if store else 0 }}') || '{}');
                 // V2.20.0：帶入了什麼就顯示一行「已帶入上次：…」（原本悄悄帶入，看不出來）
                 const applied = [];
-                if (pref.size && this.selectedItem && this.selectedItem.price_l) { this.selectedSize = pref.size; applied.push(pref.size); }
+                if (pref.size && this.selectedItem && (this.selectedItem.sizes || []).length > 1 && this.selectedItem.sizes.some(z => z.label === pref.size)) { this.selectedSize = pref.size; applied.push(pref.size); }
                 if (pref.sugar) { const r = document.querySelector(`#add-item-sheet input[name=sugar][value="${pref.sugar}"]`); if (r) { r.checked = true; applied.push(pref.sugar); } }
                 if (pref.ice)   { const r = document.querySelector(`#add-item-sheet input[name=ice][value="${pref.ice}"]`);   if (r) { r.checked = true; applied.push(pref.ice); } }
                 this.lastPrefNote = applied.join('・');
@@ -1251,7 +1249,8 @@ function orderPage() {
 
         itemSubtotal() {
             if (!this.selectedItem) return 0;
-            const base = (this.selectedSize === 'L' && this.selectedItem.price_l) ? this.selectedItem.price_l : this.selectedItem.price;
+            const _sz = (this.selectedItem.sizes || []).find(z => z.label === this.selectedSize) || (this.selectedItem.sizes || [])[0];
+            const base = _sz ? Number(_sz.price) : Number(this.selectedItem.price);
             const q = Math.max(1, parseInt(this.quantity) || 1);
             return (base + this.extraToppings) * q;
         },

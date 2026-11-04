@@ -7,6 +7,7 @@
  *   改 M 價 → 變色、「改了 1 項」、送出的 JSON 只有那一項（含原本的 L 價）
  *   打字母 → 顯示錯誤、按鈕停用；時價沒有輸入框
  *   搜尋只留符合的品項；取消（確認）→ 離開改價模式、值還原
+ *   V2.30.1：有加價選項的品項，品名下一行列出「+ 名稱 +價差、…」
  *
  * 用法：node scripts/jsdom_price_check.js <html檔>
  */
@@ -49,12 +50,17 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
   const [m, l] = rt.querySelectorAll("input");
   if (!m || !l || m.value !== "30" || l.value !== "35") fail("紅茶應有 M 30／L 35 兩個輸入框");
   if (row("季節茶").querySelector("input")) fail("時價品項不該有輸入框");
+  // V2.30.1：改價模式也看得到加價選項（用加價頂著的特大杯不會被誤判沒匯進去）
+  const op = rt.querySelector("[data-opts]");
+  if (!op || !visible(op) || text(op) !== "+ 大杯升級特大杯 +15、去冰") fail("紅茶的加價選項要列在品名下：" + text(op));
+  const gop = row("綠茶").querySelector("[data-opts]");
+  if (gop && visible(gop)) fail("沒有選項的品項不該出現選項行");
   m.value = "32"; m.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(60);
   if (save.disabled) fail("改了價格應可存");
   if (!m.className.includes("bg-amber-50")) fail("改過的輸入框要變色");
   if (!text(d.getElementById("price-form")).includes("改了 1 項")) fail("應寫「改了 1 項」");
   const payload = JSON.parse(d.querySelector("#price-form input[name=changes_json]").value);
-  if (payload.length !== 1 || payload[0].price !== "32" || payload[0].price_l !== "35") fail("送出的資料不對：" + JSON.stringify(payload));
+  if (payload.length !== 1 || JSON.stringify(payload[0].prices) !== '["32","35"]') fail("送出的資料不對：" + JSON.stringify(payload));  // V2.31.0：prices 依規格順序
   m.value = "3a"; m.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(60);
   if (!save.disabled || !text(d.getElementById("price-form")).includes("數字")) fail("填非數字應停用並提示");
   m.value = "32"; m.dispatchEvent(new w.Event("input", { bubbles: true })); await sleep(40);

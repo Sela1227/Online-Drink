@@ -8,7 +8,7 @@
 比對規則（與畫面稿一致）：
 - 以**品名**為鍵、全菜單範圍。同名品項兩邊都只有一個 → 直接配對，分類不同就標「分類改了」
 - 品名在任一邊重複（跨分類同名）→ 那個名字退回用「分類＋品名」配對
-- 「變更」= price / price_l / options / 時價 / 停售 / 說明 任一不同，或分類改了（V2.14.0 加後三項）
+- 「變更」= 規格價格（price／price_l／variants，V2.31.0 統一成 sizes）/ options / 時價 / 停售 / 說明 / 加料開關 任一不同，或分類改了（V2.14.0 加後三項）
 - 「疑似只貼了部分菜單」= 移除數 ≥ 使用中品項數的一半，且使用中品項 ≥ 6
 """
 from decimal import Decimal
@@ -24,6 +24,12 @@ def _d(v):
     return Decimal(str(v)).normalize()
 
 
+def _sizes(price, price_l, variants) -> tuple:
+    """V2.31.0：規格清單正規化成 ((label, price), ...)——舊 price／price_l 與 variants 用同一套比"""
+    from app.services.variants import choices_from
+    return tuple((lb, _d(p)) for lb, p in choices_from(price, price_l, variants))
+
+
 def _flatten_existing(menu) -> list[dict]:
     """ORM Menu → [{name, category, price, price_l, options}]（含已下架，整份比）"""
     out = []
@@ -33,7 +39,8 @@ def _flatten_existing(menu) -> list[dict]:
             "name": (it.name or "").strip(),
             "category": cat_names.get(it.category_id, "") if it.category_id else "",
             "price": _d(it.price),
-            "price_l": _d(it.price_l),
+            "sizes": _sizes(it.price, it.price_l, [(v.label, v.price) for v in (getattr(it, "variants", None) or [])]),
+            "toppings": getattr(it, "allow_toppings", True) is not False,
             "tbd": bool(getattr(it, "price_tbd", False)),
             "available": getattr(it, "is_available", True) is not False,
             "note": (getattr(it, "description", None) or "").strip(),
@@ -61,7 +68,8 @@ def _new_item(it, category):
         "name": (it.name or "").strip(),
         "category": (category or "").strip(),
         "price": _d(it.price),
-        "price_l": _d(it.price_l),
+        "sizes": _sizes(it.price, it.price_l, [(v.label, v.price) for v in (getattr(it, "variants", None) or [])]),
+        "toppings": getattr(it, "allow_toppings", True) is not False,
         "tbd": bool(getattr(it, "price_tbd", False)),
         "available": getattr(it, "is_available", True) is not False,
         "note": (getattr(it, "note", None) or "").strip(),
@@ -88,15 +96,13 @@ def _dup_names(items) -> set:
     return dup
 
 
-def _fmt_price(p, pl, tbd=False) -> str:
+def _fmt_price(sizes, tbd=False) -> str:
+    """V2.31.0：「$30」「M $30／L $35」「中杯 $125／大杯 $140／特大杯 $155」"""
     if tbd:
         return "時價"
-    if p is None:
+    if not sizes:
         return ""
-    s = f"${p:f}"
-    if pl is not None:
-        s += f"/${pl:f}"
-    return s
+    return "／".join((f"{lb} " if lb else "") + f"${p:f}" for lb, p in sizes)
 
 
 def diff_menu(existing_menu, new_content) -> dict:
@@ -130,17 +136,17 @@ def diff_menu(existing_menu, new_content) -> dict:
         if oit is None:
             added.append({
                 "name": nit["name"], "category": nit["category"],
-                "price_text": _fmt_price(nit["price"], nit["price_l"], nit["tbd"]),
+                "price_text": _fmt_price(nit["sizes"], nit["tbd"]),
                 "unavailable": not nit["available"],
             })
             continue
         price_changed = (oit["tbd"] != nit["tbd"]) or (
-            not nit["tbd"] and ((oit["price"] != nit["price"]) or (oit["price_l"] != nit["price_l"]))
+            not nit["tbd"] and oit["sizes"] != nit["sizes"]
         )
         category_changed = oit["category"] != nit["category"]
         options_changed = oit["options"] != nit["options"]
         availability_changed = oit["available"] != nit["available"]
-        note_changed = oit["note"] != nit["note"]
+        note_changed = oit["note"] != nit["note"] or oit["toppings"] != nit["toppings"]  # V2.31.0：加料開關併在說明類
         if not (price_changed or category_changed or options_changed or availability_changed or note_changed):
             unchanged += 1
             continue
@@ -153,14 +159,16 @@ def diff_menu(existing_menu, new_content) -> dict:
             notes.append("分類改了")
         if options_changed:
             notes.append("選項：" + _describe_options(dict(oit["options"]), dict(nit["options"])))
-        if note_changed:
+        if oit["note"] != nit["note"]:
             notes.append(f"說明：「{oit['note'] or '（無）'}」→「{nit['note'] or '（無）'}」")
+        if oit["toppings"] != nit["toppings"]:
+            notes.append("改為不提供加料" if not nit["toppings"] else "改為可加料")
         changed.append({
             "name": nit["name"],
             "category": nit["category"],
             "old_category": oit["category"],
-            "old_price_text": _fmt_price(oit["price"], oit["price_l"], oit["tbd"]),
-            "new_price_text": _fmt_price(nit["price"], nit["price_l"], nit["tbd"]),
+            "old_price_text": _fmt_price(oit["sizes"], oit["tbd"]),
+            "new_price_text": _fmt_price(nit["sizes"], nit["tbd"]),
             "price_changed": price_changed,
             "category_changed": category_changed,
             "options_changed": options_changed,
@@ -173,7 +181,7 @@ def diff_menu(existing_menu, new_content) -> dict:
         if key not in new_map:
             removed.append({
                 "name": oit["name"], "category": oit["category"],
-                "price_text": _fmt_price(oit["price"], oit["price_l"], oit["tbd"]),
+                "price_text": _fmt_price(oit["sizes"], oit["tbd"]),
             })
 
     # V2.16.1 B-9：分類改名合併成一行。舊分類整個消失＋新分類整個出現＋兩邊品名重疊 ≥ 80% → 視為改名；
@@ -261,8 +269,8 @@ def _detect_renamed_categories(old_items, new_items, dup) -> list[dict]:
             same = 0
             for k in set(old_by_cat[oc]) & set(new_by_cat[best]):
                 o, n = old_by_cat[oc][k], new_by_cat[best][k]
-                if (o["tbd"], o["price"], o["price_l"], o["options"], o["available"], o["note"]) == \
-                   (n["tbd"], n["price"], n["price_l"], n["options"], n["available"], n["note"]):
+                if (o["tbd"], o["sizes"], o["options"], o["available"], o["note"], o["toppings"]) == \
+                   (n["tbd"], n["sizes"], n["options"], n["available"], n["note"], n["toppings"]):
                     same += 1
             result.append({"old": oc, "new": best, "count": len(new_by_cat[best]), "unchanged": same})
     return result
