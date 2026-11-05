@@ -174,6 +174,26 @@ def split_home_groups(groups, user):
     return attention, others
 
 
+def often_stores_for(db: Session, user, limit: int = 3):
+    """V2.34.0（S-6）：首頁沒有團時列「你常開的店」。
+
+    自己開過的團依店家數次數（同次數看最近），只留看得到的店；一家都沒開過就退回全站熱門。
+    回傳 [(store, 上次開團 'MM/DD' 或 '')]。
+    """
+    visible = {s.id: s for s in visible_stores_for(db, user)}
+    if not visible:
+        return []
+    rows = db.query(Group.store_id, func.count(Group.id), func.max(Group.created_at)).filter(
+        Group.owner_id == user.id, Group.store_id.isnot(None),  # 代購是個人店，不在 visible 裡
+    ).group_by(Group.store_id).all()
+    mine = sorted([r for r in rows if r[0] in visible], key=lambda r: (-r[1], -(r[2].timestamp() if r[2] else 0)))
+    if mine:
+        return [(visible[sid], to_taipei_time(dt).strftime("%m/%d") if dt else "") for sid, _n, dt in mine[:limit]]
+    rows = db.query(Group.store_id, func.count(Group.id)).filter(Group.store_id.in_(list(visible))).group_by(Group.store_id).all()
+    hot = sorted([r for r in rows], key=lambda r: -r[1])
+    return [(visible[sid], "") for sid, _n in hot[:limit]]
+
+
 def _home_context(request: Request, db: Session, user):
     now = taipei_now()
     groups = _open_groups(db, user, now)
@@ -196,6 +216,8 @@ def _home_context(request: Request, db: Session, user):
         "active_votes": active_votes,
         "voted_ids": voted_ids,
         "now": now,
+        # V2.34.0（S-6）：沒有任何團時才查
+        "often_stores": often_stores_for(db, user) if not (attention or open_groups) else [],
     }
 
 

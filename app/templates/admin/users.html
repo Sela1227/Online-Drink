@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}人員 - SELA 快點來點餐{% endblock %}
@@ -19,17 +21,19 @@
     </div>
     {% endif %}
 
-    <div class="flex gap-1 bg-sela-100 p-1 rounded-xl text-sm overflow-x-auto">
-        {% for val, label in [('created','建立時間'), ('last_login','最近登入'), ('last_active','最近活動'), ('name','名稱')] %}
-        <a href="/admin/users?sort={{ val }}"
-           class="flex-1 text-center whitespace-nowrap py-2 px-3 min-h-[36px] rounded-lg font-medium {{ 'bg-white text-sela-800 shadow-sm' if sort == val else 'text-sela-800/60' }}">{{ label }}</a>
-        {% endfor %}
+    {# V2.34.0（M-4）：四種排序分頁拿掉，換成一個搜尋框（名字、暱稱）；預設依最近活動 #}
+    <div x-data="{ q: '' }" class="space-y-4">
+    <div class="relative">
+        <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sela-800/40"></i>
+        <input type="search" id="user-search" x-model="q" placeholder="搜尋名字或暱稱" autocomplete="off"
+               class="w-full pl-9 pr-3 py-2.5 border border-sela-200 rounded-xl bg-white text-base focus:outline-none focus:border-sela-500">
     </div>
-
     {% if users %}
     <div class="bg-white rounded-2xl shadow-sm divide-y" id="user-list">
         {% for u in users %}
-        <a href="/admin/users/{{ u.id }}" class="p-4 flex items-center gap-3 active:bg-sela-50 min-h-[64px]">
+        <a href="/admin/users/{{ u.id }}" class="p-4 flex items-center gap-3 active:bg-sela-50 min-h-[64px]"
+           data-name="{{ ((u.display_name or '') ~ ' ' ~ (u.nickname or '')) | lower }}"
+           x-show="!q.trim() || $el.dataset.name.includes(q.trim().toLowerCase())">
             <span class="relative w-10 h-10 flex-shrink-0">
                 <span class="w-10 h-10 bg-sela-100 rounded-full flex items-center justify-center overflow-hidden">
                     {% if u.picture_url %}<img src="{{ u.picture_url }}" alt="" class="w-full h-full object-cover">{% else %}<i class="ti ti-user text-lg"></i>{% endif %}
@@ -44,7 +48,7 @@
                     {% if u.id == user.id %}<span class="text-xs text-sela-800/50 font-normal ml-1">（你）</span>{% endif %}
                 </span>
                 <span class="block text-[13px] text-sela-800/60 truncate">
-                    {% if u.last_login_at %}最後登入 {{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}{% else %}尚未登入{% endif %}
+                    {% if u.last_active_at %}最近活動 {{ (u.last_active_at|taipei).strftime('%m/%d %H:%M') }}{% elif u.last_login_at %}最後登入 {{ (u.last_login_at|taipei).strftime('%m/%d %H:%M') }}{% else %}尚未登入{% endif %}
                     · {{ order_counts.get(u.id, 0) }} 筆訂單
                 </span>
             </span>
@@ -55,13 +59,14 @@
     {% else %}
     <div class="text-center py-12 text-sela-800/60 bg-white rounded-2xl">還沒有任何使用者</div>
     {% endif %}
+    </div>
 
     <section id="maintenance" class="pt-4 space-y-2">
         <h2 class="text-sm font-bold text-sela-800/60 px-1">維護</h2>
         <div class="bg-white rounded-2xl border border-red-200 p-4 space-y-3">
             <div>
                 <div class="text-[15px] font-medium text-sela-900">登出所有人</div>
-                <div class="text-sm text-sela-800/70 mt-1">所有人（包括你）下次開啟都要重新用 LINE 登入。現在有 <b id="online-impact">{{ online_count }}</b> 人在線，正在點餐的會被打斷。只在懷疑登入資料外洩時用。</div>
+                <div class="text-sm text-sela-800/70 mt-1">所有人（包括你）都要重新用 LINE 登入，<b id="online-impact">{{ online_count }}</b> 人在線會被打斷。只在懷疑登入外洩時用。</div>
             </div>
             <form action="/admin/users/logout-all" method="post" data-n="{{ online_count }}"
                   onsubmit="return confirm('登出所有人？現在有 ' + this.dataset.n + ' 人在線，大家都要重新登入。')">

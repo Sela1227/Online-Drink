@@ -123,8 +123,9 @@
     //
     // 元件尚未就緒時先排隊；元件 x-init 時會設定 window._toastShow 並倒出佇列。
     window._toastQueue = window._toastQueue || [];
-    window.toast = function (m, kind) {
-        var p = { msg: m, kind: kind || 'ok' };
+    // V2.33.0（S-4）：第三個參數可帶一顆動作鈕 { label: '復原', run: function () {...} }，停留 6 秒
+    window.toast = function (m, kind, action) {
+        var p = { msg: m, kind: kind || 'ok', action: action || null };
         if (window._toastShow) { window._toastShow(p); } else { window._toastQueue.push(p); }
     };
     </script>
@@ -222,15 +223,19 @@
          那時還沒掛上，事件發給了不存在的人。改成 x-init 直接把顯示函式交給
          window._toastShow，並同步倒出佇列 —— 不再依賴指令順序。 -->
     <div x-data="{
-             msg: '', kind: 'ok', show: false,
+             msg: '', kind: 'ok', show: false, action: null,
              init() {
                  // 用 x-data 的 init() 而不是 x-init 表達式：Alpine 會把 x-init 第一個
                  // 陳述式的結果當回傳值，若是函式就會呼叫一次（_toastShow(undefined) 噴錯）
                  window._toastShow = (p) => {
-                     this.msg = p.msg; this.kind = p.kind || 'ok'; this.show = true;
+                     window._toastAt = Date.now();
+                     this.msg = p.msg; this.kind = p.kind || 'ok'; this.action = p.action || null; this.show = true;
                      clearTimeout(window._toastT);
-                     window._toastT = setTimeout(() => { this.show = false; }, 2600);
+                     window._toastT = setTimeout(() => { this.show = false; }, this.action ? 6000 : 2600);
                  };
+                 // V2.32.0（內部審核 B-5）：打開購物車等 sheet 時，先收掉「之前」的 toast（不然壓在第一個品項的加減鈕上）；
+                 // 剛跳出來的（400ms 內，例如「已設定候補」緊接著開購物車）留著
+                 window.hideStaleToast = () => { if (this.show && Date.now() - (window._toastAt || 0) > 400) { this.show = false; clearTimeout(window._toastT); } };
                  (window._toastQueue || []).splice(0).forEach(p => window._toastShow(p));
              }
          }"
@@ -245,6 +250,8 @@
              class="text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 max-w-[88vw]">
             <i :class="kind === 'error' ? 'ti ti-alert-circle' : 'ti ti-check'" style="font-size:18px;"></i>
             <span x-text="msg"></span>
+            <button type="button" x-show="action" x-cloak id="toast-action" @click="const a = action; show = false; a && a.run && a.run()"
+                    class="pointer-events-auto ml-1 -mr-1 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold" x-text="action ? action.label : ''"></button>
         </div>
     </div>
     <script>

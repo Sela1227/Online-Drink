@@ -372,6 +372,28 @@ def run_migrations(engine, log=print) -> _Result:
         except Exception as e:
             r.errors.append(f"system_settings：{e}")
             log(f"!! system_settings：{e}")
+
+        # 7. V2.33.0（內部審核 S-2，Sela 選）：取消草稿購物車——「加入」就是點餐。
+        #    還開著的團：購物車裡有東西的 DRAFT、修改中的 EDITING 一律轉成 SUBMITTED（EDITING 以目前內容為準、丟掉快照），
+        #    跟新流程「加了就生效」一致。已截止的團不動（截止時 EDITING 已經還原過；DRAFT 本來就不算）。
+        #    冪等：新程式不會再產生「有品項的 DRAFT」或 EDITING，第二次跑變更 0。
+        try:
+            from app.models.group import taipei_now
+            with engine.begin() as conn:
+                n = conn.execute(text("""
+                    UPDATE orders SET status = 'SUBMITTED', snapshot = NULL
+                    WHERE status IN ('DRAFT', 'EDITING')
+                      AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id)
+                      AND group_id IN (SELECT id FROM groups WHERE (is_closed IS NULL OR is_closed = :f) AND deadline > :now)
+                """), {"f": False, "now": taipei_now()}).rowcount
+            if n:
+                r.changed.append(f"開放中團的購物車／修改中轉成已點 {n} 筆")
+                log(f"Converted open-group carts to submitted orders: {n}")
+            else:
+                r.ok += 1
+        except Exception as e:
+            r.errors.append(f"購物車轉已點：{e}")
+            log(f"!! 購物車轉已點：{e}")
     finally:
         _release_lock(lock)
 

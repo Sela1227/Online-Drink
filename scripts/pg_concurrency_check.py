@@ -65,6 +65,23 @@ def _child_submit(gid, line_id, start_at, q):
     q.put((line_id, r.status_code, r.text[:120]))
 
 
+def _child_add(gid, line_id, menu_item_id, start_at, q):
+    """V2.33.0（S-2）：沒有購物車，加進來就佔用——兩人同時「點這份」搶最後一份"""
+    _env()
+    import app.routers.orders as orders
+    from app.models.user import User
+    from fastapi.testclient import TestClient
+
+    async def fake(request, db):
+        return db.query(User).filter(User.line_user_id == line_id).first()
+    orders.get_current_user = fake
+    from app.main import app
+    c = TestClient(app)
+    _wait(start_at)
+    r = c.post(f"/groups/{gid}/orders/items", data={"menu_item_id": str(menu_item_id), "quantity": "1"}, headers={"HX-Request": "true"})
+    q.put((line_id, r.status_code, r.text[:120]))
+
+
 def _child_backup(gid, item_id, menu_item_id, start_at, q):
     _env()
     import app.routers.orders as orders
@@ -175,6 +192,7 @@ def main():
     from app.models.menu import Menu, MenuCategory, MenuItem
     from app.models.group import Group, taipei_now
     from app.models.order import Order, OrderItem, OrderStatus, OrderItemBackup
+    from sqlalchemy import func
     db = SessionLocal()
     st = Store(name="並行測試店", category=CategoryType.MEAL, is_active=True); db.add(st); db.flush()
     mn = Menu(store_id=st.id, is_active=True); db.add(mn); db.flush()
@@ -210,6 +228,25 @@ def main():
     print(f"[A] 搶最後一份：{rounds} 輪中 {exact} 輪恰好 1 人成功 → {'通過' if ok else '失敗（有超賣或兩人都失敗）'}")
     if not ok:
         failures.append("A")
+
+    # A2. V2.33.0（S-2）：點了就佔用——兩人同時「點這份」搶最後一份（不經送出）
+    it2 = MenuItem(menu_id=mn.id, category_id=ct.id, name="最後一份雞腿", price=100, stock_limit=1); db.add(it2)
+    for n in (3, 4):
+        db.add(User(line_user_id=f"racer{n}", display_name=f"搶{n}", nickname=f"搶{n}"))
+    db.commit()
+    exact2 = 0
+    for i in range(rounds):
+        db.query(OrderItem).filter(OrderItem.menu_item_id == it2.id).delete(synchronize_session=False); db.commit()
+        _run(_child_add, [(g.id, "racer3", it2.id), (g.id, "racer4", it2.id)])
+        db.expire_all()
+        n = db.query(func.coalesce(func.sum(OrderItem.quantity), 0)).filter(OrderItem.menu_item_id == it2.id).scalar()
+        exact2 += (int(n) == 1)
+        if int(n) != 1:
+            print(f"    A2 第 {i + 1} 輪：被點了 {n} 份")
+    ok = exact2 == rounds
+    print(f"[A2] 同時點最後一份（S-2，不經送出）：{rounds} 輪中 {exact2} 輪恰好 1 份 → {'通過' if ok else '失敗（超賣或都失敗）'}")
+    if not ok:
+        failures.append("A2")
 
     # B. 候補連點（上限 1）
     exact = 0

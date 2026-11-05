@@ -61,7 +61,7 @@
 
     <!-- 品項列表 -->
     {% if not items %}
-    <div class="text-center py-6 text-sela-800/45 text-sm">還沒有品項——加入第一項，加好再分享連結</div>
+    <div class="text-center py-6 text-sela-800/45 text-sm">還沒有品項，加好再分享連結</div>
     {% else %}
     <div class="space-y-2">
         {% for item in items %}
@@ -126,6 +126,6 @@
         </details>
         {% endfor %}
     </div>
-    <p class="text-xs text-sela-800/45">改價／下架不影響已送出的訂單（金額吃當時快照）</p>
+    <p class="text-xs text-sela-800/45">改價、下架不影響已點的訂單</p>
     {% endif %}
 </div>

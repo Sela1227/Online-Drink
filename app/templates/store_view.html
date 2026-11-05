@@ -9,6 +9,8 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-sela-800">{{ store.name }}</h1>
+        {# V2.32.0（內部審核 M-1）：管理員從前台店家頁直接進工作台 #}
+        {% if user and user.is_admin and not store.is_personal %}<a href="/admin/stores/{{ store.id }}" id="admin-manage-store" class="ml-auto inline-flex items-center gap-1 px-3 min-h-[36px] rounded-full border border-sela-700 text-sela-700 text-sm bg-white"><i class="ti ti-settings"></i> 管理</a>{% endif %}
                 {% if store.provides_invoice or store.provides_receipt %}
                 <div class="flex gap-1.5 mt-1">
                     {% if store.provides_invoice %}<span class="text-xs bg-sela-100 text-sela-800 px-2 py-0.5 rounded-full"><i class="ti ti-receipt"></i> 可開發票</span>{% endif %}

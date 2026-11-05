@@ -83,7 +83,7 @@
                 {% if a.is_owner %}
                 <div class="mt-2 flex items-center justify-between gap-2 text-xs">
                     <span class="text-sela-800/60 truncate">
-                        {{ group.submitted_count }} 人已送出{% if group.submitted_count > 0 %}・${{ group.total_amount|money }}{% endif %}
+                        {{ group.submitted_count }} 人已點{% if group.submitted_count > 0 %}・${{ group.total_amount|money }}{% endif %}
                         {% if a.status == 'unsent' %} · <span class="text-amber-700">你還沒送出</span>{% elif a.status == 'none' %} · <span class="text-amber-700">你還沒點</span>{% endif %}
                     </span>
                     {% if group.pending_count > 0 %}
@@ -125,7 +125,7 @@
                     </div>
                 </div>
                 {% if e.status == 'submitted' %}
-                <span class="text-[11px] text-green-700 bg-green-50 px-2 py-0.5 rounded-full whitespace-nowrap"><i class="ti ti-check"></i> 已送出</span>
+                <span class="text-[11px] text-green-700 bg-green-50 px-2 py-0.5 rounded-full whitespace-nowrap"><i class="ti ti-check"></i> 已點</span>
                 {% else %}
                 <span class="text-[11px] text-sela-800/50 whitespace-nowrap">還沒點</span>
                 {% endif %}
@@ -148,7 +148,25 @@
             <path d="M85 50 q-3.5 -5 0 -11" stroke="#C9A977" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.65"/>
         </svg>
         <p class="text-sela-800/60">今天還沒有人開團</p>
+        {% if often_stores %}
+        {# V2.34.0（S-6）：列三家你常開的店，點「開團」直接到選好店的開團畫面 #}
+        <div id="often-stores" class="mt-4 text-left">
+            <div class="text-xs font-semibold text-sela-800/70 mb-2 px-1">{% if often_stores[0][1] %}你常開的店{% else %}大家常開的店{% endif %}</div>
+            <div class="bg-white rounded-xl border border-sela-100 divide-y divide-sela-100">
+                {% for st, last in often_stores %}
+                <a href="/groups/new?store_id={{ st.id }}" class="flex items-center gap-3 p-3 active:bg-sela-50">
+                    {% if st.logo_url %}<img src="{{ st.logo_url }}" alt="" class="w-10 h-10 rounded-lg object-contain bg-sela-50 flex-shrink-0">
+                    {% else %}<span class="w-10 h-10 rounded-lg bg-sela-100 flex items-center justify-center flex-shrink-0 text-sela-700"><i class="ti {% if st.category and st.category.value == 'drink' %}ti-cup{% elif st.category and st.category.value == 'meal' %}ti-bowl{% else %}ti-shopping-bag{% endif %}"></i></span>{% endif %}
+                    <span class="flex-1 min-w-0"><span class="block text-sm text-sela-800 truncate">{{ st.name }}</span>{% if last %}<span class="block text-xs text-sela-800/50">上次 {{ last }}</span>{% endif %}</span>
+                    <span class="px-3 py-1.5 rounded-full bg-sela-800 text-white text-sm flex-shrink-0">開團</span>
+                </a>
+                {% endfor %}
+            </div>
+            <a href="/groups/new" class="block text-center mt-3 text-sm text-sela-800 underline">開別家 ›</a>
+        </div>
+        {% else %}
         <a href="/groups/new" class="inline-block mt-2 text-sm text-sela-800 underline">＋ 開一個？</a>
+        {% endif %}
     </div>
     {% endif %}
 

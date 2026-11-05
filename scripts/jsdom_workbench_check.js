@@ -118,7 +118,8 @@ const setVal = async (el, v) => { el.value = v; el.dispatchEvent(new w.Event("in
   if (!visible(sets) || visible(opts)) fail("按「店家資料」應切到店家資料分頁");
   if (!w.location.search.includes("tab=settings")) fail("切分頁後網址應更新為 ?tab=settings（" + w.location.search + "）");
   const tabNames = [...d.querySelectorAll("button")].filter(b => b.className.includes("border-b-2")).map(text);
-  if (tabNames.join("/") !== "菜單/甜冰加料/店家資料/停用／刪除") fail("分頁應為 菜單/甜冰加料/店家資料/停用／刪除（" + tabNames.join("/") + "）");
+  // V2.34.0（M-5）：分頁 4→3，停用／刪除併到店家資料最下面的危險區
+  if (tabNames.join("/") !== "菜單/甜冰加料/店家資料") fail("分頁應為 菜單/甜冰加料/店家資料（" + tabNames.join("/") + "）");
   // V2.27.0：頂部摘要可點——縣市 → 店家資料分頁、捲到縣市欄位；甜冰加料 → 甜冰加料分頁
   const summary = d.getElementById("wb-summary");
   if (!summary) fail("找不到店家資料摘要 #wb-summary");
@@ -139,12 +140,14 @@ const setVal = async (el, v) => { el.value = v; el.dispatchEvent(new w.Event("in
   sbtn("分店").click(); await sleep(60);
   if (w.location.hash !== "#branches") fail("按摘要的分店，網址應帶 #branches（" + w.location.hash + "）");
   // V2.29.0：刪除店家改確認框——按鈕打開、取消關閉、確定送出 confirm=yes
-  [...d.querySelectorAll("button")].find(b => text(b).includes("停用／刪除")).click(); await sleep(60);
+  [...d.querySelectorAll("button")].find(b => b.className.includes("border-b-2") && text(b).includes("店家資料")).click(); await sleep(60);
+  const danger = d.getElementById("danger");
+  if (!danger || !visible(danger) || !text(danger).includes("危險區")) fail("M-5：店家資料分頁最下面應有「危險區」");
   const dlg = d.getElementById("del-store-dialog");
   if (!dlg || visible(dlg)) fail("確認框一開始不顯示");
   d.getElementById("del-store-btn").click(); await sleep(60);
   if (!visible(dlg)) fail("按「刪除這家店」應跳出確認框");
-  if (!text(dlg).includes("無法復原")) fail("確認框要寫出影響");
+  if (!text(dlg).includes("不能復原")) fail("確認框要寫出影響");
   [...dlg.querySelectorAll("button")].find(b => text(b) === "取消").click(); await sleep(60);
   if (visible(dlg)) fail("按取消應關閉確認框");
   const dform = dlg.querySelector("form");

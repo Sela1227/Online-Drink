@@ -1,40 +1,14 @@
 {% extends "base.html" %}
 {% import "partials/nav.html" as nav %}
+{# V2.32.0（內部審核 B-4）：選完店後「開團」鈕剛好在底部導航後面；開團頁是從「＋」進來的任務頁，不顯示導航、開團鈕貼底 #}
+{% block bottom_nav %}{% endblock %}
 
 {% block title %}開新團 - SELA 快點來點餐{% endblock %}
 
 {% block content %}
 {{ nav.back('/home', '今天') }}
 <div class="space-y-4">
-    {# V2.17.0 IA：開團頁最上面——投票入口只在這裡與首頁投票卡；範本只從這裡進 #}
-    {% if not copy_from %}
-    <a href="/votes/new" class="flex items-center justify-between bg-sela-50 rounded-2xl px-4 py-3 border border-sela-200 text-sm text-sela-800 active:bg-sela-100">
-        <span><i class="ti ti-checkbox"></i> 還沒決定吃哪家？</span>
-        <span class="underline">發起投票 ›</span>
-    </a>
-    {% endif %}
-    {% if my_templates %}
-    <div>
-        <div class="text-xs font-medium text-sela-800/60 mb-2 px-1"><i class="ti ti-bolt"></i> 快速開團</div>
-        <div class="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-            {% for tpl in my_templates %}
-            <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-shrink-0">
-                <button type="submit" class="flex items-center gap-2 bg-white border border-sela-200 rounded-full pl-1.5 pr-3 py-1.5 text-sm text-sela-800 active:bg-sela-50 max-w-[12rem]">
-                    {% if tpl.store.logo_url %}
-                    <img src="{{ tpl.store.logo_url }}" alt="" class="w-6 h-6 rounded-full object-contain bg-sela-50">
-                    {% else %}
-                    <span class="w-6 h-6 rounded-full bg-sela-50 flex items-center justify-center text-sela-800/50"><i class="ti {% if tpl.store.category.value == 'drink' %}ti-cup{% elif tpl.store.category.value == 'meal' %}ti-bowl{% else %}ti-shopping-cart{% endif %}"></i></span>
-                    {% endif %}
-                    <span class="truncate">{{ tpl.name }}</span>
-                </button>
-            </form>
-            {% endfor %}
-            <a href="/templates" class="flex-shrink-0 inline-flex items-center border border-dashed border-sela-300 rounded-full px-3 py-1.5 text-sm text-sela-800/60">管理範本 ›</a>
-        </div>
-    </div>
-    {% else %}
-    <div class="text-xs text-sela-800/45 px-1">常開同一家？開完團在團頁「存成範本」，下次這裡一鍵開團。<a href="/templates" class="underline ml-1">管理範本 ›</a></div>
-    {% endif %}
+    {# V2.34.0（S-5）：投票入口與快速開團（範本）搬進選店覆蓋層——一進開團頁就是覆蓋層，放在這裡會被蓋住 #}
 
 <div class="bg-white rounded-2xl shadow-sm p-4">
     <h1 class="text-lg font-bold text-sela-800 mb-4">
@@ -42,18 +16,8 @@
     </h1>
     
     <form action="/groups" method="post" class="space-y-4" x-data="newGroupForm()" @invalid.capture="if ($event.target.closest('#advanced-body')) advOpen = true">
-        <!-- 類型（V2.19.0：4 格大按鈕 → 一列 chip） -->
-        <div>
-            <label class="block text-xs font-semibold text-sela-800/75 mb-1.5">類型</label>
-            <div class="flex gap-1.5 flex-wrap">
-                {% for key, label, icon in [('drink', '飲料', 'ti-cup'), ('meal', '餐廳', 'ti-bowl'), ('group_buy', '團購', 'ti-shopping-cart'), ('proxy', '代購', 'ti-basket')] %}
-                <button type="button" @click='selectCategory({{ key | tojson }})'
-                        :class='selectedCategory === {{ key | tojson }} ? "bg-sela-800 border-sela-800 text-white" : "bg-white border-sela-300 text-sela-800/75"'
-                        class="px-3.5 py-1.5 rounded-full border text-sm transition"><i class="ti {{ icon }}"></i> {{ label }}</button>
-                {% endfor %}
-            </div>
-            <input type="hidden" name="is_proxy" :value="selectedCategory === 'proxy' ? 'true' : ''">
-        </div>
+        {# V2.34.0（S-5）：「類型」這一步拿掉——店家本身就帶類型；一進來就是選店覆蓋層（飲料／餐廳／團購在覆蓋層裡篩），第一格是代購 #}
+        <input type="hidden" name="is_proxy" :value="selectedCategory === 'proxy' ? 'true' : ''">
 
         <!-- 店家選擇 -->
         <!-- 代購提示 -->
@@ -64,8 +28,16 @@
         <!-- 選擇店家（V2.11.0：原本是原生 select，店家一多就難找。
              改為全螢幕覆蓋層——搜尋、分區、圖片辨識，且因為不是跳頁，
              中途「更換」店家不會弄丟已填的表單內容） -->
-        <div x-show="selectedCategory && selectedCategory !== 'proxy'" x-cloak>
-            <label class="block text-sm font-medium text-sela-800/80 mb-2">選擇店家</label>
+        <div x-show="selectedCategory === 'proxy'" x-cloak id="picked-proxy"
+             class="flex items-center gap-3 p-3 border-2 border-sela-700 rounded-xl bg-white">
+            <div class="w-10 h-10 rounded-lg bg-sela-700 text-white flex items-center justify-center flex-shrink-0"><i class="ti ti-basket"></i></div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-sela-800">代購</div>
+            </div>
+            <button type="button" @click="openPicker()" class="text-xs px-2.5 py-1.5 rounded-lg border border-sela-300 text-sela-700 flex-shrink-0">換一家</button>
+        </div>
+
+        <div x-show="selectedCategory !== 'proxy'" x-cloak>
 
             <button x-show="!storeId" type="button" @click="openPicker()"
                     class="w-full flex items-center gap-3 p-3.5 border-2 border-dashed border-sela-300 rounded-xl text-left active:bg-sela-100">
@@ -73,8 +45,7 @@
                     <i class="ti ti-search text-lg"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-sela-800">點此選擇店家</div>
-                    <div class="text-xs text-sela-800/55" x-text="pool.length + ' 家可選'"></div>
+                    <div class="text-sm font-medium text-sela-800">選一家店</div>
                 </div>
                 <i class="ti ti-chevron-right text-sela-800/40"></i>
             </button>
@@ -93,13 +64,10 @@
                          x-text="(selectedStore?.branches?.length || 0) + ' 家分店'"></div>
                 </div>
                 <button type="button" @click="openPicker()"
-                        class="text-xs px-2.5 py-1.5 rounded-lg border border-sela-300 text-sela-700 flex-shrink-0">更換</button>
+                        class="text-xs px-2.5 py-1.5 rounded-lg border border-sela-300 text-sela-700 flex-shrink-0">換一家</button>
             </div>
 
             <input type="hidden" name="store_id" :value="storeId">
-            <p class="text-xs text-sela-800/45 mt-1" x-show="pool.length === 0">
-                此類型尚無店家，請先到後台新增
-            </p>
         </div>
 
         <!-- 全螢幕選店覆蓋層 -->
@@ -108,8 +76,8 @@
                  桌機上兩張卡片會撐滿整個螢幕。內容區加最大寬度置中，網格隨寬度增加欄數 -->
             <div class="bg-sela-800 text-white flex-shrink-0">
                 <div class="max-w-3xl mx-auto px-3 py-3 flex items-center gap-3">
-                    <button type="button" @click="closePicker()" class="p-1"><i class="ti ti-arrow-left text-xl"></i></button>
-                    <span class="font-medium" x-text="'選擇' + catLabel(selectedCategory)"></span>
+                    <button type="button" @click="pickerBack()" class="p-1" aria-label="返回"><i class="ti ti-arrow-left text-xl"></i></button>
+                    <span class="font-medium">開團 · 選一家店</span>
                     <span class="ml-auto text-xs text-white/70" x-text="pool.length + ' 家'"></span>
                 </div>
             </div>
@@ -130,6 +98,14 @@
                         <span x-text="showAllCities ? '· 暫時顯示全部縣市' : ('· ' + pool.length + '／' + poolAllCities.length + ' 家')"></span></span>
                     <button type="button" @click="showAllCities = !showAllCities" class="text-sela-700 font-medium flex-shrink-0" x-text="showAllCities ? '只看我的縣市' : '看全部'"></button>
                 </div>
+                {# V2.34.0（S-5）：類別篩選取代原本開團頁的「類型」步驟；只列有店的類別 #}
+                <div id="picker-cats" class="max-w-3xl mx-auto px-3 pb-2 flex items-center gap-1.5 text-sm overflow-x-auto">
+                    <template x-for="c in catChips" :key="c[0]">
+                        <button type="button" @click="pickerCat = c[0]"
+                                :class="pickerCat === c[0] ? 'bg-sela-800 text-white border-sela-800' : 'bg-white border-sela-300 text-sela-800'"
+                                class="px-3 py-1.5 rounded-full border whitespace-nowrap" x-text="c[1]"></button>
+                    </template>
+                </div>
                 {# V2.16.2：排序可自訂，預設熱門；記在 localStorage #}
                 <div class="max-w-3xl mx-auto px-3 pb-2 flex items-center gap-1.5 text-xs flex-wrap">
                     <span class="text-sela-800/50 mr-1">排序</span>
@@ -143,6 +119,30 @@
 
             <div class="flex-1 overflow-y-auto">
             <div class="max-w-3xl mx-auto px-3 py-3 space-y-4">
+                {# V2.34.0（S-5）：代購是第一格；投票與範本原本在開團頁上方，覆蓋層一進來就蓋住，搬進來 #}
+                <div x-show="!pickerQuery.trim()" class="space-y-2">
+                    <button type="button" id="pick-proxy" @click="pickProxy()"
+                            class="w-full flex items-center gap-3 p-3 bg-white border border-dashed border-sela-400 rounded-xl text-left active:bg-sela-100">
+                        <span class="w-10 h-10 rounded-lg bg-sela-100 flex items-center justify-center flex-shrink-0 text-sela-700"><i class="ti ti-basket text-lg"></i></span>
+                        <span class="flex-1 min-w-0"><span class="block text-sm font-medium text-sela-800">代購</span><span class="block text-xs text-sela-800/55">自己填品項與價格</span></span>
+                        <i class="ti ti-chevron-right text-sela-800/40"></i>
+                    </button>
+                    {% if my_templates %}
+                    <div class="text-xs font-medium text-sela-800/60 px-1 pt-1"><i class="ti ti-bolt"></i> 快速開團 <a href="/templates" class="underline font-normal ml-1">管理範本 ›</a></div>
+                    <div id="picker-templates" class="flex gap-2 overflow-x-auto pb-1">
+                        {% for tpl in my_templates %}
+                        <form action="/templates/{{ tpl.id }}/use" method="post" class="flex-shrink-0">
+                            <button type="submit" class="flex items-center gap-1.5 bg-white border border-sela-200 rounded-full px-3 py-1.5 text-sm text-sela-800 active:bg-sela-50 max-w-[12rem]"><i class="ti ti-bolt text-sela-700"></i><span class="truncate">{{ tpl.name }}</span></button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <a href="/templates" class="block text-xs text-sela-800/60 underline px-1">管理範本 ›</a>
+                    {% endif %}
+                    {% if not copy_from %}
+                    <a href="/votes/new" id="picker-vote" class="block text-xs text-sela-800/60 px-1">還沒決定吃哪家？<span class="underline">發起投票 ›</span></a>
+                    {% endif %}
+                </div>
                 <!-- 搜尋中：攤平成單一清單（分成三區各一筆比不分區還難看） -->
                 <template x-if="pickerQuery.trim()">
                     <div>
@@ -281,7 +281,7 @@
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-sm text-sela-800/60">尚未建立部門，請至後台建立</p>
+                        <p class="text-sm text-sela-800/60">還沒有部門</p>
                         {% endif %}
                     </div>
                 </div>
@@ -315,7 +315,7 @@
                 <label x-show="orderLimit > 0" x-cloak class="flex items-start gap-2 -mt-2 cursor-pointer">
                     <input type="checkbox" name="allow_over_limit" value="true" class="mt-0.5 rounded border-sela-300"
                            {% if copy_from and copy_from.allow_over_limit %}checked{% endif %}>
-                    <span class="text-sm text-sela-800/70">允許超過上限<span class="block text-xs text-sela-800/50">勾選＝可以點超過，超過的部分自行貼補；不勾＝不能送出超過上限的訂單</span></span>
+                    <span class="text-sm text-sela-800/70">允許超過上限<span class="block text-xs text-sela-800/50">勾了可以點超過，超過的自付</span></span>
                 </label>
 
                 <!-- 飲料預設（只在飲料店） -->
@@ -336,7 +336,7 @@
                             </select>
                         </template>
                     </div>
-                    <p x-show="selectedStore && !selectedStore.sugar_options.length && !selectedStore.ice_options.length" class="text-xs text-sela-800/55">這家店還沒設定甜度／冰塊選項，團員點餐時不會有甜冰可選；管理員可到店家工作台「營運設定」補。</p>
+                    <p x-show="selectedStore && !selectedStore.sugar_options.length && !selectedStore.ice_options.length" class="text-xs text-sela-800/55">這家店沒有甜冰選項，點餐不會問甜冰。</p>
                     <div class="flex gap-4 mt-2">
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="lock_sugar" value="true"><span class="text-sm text-sela-800/70">鎖定甜度</span></label>
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="lock_ice" value="true"><span class="text-sm text-sela-800/70">鎖定冰塊</span></label>
@@ -385,7 +385,7 @@
                             <span>未達人數自動延長 30 分鐘</span>
                         </label>
                     </div>
-                    {{ toggle('', 'enableRemind', '自動催單', '截止前提醒還沒送出的人') }}
+                    {{ toggle('', 'enableRemind', '自動催單', '截止前提醒還沒點的人') }}
                     <div x-show="enableRemind" x-cloak class="px-3 py-2 bg-sela-50 flex items-center gap-2 text-sm text-sela-800/70">
                         截止前
                         <select name="auto_remind_minutes" :disabled="!enableRemind" class="border rounded px-2 py-1 text-sm">
@@ -401,7 +401,7 @@
         </div>
 
         <!-- 送出 -->
-        <div class="pt-2 space-y-2" x-show="storeId || selectedCategory === 'proxy'" x-cloak>
+        <div class="pt-2 space-y-2 sticky bottom-0 z-10 bg-sela-50 pb-3" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));" x-show="storeId || selectedCategory === 'proxy'" x-cloak id="create-group-bar">
             <button type="submit" class="btn btn-primary w-full py-3 text-base">開團</button>
             <a href="/home" class="block text-center text-sm text-sela-800/50 underline py-1">取消</a>
         </div>
@@ -482,11 +482,18 @@ function newGroupForm() {
             return this.showAllCities || !myCities.length || !s.city || s.city === '不分縣市'
                 || myCities.includes(s.city) || String(s.id) === String(this.storeId);
         },
+        // V2.34.0（S-5）：覆蓋層用類別 chip 篩（'all'＝全部），不再依開團頁的「類型」
+        pickerCat: 'all',
+        get catChips() {
+            const has = c => allStores.some(s => s.category === c);
+            return [['all', '全部'], ['drink', '飲料'], ['meal', '餐廳'], ['group_buy', '團購']].filter(c => c[0] === 'all' || has(c[0]));
+        },
+        inCat(s) { return this.pickerCat === 'all' || s.category === this.pickerCat; },
         get pool() {
-            return allStores.filter(s => s.category === this.selectedCategory && this.inMyCities(s));
+            return allStores.filter(s => this.inCat(s) && this.inMyCities(s));
         },
         get poolAllCities() {
-            return allStores.filter(s => s.category === this.selectedCategory);
+            return allStores.filter(s => this.inCat(s));
         },
         
         get selectedStore() {
@@ -558,14 +565,14 @@ function newGroupForm() {
             return this.sorted(this.pool.filter(s => s.name.toLowerCase().includes(kw)));
         },
         
-        openPicker() {
+        openPicker(onEntry) {
             this.pickerQuery = '';
             try { const k = localStorage.getItem('sela_store_sort'); if (['hot', 'name', 'recent', 'new'].includes(k)) this.sortKey = k; } catch (e) {}
             this.showAllCities = false;
             this.favSnapshot = this.favoriteIds.slice();
             this.pickerOpen = true;
-            // 讓手機返回鍵先關閉覆蓋層，而不是離開整個開團頁
-            history.pushState({ storePicker: true }, '');
+            // 讓手機返回鍵先關閉覆蓋層，而不是離開整個開團頁；一進來就開的那次不推（返回＝離開，跟 ← 一樣）
+            if (!onEntry) history.pushState({ storePicker: true }, '');
         },
         
         closePicker(fromPop) {
@@ -574,10 +581,22 @@ function newGroupForm() {
                 history.back();
             }
         },
+
+        // 覆蓋層左上 ←：還沒選店就是離開開團頁（一進來就開著的覆蓋層＝開團頁本身）
+        pickerBack() {
+            if (!this.storeId && this.selectedCategory !== 'proxy') { window.location.href = '/home'; return; }
+            this.closePicker();
+        },
         
         pickStore(store) {
+            this.selectedCategory = store.category;
             this.storeId = String(store.id);
             this.onStoreChange();
+            this.closePicker();
+        },
+
+        pickProxy() {
+            this.selectCategory('proxy');
             this.closePicker();
         },
         
@@ -621,6 +640,9 @@ function newGroupForm() {
                 }
             } else if (this.storeId) {
                 this.onStoreChange();
+            } else {
+                // V2.34.0（S-5）：沒有預選、不是複製開團 → 一進來就是選店
+                this.openPicker(true);
             }
         },
         

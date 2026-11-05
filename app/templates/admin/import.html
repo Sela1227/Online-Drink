@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}{% if selected_store %}更新菜單 - {{ selected_store.name }}{% else %}匯入店家與菜單{% endif %} - SELA 快點來點餐{% endblock %}
@@ -7,7 +9,8 @@
 {% if selected_store %}{{ nav.back('/admin/stores/' ~ selected_store.id, selected_store.name) }}{% else %}{{ nav.back('/admin', '管理後台') }}{% endif %}
 {# V2.15.0：匯入頁簡化（外部審稿《菜單管理優化》第一階段）。
    貼上就自動檢查、單一輸入區、結果先給摘要、畫面不出現 prompt／JSON 這類詞。後端語意不變：仍是預覽→確認兩個請求。 #}
-<div class="space-y-4" x-data="importForm()" x-init="init()" @switch-store.window="pickStore($event.detail.id, $event.detail.name)">
+<div class="space-y-4" x-data="importForm()" x-init="init()" @switch-store.window="pickStore($event.detail.id, $event.detail.name)"
+     @edit-new-store.window="editNewStore($event.detail && $event.detail.focus)">
     <h1 class="text-xl font-bold text-sela-800">{% if selected_store %}更新菜單{% else %}匯入店家與菜單{% endif %}</h1>
 
     {% if recommendation %}
@@ -29,7 +32,7 @@
         </a>
         {% endfor %}
         {% if recommendation.menu_images %}
-        <div class="text-xs text-sela-800/50">點照片可開新分頁放大；把所有照片一起丟給 AI 轉成一份菜單資料再貼回來。</div>
+        <div class="text-xs text-sela-800/50">所有照片一起給 AI，轉成一份菜單。</div>
         {% endif %}
         {% if recommendation.menu_url %}
         <div class="text-sm"><span class="text-sela-800/60">菜單網址：</span>
@@ -73,7 +76,7 @@
         <div x-show="aiBusy" x-cloak class="text-sm text-sela-800 text-center"><i class="ti ti-loader-2 animate-spin"></i> AI 正在讀菜單…<span x-text="aiSec"></span> 秒（約 20～60 秒）</div>
         <div x-show="aiErr" x-cloak class="text-sm text-red-600 bg-red-50 rounded-xl p-3" x-text="aiErr"></div>
         <div x-show="aiDone" x-cloak class="text-sm text-green-700"><i class="ti ti-circle-check"></i> 轉好了，已填進下方並自動檢查；看過預覽再按確認</div>
-        <div class="text-xs text-sela-800/45">最多 5 張，一張拍一面最清楚。店名、類別、電話、地址、甜冰、加料、品項都從照片讀。</div>
+        <div class="text-xs text-sela-800/45">最多 5 張，一張拍一面。</div>
     </div>
     {% endif %}
 
@@ -113,7 +116,10 @@
                 </div>
             </div>
             {% else %}
-            <div class="flex-1 min-w-0">
+            {# V2.34.0（M-3）：新增店家只看到貼上區；要更新已有的店才展開「匯入至」 #}
+            <button type="button" id="pick-existing" x-show="!storeSel && !targetOpen" @click="targetOpen = true; $nextTick(() => $refs.storeQuery.focus())"
+                    class="text-xs text-sela-800/60">要更新已經有的店？<span class="underline text-sela-700">選店 ›</span></button>
+            <div class="flex-1 min-w-0" x-show="storeSel || targetOpen" x-cloak id="import-target">
                 <label class="block text-xs text-sela-800/55 mb-1">匯入至</label>
                 {# V2.16.1 B-10：下拉改搜尋（店家一多原生 select 找不到）。hidden input 仍叫 store_id，後端不變 #}
                 <input type="hidden" name="store_id" :value="storeSel">
@@ -123,7 +129,7 @@
                            placeholder="輸入店名找店，或留白新增一家店" autocomplete="off"
                            class="w-full border border-sela-300 rounded-xl px-3 py-2.5 text-sela-800 text-base">
                     <div x-show="pickerOpen" x-cloak class="absolute left-0 right-0 mt-1 bg-white border border-sela-200 rounded-xl shadow-lg divide-y divide-sela-100 text-sm z-20 max-h-72 overflow-y-auto">
-                        <button type="button" @click="pickStore('', '')" class="w-full text-left px-3 py-2.5 text-sela-800/70 active:bg-sela-50"><i class="ti ti-plus"></i> 新增一家店</button>
+                        <button type="button" @click="pickStore('', ''); targetOpen = false" class="w-full text-left px-3 py-2.5 text-sela-800/70 active:bg-sela-50"><i class="ti ti-plus"></i> 新增一家店</button>
                         <template x-for="s in filteredStores()" :key="s.id">
                             <button type="button" @click="pickStore(s.id, s.name)" class="w-full text-left px-3 py-2.5 flex justify-between gap-2 active:bg-sela-50">
                                 <span x-text="s.name"></span>
@@ -131,19 +137,20 @@
                             </button>
                         </template>
                         <div x-show="filteredStores().length === 0" class="px-3 py-2.5 text-xs text-sela-800/50">沒有符合的店家</div>
-                        <div x-show="storeQuery.trim() === '' && stores.length > 8" class="px-3 py-2 text-xs text-sela-800/45">只列前 8 家，輸入店名縮小範圍</div>
+                        <div x-show="storeQuery.trim() === '' && stores.length > 8" class="px-3 py-2 text-xs text-sela-800/45">只列前 8 家</div>
                     </div>
                 </div>
                 <div x-show="storeSel" x-cloak class="flex items-center justify-between gap-2 border border-sela-300 rounded-xl px-3 py-2.5">
                     <div class="min-w-0 truncate text-sela-800 font-medium" x-text="storeName"></div>
-                    <button type="button" @click="pickStore('', ''); $nextTick(() => $refs.storeQuery.focus())" class="text-xs text-sela-700 underline whitespace-nowrap">更換</button>
+                    <button type="button" @click="targetOpen = true; pickStore('', ''); $nextTick(() => $refs.storeQuery.focus())" class="text-xs text-sela-700 underline whitespace-nowrap">更換</button>
                 </div>
             </div>
             {% endif %}
         </div>
         {% if not selected_store %}
         {# V2.15.1 審核 P2-9：新增一家店時，店名與類別在畫面上填（AI 指令要求店名留空） #}
-        <div x-show="!storeSel" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {# V2.34.0（M-3）：店名、類別預設從資料讀；預覽「將新增：X（類別）改」按了才展開 #}
+        <div x-show="!storeSel && newOpen" x-cloak id="new-store-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
                 <label class="block text-xs text-sela-800/55 mb-1">店名 <span class="text-sela-800/40">（留空就用資料裡的店名）</span></label>
                 <input type="text" name="new_store_name" maxlength="100" placeholder="例：可不可熟成紅茶" x-model="newName"
@@ -187,7 +194,7 @@
             </div>
             <div x-show="photoUrl" x-cloak class="mb-2 rounded-xl border border-sela-200 overflow-hidden">
                 <div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-sela-50 text-xs text-sela-800">
-                    <span class="min-w-0 truncate"><i class="ti ti-photo"></i> <span x-text="photoName"></span> <span class="text-sela-800/50">· 只在你的瀏覽器顯示，不會上傳</span></span>
+                    <span class="min-w-0 truncate"><i class="ti ti-photo"></i> <span x-text="photoName"></span> <span class="text-sela-800/50">· 不會上傳</span></span>
                     <span class="flex gap-2 whitespace-nowrap">
                         <a :href="photoUrl" target="_blank" rel="noopener" class="underline">放大</a>
                         <button type="button" @click="photoOpen = !photoOpen" class="underline" x-text="photoOpen ? '收合' : '展開'"></button>
@@ -204,7 +211,7 @@
                       placeholder="把 AI 轉好的菜單資料貼在這裡，或把檔案拖進來。貼上後會自動檢查。"
                       class="w-full border-2 border-dashed rounded-xl px-3 py-2 text-sm font-mono"></textarea>
             <div class="flex items-center justify-between mt-1 text-xs text-sela-800/50 gap-3">
-                <span>拿菜單照片給 ChatGPT／Claude，連同轉換指令一起貼，把回來的內容貼到上面。<span id="import-loading" class="htmx-indicator text-sela-800">檢查中…</span></span>
+                <span>照片和轉換指令一起給 ChatGPT／Claude，回覆貼上來。<span id="import-loading" class="htmx-indicator text-sela-800">檢查中…</span></span>
                 <label class="underline cursor-pointer whitespace-nowrap">選擇檔案
                     <input type="file" accept=".json,.txt" class="hidden" @change="loadFile($event.target.files[0], $refs.ta); $event.target.value = ''">
                 </label>
@@ -230,7 +237,7 @@
         <div class="px-4 pb-4 space-y-4">
             <div>
                 <div class="text-sm font-medium text-sela-800/70 mb-2">新增店家（含菜單）</div>
-                <div class="text-xs text-sela-800/60 mb-2">phone、address、city 可省略（city 沒填會從地址判斷）；更新既有店家時，只會補上店家原本空白的欄位，不會覆蓋。</div>
+                <div class="text-xs text-sela-800/60 mb-2">phone、address、city 可省略；更新既有店家只補空白欄位。</div>
                 <pre class="text-xs bg-sela-50 p-3 rounded-lg overflow-x-auto">{
   "store": {
     "name": "可不可熟成紅茶",
@@ -287,6 +294,12 @@ function importForm() {
         copied: false,
         dragging: false,
         storeSel: {{ (selected_store_id or '') | tojson }},
+        targetOpen: false,
+        newOpen: false,
+        editNewStore(focus) {
+            this.newOpen = true;
+            if (focus) this.$nextTick(() => { const i = document.querySelector('[name=new_store_name]'); if (i) { i.focus(); i.select(); i.scrollIntoView({ block: 'center' }); } });
+        },
         storeName: {{ (selected_store.name if selected_store else '') | tojson }},
         stores: [],
         storeQuery: '',

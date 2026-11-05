@@ -105,6 +105,7 @@ def get_or_create_order(db: Session, group_id: int, user_id: int) -> Order:
     if not order:
         try:
             with db.begin_nested():
+                # V2.33.0（S-2）：DRAFT 現在只表示「還沒點任何東西」（空訂單），加進第一個品項就轉 SUBMITTED（_activate）
                 order = Order(
                     group_id=group_id,
                     user_id=user_id,
@@ -124,6 +125,30 @@ def get_or_create_order(db: Session, group_id: int, user_id: int) -> Order:
                 raise
     
     return order
+
+
+def _activate(order):
+    """V2.33.0（S-2）：加品項就是點餐——訂單一律 SUBMITTED。
+    舊資料可能是 DRAFT（空訂單或遷移前的購物車）或 EDITING（遷移前的修改中），一併轉正、丟掉快照。"""
+    if order.status != OrderStatus.SUBMITTED:
+        order.status = OrderStatus.SUBMITTED
+        order.snapshot = None
+
+
+def _settle_after_change(db, order, group):
+    """V2.33.0（S-2）：每次改動後：沒有品項 → DRAFT（＝沒點，訂單牆與收款都不算）；
+    有品項 → 檢查每單上限（原本在「送出」時擋，現在每一步都要擋）。呼叫前已改好資料、尚未 commit。"""
+    db.flush()
+    db.expire(order)
+    if not order.items:
+        order.status = OrderStatus.DRAFT
+        order.snapshot = None
+        return
+    _activate(order)
+    if group.order_limit and not group.allow_over_limit and order.final_amount > group.order_limit:
+        _amt = int(order.final_amount)
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"超過每單上限 ${int(group.order_limit)}（這樣會是 ${_amt}），請調整品項")
 
 
 @router.get("/groups/{group_id}/orders/wall")
@@ -252,11 +277,9 @@ def _reserve_stock(db: Session, group_id: int, menu_item, delta: int, order):
     跟點會**立即佔用**庫存。但這些路徑原本只有「先查再送」、沒有 `_lock_menu_items`，
     兩個人同時操作仍可能超賣 —— 這正是 CLAUDE.md 那條「先查再送不是庫存機制」。
 
-    DRAFT 不佔用（送出時才鎖），所以不需要經過這裡。
+    V2.33.0（S-2）：沒有草稿購物車了，加進來就佔用——所有增量路徑都走這裡、一律加鎖。
     """
     if menu_item is None or menu_item.stock_limit is None or delta <= 0:
-        return
-    if order.status != OrderStatus.EDITING:
         return
     _lock_menu_items(db, [menu_item.id])
     remaining = _stock_remaining(db, group_id, menu_item, exclude_order_id=order.id)
@@ -363,8 +386,6 @@ async def add_item(
         ).first()
         if not target:
             raise HTTPException(status_code=404, detail="找不到要加候補的品項")
-        if target.order.status == OrderStatus.SUBMITTED:
-            raise HTTPException(status_code=400, detail="請先進入修改模式")
         if not group.enable_backup:
             raise HTTPException(status_code=400, detail="此團未開啟候補")
         # V2.23.2 審稿 P2-01：連點兩下會同時進來。鎖住原品項列（PostgreSQL FOR UPDATE），
@@ -436,13 +457,9 @@ async def add_item(
         logger.error(f"🚨 訂單用戶不匹配！order.user_id={order.user_id}, current user.id={user.id}")
         raise HTTPException(status_code=403, detail="訂單用戶不匹配")
     
-    # 如果是已結單狀態，不能直接加
-    if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先進入修改模式")
-    
-    # V2.11.1 P1-09：修改中的加品項會立即佔用庫存（V2.8 定義佔用＝SUBMITTED＋EDITING），
-    # 但上面那道只是「先查」沒有鎖。EDITING 走加鎖版本重新驗一次。
-    if order.status == OrderStatus.EDITING and not backup_for:
+    # V2.33.0（S-2／S-3）：已送出後再加點直接併進訂單，不用先按「修改訂單」
+    # 加進來就佔用庫存，一律走加鎖版本（V2.11.1 P1-09）
+    if not backup_for:
         _reserve_stock(db, group_id, menu_item, quantity, order)
     
     # 檢查是否有相同品項+設定，有的話合併杯數
@@ -515,6 +532,7 @@ async def add_item(
             )
             db.add(order_item_topping)
     
+    _settle_after_change(db, order, group)  # V2.33.0：轉 SUBMITTED＋每單上限
     db.commit()
     
     # 重新載入 order 及其 items 和 toppings
@@ -551,9 +569,9 @@ async def delete_backup(
     
     target_item = backup.order_item
     order_id = target_item.order_id
-    if target_item.order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先進入修改模式")
     group = target_item.order.group
+    if not group.is_open:
+        raise HTTPException(status_code=400, detail="團單已截止")
     
     db.delete(backup)
     db.flush()
@@ -603,9 +621,7 @@ async def update_item(
     if not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     
-    if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先進入修改模式")
-    
+    # V2.33.0（S-2）：訂單上直接改，按了就生效
     # V2.11.1 P1-05：原本沒有上限，實測 quantity=100000 照收
     if quantity > 99:
         raise HTTPException(status_code=400, detail="數量最多 99")
@@ -615,15 +631,11 @@ async def update_item(
     else:
         if order_item.menu_item is not None and quantity > order_item.quantity:
             _delta = quantity - order_item.quantity
-            if order.status == OrderStatus.EDITING:
-                # V2.11.1 P1-09：修改中的加量會立即佔用庫存，要加鎖
-                _reserve_stock(db, order.group_id, order_item.menu_item, _delta, order)
-            else:
-                _rem = _stock_remaining(db, order.group_id, order_item.menu_item)
-                if _rem is not None and _delta > _rem:
-                    raise HTTPException(status_code=400, detail=f"「{order_item.item_name}」僅剩 {_rem} 份可再增加")
+            # V2.11.1 P1-09 → V2.33.0：加量一律加鎖佔用
+            _reserve_stock(db, order.group_id, order_item.menu_item, _delta, order)
         order_item.quantity = quantity
     
+    _settle_after_change(db, order, group)
     db.commit()
     
     # 重新載入 order
@@ -657,11 +669,9 @@ async def delete_item(item_id: int, request: Request, db: Session = Depends(get_
     if not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     
-    if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="請先進入修改模式")
-    
     order_id = order.id
     db.delete(order_item)
+    _settle_after_change(db, order, group)
     db.commit()
     
     # 重新載入 order
@@ -680,7 +690,8 @@ async def delete_item(item_id: int, request: Request, db: Session = Depends(get_
 
 @router.post("/groups/{group_id}/orders/submit")
 async def submit_order(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """結單"""
+    """結單。V2.33.0（S-2）起畫面上沒有「送出訂單」了（點了就是訂單）；
+    這支留給部署當下還開著舊頁面的人，以及把遷移前的購物車轉正。"""
     user = await get_current_user(request, db)
     
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -734,90 +745,19 @@ async def submit_order(group_id: int, request: Request, db: Session = Depends(ge
 
 @router.post("/groups/{group_id}/orders/edit")
 async def edit_order(group_id: int, request: Request, db: Session = Depends(get_db)):
-    """進入修改模式"""
+    """V2.33.0（S-2）：不再有「修改模式」——訂單上直接加減就生效。
+    這支留著給部署當下還開著舊頁面的人（按「修改訂單」不會壞），只回傳目前的訂單片段。"""
     user = await get_current_user(request, db)
-    
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group or not group.is_open:
         raise HTTPException(status_code=400, detail="團單已截止")
     _ensure_visible(group, user, db)
-    
-    order = db.query(Order).filter(
-        Order.group_id == group_id,
-        Order.user_id == user.id,
-    ).first()
-    
-    if not order:
-        raise HTTPException(status_code=404, detail="訂單不存在")
-    
-    if order.status != OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="只能修改已送出的訂單")
-    
-    # 保存快照
-    snapshot = {
-        "items": [
-            {
-                "menu_item_id": item.menu_item_id,
-                "item_name": item.item_name,
-                "size": item.size,
-                "sugar": item.sugar,
-                "ice": item.ice,
-                "quantity": item.quantity,
-                "unit_price": str(item.unit_price),
-                "note": item.note,
-                "options": [
-                    {
-                        "item_option_id": opt.item_option_id,
-                        "option_name": opt.option_name,
-                        "price_diff": str(opt.price_diff),
-                    }
-                    for opt in item.selected_options
-                ],
-                "toppings": [
-                    {
-                        "store_topping_id": t.store_topping_id,
-                        "topping_name": t.topping_name,
-                        "price": str(t.price),
-                    }
-                    for t in item.selected_toppings
-                ],
-                "fulfillment": item.fulfillment,
-                "fulfilled_backup_priority": (item.fulfilled_backup.priority if item.fulfilled_backup else None),
-                "diff_settled": item.diff_settled,
-                "backups": [
-                    {
-                        "priority": b.priority,
-                        "menu_item_id": b.menu_item_id,
-                        "item_name": b.item_name,
-                        "size": b.size,
-                        "sugar": b.sugar,
-                        "ice": b.ice,
-                        "extras_text": b.extras_text,
-                        "unit_price": str(b.unit_price),
-                        "extras_price": str(b.extras_price or 0),
-                    }
-                    for b in item.backups
-                ],
-            }
-            for item in order.items
-        ]
-    }
-    
-    order.status = OrderStatus.EDITING
-    order.snapshot = snapshot
-    db.commit()
-    
-    # 重新載入 order
-    order = db.query(Order).filter(Order.id == order.id).options(
+    order = db.query(Order).filter(Order.group_id == group_id, Order.user_id == user.id).options(
         joinedload(Order.items).joinedload(OrderItem.selected_options),
         joinedload(Order.items).joinedload(OrderItem.selected_toppings)
     ).first()
-    
     return templates.TemplateResponse(request, "partials/my_order.html", {
-        "request": request,
-        "order": order,
-        "group": group,
-        "is_open": group.is_open,
+        "request": request, "order": order, "group": group, "is_open": group.is_open,
     })
 
 
@@ -837,11 +777,11 @@ async def cancel_edit(group_id: int, request: Request, db: Session = Depends(get
     if not order:
         raise HTTPException(status_code=404, detail="訂單不存在")
     
-    if order.status != OrderStatus.EDITING:
-        raise HTTPException(status_code=400, detail="目前不在修改模式")
-    
-    if not order.snapshot:
-        raise HTTPException(status_code=400, detail="無法還原訂單")
+    # V2.33.0（S-2）：只剩遷移前留下的 EDITING 會走還原；其他情況（舊頁面按「取消修改」）回傳目前的訂單，不報錯
+    if order.status != OrderStatus.EDITING or not order.snapshot:
+        return templates.TemplateResponse(request, "partials/my_order.html", {
+            "request": request, "order": order, "group": group, "is_open": group.is_open if group else False,
+        })
     
     # V2.8.0：還原前重驗庫存（修改期間若把限量品項刪除，名額可能已被他人取走）
     _snap_req = {}
@@ -934,21 +874,13 @@ async def follow_item(
     # 取得或建立訂單
     order = get_or_create_order(db, group_id, user.id)
     
-    # V2.4.1 修：已結單不再靜默改狀態（原本偷偷進 EDITING 且無快照，取消修改會壞）
-    if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="你已送出訂單，先按「修改訂單」再跟單")
-    
+    # V2.33.0（S-2）：跟單直接併進自己的訂單（不用先按修改）
+
     # V2.7.0：跟點也吃庫存/上下架
     if source_item.menu_item is not None:
         if source_item.menu_item.is_available is False:
             raise HTTPException(status_code=400, detail="此品項已下架")
-        if order.status == OrderStatus.EDITING:
-            # V2.11.1 P1-09：修改中的跟點會立即佔用庫存，要加鎖
-            _reserve_stock(db, group_id, source_item.menu_item, 1, order)
-        else:
-            _rem = _stock_remaining(db, group_id, source_item.menu_item)
-            if _rem is not None and _rem < 1:
-                raise HTTPException(status_code=400, detail=f"「{source_item.item_name}」已售完")
+        _reserve_stock(db, group_id, source_item.menu_item, 1, order)  # V2.33.0：一律加鎖佔用
     
     # 複製品項
     order_item = OrderItem(
@@ -987,6 +919,7 @@ async def follow_item(
         )
         db.add(order_item_topping)
     
+    _settle_after_change(db, order, group)
     db.commit()
     
     # 重新載入 order（修復：確保 items 被載入）
@@ -1047,9 +980,10 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
     # 取得或建立當前訂單
     order = get_or_create_order(db, group_id, user.id)
     
-    # V2.6.0 修：已送出的訂單不可被複製覆蓋（原本會靜默清空已送出內容）
-    if order.status == OrderStatus.SUBMITTED:
-        raise HTTPException(status_code=400, detail="訂單已送出，請先按「修改訂單」再複製")
+    # V2.33.0（S-2／S-4）：複製上次直接變成訂單；原本是空的才給「復原」（復原＝清空）
+    _was_empty = not order.items
+    _activate(order)
+    db.flush()
     
     # ── 先算出「複製得成的清單」，確定有東西才動購物車（V2.11.2 N-03）──
     #
@@ -1091,12 +1025,12 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
             break
         _pre_rem = _stock_remaining(
             db, group_id, _m,
-            exclude_order_id=order.id if (mode != "append" or order.status == OrderStatus.EDITING) else None,
+            exclude_order_id=order.id,
         )
         if _pre_rem is None:
             _any_available = True
             break
-        if mode == "append" and order.status == OrderStatus.EDITING:
+        if mode == "append":
             _pre_rem -= _own_qty(db, order.id, _m.id)
         if _pre_rem >= 1:
             _any_available = True
@@ -1130,24 +1064,15 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
     _copied = 0
     for old_item, _mi in _plan:
         _copy_qty = old_item.quantity
-        if order.status == OrderStatus.EDITING:
-            # V2.11.3 R-01：修改中的訂單會立即佔用庫存，要問「還能再加幾份」。
-            # V2.11.2 用 try/except 做流程控制是錯的 —— except 分支算的剩餘量
-            # 排除了自己（exclude_order_id=order.id），等於把剛被擋下的量又放回去：
-            # 已送出 5 份、上次點 3 份、庫存 5，結果複製成 8 份。
-            _avail = _available_for(db, group_id, _mi, order)
-            if _avail is not None:
-                if _avail < 1:
-                    _skipped += 1
-                    continue
-                _copy_qty = min(_copy_qty, _avail)
-        else:
-            _rem = _stock_remaining(db, group_id, _mi)
-            if _rem is not None:
-                if _rem < 1:
-                    _skipped += 1
-                    continue
-                _copy_qty = min(_copy_qty, _rem)
+        # V2.33.0：訂單一律佔用庫存（原本只有 EDITING 走這支），要問「還能再加幾份」（V2.11.3 R-01）。
+        # V2.11.2 用 try/except 做流程控制是錯的 —— except 分支算的剩餘量排除了自己，
+        # 等於把剛被擋下的量又放回去：已送出 5 份、上次點 3 份、庫存 5，結果複製成 8 份。
+        _avail = _available_for(db, group_id, _mi, order)
+        if _avail is not None:
+            if _avail < 1:
+                _skipped += 1
+                continue
+            _copy_qty = min(_copy_qty, _avail)
         # V2.11.2 N-09：團單若鎖定甜冰，複製過來的也要照團單走，
         # 否則等於從這條路徑繞過 P1-05 的鎖定
         _sugar = group.default_sugar if group.lock_sugar else old_item.sugar
@@ -1229,15 +1154,14 @@ async def copy_last_order(group_id: int, request: Request, mode: str = Form("rep
             ))
         _copied += 1
     
-    # V2.11.1 P1-01：原本無條件設成 DRAFT。在「修改中」執行複製上次，會讓訂單
-    # 從 EDITING 掉回 DRAFT：庫存佔用被釋放、快照殘留、「取消修改」按鈕也消失
-    # （因為狀態不是 EDITING）。新建的訂單本來就是 DRAFT，這行只會造成傷害。
+    _settle_after_change(db, order, group)  # V2.33.0：沒複製到東西就回 DRAFT；有就檢查每單上限
     db.commit()
     
     return RedirectResponse(
         # V2.31.1（內部審核 V-1）：杯型換了、甜冰被清掉都要讓使用者知道（原本 _skipped_opt 算了沒帶出去）
         url=f"/groups/{group_id}?copied={_copied}&skipped={_skipped}"
-            + (f"&resized={_resized}" if _resized else "") + ("&optreset=1" if _skipped_opt else ""),
+            + (f"&resized={_resized}" if _resized else "") + ("&optreset=1" if _skipped_opt else "")
+            + ("&undo=1" if (_was_empty and _copied) else ""),
         status_code=302,
     )
 

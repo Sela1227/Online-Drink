@@ -5,7 +5,7 @@
  * 煙霧測試看得到模板渲染出什麼，看不到 Alpine／htmx 串起來以後「結帳列有沒有讀到件數與金額」
  * 「已送出後菜單有沒有收合」「更多 sheet 開不開得起來」。這支把 Python 渲染好的團頁載進 jsdom，
  * 載入 htmx 與 Alpine，攔截 XHR（/orders/mine 與 /orders/wall 回 TestClient 產生的真實片段），然後：
- *   member 模式：結帳列讀到「1 件 · $100」→ 按「查看並送出」開購物車 sheet → 導覽列有 常點／熱門／骰子、
+ *   member 模式（V2.33.0 S-2 改寫）：結帳列讀到「你點了 2 件 · $200」、沒有購物車 sheet、我的訂單卡在頁面上 → 導覽列有 常點／熱門／骰子、
  *               按骰子開隨機視窗 → 模擬送出（orderStatus='submitted'）後菜單收合、結帳列變說明、
  *               按「再加點 ›」菜單展開
  *               V2.20.0：加點 sheet 主鈕帶金額、＋ 數量金額加倍、備註收合、✕ 關閉；購物車數量 1 是垃圾桶、⋯ 才有清空
@@ -83,13 +83,13 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     const bar = d.getElementById("checkout-bar");
     if (!bar) fail("找不到結帳列");
     if (comp.cartCount !== 2 || String(comp.cartTotal) !== "200") fail("結帳列沒從片段讀回件數與金額（cartCount=" + comp.cartCount + ", cartTotal=" + comp.cartTotal + "）");
-    if (!text(bar).includes("2 件 · $200")) fail("結帳列文字應為「2 件 · $200」（" + text(bar) + "）");
-    // 2) 按「查看並送出」開購物車 sheet
-    const go = [...bar.querySelectorAll("button")].find(b => b.textContent.includes("查看並送出"));
-    if (!go || go.disabled) fail("「查看並送出」不存在或被停用");
-    go.click(); await sleep(60);
-    if (!comp.showCart) fail("按「查看並送出」後購物車 sheet 沒開");
-    comp.showCart = false; await sleep(30);
+    if (!text(bar).includes("你點了 2 件 · $200") || !text(bar).includes("不用再按送出")) fail("結帳列文字應為「你點了 2 件 · $200 … 不用再按送出」（" + text(bar) + "）");
+    // 2) V2.33.0（S-2）：沒有購物車 sheet；結帳列「我的訂單」捲到頁面上的訂單卡
+    if ([...bar.querySelectorAll("button")].some(b => b.textContent.includes("查看並送出"))) fail("不該再有「查看並送出」");
+    if (d.getElementById("cart-content")) fail("不該再有購物車 sheet");
+    const goMine = [...bar.querySelectorAll("button")].find(b => b.textContent.includes("我的訂單"));
+    if (!goMine || !visible(goMine)) fail("結帳列應有「我的訂單」鈕");
+    if (!d.querySelector("#my-order-display #my-order-card")) fail("我的訂單卡應直接在頁面上");
     // 3) 導覽列：常點／熱門／骰子
     const nav = d.getElementById("menu-nav");
     if (!nav) fail("找不到菜單導覽列");
@@ -109,11 +109,11 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     const sheet = d.getElementById("add-item-sheet");
     if (!comp.showAddItem || !visible(sheet)) fail("按品項後加點 sheet 沒開");
     const submit = d.getElementById("add-item-submit");
-    const m1 = text(submit).match(/^加入購物車・\$(\d+)$/);
-    if (!m1 || Number(m1[1]) <= 0) fail("加點主鈕應為「加入購物車・$金額」（" + text(submit) + "）");
+    const m1 = text(submit).match(/^點這份・\$(\d+)$/);
+    if (!m1 || Number(m1[1]) <= 0) fail("加點主鈕應為「點這份・$金額」（餐點團；" + text(submit) + "）");
     const plus = [...sheet.querySelectorAll("button")].find(b => b.getAttribute("aria-label") === "增加數量");
     plus.click(); await sleep(60);
-    if (text(submit) !== "加入購物車・$" + (Number(m1[1]) * 2)) fail("數量 2 時主鈕金額應加倍（" + text(submit) + "）");
+    if (text(submit) !== "點這 2 份・$" + (Number(m1[1]) * 2)) fail("數量 2 時主鈕「點這 2 份」、金額加倍（" + text(submit) + "）");
     if ([...sheet.querySelectorAll("button")].some(b => text(b) === "取消")) fail("加點 sheet 底部不該再有「取消」（改右上 ✕）");
     const noteInput = sheet.querySelector("input[name=note]");
     if (visible(noteInput.closest("[x-show]"))) fail("備註應預設收合");
@@ -121,24 +121,18 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     if (!comp.noteOpen || !visible(noteInput.closest("[x-show]"))) fail("按「＋ 加備註」沒展開輸入框");
     sheet.querySelector("button[aria-label='關閉']").click(); await sleep(60);
     if (comp.showAddItem) fail("按 ✕ 沒關掉加點 sheet");
-    // 3c) 購物車 sheet：數量 1 的「−」是垃圾桶（數量 0）；⋯ 選單才有「清空購物車」
-    comp.showCart = true; await sleep(60);
-    const trash = d.querySelector("#cart-content button[aria-label='移除品項']");
+    // 3c) 我的訂單卡（V2.33.0）：數量 1 的「−」是垃圾桶（數量 0）；「全部取消」是小字、直接看得到
+    const trash = d.querySelector("#my-order-content button[aria-label='移除品項']");
     if (!trash || !(trash.getAttribute("hx-vals") || "").includes('"quantity": 0')) fail("數量 1 的品項應顯示垃圾桶（hx-vals quantity 0）");
-    if (d.querySelector("#cart-content [hx-delete$='/orders']")) fail("整單刪除應已移出購物車內容（改在 ⋯）");
     const clear = d.getElementById("clear-cart");
-    if (!clear || visible(clear.closest("[x-show]"))) fail("「清空購物車」應收在 ⋯ 選單、預設隱藏");
-    d.querySelector("#cart-header button[aria-label='更多']").click(); await sleep(60);
-    if (!visible(clear.closest("[x-show]"))) fail("按 ⋯ 沒出現「清空購物車」");
-    comp.showCart = false; await sleep(30);
-    // 4) 送出後：菜單收合、結帳列變說明；「再加點」展開
-    const collapsed = d.getElementById("menu-collapsed"), section = d.getElementById("menu-section");
-    if (!visible(section) || visible(collapsed)) fail("還沒送出時菜單應展開、收合列隱藏");
+    if (!clear || !visible(clear) || !text(clear).includes("全部取消")) fail("我的訂單卡應有「全部取消」");
+    if ([...d.querySelectorAll("#my-order-content button")].some(b => /送出訂單|修改訂單|取消修改/.test(text(b)))) fail("我的訂單不該再有送出／修改鈕");
+    // 4) V2.33.0：點了之後菜單照常展開（要第二杯直接點），沒有「再加點 ›」
+    const section = d.getElementById("menu-section");
+    if (d.getElementById("menu-collapsed")) fail("不該再有菜單收合列");
     comp.orderStatus = "submitted"; await sleep(80);
-    if (visible(section) || !visible(collapsed)) fail("送出後菜單應收合成「再加點 ›」");
-    if (!text(bar).includes("已送出")) fail("送出後結帳列應變成說明文字（" + text(bar) + "）");
-    collapsed.click(); await sleep(60);
-    if (!visible(section)) fail("按「再加點 ›」菜單應展開");
+    if (!visible(section)) fail("點了之後菜單仍要展開");
+    if (!text(bar).includes("你點了")) fail("點了之後結帳列仍報件數金額（" + text(bar) + "）");
     // 5) 訂單牆：一行摘要、展開有跟單鈕
     const wallCard = d.getElementById("order-wall-card");
     if (!wallCard) fail("找不到訂單牆卡");
@@ -148,18 +142,30 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     // 6) V2.31.1（內部審核 B-1）：購物車裡的按鈕回應後會被 hx-swap 換掉，按鈕已離開 DOM，
     //    從它身上 $dispatch 的事件傳不到 body——訂單牆、我的訂單、結帳列都不會更新。要從 body 發
     const count = (k) => reqs.filter(r => r.m === "GET" && r.u.includes(k)).length;
-    const cartBtn = (pred) => [...d.querySelectorAll("#cart-content button")].find(pred);
+    const cartBtn = (pred) => [...d.querySelectorAll("#my-order-content button")].find(pred);
     let w0 = count("/orders/wall"), m0 = count("/orders/mine");
     const plusBtn = cartBtn(b => b.getAttribute("aria-label") === "增加數量");
     if (!plusBtn) fail("購物車找不到 ＋ 鈕");
     plusBtn.click(); await sleep(250);
     if (count("/orders/wall") <= w0 || count("/orders/mine") <= m0) fail("購物車按 ＋ 之後訂單牆與我的訂單沒有重新載入（$dispatch 從被換掉的按鈕發出，傳不到 body）");
     w0 = count("/orders/wall");
-    const subBtn = cartBtn(b => (b.getAttribute("hx-post") || "").endsWith("/orders/submit"));
-    if (!subBtn) fail("購物車重新載入後找不到「送出訂單」鈕");
-    subBtn.click(); await sleep(250);
-    if (count("/orders/wall") <= w0) fail("送出訂單後訂單牆沒有重新載入（B-1）");
-    if (comp.orderStatus !== "submitted") fail("送出後 orderStatus 應為 submitted");
+    const cancelAll = cartBtn(b => b.id === "clear-cart");
+    if (!cancelAll) fail("我的訂單重新載入後找不到「全部取消」");
+    cancelAll.click(); await sleep(250);
+    if (count("/orders/wall") <= w0) fail("全部取消後訂單牆沒有重新載入（B-1）");
+    if (comp.orderStatus !== "none") fail("全部取消後應回到沒點（orderStatus=" + comp.orderStatus + "）");
+    // 7) V2.32.0（內部審核 B-5）：打開購物車時先收掉之前的 toast（不然壓在第一個品項的加減鈕上）；剛跳出來的留著
+    comp.showAddItem = false; await sleep(60);
+    const toastBox = () => [...d.querySelectorAll("[x-show='show']")].find(el => el.textContent.includes("測試提示"));
+    w.toast("測試提示"); await sleep(500);
+    if (!toastBox() || !visible(toastBox())) fail("toast 應該出現");
+    comp.showAddItem = true; await sleep(120);
+    if (visible(toastBox())) fail("打開加點 sheet 應收掉之前的 toast（B-5）");
+    comp.showAddItem = false; await sleep(60);
+    // 實際順序：sheet 一打開就緊接著 toast、緊接著 toast('已設定候補')
+    comp.showAddItem = true; w.toast("測試提示"); await sleep(120);
+    if (!visible(toastBox())) fail("剛跳出來的 toast 不該被收掉");
+    comp.showAddItem = false;
     console.log(JSON.stringify({ ok: true, mode }));
     process.exit(0);
   }

@@ -656,7 +656,7 @@ def main():
 
         r = _c.get(f"/admin/stores/{store.id}")
         assert r.status_code == 200 and "店家資料" in r.text and "營運設定" not in r.text and "基本資料" in r.text
-        check("工作台 200，分頁（V2.27.0 起：菜單／甜冰加料／店家資料／停用／刪除）")
+        check("工作台 200，分頁（V2.27.0 起：菜單／甜冰加料／店家資料；V2.34.0 起停用／刪除在危險區）")
 
         r = _c.get(f"/admin/stores/{store.id}/edit", follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings")
@@ -1578,7 +1578,7 @@ def main():
         db.expire_all(); rec = db.query(StoreRecommendation).filter(StoreRecommendation.id == rec.id).first()
         assert not rec.created_store_id and rec.status == "pending", "還沒確認匯入前不建店、不核准"
         r = _c.get(f"/admin/import?rec_id={rec.id}")
-        assert r.text.count('alt="菜單照片 ') == 2 and "2 張菜單照片" in _T(r) and "一起丟給 AI" in r.text  # B-3 的對照照片 alt 沒有序號
+        assert r.text.count('alt="菜單照片 ') == 2 and "2 張菜單照片" in _T(r) and "一起給 AI" in r.text  # B-3 的對照照片 alt 沒有序號
         check("後台推薦列表縮圖列、核准後匯入頁推薦卡列出全部照片")
 
         # 店家排序資料：後台列表 group_counts／lastTs；開團覆蓋層 last_group_at／last_ts
@@ -1664,7 +1664,7 @@ def main():
         r = _c.get(f"/groups/{_g3.id}/orders/wall")
         assert r.status_code == 200 and "$30.00" not in r.text and "$30" in _T(r), _T(r)[:300]
         r = _c.get(f"/groups/{_g3.id}")
-        assert "點 +1 直接加入購物車" not in r.text and "點「跟單」直接加入購物車" in r.text
+        assert "點 +1 直接加入購物車" not in r.text and "直接加進你的訂單" not in r.text  # V2.33.0 S-2：沒有購物車了；V2.34.1 說明小字拿掉
         check("P1-2a／2d：訂單牆總額 $30 不是 $30.00；「跟單」文案一致")
     finally:
         _grp.get_current_user = _orig_cu
@@ -1777,9 +1777,9 @@ def main():
         # 順序：要處理的 A、B、G；開放中依截止 C(2h) D(4h) E(5h) F(6h)
         pos = [r.text.index(f'href="/groups/{g.id}"') for g in (ga, gb, gg, gc, gd, ge, gf)]
         assert pos == sorted(pos), pos
-        assert "你還沒點" in t and "0 人已送出" in t and "催單 1" in t
+        assert "你還沒點" in t and "0 人已點" in t and "催單 1" in t
         assert "截止，還沒點的快來點餐" in r.text and "結單，還沒點" not in r.text, "催單文字「結單」→「截止」"
-        assert "已送出" in t and "還沒點" in t and "未送出" in t
+        assert "已點" in t and "還沒點" in t and "未送出" in t
         assert "投票中" not in t, "沒有投票時整塊隱藏"
         assert "已截止的團" in t and 'href="/records"' in r.text
         assert "店家目錄" not in t and "(" not in t.split("開放中")[1][:5], "首頁不再放店家清單與分類段落"
@@ -1877,11 +1877,11 @@ def main():
     try:
         # 團主・開放中：團主列（分享／催單 N／更多）、沒有團主工具、沒有下一步、有結帳列、沒有底部導航
         r = _c.get(f"/groups/{ga.id}"); t = _T(r)
-        assert r.status_code == 200 and 'id="owner-bar"' in r.text and "分享" in t and "催單 1" in t and "更多" in t
+        assert r.status_code == 200 and 'id="owner-bar"' in r.text and "分享" in t and "催單" in t and "更多" in t  # V2.33.0：沒有「點了還沒送出」的人數了
         assert "團主工具" not in t and 'id="next-steps"' not in r.text and 'id="checkout-bar"' in r.text
         assert "<nav" not in r.text, "團頁要隱藏底部導航"
         assert 'id="remind-text"' in r.text and "截止，還沒點的快來點餐：__ORIGIN__/groups/" in r.text and "結單" not in t
-        assert 'id="more-tabs"' in r.text and "提前截止" in t and "存成範本" in t and "複製開團" in t and "還沒送出的名單" in t
+        assert 'id="more-tabs"' in r.text and "提前截止" in t and "存成範本" in t and "複製開團" in t and "還沒送出的名單" not in t
         assert 'href="/groups/%d/export/order"' % ga.id in r.text and 'href="/groups/%d/export/payment"' % ga.id in r.text
         assert "快速點餐" not in t and 'id="quick-mine"' in r.text and 'id="quick-hot"' in r.text and 'id="menu-nav"' in r.text and "ti-dice" in r.text
         assert "詳細資訊 ›" in t and "剩 " in t
@@ -1900,9 +1900,10 @@ def main():
         # 團員・已送出：菜單收合列、訂單牆一行摘要、自己的列標（你）且沒有跟單鈕
         r = _c.get(f"/groups/{gc.id}"); t = _T(r)
         assert 'id="owner-bar"' not in r.text and 'id="next-steps"' not in r.text
-        assert 'id="menu-collapsed"' in r.text and "再加點 ›" in t and 'id="order-wall-card"' in r.text and "看大家點什麼 ›" in t
+        # V2.33.0（S-2）：點了之後菜單不收合（要第二杯直接點）
+        assert 'id="menu-collapsed"' not in r.text and 'id="menu-section"' in r.text and 'id="order-wall-card"' in r.text and "看大家點什麼 ›" in t
         assert "（你）" in t and "/orders/follow/" not in r.text, "自己的品項不該有跟單鈕"
-        check("團員已送出：菜單收合成「再加點 ›」、訂單牆一行摘要、自己的列標（你）無跟單鈕")
+        check("團員已點：菜單照常展開（V2.33.0）、訂單牆一行摘要、自己的列標（你）無跟單鈕")
 
         # 訂單牆片段：別人的品項才有跟單；跟單成功回 my_order 片段帶件數金額
         _oc = db.query(_O2).filter(_O2.group_id == gc.id, _O2.user_id == user.id).first()
@@ -1915,8 +1916,10 @@ def main():
         r = _c.get(f"/groups/{gc.id}/orders/wall")
         assert r.status_code == 200 and f"/orders/follow/{_oc_item.id}" in r.text and "（你）" not in r.text
         r = _c.post(f"/groups/{gc.id}/orders/follow/{_oc_item.id}", headers={"HX-Request": "true"})
-        assert r.status_code == 200 and 'data-cart-count="1"' in r.text and 'data-cart-total="100"' in r.text and "送出訂單" in _T(r) and "確定結單" not in r.text
-        check("訂單牆：別人的品項有跟單鈕；跟單後回購物車片段帶 data-cart-count／total，按鈕是「送出訂單」")
+        assert r.status_code == 200 and 'data-cart-count="1"' in r.text and 'data-cart-total="100"' in r.text and "我的訂單" in _T(r) and "送出訂單" not in _T(r) and "確定結單" not in r.text
+        _oo = db.query(_O2).filter(_O2.group_id == gc.id, _O2.user_id == _other.id).first(); db.refresh(_oo)
+        assert _oo.status.value == "submitted", "V2.33.0 S-2：跟單直接成為訂單"
+        check("訂單牆：別人的品項有跟單鈕；跟單後直接成為訂單（V2.33.0），回「我的訂單」片段帶 data-cart-count／total、沒有送出鈕")
 
         # 盲點模式：訂單牆只給人數金額、不列品項
         gc.is_blind_mode = True; db.commit()
@@ -1989,23 +1992,24 @@ def main():
         r = _c.get(f"/groups/{gc.id}"); t = r.text
         assert 'id="add-item-sheet"' in t and 'id="add-item-submit"' in t and "addButtonLabel()" in t and "本品小計" not in _T(r)
         assert "＋ 加備註" in t and 'x-ref="itemNote"' in t and 'id="last-pref-note"' in t
-        assert 'id="cart-header"' in t and 'id="clear-cart"' in t and f'hx-delete="/groups/{gc.id}/orders"' in t
-        assert "'加入購物車・$' + this.itemSubtotal()" in t and "'設為候補 ' + this.backupMode.priority" in t
-        check("團頁：加點是底部 sheet（✕、＋ 加備註、主鈕帶金額、上次偏好提示）；購物車標題列 ⋯ 清空購物車")
+        # V2.33.0（S-2）：沒有購物車 sheet；主鈕「點這杯・$」
+        assert 'id="cart-header"' not in t and 'id="cart-content"' not in t and "查看並送出" not in t
+        assert "verb + '・$' + this.itemSubtotal()" in t and "'點這' + unit" in t and "'設為候補 ' + this.backupMode.priority" in t
+        check("團頁：加點是底部 sheet（✕、＋ 加備註、主鈕「點這杯・$」、上次偏好提示）；沒有購物車 sheet 與「查看並送出」")
 
         # 購物車片段（未送出）：沒有第二個「我的訂單」標題；數量 1 的「−」是垃圾桶＝數量 0；片段內不再有整單刪除與每列刪除鈕
         _ordm31.get_current_user = _fake_other31
         _oo = db.query(_O31).filter(_O31.group_id == gc.id, _O31.user_id == _other.id).first()
-        assert _oo is not None and _oo.status == _OS31.DRAFT
+        assert _oo is not None and _oo.status == _OS31.SUBMITTED  # V2.33.0：第 29 節的跟單直接成為訂單
         _it = _oo.items[0]
         _bk_prev = (gc.enable_backup, gc.backup_count); gc.enable_backup = True; gc.backup_count = 2; db.commit()
         r = _c.get(f"/groups/{gc.id}/orders/mine"); t = r.text
         gc.enable_backup, gc.backup_count = _bk_prev; db.commit()
-        assert r.status_code == 200 and "我的訂單" not in t and "送出訂單" in _T(r)
+        assert r.status_code == 200 and "我的訂單" in t and "送出訂單" not in _T(r) and "修改訂單" not in _T(r)
         assert f'hx-put="/orders/items/{_it.id}" hx-vals=\'{{"quantity": 0}}\'' in t and "移除品項" in t
-        assert f'hx-delete="/groups/{gc.id}/orders"' not in t and f'hx-delete="/orders/items/{_it.id}"' not in t
+        assert f'hx-delete="/groups/{gc.id}/orders"' in t and "全部取消" in _T(r) and f'hx-delete="/orders/items/{_it.id}"' not in t
         assert f", {float(_it.subtotal / _it.quantity)})" in t, "候補要帶主品項每份總價（算價差）"
-        check("購物車片段：無雙標題；數量 1 的「−」變垃圾桶（數量 0＝移除）；整單／每列刪除鈕移出；候補帶每份價")
+        check("我的訂單片段（V2.33.0）：標題「我的訂單」、沒有送出／修改鈕；數量 1 的「−」是垃圾桶；整單取消是小字；候補帶每份價")
 
         # 數量 2：回到「−」（數量 1）
         _it.quantity = 2; db.commit()
@@ -2014,12 +2018,12 @@ def main():
         _it.quantity = 1; db.commit()
         check("數量 2 時是一般「−」（數量 1），不是垃圾桶")
 
-        # 修改中：主鈕「送出修改」＋「取消修改」
+        # V2.33.0（S-2）：遷移前留下的 EDITING 也一樣——沒有「送出修改」「取消修改」，直接改
         _oo.status = _OS31.EDITING; db.commit()
         r = _c.get(f"/groups/{gc.id}/orders/mine"); tt = _T(r)
-        assert "送出修改" in tt and "取消修改" in tt and "送出訂單" not in tt and "我的訂單" not in r.text
+        assert "送出修改" not in tt and "取消修改" not in tt and "我的訂單" in tt and f'hx-put="/orders/items/{_it.id}"' in r.text
         _oo.status = _OS31.DRAFT; db.commit()
-        check("修改中：主鈕「送出修改」、旁邊「取消修改」")
+        check("舊的修改中訂單：同樣直接加減，沒有送出修改／取消修改")
 
         # 垃圾桶的實際行為：PUT 數量 0 → 品項（連同候補）刪掉，回空購物車片段
         from app.models.order import OrderItemBackup as _OIB31
@@ -2050,7 +2054,7 @@ def main():
         _gb = Store(name="分頁測試團購", category=CategoryType.GROUP_BUY, is_active=True); db.add(_gb); db.commit()
 
         r = _c.get(f"/admin/stores/{_ds.id}"); t = r.text
-        assert r.status_code == 200 and "甜冰加料" in t and "店家資料" in t and "停用／刪除" in t and 'id="tab-options"' in t and 'id="tab-settings"' in t
+        assert r.status_code == 200 and "甜冰加料" in t and "店家資料" in t and 'id="danger"' in t and "停用／刪除" not in t and 'id="tab-options"' in t and 'id="tab-settings"' in t
         assert "營運設定" not in t and "基本資料" in t and "分店" in t and "可見範圍" in t
         # 甜冰：標籤元件帶目前清單（順序保留）、預設組、送出欄位名不變
         assert ("tagEditor(" + json.dumps(["全糖", "半糖"]) + ")") in t and 'name="sugar_options"' in t and 'name="ice_options"' in t
@@ -2059,7 +2063,7 @@ def main():
         assert 'action="/admin/stores/%d/toppings/batch"' % _ds.id in t and 'name="toppings_json"' in t
         assert "/toppings/%d/toggle" % _ta.id not in t and "/toppings/%d/delete" % _ta.id not in t
         assert ('"name": "珍珠"' in t or json.dumps("珍珠") in t)
-        check("飲料店工作台：菜單／甜冰加料／店家資料／停用／刪除；甜冰是標籤＋預設組（欄位名不變）；加料一張表單")
+        check("飲料店工作台：菜單／甜冰加料／店家資料（危險區在店家資料最下面）；甜冰是標籤＋預設組（欄位名不變）；加料一張表單")
 
         r = _c.get(f"/admin/stores/{_gb.id}?tab=options")
         assert r.status_code == 200 and "甜冰加料" not in r.text and 'id="tab-options"' not in r.text and 'tab: "settings"' in r.text
@@ -2760,8 +2764,12 @@ def main():
         import io as _io40, contextlib as _cl40
         _buf = _io40.StringIO()
         _ids40 = [g.id for g in _adm._test_group_candidates(db)]
-        with _cl40.redirect_stdout(_buf):  # V2.28.0 P1-1：送出畫面上列的 ids
+        import logging as _lg40
+        _h40 = _lg40.StreamHandler(_buf); _lg40.getLogger("admin").addHandler(_h40)  # V2.34.1：稽核訊息改 logging
+        try:  # V2.28.0 P1-1：送出畫面上列的 ids
             r = _c.post("/admin/groups/cleanup-test", data={"ids": [str(i) for i in _ids40]}, follow_redirects=False)
+        finally:
+            _lg40.getLogger("admin").removeHandler(_h40)
         assert r.status_code == 302 and r.headers["location"].endswith("cleaned=%d" % _n40)
         assert "清除測試團：" in _buf.getvalue() and str(_gt_id) in _buf.getvalue(), _buf.getvalue()
         db.expire_all()
@@ -3390,10 +3398,9 @@ def main():
     # ---------- 48. V2.31.2 未完成事項總表第一批 ----------
     print("\n[48] 未完成事項總表第一批（S-1、B-7、P2-17、P2-F6）")
     _mo48 = open("app/templates/partials/my_order.html", encoding="utf-8").read()
-    _sub48 = _mo48[_mo48.index('hx-post="/groups/{{ group.id }}/orders/submit"'):][:900]
-    _sub48 = _sub48[:_sub48.index(">")]
-    assert "hx-confirm" not in _sub48, "S-1：送出是可逆的（截止前能改），不要確認框"
-    assert "截止前都能改" in _sub48
+    # V2.33.0（S-2）取代 S-1：連「送出訂單」鈕都沒有了（點了就是訂單）
+    assert "/orders/submit" not in _mo48 and "/orders/edit" not in _mo48 and "/orders/cancel" not in _mo48, "S-2：我的訂單不該再有送出／修改／取消修改"
+    assert "截止前都能改" in _mo48
     assert "點了直接加" not in open("app/templates/group.html", encoding="utf-8").read(), "B-7：常點其實會開彈窗"
     import pathlib as _pl48, re as _re48
     _float48 = [f"{p.name}: {m.group(0)}" for p in _pl48.Path("app/templates").rglob("*.html")
@@ -3419,6 +3426,290 @@ def main():
     _vals48 = [c.value for c in _cells48]
     assert "=1+1" in _vals48 and any(str(v).startswith("=HYPERLINK") for v in _vals48), "內容照原樣顯示（不加 '）"
     check("S-1 送出不跳確認框；B-7 常點文案；P2-17 Excel 不會把使用者的字當公式；P2-F6 CDN 全部鎖確切版本")
+
+    # ---------- 49. V2.32.0 總表第二批 ----------
+    print("\n[49] 總表第二批（M-1 就地改價格、M-2 後台無底部導航、M-6 常用區、B-4 開團鈕）")
+    import app.routers.home as _home49
+    from app.schemas.menu import MenuImport as _MI49
+    from app.services.import_service import import_menu as _im49
+    from app.models.menu import Menu as _M49
+    _u49 = User(line_user_id="smoke49_member", display_name="團員四九"); db.add(_u49); db.commit(); _mem49 = _u49.id
+    _who49 = {"id": _uid}
+    async def _f49(request, db_):
+        return db_.query(User).filter(User.id == _who49["id"]).first()
+    async def _f49o(request, db_):
+        return (db_.query(User).filter(User.id == _who49["id"]).first(), None)
+    _o49 = (_grp.get_current_user, _grp.get_current_user_optional, _home49.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _home49.get_current_user = _f49, _f49o, _f49
+    _adm.get_admin_user = _fake_admin
+    try:
+        _s49 = Store(name="四九店", category=CategoryType.DRINK, is_active=True, is_public=True); db.add(_s49); db.commit()
+        _im49(db, _MI49(store_id=_s49.id, mode="new", menu={"items": [{"name": "紅茶", "price": 30}]}))
+        _m49 = db.query(_M49).filter(_M49.store_id == _s49.id, _M49.is_active == True).one()
+        _g49 = Group(owner_id=_mem49, store_id=_s49.id, menu_id=_m49.id, name="四九團", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True); db.add(_g49); db.commit()
+        # 管理員：團頁有「改價格」直達改價模式＋說明；店家頁有「管理」
+        _who49["id"] = _uid
+        t = _c.get(f"/groups/{_g49.id}").text
+        assert f'href="/admin/stores/{_s49.id}?tab=menu&amp;edit=price" id="admin-edit-price"' in t or f'href="/admin/stores/{_s49.id}?tab=menu&edit=price" id="admin-edit-price"' in t, "M-1：管理員團頁要有改價格"
+        assert "改了只影響之後開的團" in t and "價格跟店裡不一樣" not in t, "管理員不用回報給自己"
+        t = _c.get(f"/stores/{_s49.id}").text
+        assert 'id="admin-manage-store"' in t and f'href="/admin/stores/{_s49.id}"' in t
+        # 團員：照舊回報、沒有管理入口
+        _who49["id"] = _mem49
+        t = _c.get(f"/groups/{_g49.id}").text
+        assert "admin-edit-price" not in t and "價格跟店裡不一樣" in t
+        assert "admin-manage-store" not in _c.get(f"/stores/{_s49.id}").text
+        check("M-1：管理員團頁「改價格」直進改價模式（註明只影響之後的團）、店家頁「管理」；團員照舊回報、看不到入口")
+        # M-6：團單、公告在「管理」區
+        _who49["id"] = _uid
+        t = _c.get("/admin").text
+        _common = t[t.index('id="admin-common"'):t.index('id="admin-manage"')]
+        _manage = t[t.index('id="admin-manage"'):]
+        assert "go-groups" not in _common and "go-announcements" not in _common and "go-groups" in _manage and "go-announcements" in _manage
+        assert "go-new-store" in _common and "go-stores" in _common
+        # M-2：後台每一頁都沒有底部導航；B-4：開團頁也沒有、開團鈕貼底
+        for _u in ("/admin", "/admin/stores", f"/admin/stores/{_s49.id}", f"/admin/stores/{_s49.id}?tab=menu&edit=price", "/admin/import",
+                   "/admin/groups", "/admin/users", "/admin/departments", "/admin/announcements", "/admin/feedbacks", "/admin/recommendations"):
+            r = _c.get(_u)
+            assert r.status_code == 200, (_u, r.status_code)
+            assert "<nav" not in r.text, f"M-2：後台 {_u} 不該有底部導航"
+        assert "<nav" in _c.get("/home").text, "前台照舊有導航"
+        t = _c.get("/groups/new").text
+        assert "<nav" not in t and 'id="create-group-bar"' in t and "sticky bottom-0" in t
+        check("M-6 常用只留新增店家／店家與菜單；M-2 後台 11 頁都沒有底部導航；B-4 開團頁無導航、開團鈕貼底")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _home49.get_current_user = _o49
+        _adm.get_admin_user = _orig
+
+    # ---------- 50. V2.33.0 S-2 取消草稿購物車 ----------
+    print("\n[50] S-2 取消草稿購物車（點了就是訂單、就地改、上限與庫存即時、上次點的一鍵＋復原、遷移）")
+    from app.schemas.menu import MenuImport as _MI50
+    from app.services.import_service import import_menu as _im50
+    from app.models.menu import Menu as _M50
+    from app.models.order import Order as _O50, OrderItem as _OI50, OrderStatus as _OS50
+    import app.routers.orders as _ord50
+    _ua50 = User(line_user_id="s50_a", display_name="甲五十"); _ub50 = User(line_user_id="s50_b", display_name="乙五十")
+    db.add_all([_ua50, _ub50]); db.commit(); _a50, _b50 = _ua50.id, _ub50.id
+    _who50 = {"id": _a50}
+    async def _f50(request, db_):
+        return db_.query(User).filter(User.id == _who50["id"]).first()
+    async def _f50o(request, db_):
+        return (db_.query(User).filter(User.id == _who50["id"]).first(), None)
+    _o50 = (_grp.get_current_user, _grp.get_current_user_optional, _ord50.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _ord50.get_current_user = _f50, _f50o, _f50
+    try:
+        _s50 = Store(name="五十店", category=CategoryType.MEAL, is_active=True, is_public=True); db.add(_s50); db.commit()
+        _im50(db, _MI50(store_id=_s50.id, mode="new", menu={"items": [{"name": "雞腿飯", "price": 30}, {"name": "排骨飯", "price": 30}, {"name": "限量便當", "price": 20}]}))
+        _m50 = db.query(_M50).filter(_M50.store_id == _s50.id, _M50.is_active == True).one()
+        _mi50 = {i.name: i for i in _m50.items}
+        _mi50["限量便當"].stock_limit = 1; db.commit()
+        def _g50(name, **kw):
+            g = Group(owner_id=_uid, store_id=_s50.id, menu_id=_m50.id, name=name, category=CategoryType.MEAL,
+                      deadline=taipei_now() + timedelta(hours=2), is_public=True, **kw); db.add(g); db.commit(); return g.id
+        def _add50(gid, name, q=1):
+            return _c.post(f"/groups/{gid}/orders/items", data={"menu_item_id": str(_mi50[name].id), "quantity": str(q)}, headers={"HX-Request": "true"})
+        def _order50(gid, uid):
+            db.expire_all(); return db.query(_O50).filter(_O50.group_id == gid, _O50.user_id == uid).first()
+        g1 = _g50("五十團")
+        # 1. 點了就是訂單，訂單牆馬上看得到
+        r = _add50(g1, "雞腿飯")
+        assert r.status_code == 200 and "我的訂單" in r.text and "送出訂單" not in r.text
+        o = _order50(g1, _a50); assert o.status == _OS50.SUBMITTED and len(o.items) == 1
+        _who50["id"] = _b50
+        assert "甲五十" in _c.get(f"/groups/{g1}/orders/wall").text, "點了就出現在訂單牆"
+        # 2. 已點後再加點直接併入（S-3：不用先按修改）
+        _who50["id"] = _a50
+        r = _add50(g1, "排骨飯"); assert r.status_code == 200
+        o = _order50(g1, _a50); assert o.status == _OS50.SUBMITTED and len(o.items) == 2 and o.snapshot is None
+        # 整頁首次渲染：卡片就帶品項（不靠 htmx 再載一次；結帳列數字跟卡片一致）
+        _pg50 = _c.get(f"/groups/{g1}").text
+        _i50 = _pg50.find('id="my-order-card"'); _card50 = _pg50[_i50:_i50 + 3000]
+        assert _i50 > 0 and 'data-cart-count="2"' in _card50 and "排骨飯" in _card50 and "還沒點東西" not in _card50, "整頁首次渲染的我的訂單卡應帶品項"
+        check("S-2：加品項就是已點的訂單、訂單牆馬上看得到；已點後再加點直接併入（S-3），不經修改模式；整頁首次渲染卡片就有品項")
+        # 3. 就地改數量／刪除；刪光 → 回到沒點（DRAFT），訂單牆不算
+        _it = [i for i in o.items if i.item_name == "排骨飯"][0]
+        assert _c.put(f"/orders/items/{_it.id}", data={"quantity": "3"}, headers={"HX-Request": "true"}).status_code == 200
+        o = _order50(g1, _a50); assert sum(i.quantity for i in o.items) == 4 and o.status == _OS50.SUBMITTED
+        for i in list(o.items):
+            assert _c.put(f"/orders/items/{i.id}", data={"quantity": "0"}, headers={"HX-Request": "true"}).status_code == 200
+        o = _order50(g1, _a50); assert not o.items and o.status == _OS50.DRAFT
+        _who50["id"] = _b50
+        assert "甲五十" not in _c.get(f"/groups/{g1}/orders/wall").text, "刪光就不算點"
+        check("就地加減立即生效；刪光品項回到「沒點」，訂單牆不列")
+        # 4. 每單上限：每一步都擋（原本只在送出時擋）
+        g2 = _g50("五十上限團", order_limit=50, allow_over_limit=False)
+        _who50["id"] = _a50
+        assert _add50(g2, "雞腿飯").status_code == 200
+        r = _add50(g2, "排骨飯"); assert r.status_code == 400 and "超過每單上限" in r.text, r.text[:200]
+        o = _order50(g2, _a50); assert len(o.items) == 1 and o.status == _OS50.SUBMITTED, "被擋下時原本的訂單不變"
+        _it = o.items[0]
+        r = _c.put(f"/orders/items/{_it.id}", data={"quantity": "2"}, headers={"HX-Request": "true"}); assert r.status_code == 400
+        o = _order50(g2, _a50); assert o.items[0].quantity == 1
+        check("每單上限：加品項、加數量超過就 400，原本的訂單不變")
+        # 5. 庫存：點了就佔用（別人馬上點不到）
+        g3 = _g50("五十限量團")
+        assert _add50(g3, "限量便當").status_code == 200
+        _who50["id"] = _b50
+        r = _add50(g3, "限量便當"); assert r.status_code == 400 and "售完" in r.text
+        check("限量品項：點了就佔用，別人立刻點不到")
+        # 6. 跟單（已點也能跟）
+        _who50["id"] = _a50
+        _src = _order50(g1, _a50)
+        _who50["id"] = _b50; assert _add50(g1, "雞腿飯").status_code == 200
+        _bi = _order50(g1, _b50).items[0]
+        _who50["id"] = _a50; assert _add50(g1, "排骨飯").status_code == 200
+        r = _c.post(f"/groups/{g1}/orders/follow/{_bi.id}", headers={"HX-Request": "true"}); assert r.status_code == 200
+        o = _order50(g1, _a50); assert o.status == _OS50.SUBMITTED and len(o.items) == 2
+        check("已點的人也能跟單，直接併進訂單")
+        # 7. 舊頁面的「修改訂單」「取消修改」「送出訂單」：不壞、不進修改模式
+        for _u in ("edit", "cancel", "submit"):
+            r = _c.post(f"/groups/{g1}/orders/{_u}", headers={"HX-Request": "true"}); assert r.status_code == 200, (_u, r.status_code)
+        o = _order50(g1, _a50); assert o.status == _OS50.SUBMITTED and o.snapshot is None
+        check("舊頁面按修改／取消修改／送出：200、不進修改模式（部署當下開著舊頁的人不會壞）")
+        # 8. 上次點的（S-4）：一鍵點好；原本沒點才帶 undo
+        db.query(Group).filter(Group.id == g1).update({"deadline": taipei_now() - timedelta(minutes=1)}); db.commit()
+        g4 = _g50("五十再來團")
+        r = _c.post(f"/groups/{g4}/orders/copy-last", data={"mode": "append"}, follow_redirects=False)
+        assert r.status_code == 302 and "undo=1" in r.headers["location"] and "copied=2" in r.headers["location"], r.headers.get("location")
+        o = _order50(g4, _a50); assert o.status == _OS50.SUBMITTED and len(o.items) == 2
+        r = _c.post(f"/groups/{g4}/orders/copy-last", data={"mode": "append"}, follow_redirects=False)
+        assert "undo=1" not in r.headers["location"], "已經有點東西時不給復原（復原＝全部取消，會連原本的也刪掉）"
+        t = _c.get(f"/groups/{g4}").text
+        assert 'id="last-order-again"' in t and "一樣再來" in t and "q.get('undo')" in t and "label: '復原'" in t
+        r = _c.request("DELETE", f"/groups/{g4}/orders", headers={"HX-Request": "true"}); assert r.status_code == 200
+        o = _order50(g4, _a50); assert not o.items and o.status == _OS50.DRAFT
+        check("上次點的：「一樣再來」一下點好（S-4），原本沒點才給 6 秒「復原」；復原＝取消這團全部")
+        # 9. 團頁：沒有購物車、沒有「查看並送出」、結帳列報數字
+        _who50["id"] = _a50; _add50(g4, "雞腿飯")
+        t = _c.get(f"/groups/{g4}").text
+        assert 'id="cart-content"' not in t and "查看並送出" not in t and "你點了 " in t and "不用再按送出" in t and 'id="my-order-card"' in t
+        assert "您已送出訂單，是否要加點" not in t, "S-3：加點不再先確認"
+        check("團頁：沒有購物車與「查看並送出」；結帳列「你點了 N 件」；我的訂單卡在頁面上；加點不跳確認")
+        # 10. 遷移：開放中團的購物車／修改中 → 已點；已截止的不動；再跑 0
+        g5 = _g50("五十遷移開放團"); g6 = _g50("五十遷移截止團")
+        db.query(Group).filter(Group.id == g6).update({"is_closed": True}); db.commit()
+        for gid, uid, st in ((g5, _a50, _OS50.DRAFT), (g5, _b50, _OS50.EDITING), (g6, _a50, _OS50.DRAFT)):
+            od = _O50(group_id=gid, user_id=uid, status=st, snapshot={"items": []} if st == _OS50.EDITING else None); db.add(od); db.flush()
+            db.add(_OI50(order_id=od.id, menu_item_id=_mi50["雞腿飯"].id, item_name="雞腿飯", unit_price=30, quantity=1)); db.commit()
+        _empty = _O50(group_id=g5, user_id=_uid, status=_OS50.DRAFT); db.add(_empty); db.commit()
+        from app.migrations import run_migrations as _rm50
+        _r1 = _rm50(engine, log=lambda *a: None)
+        assert any("轉成已點 2 筆" in x for x in _r1.changed), _r1.changed
+        db.expire_all()
+        assert _order50(g5, _a50).status == _OS50.SUBMITTED and _order50(g5, _b50).status == _OS50.SUBMITTED and _order50(g5, _b50).snapshot is None
+        assert _order50(g6, _a50).status == _OS50.DRAFT and _order50(g5, _uid).status == _OS50.DRAFT, "已截止的、空的不動"
+        _r2 = _rm50(engine, log=lambda *a: None)
+        assert not any("轉成已點" in x for x in _r2.changed)
+        check("遷移：開放中團的購物車與修改中轉成已點（丟掉快照）、已截止與空的不動；再跑 0 筆")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _ord50.get_current_user = _o50
+
+    # ---------- 51. V2.34.0 總表第四批（S-5、S-6、M-3、M-4、M-5） ----------
+    print("\n[51] 開團一進來就選店、首頁常開的店、匯入一個貼上區、人員搜尋、工作台危險區")
+    import json as _j51
+    import app.routers.home as _hm51
+    _adm.get_admin_user = _fake_admin
+    try:
+        # S-5：開團頁沒有「類型」列；覆蓋層有類別 chip、代購第一格、投票與範本入口
+        _who50["id"] = _a50
+        _o51 = (_grp.get_current_user, _grp.get_current_user_optional)
+        _grp.get_current_user, _grp.get_current_user_optional = _f50, _f50o
+        try:
+            t = _c.get("/groups/new").text
+        finally:
+            _grp.get_current_user, _grp.get_current_user_optional = _o51
+        assert ">類型</label>" not in t and "selectCategory(" not in t.split("function newGroupForm")[0], "S-5：類型列拿掉"
+        assert 'id="picker-cats"' in t and 'id="pick-proxy"' in t and 'id="picker-vote"' in t and "開團 · 選一家店" in t
+        assert 'name="is_proxy"' in t and "this.openPicker(true)" in t, "沒預選時一進來就開覆蓋層"
+        check("S-5：開團頁沒有類型列；一進來就是選店（類別 chip、代購第一格、投票入口在覆蓋層裡）")
+        # S-6：常開的店——自己開過的依次數、看得到的才算；沒開過退回全站熱門；模板列出開團連結
+        _u51 = User(line_user_id="s51_u", display_name="丙五一"); _n51 = User(line_user_id="s51_n", display_name="丁五一")
+        db.add_all([_u51, _n51]); db.commit()
+        _s51 = Store(name="五一店", category=CategoryType.DRINK, is_active=True, is_public=True); db.add(_s51); db.commit()
+        _im50(db, _MI50(store_id=_s51.id, mode="new", menu={"items": [{"name": "紅茶", "price": 30}]}))
+        _hid51 = Store(name="五一停用店", category=CategoryType.DRINK, is_active=False, is_public=True); db.add(_hid51); db.commit()
+        _past = taipei_now() - timedelta(days=3)
+        for sid, n in ((_s51.id, 1), (_s50.id, 2), (_hid51.id, 5)):
+            for k in range(n):
+                db.add(Group(owner_id=_u51.id, store_id=sid, name=f"五一{sid}-{k}", category=CategoryType.DRINK, deadline=_past - timedelta(days=k), is_public=True, is_closed=True))
+        db.commit()
+        _of = _hm51.often_stores_for(db, _u51)
+        assert [st.name for st, _ in _of][:2] == ["五十店", "五一店"] and all(lst for _, lst in _of[:2]), [(st.name, l) for st, l in _of]
+        assert "五一停用店" not in [st.name for st, _ in _of], "停用的店不列"
+        _of2 = _hm51.often_stores_for(db, _n51)
+        assert _of2 and all(lst == "" for _, lst in _of2), "沒開過團退回全站熱門（不寫上次）"
+        _tpl51 = _hm51.templates.env.get_template("partials/home_groups.html")
+        _html51 = _tpl51.render(request=None, user=_u51, attention=[], open_groups=[], announcements=[], active_votes=[], voted_ids=set(), now=taipei_now(), often_stores=_of)
+        assert 'id="often-stores"' in _html51 and f'href="/groups/new?store_id={_s50.id}"' in _html51 and "你常開的店" in _html51 and "開別家" in _html51
+        _html51b = _tpl51.render(request=None, user=_n51, attention=[], open_groups=[], announcements=[], active_votes=[], voted_ids=set(), now=taipei_now(), often_stores=_of2)
+        assert "大家常開的店" in _html51b
+        _html51c = _tpl51.render(request=None, user=_n51, attention=[], open_groups=[], announcements=[], active_votes=[], voted_ids=set(), now=taipei_now(), often_stores=[])
+        assert 'id="often-stores"' not in _html51c and "開一個？" in _html51c
+        check("S-6：首頁沒有團時列常開的店（自己開過的依次數、停用的不列；沒開過退回大家常開的）＋開團連結帶 store_id")
+        # M-3：新增店家只看到貼上區；「匯入至」與店名類別收起來，預覽「將新增…」旁有「改」
+        t = _c.get("/admin/import").text
+        assert 'id="pick-existing"' in t and 'x-show="storeSel || targetOpen"' in t and 'x-show="!storeSel && newOpen"' in t
+        r = _c.post("/admin/import/preview", data={"store_id": "", "json_text": _j51.dumps({"store": {"name": "五一新店", "category": "drink"}, "menu": {"items": [{"name": "x", "price": 1}]}}, ensure_ascii=False)}, headers=_H)
+        assert "將新增店家「五一新店」" in r.text and 'id="edit-new-store"' in r.text and "edit-new-store" in r.text
+        t = _c.get(f"/admin/import?store_id={_s51.id}").text
+        assert "匯入至" in t and "五一店" in t and 'id="pick-existing"' not in t, "從工作台更新菜單：一行店名"
+        check("M-3：新增店家只看到貼上區（選既有店、店名類別收起來）；預覽「將新增」旁有「改」；更新菜單照舊一行店名")
+        # M-4：人員頁一個搜尋框、沒有排序分頁；預設最近活動；舊 ?sort= 照樣能用
+        db.query(User).filter(User.id == _u51.id).update({"last_active_at": datetime.utcnow()}); db.commit()
+        t = _c.get("/admin/users").text
+        assert 'id="user-search"' in t and "/admin/users?sort=" not in t and ">建立時間<" not in t
+        _ul = t[t.index('id="user-list"'):]
+        assert _ul.index("丙五一") < _ul.index("丁五一"), "預設依最近活動"
+        assert 'data-name="丙五一 ' in t
+        assert _c.get("/admin/users?sort=name").status_code == 200 and _c.get("/admin/users?sort=bogus").status_code == 200
+        check("M-4：人員頁一個搜尋框、排序分頁拿掉、預設最近活動；舊 ?sort= 網址照樣能開")
+        # M-5：工作台 3 個分頁；危險區在店家資料；?tab=more 302 → settings#danger；停用後也回危險區
+        t = _c.get(f"/admin/stores/{_s51.id}?tab=settings").text
+        assert 'id="danger"' in t and "危險區" in t and "停用／刪除" not in t, "分頁沒有停用／刪除"
+        r = _c.get(f"/admin/stores/{_s51.id}?tab=more", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith(f"/admin/stores/{_s51.id}?tab=settings#danger"), r.headers.get("location")
+        r = _c.post(f"/admin/stores/{_s51.id}/toggle", follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("?tab=settings#danger")
+        _c.post(f"/admin/stores/{_s51.id}/toggle", follow_redirects=False)
+        check("M-5：工作台分頁 4→3，停用／刪除在店家資料最下面的危險區；舊 ?tab=more 與停用後都 302 到 #danger")
+    finally:
+        _adm.get_admin_user = _orig
+
+    # ---------- 52. V2.34.1 對齊 Kit V2.7.0 ----------
+    print("\n[52] 對齊 Kit V2.7.0：說明小字、Kit 回饋檔版本、print 改 logging")
+    import re as _re52, glob as _glob52
+    _tpl52 = {f: open(f, encoding="utf-8").read() for f in _glob52.glob("app/templates/**/*.html", recursive=True)}
+    _all52 = "\n".join(_tpl52.values())
+    for _gone in ("點了帶入選項", "點了捲到品項", "點下面菜單的品項，選好就點好了", "點菜單的品項，選好就點好了", "結帳金額自動重算",
+                  "對方點開後用自己的 LINE 登入就能一起點餐", "截止時間、備註、上限、折扣…", "直接加進你的訂單</p>",
+                  "家可選，也可以代購", "下次這裡一鍵開團"):
+        assert _gone not in _all52, f"Kit 鐵律：說明小字「{_gone}」應拿掉"
+    assert _tpl52["app/templates/group_new.html"].count("自己填品項與價格") == 1, "代購說明只留選店畫面第一格"
+    for _keep in ("改了只影響之後開的團", "候補數量會跟隨主品項", "每張卡片各自儲存", "不用再按送出", "只有你看得到", "自動分攤"):
+        assert _keep in _all52, f"有資訊量的提醒「{_keep}」要留著"
+    for _long in ("推薦給大家一起訂", "儲存常用設定，一鍵快速開團", "停用後團員看不到這家店，但資料都在", "營運設定」補",
+                  "勾選＝可以點超過，超過的部分自行貼補", "宅配、團購這種「不分縣市」的店", "中途離開什麼都不會留下", "金額吃當時快照"):
+        assert _long not in _all52, f"V2.34.2：長句「{_long}」應已縮短或拿掉"
+    check("Kit 鐵律（不加說明小字）：拿掉的 11 處不再出現、V2.34.2 縮短的長句不再出現；有資訊量的提醒還在")
+    # Kit 回饋檔：檔頭版號距今 ≤ 5 個版本（坑 #57；交班檔每版都改，不算）
+    _hd52 = open("SELA-handoff.md", encoding="utf-8").readline()
+    _mv52 = _re52.search(r"Online-Drink (V\d+\.\d+\.\d+)", _hd52)
+    assert _mv52, "SELA-handoff.md 第一行要寫「Online-Drink V<a>.<b>.<c>」"
+    _hist52 = _re52.findall(r"^\| (V\d+\.\d+\.\d+) \|", open("CLAUDE.md", encoding="utf-8").read() + "\n" + open("docs/CHANGELOG.md", encoding="utf-8").read(), _re52.M)
+    from app.version import APP_VERSION as _V52
+    assert _hist52 and _hist52[0] == _V52, (_hist52[:2], _V52)
+    assert _mv52.group(1) in _hist52, f"Kit 回饋檔版本 {_mv52.group(1)} 不在版本歷程裡"
+    _gap52 = _hist52.index(_mv52.group(1))
+    assert _gap52 <= 5, f"Kit 回饋檔停在 {_mv52.group(1)}，距今 {_gap52} 版（> 5，坑 #57）：照 Kit 範本補產"
+    check(f"Kit 回饋檔 SELA-handoff.md 停在 {_mv52.group(1)}，距今 {_gap52} 版（≤ 5）")
+    # print 只留啟動那行（V2.34.1 錯誤／稽核訊息改 logging）
+    _pr52 = []
+    for _f in _glob52.glob("app/**/*.py", recursive=True):
+        for _n, _ln in enumerate(open(_f, encoding="utf-8"), 1):
+            if _re52.match(r"\s*print\(", _ln): _pr52.append(f"{_f}:{_n}")
+    assert _pr52 == ["app/main.py:56"] or (len(_pr52) == 1 and _pr52[0].startswith("app/main.py:")), _pr52
+    check("後端只剩啟動那行 print，其餘錯誤／稽核訊息走 logging")
 
     print(f"\n全部通過（{len(passed)} 項）")
 

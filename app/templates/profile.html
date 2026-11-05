@@ -40,7 +40,7 @@
             <button type="submit" class="btn btn-primary text-sm px-3">儲存</button>
             <button type="button" @click="editing = false" class="text-sm text-sela-800/50 px-1">取消</button>
         </form>
-        <p x-show="editing" x-cloak class="text-[11px] text-sela-800/45 mt-1.5">留空就用 LINE 名稱（{{ user.display_name }}）；這個名稱會出現在訂單牆與團單</p>
+        <p x-show="editing" x-cloak class="text-[11px] text-sela-800/45 mt-1.5">留空就用 LINE 名稱（{{ user.display_name }}）</p>
     </div>
 
     {% if user.is_admin and new_rec_count %}

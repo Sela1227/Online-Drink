@@ -2,6 +2,8 @@ import cloudinary
 import cloudinary.uploader
 from fastapi import UploadFile
 from app.config import get_settings
+import logging
+_log = logging.getLogger("upload")  # V2.34.1：錯誤／稽核訊息改 logging（原本 print）
 
 settings = get_settings()
 
@@ -27,7 +29,7 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores", max_size: 
     
     # 檢查是否有設定 Cloudinary
     if not settings.cloudinary_cloud_name:
-        print("Cloudinary not configured")
+        _log.warning("Cloudinary 沒設定，照片上傳略過")
         return None
     
     _ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
@@ -52,7 +54,7 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores", max_size: 
         )
         return result.get("secure_url")
     except Exception as e:
-        print(f"Cloudinary upload failed: {e}")
+        _log.error(f"Cloudinary 上傳失敗：{e}")
         raise HTTPException(status_code=400, detail="圖片上傳失敗，請稍後再試")
 
 def delete_image(url: str) -> bool:
@@ -76,5 +78,5 @@ def delete_image(url: str) -> bool:
         cloudinary.uploader.destroy(public_id)
         return True
     except Exception as e:
-        print(f"Cloudinary delete error: {e}")
+        _log.error(f"Cloudinary 刪除失敗：{e}")
         return False

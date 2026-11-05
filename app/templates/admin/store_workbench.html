@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}{{ store.name }} - 店家管理{% endblock %}
@@ -95,11 +97,11 @@
 
         <div class="flex gap-1 mt-4 border-b border-sela-100 -mb-4 overflow-x-auto">
             {# V2.21.0 分頁重組：菜單／共用選項（甜冰、加料）／店家設定（基本資料、分店、可見範圍）／更多。團購店沒有共用選項分頁 #}
-            {% set wb_tabs = [('menu','菜單','ti-clipboard-list')] + ([('options','甜冰加料','ti-adjustments')] if has_options else []) + [('settings','店家資料','ti-building-store'), ('more','停用／刪除','ti-alert-triangle')] %}
+            {% set wb_tabs = [('menu','菜單','ti-clipboard-list')] + ([('options','甜冰加料','ti-adjustments')] if has_options else []) + [('settings','店家資料','ti-building-store')] %}
             {% for key, label, icon in wb_tabs %}
             <button type="button" @click='tab = {{ key | tojson }}'
                     :class='tab === {{ key | tojson }} ? "border-sela-700 text-sela-800 font-medium" : "border-transparent text-sela-800/60"'
-                    class="px-3 min-h-[44px] text-[15px] border-b-2 whitespace-nowrap -mb-px{{ ' ml-auto text-red-700' if key == 'more' else '' }}">
+                    class="px-3 min-h-[44px] text-[15px] border-b-2 whitespace-nowrap -mb-px">
                 <i class="ti {{ icon }}"></i> {{ label }}
             </button>
             {% endfor %}
@@ -162,7 +164,7 @@
             </div>
             <form action="/admin/stores/{{ store.id }}/menu/prices" method="post" data-track id="price-form"
                   class="sticky z-10 bg-white border border-sela-200 rounded-2xl p-3 flex items-center gap-2 shadow-sm"
-                  style="bottom: calc(4.5rem + env(safe-area-inset-bottom))">
+                  style="bottom: calc(0.75rem + env(safe-area-inset-bottom))">{# V2.32.0：後台沒有底部導航了（M-2），不用再讓 4.5rem #}
                 <input type="hidden" name="base_menu_id" value="{{ active_menu.id }}">
                 <input type="hidden" name="changes_json" :value="payload()">
                 <div class="flex-1 min-w-0 text-[13px] text-sela-800/70">
@@ -243,7 +245,7 @@
             </div>
         </div>
         {% endif %}
-        <p class="text-xs text-sela-800/45 px-1">更新菜單會新增一個版本，舊版本保留。進行中的團用的是它開團當時的版本，不會被影響。</p>
+        <p class="text-xs text-sela-800/45 px-1">更新菜單會存成新版本，進行中的團不受影響。</p>
     </div>
 
     {% if has_options %}
@@ -251,7 +253,7 @@
     <div x-show="tab === 'options'" x-cloak class="space-y-3" id="tab-options">
         {% if saved == 'options' %}<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"><i class="ti ti-circle-check"></i> 甜度／冰塊已儲存</div>{% endif %}
         {% if saved == 'toppings' %}<div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"><i class="ti ti-circle-check"></i> 加料已儲存</div>{% endif %}
-        <p class="text-xs text-sela-800/55 px-1">這家店所有品項共用。菜單匯入不會動到這裡。</p>
+        <p class="text-xs text-sela-800/55 px-1">所有品項共用，匯入菜單不會改到這裡。</p>
 
         {% if store.category and store.category.value == 'drink' %}
         <form action="/admin/stores/{{ store.id }}/options" method="post" id="options-form" data-track
@@ -311,7 +313,7 @@
                 <h2 class="font-medium text-sela-800"><i class="ti ti-plus"></i> 加料</h2>
                 <span class="text-xs text-sela-800/45" x-text="rows.length + ' 項'"></span>
             </div>
-            <p class="text-xs text-sela-800/55 mb-3">直接改名稱與加價、關掉就是停用；改完按一次儲存。</p>
+            <p class="text-xs text-sela-800/55 mb-3">關掉就是停用，改完按一次儲存。</p>
             <div class="divide-y divide-sela-100">
                 <template x-for="(r, i) in rows" :key="r.key">
                     <div class="py-2 flex items-center gap-2 topping-row" :class="r.active ? '' : 'opacity-60'">
@@ -410,7 +412,7 @@
                                     class="text-left px-3 py-2 rounded-lg bg-sela-50 border border-sela-200 text-sela-800">
                                 <span x-text='copied === "t" ? "已複製" : "複製「文字 Logo」指令"'></span> <span class="text-sela-800/50">— 沒有圖，用店名生成</span>
                             </button>
-                            <div class="text-sela-800/50">把指令連同原圖（或店名）貼給 ChatGPT／Claude，生成後下載圖片，在上面選擇檔案上傳。</div>
+                            <div class="text-sela-800/50">指令和原圖給 ChatGPT／Claude，生成後在上面上傳。</div>
                         </div>
                     </details>
                 </div>
@@ -501,11 +503,11 @@
         </div>
     </div>
 
-    <!-- ════ 更多 ════ -->
-    <div x-show="tab === 'more'" x-cloak class="bg-white rounded-2xl shadow-sm border border-red-200 p-4 space-y-4">
+    {# ════ 危險區（V2.34.0 M-5：原「停用／刪除」分頁，併到店家資料最下面；手機上第 4 個分頁原本被切一半，B-6） ════ #}
+    <div x-show="tab === 'settings'" x-cloak id="danger" class="bg-white rounded-2xl shadow-sm border border-red-200 p-4 space-y-4 scroll-mt-20">
         <div>
-            <h2 class="font-medium text-red-700 mb-1"><i class="ti ti-alert-triangle"></i> 危險操作</h2>
-            <p class="text-xs text-sela-800/55">停用後團員看不到這家店，但資料都在；刪除則不可復原。</p>
+            <h2 class="font-medium text-red-700 mb-1"><i class="ti ti-alert-triangle"></i> 危險區</h2>
+            <p class="text-xs text-sela-800/55">停用：團員看不到、資料都在。刪除：不能復原。</p>
         </div>
         <form action="/admin/stores/{{ store.id }}/toggle" method="post" class="flex items-center justify-between gap-3">
             <div class="text-sm text-sela-800/80">{% if store.is_active %}停用店家{% else %}啟用店家{% endif %}</div>
@@ -527,7 +529,7 @@
                     {% if group_count %}<li>{{ group_count }} 個歷史團保留，店名顯示「店家已移除」</li>{% endif %}
                     {% if active_group_count %}<li class="text-red-700 font-bold">還有 {{ active_group_count }} 個進行中的團</li>{% endif %}
                 </ul>
-                <p class="text-[13px] text-sela-800/70">刪除後無法復原；只是暫時不用可以改「停用」。</p>
+                <p class="text-[13px] text-sela-800/70">不能復原；暫時不用可以改「停用」。</p>
                 <form action="/admin/stores/{{ store.id }}/delete" method="post" class="flex gap-2 pt-1">
                     <input type="hidden" name="confirm" value="yes">
                     <button type="button" @click="delOpen = false" class="flex-1 min-h-[44px] rounded-xl border border-sela-300 text-[15px]">取消</button>

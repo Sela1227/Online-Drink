@@ -4,7 +4,7 @@
 {% set wall_total = (submitted_orders|sum(attribute='final_amount')) %}
 <div class="bg-white rounded-2xl shadow-sm border border-sela-100" x-data="{ expanded: false }" id="order-wall-card">
     <button type="button" @click="expanded = !expanded" class="w-full px-4 py-3 flex items-center justify-between gap-2 text-sm active:bg-sela-50 rounded-2xl">
-        <span class="text-sela-800"><i class="ti ti-users"></i> 已送出 {{ submitted_orders|length }} 人 · ${{ wall_total|money }}
+        <span class="text-sela-800"><i class="ti ti-users"></i> 已點 {{ submitted_orders|length }} 人 · ${{ wall_total|money }}
             {% if group.is_blind_mode and is_open %}<span class="ml-1 text-[10px] bg-sela-100 text-sela-800 px-1.5 py-0.5 rounded"><i class="ti ti-eye-off"></i> 盲點</span>{% endif %}
         </span>
         <span class="text-xs text-sela-800/60 underline whitespace-nowrap" x-text="expanded ? '收起' : '看大家點什麼 ›'">看大家點什麼 ›</span>
@@ -48,9 +48,8 @@
                     {% if is_open and not is_me %}
                     <button type="button"
                             hx-post="/groups/{{ group.id }}/orders/follow/{{ item.id }}"
-                            hx-target="#cart-content" hx-swap="innerHTML"
-                            x-show="orderStatus !== 'submitted'"
-                            @htmx:after-request="if ($event.detail.successful) { document.body.dispatchEvent(new CustomEvent('orderUpdated')); if (orderStatus === 'none') orderStatus = 'draft'; window.toast('已跟單，加進購物車了'); }"
+                            hx-target="#my-order-content" hx-swap="innerHTML"
+                            @htmx:after-request="if ($event.detail.successful) { document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus = 'submitted'; window.toast('已跟單 · 加進你的訂單了'); }"
                             class="flex-shrink-0 text-[11px] px-2 py-0.5 rounded-full border border-sela-300 bg-white text-sela-800 active:bg-sela-50"><i class="ti ti-plus"></i> 跟單</button>
                     {% endif %}
                 </div>
@@ -86,12 +85,9 @@
             {% endif %}
         </div>
         {% endfor %}
-        {% if is_open %}
-        <p class="px-4 py-2 text-[11px] text-sela-800/45">點「跟單」直接加入購物車</p>
-        {% endif %}
     </div>
     {% endif %}
 </div>
 {% elif is_open %}
-<div class="text-center text-xs text-sela-800/45 py-1">還沒有人送出</div>
+<div class="text-center text-xs text-sela-800/45 py-1">還沒有人點</div>
 {% endif %}

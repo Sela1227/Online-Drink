@@ -11,6 +11,8 @@ import httpx
 
 from app.config import get_settings
 from app.services.menu_prompt import PROMPT_LINES, prompt_tail
+import logging
+_log = logging.getLogger("ai_menu")  # V2.34.1：錯誤／稽核訊息改 logging（原本 print）
 
 MAX_PHOTOS = 5
 MAX_BYTES = 5 * 1024 * 1024          # Claude API 單張上限
@@ -98,12 +100,12 @@ async def convert_menu(images: list[tuple[bytes, str]], store_name: str | None =
     if r.status_code == 429 or r.status_code >= 500:
         raise AIMenuError("AI 服務忙碌中，請過一分鐘再試")
     if r.status_code != 200:
-        print(f"AI 轉換失敗 {r.status_code}：{r.text[:300]}")
+        _log.error(f"AI 轉換失敗 {r.status_code}：{r.text[:300]}")
         raise AIMenuError("AI 轉換失敗，可以改用「複製 AI 轉換指令」手動轉")
     data = r.json()
     text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     if not text.strip():
         raise AIMenuError("AI 沒有回傳內容，請再試一次")
     if data.get("stop_reason") == "max_tokens":
-        print("AI 轉換：回覆被截斷（max_tokens）")
+        _log.warning("AI 轉換：回覆被截斷（max_tokens）")
     return extract_json_text(text)

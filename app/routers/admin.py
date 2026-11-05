@@ -14,6 +14,8 @@ from app.models.menu import Menu, MenuCategory, MenuItem, ItemOption
 from app.models.group import Group, taipei_now, taipei_to_utc
 from app.schemas.menu import MenuImport, FullImport, MenuContent
 from app.services.auth import get_admin_user
+import logging as _logging
+_audit = _logging.getLogger("admin")  # V2.34.1：稽核訊息改 logging（原本 print）
 from app.services.import_service import import_store_and_menu, import_menu
 from app.services.import_analysis import analyze_menu_content, describe_loc, json_error_context
 from app.services.menu_diff import diff_menu
@@ -384,7 +386,7 @@ async def import_ai_convert(
         text = await ai_menu.convert_menu(images, store_name=(st.name if st else new_store_name), existing=st is not None)
     except ai_menu.AIMenuError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    print(f"AI 轉換完成：{len(images)} 張照片，{len(text)} 字（{user.show_name}）")
+    _audit.info(f"AI 轉換完成：{len(images)} 張照片，{len(text)} 字（{user.show_name}）")
     return JSONResponse({"text": text, "photos": len(images)})
 
 
@@ -525,7 +527,7 @@ async def update_menu_prices(
     new_menu = import_menu(db, validated)
     _ver = db.query(Menu).filter(Menu.store_id == store_id).count()
     cat_count, item_count = _count_import(validated.menu)
-    print(f"工作台改價：{user.show_name}（user_id={user.id}）{store.name} 改 {len(overrides)} 項 → 第 {_ver} 版")
+    _audit.info(f"工作台改價：{user.show_name}（user_id={user.id}）{store.name} 改 {len(overrides)} 項 → 第 {_ver} 版")
     return RedirectResponse(url=f"/admin/stores/{store_id}?tab=menu&imported=1&cats={cat_count}&items={item_count}&ver={_ver}&priced={len(overrides)}",
                             status_code=303)
 
@@ -1013,7 +1015,7 @@ async def cleanup_test_groups(request: Request, ids: list[int] = Form(default=[]
     removed = len(ids)
     db.commit()
     # V2.27.0（UI 審稿 P0-2）：留紀錄——誰、清了哪幾團
-    print(f"清除測試團：{user.show_name}（user_id={user.id}）刪除 {removed} 團 {ids}")
+    _audit.info(f"清除測試團：{user.show_name}（user_id={user.id}）刪除 {removed} 團 {ids}")
     return RedirectResponse(url=f"/admin/groups?cleaned={removed}", status_code=302)
 
 
@@ -1039,7 +1041,7 @@ async def toggle_store(store_id: int, request: Request, db: Session = Depends(ge
         db.commit()
     
     # 檢查來源頁面，回到對應頁面
-    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=more", status_code=302)
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings#danger", status_code=302)  # V2.34.0 M-5
 
 
 @router.post("/stores/{store_id}/delete")
@@ -1254,10 +1256,13 @@ async def store_workbench(
     # V2.21.0 分頁重組：菜單／共用選項（甜冰、加料）／店家設定（基本資料、分店、可見範圍）／更多。
     # 舊網址的 info／ops 對到新分頁（書籤與 V2.20.0 以前的導回網址）
     tab = {"info": "settings", "ops": "options"}.get(tab, tab)
+    # V2.34.0（M-5）：「停用／刪除」分頁併進店家資料最下面的危險區；舊網址 ?tab=more 轉過去（302，坑 #108）
+    if tab == "more":
+        return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings#danger", status_code=302)
     has_options = bool(store.category and store.category.value in ("drink", "meal"))
     if tab == "options" and not has_options:
         tab = "settings"
-    if tab not in ("menu", "options", "settings", "more"):
+    if tab not in ("menu", "options", "settings"):
         tab = "menu"
 
     def _values(opt_type):
@@ -1464,7 +1469,7 @@ async def update_store(
 
 
 @router.get("/users")
-async def user_list(request: Request, sort: str = "created", db: Session = Depends(get_db)):
+async def user_list(request: Request, sort: str = "last_active", db: Session = Depends(get_db)):
     """使用者列表"""
     user = await get_admin_user(request, db)
     
@@ -1478,9 +1483,10 @@ async def user_list(request: Request, sort: str = "created", db: Session = Depen
         "last_active": nullslast(User.last_active_at.desc()),
         "name": User.display_name.asc(),
     }
+    # V2.34.0（M-4）：預設改「最近活動」，畫面只剩搜尋框；?sort= 舊網址照樣能用
     if sort not in sort_map:
-        sort = "created"
-    users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort]).all()
+        sort = "last_active"
+    users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort], User.id.desc()).all()
     # V2.28.0 P2-5：訂單數一次 GROUP BY（原本模板 u.orders|length 每人載入全部訂單）
     from app.models.order import Order
     from sqlalchemy import func

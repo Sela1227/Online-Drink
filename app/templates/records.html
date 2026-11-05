@@ -26,7 +26,7 @@
         </div>
     </div>
     {% if order.status.value == 'submitted' %}
-    <span class="text-[11px] text-green-700 bg-green-50 px-2 py-0.5 rounded-full whitespace-nowrap">已送出</span>
+    <span class="text-[11px] text-green-700 bg-green-50 px-2 py-0.5 rounded-full whitespace-nowrap">已點</span>
     {% elif not g.is_open %}
     {# V2.16.3 審核 P1-2f：團已截止、沒送出的訂單不會被算進去 #}
     <span class="text-[11px] text-sela-800/50 bg-sela-100 px-2 py-0.5 rounded-full whitespace-nowrap">未送出・已截止</span>
@@ -85,7 +85,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="text-sm font-semibold text-sela-800 truncate">{{ group.name }}</div>
                     <div class="text-xs text-sela-800/55 truncate mt-0.5">
-                        {{ group.store_display_name }} · {{ group.submitted_count }} 人送出{% if group.submitted_count > 0 %} · ${{ group.total_amount|money }}{% endif %} · {{ group.deadline.strftime('%m/%d %H:%M') }} 截止
+                        {{ group.store_display_name }} · {{ group.submitted_count }} 人已點{% if group.submitted_count > 0 %} · ${{ group.total_amount|money }}{% endif %} · {{ group.deadline.strftime('%m/%d %H:%M') }} 截止
                     </div>
                 </div>
                 {% if group.is_open %}

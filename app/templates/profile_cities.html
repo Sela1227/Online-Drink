@@ -9,7 +9,7 @@
 <form method="POST" action="/profile/cities" class="space-y-4" x-data='{ picked: {{ my_cities | tojson }} }'>
     <h1 class="text-xl font-bold text-sela-800"><i class="ti ti-map-pin"></i> 我會訂的縣市</h1>
     <div class="bg-white rounded-2xl shadow-sm border border-sela-100 p-4 space-y-4">
-        <p class="text-sm text-sela-800/70">勾選後，店家頁和開團選店只顯示這些縣市的店。都不勾＝全部顯示。宅配、團購這種「不分縣市」的店，和還沒設縣市的店，永遠都會顯示。</p>
+        <p class="text-sm text-sela-800/70">只顯示勾選縣市的店，都不勾＝全部；不分縣市與沒設縣市的店一直會顯示。</p>
         {% for grp, cs in city_groups %}
         <div>
             <div class="text-sm font-bold text-sela-800 mb-2">{{ grp }}</div>

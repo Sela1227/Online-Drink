@@ -38,6 +38,8 @@ const w = dom.window;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fail = (msg) => { console.log(JSON.stringify({ ok: false, mode, msg })); process.exit(1); };
 const zh = (a, b) => a.localeCompare(b, "zh-Hant");
+// V2.34.0（S-5）：開團頁沒有「類型」了，一進來就是選店覆蓋層，類別在覆蓋層的 #picker-cats 篩
+const catChip = (d, label) => { const b = [...d.querySelectorAll("#picker-cats button")].find(x => x.textContent.trim() === label); if (!b) fail("覆蓋層找不到類別「" + label + "」"); return b; };
 
 (async () => {
   await sleep(100);
@@ -51,9 +53,7 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     // V2.26.0：只勾彰化縣。甲店彰化（10 天前）、乙店台中（1 天前，收藏）、丙店未設（5 天前）、丁店不分縣市（飲料）
     let readAll;
     if (mode === "picker_city") {
-      [...d.querySelectorAll("button")].find(b => b.textContent.includes("餐廳") && (b.getAttribute("@click") || "").includes("selectCategory")).click();
-      await sleep(100);
-      [...d.querySelectorAll("button")].find(b => b.textContent.includes("點此選擇店家")).click();
+      catChip(d, "餐廳").click();
       await sleep(150);
       readAll = () => [...d.querySelectorAll("div[role=button] .text-xs.font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n));
     } else {
@@ -94,14 +94,15 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
   }
 
   if (mode === "picker") {
-    // 選類別（餐廳）→ 按「點此選擇店家」打開覆蓋層
-    const catBtn = [...d.querySelectorAll("button")].find(b => b.textContent.includes("餐廳") && (b.getAttribute("@click") || "").includes("selectCategory"));
-    if (!catBtn) fail("找不到「餐廳」類別按鈕");
-    catBtn.click();
-    await sleep(100);
-    const open = [...d.querySelectorAll("button")].find(b => b.textContent.includes("點此選擇店家"));
-    if (!open) fail("找不到「點此選擇店家」");
-    open.click();
+    // V2.34.0（S-5）：一進來覆蓋層就開著、沒有類型列；第一格代購；類別 chip 只列有店的
+    const form0 = d.querySelector("form[action='/groups']");
+    const c0 = w.Alpine.$data(form0);
+    if (!c0.pickerOpen) fail("S-5：一進開團頁就應打開選店覆蓋層");
+    if ([...d.querySelectorAll("button")].some(b => (b.getAttribute("@click") || "").includes("selectCategory("))) fail("S-5：不該再有「類型」按鈕");
+    if (!d.getElementById("pick-proxy")) fail("S-5：覆蓋層第一格應是代購");
+    const catLabels = [...d.querySelectorAll("#picker-cats button")].map(b => b.textContent.trim());
+    if (catLabels[0] !== "全部" || !catLabels.includes("飲料") || !catLabels.includes("餐廳")) fail("S-5：類別 chip 應有 全部／飲料／餐廳（" + catLabels.join("/") + "）");
+    catChip(d, "餐廳").click();
     await sleep(150);
     const readOrder = () => [...d.querySelectorAll("div[role=button] .text-xs.font-medium")].map(e => e.textContent.trim()).filter(n => names.includes(n));
     const chips = () => [...d.querySelectorAll("button")].filter(b => /^(熱門|名稱|最近開過)$/.test(b.textContent.replace(/\s+/g, "")));
@@ -180,11 +181,14 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     const fd2 = fd();
     if (fd2.name !== "我的團" || !fd2.deadline || fd2.order_limit !== "140" || fd2.visibility !== "departments") fail("送出的欄位不對 " + JSON.stringify(fd2));
     if ("lucky_draw_count" in fd2) fail("沒開隨機免單卻送出 lucky_draw_count");
-    // 切到飲料、選丁店（有 全糖/半糖 與 去冰）
-    [...d.querySelectorAll("button")].find(b => b.textContent.includes("飲料") && (b.getAttribute("@click") || "").includes("selectCategory")).click();
-    await sleep(80);
-    [...d.querySelectorAll("button")].find(b => b.textContent.includes("點此選擇店家")).click();
+    // 換一家：飲料、選丁店（有 全糖/半糖 與 去冰）
+    const chg = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === "換一家" && !b.closest("#picked-proxy"));
+    if (!chg) fail("選好店後應有「換一家」");
+    chg.click();
     await sleep(120);
+    if (!comp.pickerOpen) fail("按換一家應打開覆蓋層");
+    catChip(d, "飲料").click();
+    await sleep(80);
     const ding = [...d.querySelectorAll("div[role=button]")].find(e => e.textContent.includes("丁店"));
     if (!ding) fail("覆蓋層找不到丁店");
     ding.click();
@@ -196,6 +200,14 @@ const zh = (a, b) => a.localeCompare(b, "zh-Hant");
     const selIce = d.querySelector("select[name=default_ice]");
     if (!selIce || [...selIce.options].map(o => o.value).join() !== ",去冰") fail("預設冰塊選項應來自店家");
     if (/正常糖/.test(d.body.textContent)) fail("不該再有寫死的「正常糖」");
+
+    // ---- V2.34.0（S-5）：代購從覆蓋層第一格選 ----
+    comp.openPicker(); await sleep(80);
+    d.getElementById("pick-proxy").click(); await sleep(120);
+    if (comp.selectedCategory !== "proxy" || comp.storeId) fail("按代購應切成代購、清掉店家（" + comp.selectedCategory + "/" + comp.storeId + "）");
+    if (comp.pickerOpen) fail("選了代購覆蓋層應關閉");
+    if (fd().is_proxy !== "true") fail("代購應送 is_proxy=true（" + fd().is_proxy + "）");
+    if (!d.getElementById("picked-proxy") || d.getElementById("picked-proxy").style.display === "none") fail("代購要顯示已選的代購卡");
 
     // ---- V2.16.3 審核 P1-2c：快捷標籤今天／明天 ----
     const lbl = [...d.querySelectorAll("button")].filter(b => /(今天|明天) 1[27]:00/.test(b.textContent.trim()));

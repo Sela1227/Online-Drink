@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}公告 - SELA 快點來點餐{% endblock %}
@@ -77,7 +79,7 @@
         </div>
     </div>
     {% else %}
-    <div class="text-center py-10 text-sela-800/60 bg-white rounded-2xl" x-show="open !== 'new'">還沒有公告，按右上「新增公告」</div>
+    <div class="text-center py-10 text-sela-800/60 bg-white rounded-2xl" x-show="open !== 'new'">還沒有公告</div>
     {% endfor %}
 </div>
 {% endblock %}

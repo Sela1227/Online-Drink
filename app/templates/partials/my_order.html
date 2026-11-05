@@ -1,15 +1,13 @@
-{# V2.18.0：根元素帶件數與金額，團頁的結帳列從這裡讀（單一來源） #}
-{% set in_cart = not (order and order.status.value == 'submitted') %}
-<div class="{% if in_cart %}px-1{% else %}bg-white rounded-2xl shadow-sm border border-green-200 p-4{% endif %}"
-     data-cart-count="{{ order.total_quantity if (order and order.status.value != 'submitted') else 0 }}"
-     data-cart-total="{{ order.final_amount|money if (order and order.status.value != 'submitted') else 0 }}">
-    {# V2.20.0：購物車 sheet 自己有標題（購物車 · N 件／修改中），這裡只在「已送出」的頁面卡上放標題 #}
-    {% if not in_cart %}
-    <h2 class="font-semibold text-sela-800 mb-3 flex items-center gap-2">
-        <span class="text-green-700"><i class="ti ti-check"></i> 你已送出</span>
-        <span class="ml-auto text-sela-800">${{ order.final_amount|money }}</span>
+{# V2.18.0：根元素帶件數與金額，團頁的結帳列從這裡讀（單一來源）
+   V2.33.0（內部審核 S-2，Sela 選）：沒有購物車了——點了就是訂單，這張卡就是「我的訂單」，直接在上面加減、刪除、填候補 #}
+{% set has_items = order and order.items %}
+<div class="bg-white rounded-2xl shadow-sm p-4 {% if has_items %}border border-green-200{% endif %}" id="my-order-card"
+     data-cart-count="{{ order.total_quantity if has_items else 0 }}"
+     data-cart-total="{{ order.final_amount|money if has_items else 0 }}">
+    <h2 class="font-semibold text-sela-800 mb-2 flex items-center gap-2">
+        我的訂單
+        {% if has_items %}<span class="text-[11px] font-normal bg-green-50 text-green-700 px-2 py-0.5 rounded-full">{% if is_open %}已點 · 截止前都能改{% else %}已點{% endif %}</span>{% endif %}
     </h2>
-    {% endif %}
 
     {% if order and order.items %}
     <!-- 品項列表 -->
@@ -35,21 +33,21 @@
                 <div class="text-sela-800 font-semibold text-sm whitespace-nowrap">{% if item.menu_item and item.menu_item.price_tbd and item.unit_price == 0 %}<span class="text-xs text-sela-800/50">未訂</span>{% else %}${{ item.subtotal|money }}{% endif %}</div>
             </div>
 
-            {% if is_open and order.status.value != 'submitted' %}
+            {% if is_open %}
             <div class="flex items-center gap-2 mt-2">
                 {% if item.quantity <= 1 %}
                 {# V2.20.0：減到 0 即移除（後端數量 0＝刪除），取代每列的獨立刪除鈕 #}
                 <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": 0}' hx-confirm="移除「{{ item.item_name }}」？"
-                        hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
+                        hx-target="#my-order-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
                         class="w-9 h-9 rounded-full bg-sela-100 text-red-500 active:scale-90 transition flex items-center justify-center" aria-label="移除品項"><i class="ti ti-trash"></i></button>
                 {% else %}
                 <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": {{ item.quantity - 1 }}}'
-                        hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
+                        hx-target="#my-order-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
                         class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 active:scale-90 transition flex items-center justify-center text-lg leading-none" aria-label="減少數量">−</button>
                 {% endif %}
                 <span class="w-7 text-center font-medium text-sela-800">{{ item.quantity }}</span>
                 <button hx-put="/orders/items/{{ item.id }}" hx-vals='{"quantity": {{ item.quantity + 1 }}}'
-                        hx-target="#cart-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
+                        hx-target="#my-order-content" hx-swap="innerHTML" @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
                         class="w-9 h-9 rounded-full bg-sela-100 text-sela-800 active:scale-90 transition flex items-center justify-center text-lg leading-none" aria-label="增加數量">+</button>
             </div>
             {% if group.enable_backup %}
@@ -62,7 +60,7 @@
                     {% if b.sugar or b.ice %}<span class="text-sela-800/50">{{ b.sugar or '' }}{% if b.sugar and b.ice %}/{% endif %}{{ b.ice or '' }}</span>{% endif %}
                     {% if diff > 0 %}<span class="text-amber-600 font-medium">+${{ diff|money }}</span>
                     {% elif diff < 0 %}<span class="text-green-600 font-medium">-${{ (0 - diff)|money }}</span>{% endif %}
-                    <button hx-delete="/orders/backups/{{ b.id }}" hx-target="#cart-content" hx-swap="innerHTML"
+                    <button hx-delete="/orders/backups/{{ b.id }}" hx-target="#my-order-content" hx-swap="innerHTML"
                             @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated'))"
                             class="w-5 h-5 rounded-full flex items-center justify-center text-sela-800/45 active:bg-sela-100" aria-label="刪除候補"><i class="ti ti-x" style="font-size:11px;"></i></button>
                 </span>
@@ -119,7 +117,7 @@
                 <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount|money }}</span>
             </span>
         </div>
-        {% if group.order_limit and order.status.value == 'submitted' and over == 0 %}
+        {% if group.order_limit and over == 0 %}
         {# V2.18.0：送出後一行講清楚補助與自付（原本只有超過上限才有提示） #}
         <div class="-mt-1.5 mb-2.5 text-xs text-sela-800/50">補助 ${{ group.order_limit|money }} 內 · 自付 $0</div>
         {% endif %}
@@ -133,33 +131,20 @@
         </div>
         {% endif %}
         {% if is_open %}
-        <div class="flex gap-2">
-            {% if order.status.value == 'draft' or order.status.value == 'editing' %}
-            {% if over > 0 and not group.allow_over_limit %}
-            <button type="button" disabled class="btn btn-primary flex-1">超過上限，請調整</button>
-            {% else %}
-            {% set bkn = order.items | selectattr('backups') | list | length %}
-            <button hx-post="/groups/{{ group.id }}/orders/submit" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus='submitted'; showCart=false; window.toast('{% if order.status.value == 'editing' %}已送出修改{% else %}已送出{% endif %} · 截止前都能改')"
-                    class="btn btn-primary {% if order.status.value == 'editing' %}flex-[2] order-2{% else %}flex-1{% endif %} py-3">{% if order.status.value == 'editing' %}送出修改{% else %}送出訂單{% endif %}</button>
-            {% endif %}
-            {% if order.status.value == 'editing' %}
-            {# V2.20.0：「取消」改「取消修改」，避免以為是關視窗 #}
-            <button hx-post="/groups/{{ group.id }}/orders/cancel" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus='submitted'; window.toast('已取消修改')" class="btn btn-secondary flex-1 order-1">取消修改</button>
-            {% endif %}
-            {% else %}
-            <button hx-post="/groups/{{ group.id }}/orders/edit" hx-target="#cart-content" hx-swap="innerHTML"
-                    @htmx:after-request="document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus='editing'" class="btn btn-secondary flex-1">修改訂單</button>
-            {% endif %}
+        {# V2.33.0：沒有「送出訂單」「修改訂單」「取消修改」了；按了就生效。整單取消放小字（原本在購物車 ⋯ 裡） #}
+        <div class="flex justify-end">
+            <button type="button" id="clear-cart"
+                    hx-delete="/groups/{{ group.id }}/orders" hx-target="#my-order-content" hx-swap="innerHTML" hx-confirm="取消這團你點的全部品項？"
+                    @htmx:after-request="if ($event.detail.successful) { document.body.dispatchEvent(new CustomEvent('orderUpdated')); orderStatus = 'none'; cartCount = 0; window.toast('已取消你的訂單') }"
+                    class="text-xs text-sela-800/50 underline px-1 py-1">全部取消</button>
         </div>
         {% endif %}
     </div>
 
     {% else %}
     <!-- 空訂單 -->
-    <div class="text-center py-10">
-        <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3">
+    <div class="text-center py-4">
+        <svg width="56" height="56" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-2">
             <ellipse cx="44" cy="78" rx="22" ry="4" fill="#E8D9C0" opacity="0.6"/>
             <rect x="42" y="14" width="6" height="26" rx="3" transform="rotate(14 45 27)" fill="#8A6A38"/>
             <path d="M25 31 H63 L58.5 71 Q58 75.5 53.5 75.5 H34.5 Q30 75.5 29.5 71 Z" fill="#F3EBDD" stroke="#C9A977" stroke-width="2.5"/>
@@ -167,8 +152,11 @@
             <circle cx="37" cy="69" r="3" fill="#5B4733"/><circle cx="45" cy="70" r="3" fill="#5B4733"/><circle cx="52" cy="68" r="3" fill="#5B4733"/>
             <rect x="22" y="26" width="44" height="8" rx="4" fill="#C9A977"/>
         </svg>
-        <p class="text-sela-800/70 font-medium">購物車是空的</p>
-        <p class="text-sm text-sela-800/45">從菜單選擇品項加入</p>
+        {% if is_open %}
+        <p class="text-sela-800/70 font-medium">還沒點東西</p>
+        {% else %}
+        <p class="text-sela-800/70 font-medium">你這團沒有點</p>
+        {% endif %}
     </div>
     {% endif %}
 </div>

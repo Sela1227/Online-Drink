@@ -80,6 +80,7 @@
         <div class="text-xs text-green-800/70">
             {% if is_full_import and not duplicate_store %}
             將新增店家「{{ data.store.name }}」（{{ '飲料' if data.store.category == 'drink' else ('團購' if data.store.category == 'group_buy' else '餐點') }}）· {{ item_count.n }} 項
+            <button type="button" id="edit-new-store" class="underline text-sela-700 ml-1" onclick="window.dispatchEvent(new CustomEvent('edit-new-store', {detail: {focus: true}}))">改</button>
             {% elif existing_version %}
             更新「{{ (target_store.name if target_store else duplicate_store.name) }}」· {{ item_count.n }} 項 · 將建立第 {{ next_version }} 版，使用中的第 {{ existing_version }} 版自動保留
             {% else %}
@@ -115,9 +116,9 @@
         <i class="ti ti-info-circle"></i> 已有同名店家「{{ duplicate_store.name }}」，菜單會更新到那家店，不會新增重複店家
         {# V2.23.2 審稿 P1-04：同名不同店（例如不同分店）要有出口，不然只能硬著頭皮蓋掉別家 #}
         <div class="mt-1.5 text-sela-800/70" id="not-same-store">
-            不是同一家（例如不同分店）？把上面的店名改成不一樣的，例如「{{ duplicate_store.name }} 中山店」，就會新增一家店。
+            不是同一家？店名改成「{{ duplicate_store.name }} 中山店」這種就會新增。
             <button type="button" class="underline text-sela-700 ml-1"
-                    onclick="var i=document.querySelector('[name=new_store_name]'); if(i){ i.focus(); i.select(); i.scrollIntoView({block:'center'}); }">改店名</button>
+                    onclick="window.dispatchEvent(new CustomEvent('edit-new-store', {detail: {focus: true}}))">改店名</button>
         </div>
     </div>
     {% endif %}
@@ -321,7 +322,7 @@
         {% if diff and diff.partial_suspect %}仍要更新（移除 {{ diff.removed | length }} 個品項）{% elif is_full_import and not duplicate_store %}確認建立店家{% else %}確認更新菜單{% endif %}
     </button>
     {% if not is_full_import or duplicate_store %}
-    <p class="mt-2 text-xs text-center text-sela-800/50">進行中的團仍用它開團時的版本，不受影響。</p>
+    <p class="mt-2 text-xs text-center text-sela-800/50">進行中的團不受影響。</p>
     {% endif %}
 </form>
 {% endif %}

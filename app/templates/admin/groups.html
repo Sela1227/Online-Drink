@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}所有團單 - SELA 快點來點餐{% endblock %}
@@ -46,7 +48,7 @@
                         </div>
                         <div class="text-xs text-sela-800/45">
                             {{ (group.created_at|taipei).strftime('%Y-%m-%d %H:%M') }}
-                            ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已送出
+                            ・{{ group.orders | selectattr('status.value', 'equalto', 'submitted') | list | length }} 人已點
                         </div>
                     </div>
                 </a>
@@ -84,7 +86,7 @@
     <section id="maintenance" class="bg-white rounded-2xl border border-red-200 p-4 space-y-2 mt-6">
         <h2 class="font-bold text-red-700"><i class="ti ti-tool"></i> 維護</h2>
         <div class="text-[15px] font-medium text-sela-900">清除測試團</div>
-        <p class="text-sm text-sela-800/70">已截止、而且沒有任何人送出訂單的團（團主自己送出過的不算，要刪請用該團的「刪除」）。只會刪下面列出的這幾團，刪除後無法復原。</p>
+        <p class="text-sm text-sela-800/70">已截止、沒人點的團，只刪下面列出的，刪了不能復原。</p>
         {% if test_groups %}
         <details class="text-sm">
             <summary class="cursor-pointer text-sela-800 min-h-[36px] flex items-center">目前符合：<b class="mx-1">{{ test_groups | length }}</b> 個（展開看清單）</summary>

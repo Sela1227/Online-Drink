@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# V2.32.0（內部審核 M-2）：後台不屬於前台五個分頁，不顯示底部導航（返回靠頁首 ←；也不再擋住存檔列） #}
+{% block bottom_nav %}{% endblock %}
 {% import "partials/nav.html" as nav %}
 
 {% block title %}後台管理 - SELA 快點來點餐{% endblock %}
@@ -34,12 +36,13 @@
         <h2 class="text-sm font-bold text-sela-800/60 px-1">常用</h2>
         {{ row('/admin/import', 'ti-plus', '新增店家', '拍照或貼上', id='go-new-store') }}
         {{ row('/admin/stores', 'ti-building-store', '店家與菜單', store_count ~ ' 家' ~ ((' · ' ~ no_menu_count ~ ' 家沒菜單') if no_menu_count else ''), id='go-stores') }}
-        {{ row('/admin/groups', 'ti-clipboard-list', '團單', ('進行中 ' ~ open_group_count) if open_group_count else ('共 ' ~ group_count), id='go-groups') }}
-        {{ row('/admin/announcements', 'ti-speakerphone', '公告', ('顯示中 ' ~ active_announcement_count) if active_announcement_count else '沒有顯示中', id='go-announcements') }}
     </section>
 
+    {# V2.32.0（內部審核 M-6）：團單（主要用來清測試團）、公告（每月一兩次）從「常用」移到「管理」 #}
     <section class="space-y-2" id="admin-manage">
         <h2 class="text-sm font-bold text-sela-800/60 px-1">管理</h2>
+        {{ row('/admin/groups', 'ti-clipboard-list', '團單', ('進行中 ' ~ open_group_count) if open_group_count else ('共 ' ~ group_count), id='go-groups') }}
+        {{ row('/admin/announcements', 'ti-speakerphone', '公告', ('顯示中 ' ~ active_announcement_count) if active_announcement_count else '沒有顯示中', id='go-announcements') }}
         {{ row('/admin/users', 'ti-user', '人員', user_count ~ ' 人 · 在線 ' ~ online_count, id='go-users') }}
         {{ row('/admin/departments', 'ti-users', '部門', department_count ~ ' 個', id='go-departments') }}
         {# V2.28.0（內部審核 B-5）：沒有待處理時，兩列「沒有待審」「沒有待處理」合成一列，兩個小連結各自進去 #}
