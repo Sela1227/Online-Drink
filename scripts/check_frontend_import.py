@@ -140,6 +140,7 @@ def _render_pages() -> dict:
     g_owner = Group(owner_id=u.id, store_id=jia.id, menu_id=mn_jia.id, name="我開的", category=CategoryType.MEAL,
                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
     db.add_all([g_member, g_owner]); db.flush()
+    jia.set_menu_photos(["https://res.cloudinary.com/demo/image/upload/a.jpg", "https://res.cloudinary.com/demo/image/upload/b.jpg"])  # V2.35.0
     o_me = Order(group_id=g_member.id, user_id=u.id, status=OrderStatus.DRAFT); db.add(o_me); db.flush()
     db.add(OrderItem(order_id=o_me.id, menu_item_id=mi.id, item_name="雞腿飯", unit_price=100, quantity=1))
     o_other = Order(group_id=g_member.id, user_id=other.id, status=OrderStatus.SUBMITTED); db.add(o_other); db.flush()

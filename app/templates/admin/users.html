@@ -45,6 +45,7 @@
                     {{ u.show_name }}
                     {% if u.nickname %}<span class="text-xs text-sela-800/50 font-normal">({{ u.display_name }})</span>{% endif %}
                     {% if u.is_admin %}<span class="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1">管理員</span>{% endif %}
+                    {% if dup.get(u.id) %}<span class="text-[11px] font-normal bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded ml-1" data-dup="{{ dup[u.id] }}">同名 {{ dup[u.id] }} 個</span>{% endif %}
                     {% if u.id == user.id %}<span class="text-xs text-sela-800/50 font-normal ml-1">（你）</span>{% endif %}
                 </span>
                 <span class="block text-[13px] text-sela-800/60 truncate">

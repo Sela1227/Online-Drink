@@ -110,6 +110,38 @@
 
     <!-- ════ 菜單 ════ -->
     <div x-show="tab === 'menu'" class="space-y-3">
+        {# V2.35.0：菜單照片（Sela：只有管理員上傳；團頁、店家頁可點開看）。放菜單分頁最上面 #}
+        {% set _mp = store.menu_photos %}
+        <div id="menu-photos" class="bg-white rounded-2xl shadow-sm p-4 scroll-mt-20" x-data="{ busy: false }">
+            {% if saved == 'photos' %}<div class="mb-3 p-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700" data-saved="photos"><i class="ti ti-circle-check"></i> 菜單照片已儲存</div>{% endif %}
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-medium text-sela-800">菜單照片{% if _mp %} {{ _mp | length }} 張{% endif %}</h2>
+                {% if store.menu_photos_updated_at and _mp %}<span class="text-xs text-sela-800/50">更新於 {{ (store.menu_photos_updated_at|taipei).strftime('%m/%d') }}</span>{% endif %}
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+                {% for u in _mp %}
+                <div class="relative aspect-square">
+                    <a href="{{ u }}" target="_blank" rel="noopener" class="block w-full h-full rounded-lg overflow-hidden border border-sela-100 bg-sela-50">
+                        <img src="{{ u }}" alt="菜單照片 {{ loop.index }}" loading="lazy" class="w-full h-full object-cover">
+                    </a>
+                    <form action="/admin/stores/{{ store.id }}/menu-photos/delete" method="post" class="absolute -top-2 -right-2"
+                          onsubmit="return confirm('刪除這張菜單照片？')">
+                        <input type="hidden" name="url" value="{{ u }}">
+                        <button type="submit" aria-label="刪除第 {{ loop.index }} 張" class="w-7 h-7 rounded-full bg-white border border-sela-300 text-sela-800 shadow-sm"><i class="ti ti-x text-sm"></i></button>
+                    </form>
+                </div>
+                {% endfor %}
+                {% if _mp | length < 8 %}
+                <form action="/admin/stores/{{ store.id }}/menu-photos" method="post" enctype="multipart/form-data" id="menu-photo-add" @submit="busy = true">
+                    <label class="aspect-square rounded-lg border-2 border-dashed border-sela-300 flex flex-col items-center justify-center text-sela-700 text-xs cursor-pointer active:bg-sela-50"
+                           :class="busy && 'opacity-50 pointer-events-none'">
+                        <i class="ti text-xl" :class="busy ? 'ti-loader-2 animate-spin' : 'ti-camera-plus'"></i><span x-text="busy ? '上傳中' : '加照片'"></span>
+                        <input type="file" name="photos" accept="image/*" multiple class="hidden" @change="if ($event.target.files.length) { busy = true; $el.form.submit(); }">
+                    </label>
+                </form>
+                {% endif %}
+            </div>
+        </div>
         {% if active_menu %}
 {# V2.15.1 審核 P3-8：工作台品項一行——時價標籤、停售、選項、說明 #}
 {% macro wb_item(item) -%}

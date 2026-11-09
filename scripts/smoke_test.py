@@ -3711,6 +3711,131 @@ def main():
     assert _pr52 == ["app/main.py:56"] or (len(_pr52) == 1 and _pr52[0].startswith("app/main.py:")), _pr52
     check("後端只剩啟動那行 print，其餘錯誤／稽核訊息走 logging")
 
+    # ---------- 53. V2.35.0 店家菜單照片、同名帳號標示 ----------
+    print("\n[53] 店家菜單照片（工作台上傳／刪除、團頁縮圖、店家頁、匯入順便存）、同名帳號標示")
+    import json as _j53
+    import app.routers.home as _home53
+    from app.config import get_settings as _gs53
+    from app.schemas.menu import MenuImport as _MI53
+    from app.services.import_service import import_menu as _im53
+    from app.models.menu import Menu as _M53
+    _who53 = {"id": _uid}
+    async def _f53(request, db_):
+        return db_.query(User).filter(User.id == _who53["id"]).first()
+    async def _f53o(request, db_):
+        return (db_.query(User).filter(User.id == _who53["id"]).first(), None)
+    _o53 = (_grp.get_current_user, _grp.get_current_user_optional, _home53.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _home53.get_current_user = _f53, _f53o, _f53
+    _up53 = (_adm.upload_image, _adm.delete_image)
+    _seq53 = {"n": 0, "deleted": []}
+    async def _fake_up53(f, folder="", max_size=0):
+        _seq53["n"] += 1
+        return f"https://res.cloudinary.com/demo/image/upload/v1/sela/menus/p{_seq53['n']}.jpg"
+    _adm.upload_image = _fake_up53
+    _adm.delete_image = lambda u: _seq53["deleted"].append(u) or True
+    _adm.get_admin_user = _fake_admin
+    _cfg53 = _gs53(); _cloud53 = _cfg53.cloudinary_cloud_name
+    try:
+        _s53 = Store(name="五三店", category=CategoryType.DRINK, is_active=True, is_public=True); db.add(_s53); db.commit()
+        _im53(db, _MI53(store_id=_s53.id, mode="new", menu={"items": [{"name": "紅茶", "price": 30}]}))
+        _m53 = db.query(_M53).filter(_M53.store_id == _s53.id, _M53.is_active == True).one()
+        _g53 = Group(owner_id=_uid, store_id=_s53.id, menu_id=_m53.id, name="五三團", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True); db.add(_g53); db.commit()
+        # 沒照片：團頁、店家頁沒有縮圖列；工作台有「加照片」
+        assert 'id="menu-photos-strip"' not in _c.get(f"/groups/{_g53.id}").text
+        t = _c.get(f"/admin/stores/{_s53.id}?tab=menu").text
+        assert 'id="menu-photos"' in t and 'id="menu-photo-add"' in t and 'name="photos"' in t
+        # 上傳兩張 → 存進店家、302 回工作台照片卡
+        _img = ("m.jpg", b"\xff\xd8fake", "image/jpeg")
+        r = _c.post(f"/admin/stores/{_s53.id}/menu-photos", files=[("photos", _img), ("photos", _img)], follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"].endswith("saved=photos#menu-photos"), (r.status_code, r.text[:200])
+        db.expire_all(); _st53 = db.get(Store, _s53.id)
+        assert len(_st53.menu_photos) == 2 and _st53.menu_photos_updated_at is not None
+        # 超過 8 張整批擋下、不上傳
+        _n0 = _seq53["n"]
+        r = _c.post(f"/admin/stores/{_s53.id}/menu-photos", files=[("photos", _img)] * 7, follow_redirects=False)
+        assert r.status_code == 400 and "最多 8 張" in r.text and _seq53["n"] == _n0
+        # 團頁：菜單上方一排縮圖＋看圖；網址放 data-photos（JSON），不進 Alpine 表達式
+        t = _c.get(f"/groups/{_g53.id}").text
+        assert 'id="menu-photos-strip"' in t and 'id="menu-photo-viewer"' in t
+        _dp = _re52.search(r'data-photos="([^"]*)"', t).group(1)
+        import html as _h53
+        assert _j53.loads(_h53.unescape(_dp)) == _st53.menu_photos
+        assert t.index('id="menu-photos-strip"') < t.index('id="menu-nav"') if 'id="menu-nav"' in t else True, "縮圖在菜單導覽上方"
+        # 店家頁、店家菜單頁也看得到
+        assert 'id="menu-photos-strip"' in _c.get(f"/stores/{_s53.id}").text
+        assert 'id="menu-photos-strip"' in _c.get(f"/stores/{_s53.id}/menu").text
+        # 刪一張；刪不存在的網址當已刪
+        _u0 = _st53.menu_photos[0]
+        r = _c.post(f"/admin/stores/{_s53.id}/menu-photos/delete", data={"url": _u0}, follow_redirects=False)
+        db.expire_all(); _st53 = db.get(Store, _s53.id)
+        assert r.status_code == 302 and _u0 not in _st53.menu_photos and len(_st53.menu_photos) == 1 and _seq53["deleted"] == [_u0]
+        assert _c.post(f"/admin/stores/{_s53.id}/menu-photos/delete", data={"url": "https://x/y.jpg"}, follow_redirects=False).status_code == 302
+        # 代購個人店不給放
+        _p53 = Store(name="五三代購", category=CategoryType.MEAL, is_active=True, is_public=False, is_personal=True, owner_user_id=_uid); db.add(_p53); db.commit()
+        assert _c.post(f"/admin/stores/{_p53.id}/menu-photos", files=[("photos", _img)], follow_redirects=False).status_code == 404
+        check("菜單照片：工作台上傳兩張存進店家、超過 8 張整批擋下、刪一張；團頁菜單上方縮圖＋看圖（data-photos 是 JSON）、店家頁與菜單頁也有；代購店不給放")
+        # 匯入頁：勾選預設不勾、確認匯入帶 menu_photo_urls；只收我們圖片服務的網址
+        t = _c.get(f"/admin/import?store_id={_s53.id}").text
+        _can_ai53 = 'id="ai-convert"' in t
+        _ti53 = t if _can_ai53 else open("app/templates/admin/import.html", encoding="utf-8").read()
+        assert 'id="ai-save-photos"' in _ti53 and "aiSavePhotos: false" in _ti53 and 'name="menu_photo_urls"' in _ti53
+        assert "if (this.aiSavePhotos) fd.append('save_photos', '1')" in _ti53, "勾了才請伺服器上傳照片"
+        _cfg53.cloudinary_cloud_name = "demo"
+        _ok = ["https://res.cloudinary.com/demo/image/upload/v1/sela/menus/a.jpg", "https://res.cloudinary.com/demo/image/upload/v1/sela/menus/b.jpg"]
+        _bad = ["https://evil.example/x.jpg", "javascript:alert(1)", "https://res.cloudinary.com/other/image/upload/c.jpg"]
+        assert _adm._clean_menu_photo_urls(_j53.dumps(_ok + _bad)) == _ok
+        assert _adm._clean_menu_photo_urls("not json") == [] and _adm._clean_menu_photo_urls(_j53.dumps(_ok * 9))[:1] == _ok[:1] and len(_adm._clean_menu_photo_urls(_j53.dumps(_ok * 9))) == 8
+        _js53 = _j53.dumps({"store_id": _s53.id, "mode": "new", "menu": {"items": [{"name": "紅茶", "price": 35}]}}, ensure_ascii=False)
+        r = _c.post("/admin/import", data={"json_str": _js53, "base_menu_id": str(_m53.id),
+                                            "menu_photo_urls": _j53.dumps(_ok + _bad)}, headers=_H, follow_redirects=False)
+        assert r.status_code in (200, 302), (r.status_code, r.text[:300])
+        db.expire_all(); _st53 = db.get(Store, _s53.id)
+        assert _st53.menu_photos == _ok, ("確認匯入時換成這次的照片、外站網址不收", _st53.menu_photos)
+        # 沒帶照片的匯入不動原本的照片
+        _m53b = db.query(_M53).filter(_M53.store_id == _s53.id, _M53.is_active == True).one()
+        _js53b = _j53.dumps({"store_id": _s53.id, "mode": "new", "menu": {"items": [{"name": "紅茶", "price": 40}]}}, ensure_ascii=False)
+        _c.post("/admin/import", data={"json_str": _js53b, "base_menu_id": str(_m53b.id)}, headers=_H, follow_redirects=False)
+        db.expire_all(); assert db.get(Store, _s53.id).menu_photos == _ok
+        _tr53 = open("app/templates/admin/partials/import_result.html", encoding="utf-8").read()
+        assert "[name=menu_photo_urls]" in _tr53, "確認鈕要把照片網址一起送"
+        check("匯入頁順便存照片：預設不勾、確認時換成這次的照片、只收我們圖片服務的網址（最多 8）、沒帶照片的匯入不動原照片" + ("" if _can_ai53 else "（本機沒 AI 權限，勾選框看模板原文）"))
+        # 同名帳號：部門加人清單與人員頁標「同名 2 個」，依最近活動排
+        from app.services.user_names import dup_name_counts as _dnc
+        # 最近在用的那個帳號刻意建得晚、LINE ID 排後面——不是照活動排就會紅
+        _ub = User(line_user_id="s53_a_old", display_name="美玲五三", last_active_at=datetime.utcnow() - timedelta(days=60))
+        db.add(_ub); db.commit()
+        _ua = User(line_user_id="s53_z_new", display_name="美玲五三", last_active_at=datetime.utcnow())
+        _uc = User(line_user_id="s53_c", display_name="ｍｅｉ五三", nickname="美玲五三")  # 暱稱撞名、全形也算
+        _ud = User(line_user_id="s53_d", display_name="志明五三")
+        db.add_all([_ua, _uc, _ud]); db.commit()
+        _d53 = _dnc([_ua, _ub, _uc, _ud])
+        assert _d53 == {_ua.id: 3, _ub.id: 3, _uc.id: 3}, _d53
+        from app.models.department import Department as _D53
+        _dep53 = _D53(name="五三部"); db.add(_dep53); db.commit()
+        t = _c.get(f"/admin/departments/{_dep53.id}").text
+        _add53 = t[t.index('id="add-member"'):]
+        assert "<select" not in _add53.split("<!-- 成員列表 -->")[0], "加人改成清單"
+        assert _add53.count('data-dup="3"') == 3 and "同名 3 個" in _add53
+        assert _add53.index(f'name="user_id" value="{_ua.id}"') < _add53.index(f'name="user_id" value="{_ub.id}"'), "同名依最近活動排"
+        r = _c.post(f"/admin/departments/{_dep53.id}/members", data={"user_id": str(_ub.id)}, follow_redirects=False)
+        assert r.status_code in (302, 303)
+        t = _c.get(f"/admin/departments/{_dep53.id}").text
+        _mem53 = t.split("<!-- 成員列表 -->")[1]
+        assert "美玲五三" in _mem53 and "同名 3 個" in _mem53, "成員列表也標同名"
+        t = _c.get("/admin/users").text
+        assert t.count('data-dup="3"') >= 3
+        check("同名帳號：暱稱或 LINE 名稱撞名（不分全半形）就標「同名 N 個」；部門加人改清單、依最近活動排；成員列表與人員頁也標")
+        # 遷移欄位
+        from app.migrations import COLUMNS as _C53
+        assert ("stores", "menu_photo_urls", "TEXT") in _C53 and ("stores", "menu_photos_updated_at", "TIMESTAMP") in _C53
+        check("遷移：stores 加 menu_photo_urls、menu_photos_updated_at")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _home53.get_current_user = _o53
+        _adm.upload_image, _adm.delete_image = _up53
+        _adm.get_admin_user = _orig
+        _cfg53.cloudinary_cloud_name = _cloud53
+
     print(f"\n全部通過（{len(passed)} 項）")
 
 

@@ -40,6 +40,16 @@ async def upload_image(file: UploadFile, folder: str = "sela/stores", max_size: 
     if len(content) > _MAX:
         raise HTTPException(status_code=400, detail="圖片請小於 5MB")
     
+    return upload_bytes(content, folder=folder, max_size=max_size)
+
+
+def upload_bytes(content: bytes, folder: str = "sela/stores", max_size: int = 400) -> str | None:
+    """V2.35.0：已經讀進來的圖片位元組直接上傳（匯入頁 AI 轉換讀過照片，不能再讀一次 UploadFile）。
+    呼叫端負責格式與大小檢查。"""
+    from fastapi import HTTPException
+    if not settings.cloudinary_cloud_name:
+        _log.warning("Cloudinary 沒設定，照片上傳略過")
+        return None
     try:
         # 上傳到 Cloudinary
         result = cloudinary.uploader.upload(

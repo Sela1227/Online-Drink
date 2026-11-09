@@ -19,39 +19,46 @@
         
     </div>
     
-    <!-- 新增成員 -->
-    <div class="bg-white rounded-2xl shadow-sm p-4">
-        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 新增成員</h2>
-        <form action="/admin/departments/{{ department.id }}/members" method="POST" class="flex flex-wrap gap-2">
-            <select name="user_id" required class="flex-1 min-w-[140px] border border-sela-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">選擇用戶</option>
-                {% for user in available_users %}
-                <option value="{{ user.id }}">{{ user.show_name }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="bg-sela-500 text-sela-800 px-3 py-2 rounded-lg text-sm font-medium hover:bg-sela-600 whitespace-nowrap">
-                新增
-            </button>
-        </form>
+    {# V2.35.0：加人改成清單（頭像＋最近活動，依最近活動排），同名標「同名 N 個」——同一人兩個 LINE 帳號時才分得出來 #}
+    {% macro who(u) -%}
+    {% if u.picture_url %}<img src="{{ u.picture_url }}" alt="" class="w-10 h-10 rounded-full flex-shrink-0">
+    {% else %}<div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center flex-shrink-0"><i class="ti ti-user"></i></div>{% endif %}
+    <div class="min-w-0 flex-1">
+        <div class="font-medium text-sela-800 truncate">{{ u.show_name }}{% if dup.get(u.id) %} <span class="ml-1 text-[11px] font-normal px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 whitespace-nowrap" data-dup="{{ dup[u.id] }}">同名 {{ dup[u.id] }} 個</span>{% endif %}</div>
+        <div class="text-xs text-sela-800/50">{% if u.last_active_at %}最近活動 {{ (u.last_active_at|taipei).strftime('%m/%d %H:%M') }}{% else %}還沒用過{% endif %}</div>
     </div>
-    
+    {%- endmacro %}
+    <div class="bg-white rounded-2xl shadow-sm p-4" id="add-member" x-data="{ q: '' }">
+        <h2 class="font-medium text-sela-800 mb-3"><i class="ti ti-plus"></i> 新增成員</h2>
+        {% if available_users %}
+        <div class="relative mb-2">
+            <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sela-800/40"></i>
+            <input type="search" x-model="q" placeholder="搜尋要加入的人" autocomplete="off"
+                   class="w-full pl-9 pr-3 py-2.5 border border-sela-200 rounded-xl bg-white text-base focus:outline-none focus:border-sela-500">
+        </div>
+        <div class="divide-y divide-sela-100 max-h-80 overflow-y-auto -mx-1 px-1">
+            {% for u in available_users %}
+            <form action="/admin/departments/{{ department.id }}/members" method="POST" class="py-2.5 flex items-center gap-3"
+                  data-name="{{ ((u.display_name or '') ~ ' ' ~ (u.nickname or '')) | lower }}"
+                  x-show="!q.trim() || $el.dataset.name.includes(q.trim().toLowerCase())">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                {{ who(u) }}
+                <button type="submit" class="px-3 py-1.5 rounded-lg border border-sela-300 text-sela-800 text-sm flex-shrink-0 active:bg-sela-50">加入</button>
+            </form>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-sela-800/60">所有人都在這個部門了</p>
+        {% endif %}
+    </div>
+
     <!-- 成員列表 -->
     {% if members %}
     <div class="bg-white rounded-2xl shadow-sm divide-y">
         {% for m in members %}
         <div class="p-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                {% if m.user.picture_url %}
-                <img src="{{ m.user.picture_url }}" class="w-10 h-10 rounded-full">
-                {% else %}
-                <div class="w-10 h-10 rounded-full bg-sela-100 flex items-center justify-center"><i class="ti ti-user"></i></div>
-                {% endif %}
-                <div>
-                    <div class="font-medium text-sela-800">{{ m.user.show_name }}</div>
-                    <div class="text-xs text-sela-800/45">
-                        加入於 {{ (m.joined_at|taipei).strftime('%Y/%m/%d') }}
-                    </div>
-                </div>
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                {{ who(m.user) }}
             </div>
             
             <div class="flex items-center gap-2">

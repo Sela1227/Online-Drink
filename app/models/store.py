@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 from decimal import Decimal
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Enum, Numeric
+from sqlalchemy import Text, String, Boolean, DateTime, Integer, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 import enum
@@ -20,6 +20,9 @@ class CategoryType(str, enum.Enum):
 class OptionType(str, enum.Enum):
     SUGAR = "sugar"
     ICE = "ice"
+
+
+MENU_PHOTO_MAX = 8  # V2.35.0：店家菜單照片上限
 
 
 class Store(Base):
@@ -45,9 +48,30 @@ class Store(Base):
     owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 個人店家擁有者
     provides_invoice: Mapped[bool] = mapped_column(Boolean, default=False)  # 可開發票（V2.3.0）
     provides_receipt: Mapped[bool] = mapped_column(Boolean, default=False)  # 可開收據（V2.3.0）
+    # V2.35.0：店家的原始菜單照片（管理員在工作台上傳；團頁與店家頁可點開看）。JSON 陣列，最多 MENU_PHOTO_MAX 張
+    menu_photo_urls: Mapped[str | None] = mapped_column(Text, nullable=True)
+    menu_photos_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
+    @property
+    def menu_photos(self) -> list[str]:
+        """V2.35.0：菜單照片網址清單（壞資料當沒有）"""
+        import json
+        if not self.menu_photo_urls:
+            return []
+        try:
+            urls = json.loads(self.menu_photo_urls)
+        except (TypeError, ValueError):
+            return []
+        return [u for u in urls if isinstance(u, str) and u] if isinstance(urls, list) else []
+
+    def set_menu_photos(self, urls: list[str]) -> None:
+        import json
+        urls = [u for u in urls if u][:MENU_PHOTO_MAX]
+        self.menu_photo_urls = json.dumps(urls) if urls else None
+        self.menu_photos_updated_at = datetime.utcnow()
+
     # Relationships
     # V2.15.1 審核 P2-1：甜冰與加料的顯示順序只靠 order_by（坑 #40）
     options: Mapped[list["StoreOption"]] = relationship(

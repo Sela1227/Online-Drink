@@ -555,6 +555,9 @@
             {% endif %}
         </div>
 
+        {# V2.35.0：店家菜單照片——菜單上方一排縮圖（Sela 選 B） #}
+        {% if group.store and not group.store.is_personal %}{% with photos = group.store.menu_photos %}{% include "partials/menu_photos.html" %}{% endwith %}{% endif %}
+
         {# V2.16.0 A-5：導覽 chip 帶品項數；無分類品項有「其他」標題並進導覽（只算會顯示的品項） #}
         {% set uncategorized = (menu.items if menu else []) | selectattr('category_id', 'none') | selectattr('is_available', 'ne', false) | list %}
         {% set nav_cats = [] %}

@@ -29,6 +29,11 @@
         
     </div>
     
+    {# V2.35.0：菜單照片 #}
+    {% if store.menu_photos %}
+    <div class="bg-white rounded-2xl shadow-sm p-4 pb-1">{% with photos = store.menu_photos %}{% include "partials/menu_photos.html" %}{% endwith %}</div>
+    {% endif %}
+
     <!-- 菜單內容（V2.15.1 審核 P2-7：與團頁同一套呈現——時價、停售隱藏、加購、無分類品項）-->
     {% set loose = (menu.items if menu else []) | selectattr('category_id', 'none') | selectattr('is_available', 'ne', false) | list %}
     {% set shown = namespace(n=0) %}

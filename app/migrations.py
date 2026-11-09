@@ -82,6 +82,8 @@ COLUMNS = [
     ("stores", "city", "VARCHAR(10)"),   # V2.26.0
     ("users", "cities", "TEXT"),         # V2.26.0
     ("menu_items", "allow_toppings", "BOOLEAN DEFAULT TRUE"),  # V2.31.0
+    ("stores", "menu_photo_urls", "TEXT"),               # V2.35.0
+    ("stores", "menu_photos_updated_at", "TIMESTAMP"),   # V2.35.0
 ]
 
 # V2.31.0：規格標籤變長（「盒裝分享號」「特大杯」），原本 VARCHAR(10)。

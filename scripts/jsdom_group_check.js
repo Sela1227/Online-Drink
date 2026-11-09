@@ -90,6 +90,26 @@ const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
     const goMine = [...bar.querySelectorAll("button")].find(b => b.textContent.includes("我的訂單"));
     if (!goMine || !visible(goMine)) fail("結帳列應有「我的訂單」鈕");
     if (!d.querySelector("#my-order-display #my-order-card")) fail("我的訂單卡應直接在頁面上");
+    // V2.35.0：菜單照片——菜單上方一排縮圖，點了全螢幕看、左右切、Esc 關
+    const strip = d.getElementById("menu-photos-strip");
+    if (!strip) fail("菜單上方應有菜單照片縮圖");
+    const thumbs = strip.querySelectorAll("button[aria-label^='看菜單照片']");
+    if (thumbs.length !== 2) fail("應有 2 張縮圖（" + thumbs.length + "）");
+    const viewer = d.getElementById("menu-photo-viewer");
+    if (visible(viewer)) fail("看圖一開始應該關著");
+    thumbs[1].click(); await sleep(60);
+    if (!visible(viewer)) fail("點縮圖應打開看圖");
+    const cnt = () => text(viewer).match(/\d+ \/ \d+/)?.[0];
+    if (cnt() !== "2 / 2") fail("點第 2 張應顯示 2 / 2（" + cnt() + "）");
+    if (!viewer.querySelector("img").getAttribute("src").endsWith("/b.jpg")) fail("應顯示第 2 張圖");
+    if (!d.body.classList.contains("overflow-hidden")) fail("看圖時背景不該捲動");
+    viewer.querySelector("button[aria-label='下一張']").click(); await sleep(40);
+    if (cnt() !== "1 / 2") fail("最後一張再下一張應回到第 1 張（" + cnt() + "）");
+    viewer.querySelector("button[aria-label='上一張']").click(); await sleep(40);
+    if (cnt() !== "2 / 2") fail("上一張應回到第 2 張（" + cnt() + "）");
+    w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape" })); await sleep(60);
+    if (visible(viewer)) fail("按 Esc 應關閉看圖");
+    if (d.body.classList.contains("overflow-hidden")) fail("關掉後背景要能捲動");
     // 3) 導覽列：常點／熱門／骰子
     const nav = d.getElementById("menu-nav");
     if (!nav) fail("找不到菜單導覽列");

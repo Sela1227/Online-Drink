@@ -356,6 +356,7 @@ async def import_ai_convert(
     rec_id: int = Form(None),
     store_id: str = Form(None),
     new_store_name: str = Form(None),
+    save_photos: str = Form(None),
     db: Session = Depends(get_db),
 ):
     """V2.25.0：照片 → AI → 匯入格式文字（只回文字，填進輸入框後照舊自動檢查、預覽、確認）。
@@ -367,6 +368,7 @@ async def import_ai_convert(
         return JSONResponse({"error": "這個功能目前只開放給系統負責人"}, status_code=403)
 
     images = []
+    photo_urls = []  # V2.35.0：勾了「存成這家店的菜單照片」才有；確認匯入時才寫進店家
     try:
         if rec_id:
             from app.models.user import StoreRecommendation
@@ -374,6 +376,8 @@ async def import_ai_convert(
             if not rec or not rec.menu_images:
                 return JSONResponse({"error": "這筆推薦沒有菜單照片"}, status_code=400)
             images += await ai_menu.fetch_images(rec.menu_images)
+            if save_photos:
+                photo_urls += list(rec.menu_images)  # 推薦的照片本來就在圖片服務上，不用再傳
         for f in (photos or []):
             if not f or not f.filename:
                 continue
@@ -381,13 +385,19 @@ async def import_ai_convert(
                 return JSONResponse({"error": "照片僅支援 JPG／PNG／WebP"}, status_code=400)
             data = await f.read(ai_menu.MAX_BYTES + 1)
             images.append((data, f.content_type))
+            if save_photos:
+                from app.services.upload_service import upload_bytes
+                _u = upload_bytes(data, folder="sela/menus", max_size=1600)
+                if _u:
+                    photo_urls.append(_u)
         sid = _parse_store_id(store_id)
         st = db.query(Store).filter(Store.id == sid).first() if sid else None
         text = await ai_menu.convert_menu(images, store_name=(st.name if st else new_store_name), existing=st is not None)
     except ai_menu.AIMenuError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     _audit.info(f"AI 轉換完成：{len(images)} 張照片，{len(text)} 字（{user.show_name}）")
-    return JSONResponse({"text": text, "photos": len(images)})
+    from app.models.store import MENU_PHOTO_MAX
+    return JSONResponse({"text": text, "photos": len(images), "photo_urls": photo_urls[:MENU_PHOTO_MAX]})
 
 
 def _stores_for_picker(db, stores):
@@ -833,6 +843,7 @@ async def do_import(
     new_store_name: str = Form(None),
     new_store_category: str = Form(None),
     rec_id: int = Form(None),
+    menu_photo_urls: str = Form(None),
     db: Session = Depends(get_db),
 ):
     """執行匯入（V2.15.0：htmx 送出；版本被別人更新 → 回傳重新比對的片段；成功 → HX-Redirect）"""
@@ -922,6 +933,13 @@ async def do_import(
 
         # V2.10.0：匯完直接去工作台驗收，不再丟回儀表板
         cat_count, item_count = _count_import(validated.menu)
+        # V2.35.0：匯入頁「轉完把照片存成這家店的菜單照片」——換成這次的照片（舊照片對應舊菜單）
+        _photos = _clean_menu_photo_urls(menu_photo_urls)
+        if _photos:
+            _st = db.query(Store).filter(Store.id == target_store_id).first()
+            if _st:
+                _st.set_menu_photos(_photos)
+                db.commit()
         _ver = db.query(Menu).filter(Menu.store_id == target_store_id).count()
         url = f"/admin/stores/{target_store_id}?tab=menu&imported=1&cats={cat_count}&items={item_count}&ver={_ver}"
         if is_hx:
@@ -1468,6 +1486,73 @@ async def update_store(
     return RedirectResponse(url=f"/admin/stores/{store_id}?tab=settings&saved=info#store-info", status_code=302)
 
 
+# ---------- V2.35.0：店家菜單照片（只有管理員；團頁與店家頁可點開看） ----------
+def _clean_menu_photo_urls(raw: str | None) -> list[str]:
+    """匯入確認帶回來的照片網址：只收我們圖片服務的 https 網址（前端送什麼都不能直接信）。"""
+    import json
+    from app.config import get_settings
+    from app.models.store import MENU_PHOTO_MAX
+    if not raw:
+        return []
+    try:
+        urls = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    cloud = get_settings().cloudinary_cloud_name or ""
+    prefix = f"https://res.cloudinary.com/{cloud}/" if cloud else None
+    if not prefix or not isinstance(urls, list):
+        return []
+    return [u for u in urls if isinstance(u, str) and u.startswith(prefix) and len(u) < 500][:MENU_PHOTO_MAX]
+
+
+from app.services.upload_service import upload_image, delete_image  # noqa: E402
+def _menu_photo_store(db: Session, store_id: int) -> Store:
+    store = db.query(Store).filter(Store.id == store_id).with_for_update().first()
+    if not store or store.is_personal:
+        raise HTTPException(status_code=404, detail="店家不存在")
+    return store
+
+
+@router.post("/stores/{store_id}/menu-photos")
+async def add_menu_photos(store_id: int, request: Request, photos: list[UploadFile] = File(None),
+                          db: Session = Depends(get_db)):
+    """加菜單照片（可一次多張）。超過上限的整批擋下、不上傳。"""
+    from app.models.store import MENU_PHOTO_MAX
+    user = await get_admin_user(request, db)
+    store = _menu_photo_store(db, store_id)
+    files = [f for f in (photos or []) if f and f.filename]
+    if not files:
+        raise HTTPException(status_code=400, detail="請選照片")
+    cur = store.menu_photos
+    if len(cur) + len(files) > MENU_PHOTO_MAX:
+        raise HTTPException(status_code=400, detail=f"菜單照片最多 {MENU_PHOTO_MAX} 張（現在 {len(cur)} 張）")
+    added = []
+    for f in files:
+        url = await upload_image(f, folder="sela/menus", max_size=1600)
+        if url:
+            added.append(url)
+    if not added:
+        raise HTTPException(status_code=400, detail="照片沒有上傳成功（圖片服務沒設定）")
+    store.set_menu_photos(cur + added)
+    db.commit()
+    _audit.info(f"菜單照片：{store.name} 加 {len(added)} 張（{user.show_name}）")
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=menu&saved=photos#menu-photos", status_code=302)
+
+
+@router.post("/stores/{store_id}/menu-photos/delete")
+async def delete_menu_photo(store_id: int, request: Request, url: str = Form(...), db: Session = Depends(get_db)):
+    """刪一張菜單照片（用網址比對；不在清單裡就當已刪）。"""
+    user = await get_admin_user(request, db)
+    store = _menu_photo_store(db, store_id)
+    cur = store.menu_photos
+    if url in cur:
+        store.set_menu_photos([u for u in cur if u != url])
+        db.commit()
+        delete_image(url)
+        _audit.info(f"菜單照片：{store.name} 刪 1 張（{user.show_name}）")
+    return RedirectResponse(url=f"/admin/stores/{store_id}?tab=menu&saved=photos#menu-photos", status_code=302)
+
+
 @router.get("/users")
 async def user_list(request: Request, sort: str = "last_active", db: Session = Depends(get_db)):
     """使用者列表"""
@@ -1487,6 +1572,8 @@ async def user_list(request: Request, sort: str = "last_active", db: Session = D
     if sort not in sort_map:
         sort = "last_active"
     users = db.query(User).filter(User.is_guest == False).order_by(sort_map[sort], User.id.desc()).all()
+    from app.services.user_names import dup_name_counts
+    dup = dup_name_counts(users)  # V2.35.0：同名帳號標出來
     # V2.28.0 P2-5：訂單數一次 GROUP BY（原本模板 u.orders|length 每人載入全部訂單）
     from app.models.order import Order
     from sqlalchemy import func
@@ -1503,6 +1590,7 @@ async def user_list(request: Request, sort: str = "last_active", db: Session = D
         "request": request,
         "user": user,
         "users": users,
+        "dup": dup,
         "online_count": online_count,
         "order_counts": order_counts,
         "sort": sort,
@@ -1866,10 +1954,14 @@ async def department_detail(request: Request, dept_id: int, db: Session = Depend
     
     # 取得尚未加入此部門的用戶
     member_ids = [m.user_id for m in members]
-    available_users = db.query(User).filter(
-        User.is_guest == False,
-        ~User.id.in_(member_ids) if member_ids else True
-    ).order_by(User.display_name).all()
+    # V2.35.0：依最近活動排（同名時最上面通常是她現在用的帳號），並標出同名
+    from app.services.user_names import dup_name_counts
+    _all_users = db.query(User).filter(User.is_guest == False).all()
+    dup = dup_name_counts(_all_users)
+    available_users = sorted(
+        [u for u in _all_users if u.id not in set(member_ids)],
+        key=lambda u: (u.last_active_at is None, -(u.last_active_at.timestamp() if u.last_active_at else 0), u.show_name or ""),
+    )
     
     return templates.TemplateResponse(request, "admin/department_detail.html", {
         "request": request,
@@ -1877,6 +1969,7 @@ async def department_detail(request: Request, dept_id: int, db: Session = Depend
         "department": department,
         "members": members,
         "available_users": available_users,
+        "dup": dup,
     })
 
 

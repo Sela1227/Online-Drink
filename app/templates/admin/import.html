@@ -75,7 +75,13 @@
                 class="w-full py-3 rounded-xl bg-sela-700 text-white font-bold text-base disabled:opacity-50">轉成菜單</button>
         <div x-show="aiBusy" x-cloak class="text-sm text-sela-800 text-center"><i class="ti ti-loader-2 animate-spin"></i> AI 正在讀菜單…<span x-text="aiSec"></span> 秒（約 20～60 秒）</div>
         <div x-show="aiErr" x-cloak class="text-sm text-red-600 bg-red-50 rounded-xl p-3" x-text="aiErr"></div>
-        <div x-show="aiDone" x-cloak class="text-sm text-green-700"><i class="ti ti-circle-check"></i> 轉好了，已填進下方並自動檢查；看過預覽再按確認</div>
+        {# V2.35.0：照片順便存成店家的菜單照片（Sela：預設不勾）；轉換時才上傳，確認匯入時才寫進店家 #}
+        <label class="flex items-center gap-2 text-sm text-sela-800">
+            <input type="checkbox" id="ai-save-photos" x-model="aiSavePhotos" :disabled="aiBusy" class="w-4 h-4 rounded">
+            轉完把照片存成這家店的菜單照片
+        </label>
+        <input type="hidden" name="menu_photo_urls" :value="aiSavePhotos && aiPhotoUrls.length ? JSON.stringify(aiPhotoUrls) : ''">
+        <div x-show="aiDone" x-cloak class="text-sm text-green-700"><i class="ti ti-circle-check"></i> 轉好了，已填進下方並自動檢查；看過預覽再按確認<span x-show="aiSavePhotos && aiPhotoUrls.length" x-text="'；確認後 ' + aiPhotoUrls.length + ' 張照片存成菜單照片'"></span></div>
         <div class="text-xs text-sela-800/45">最多 5 張，一張拍一面。</div>
     </div>
     {% endif %}
@@ -320,6 +326,8 @@ function importForm() {
         aiBusy: false,
         aiErr: '',
         aiDone: false,
+        aiSavePhotos: false,  // V2.35.0：預設不勾（Sela）
+        aiPhotoUrls: [],
         aiSec: 0,
         aiRecId: {{ (recommendation.id if recommendation else none) | tojson }},
         init() {
@@ -379,6 +387,8 @@ function importForm() {
             if (!useRec) this.aiBlobs.forEach((b, i) => fd.append('photos', b, 'menu' + (i + 1) + '.jpg'));
             fd.append('store_id', this.storeSel || '');
             fd.append('new_store_name', this.newName || '');
+            if (this.aiSavePhotos) fd.append('save_photos', '1');
+            this.aiPhotoUrls = [];
             this.aiBusy = true; this.aiErr = ''; this.aiDone = false; this.aiSec = 0;
             const tick = setInterval(() => { this.aiSec++; }, 1000);
             const x = new XMLHttpRequest();
@@ -392,6 +402,7 @@ function importForm() {
                 end('');
                 const el = this.$refs.ta;
                 this.jsonText = d.text; if (el) el.value = d.text;
+                this.aiPhotoUrls = Array.isArray(d.photo_urls) ? d.photo_urls : [];
                 this.aiDone = true;
                 if (el) setTimeout(() => el.dispatchEvent(new Event('input', { bubbles: true })), 0);
             };
