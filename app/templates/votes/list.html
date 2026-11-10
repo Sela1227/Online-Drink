@@ -86,7 +86,7 @@
             <span x-text="showClosed ? '▼' : '▶'" class="text-xs"></span>
             已結束 <span class="text-sm font-normal">({{ closed_votes|length }})</span>
         </h2>
-        <div x-show="showClosed" x-collapse>
+        <div x-show="showClosed">
             <div class="grid grid-cols-2 gap-4">
                 {% for vote in closed_votes %}
                 <a href="/votes/{{ vote.id }}"

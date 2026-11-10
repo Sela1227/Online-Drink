@@ -22,7 +22,7 @@
             </div>
         </div>
         {% if announcements|length > 1 %}
-        <div x-show="more" x-collapse x-cloak class="space-y-2">
+        <div x-show="more" x-cloak class="space-y-2">
             {% for a in announcements[1:] %}
             <div class="bg-white rounded-2xl px-4 py-3 shadow-sm border border-sela-100">
                 <div class="text-sm font-semibold text-sela-800">{{ a.title }}</div>

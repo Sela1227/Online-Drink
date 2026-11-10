@@ -15,26 +15,33 @@
             remaining: {{ rem if rem is not none else "null" }},
             options: [{% for opt in item.options %}{ id: {{ opt.id }}, name: {{ opt.name | tojson }}, price_diff: {{ opt.price_diff }} }{% if not loop.last %},{% endif %}{% endfor %}]
         })'{% else %}disabled{% endif %}
-        data-menu-item-id="{{ item.id }}"
-        class="w-full flex items-center justify-between gap-3 p-3.5 bg-sela-50 rounded-xl transition text-left {% if sold_out %}opacity-50{% else %}active:bg-sela-100 active:scale-[0.99]{% endif %}">
-    <div class="flex items-center gap-3 min-w-0">
-        {% if item.image_url %}
-        <img src="{{ item.image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" loading="lazy">
-        {% endif %}
-        <div class="min-w-0">
-            <div class="font-medium text-sela-800">{{ item.name }}
-                {% if sold_out %}
-                <span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal">完售</span>
-                {% elif rem is not none and rem <= 5 %}
-                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-normal">剩 {{ rem }}</span>
-                {% endif %}
-            </div>
-            {{ mi.item_meta(item) }}
+        data-menu-item-id="{{ item.id }}"{% if hot_ids is defined and item.id in hot_ids %} data-hot{% endif %}
+        {% if not sold_out %}:class='orderedQty[{{ item.id }}] ? "ring-1 ring-sela-400" : ""'{% endif %}
+        class="w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[48px] bg-sela-50 rounded-xl transition text-left {% if sold_out %}opacity-50{% else %}active:bg-sela-100 active:scale-[0.99]{% endif %}">
+    {% if item.image_url %}
+    <img src="{{ item.image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" loading="lazy">
+    {% endif %}
+    <div class="flex-1 min-w-0">
+        <div class="font-medium text-sela-900 leading-snug">{{ item.name }}
+            {# V2.36.0（R-4）：大家常點改成品項上的火焰圖示（原本菜單上方一段「大家常點」） #}
+            {% if hot_ids is defined and item.id in hot_ids %}<i class="ti ti-flame text-sela-600 text-sm" title="大家常點" aria-label="大家常點"></i>{% endif %}
+            {% if sold_out %}
+            <span class="text-xs bg-sela-200 text-sela-800/60 px-1.5 py-0.5 rounded-full font-normal">完售</span>
+            {% elif rem is not none and rem <= 5 %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-normal">剩 {{ rem }}</span>
+            {% endif %}
+            {# V2.36.0（R-5）：我點了幾份，從 my_order.html 的 data-ordered 讀 #}
+            {% if not sold_out %}<span x-show="orderedQty[{{ item.id }}]" x-cloak class="ml-0.5 text-[11px] font-normal px-1.5 py-0.5 rounded bg-sela-800 text-white whitespace-nowrap" x-text='"已點 ×" + orderedQty[{{ item.id }}]'></span>{% endif %}
         </div>
+        {{ mi.item_meta(item) }}
+        {# V2.36.0（Q-2，Sela 選）：價格一行「M $25 · L $30」放品名下面 #}
+        <div class="text-xs text-sela-800/70 mt-0.5">{{ mi.item_price(item, personal=(group is defined and group.store and group.store.is_personal)) }}</div>
     </div>
-    <div class="text-sela-800 font-medium flex-shrink-0">
-        {# V2.14.0：一般店家的時價品項顯示「時價」，代購團維持「價格未訂」；V2.15.1 抽成共用 macro #}
-        {{ mi.item_price(item, personal=(group is defined and group.store and group.store.is_personal)) }}
-    </div>
+    {# V2.36.0（R-10）：右側白底細框 ＋（整列照樣可點）；完售不顯示、位置保留 #}
+    {% if not sold_out %}
+    <span class="w-8 h-8 rounded-full border border-sela-300 bg-white text-sela-800 flex items-center justify-center flex-shrink-0" aria-hidden="true"><i class="ti ti-plus"></i></span>
+    {% else %}
+    <span class="w-8 flex-shrink-0"></span>
+    {% endif %}
 </button>
 {% endif %}

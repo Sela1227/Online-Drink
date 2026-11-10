@@ -136,7 +136,8 @@ def _render_pages() -> dict:
     mi = MenuItem(menu_id=mn_jia.id, category_id=cat.id, name="雞腿飯", price=100, sort_order=0); db.add(mi); db.flush()
     from app.models.group import taipei_now
     g_member = Group(owner_id=other.id, store_id=jia.id, menu_id=mn_jia.id, name="別人開的", category=CategoryType.MEAL,
-                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True,
+                     order_limit=250, allow_over_limit=False)  # V2.36.0（R-8）：已點 $100，再點 2 份 $200 就超過
     g_owner = Group(owner_id=u.id, store_id=jia.id, menu_id=mn_jia.id, name="我開的", category=CategoryType.MEAL,
                     deadline=taipei_now() + timedelta(hours=2), is_public=True)
     db.add_all([g_member, g_owner]); db.flush()

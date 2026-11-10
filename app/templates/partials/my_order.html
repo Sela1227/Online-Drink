@@ -1,9 +1,13 @@
 {# V2.18.0：根元素帶件數與金額，團頁的結帳列從這裡讀（單一來源）
    V2.33.0（內部審核 S-2，Sela 選）：沒有購物車了——點了就是訂單，這張卡就是「我的訂單」，直接在上面加減、刪除、填候補 #}
 {% set has_items = order and order.items %}
-<div class="bg-white rounded-2xl shadow-sm p-4 {% if has_items %}border border-green-200{% endif %}" id="my-order-card"
+{# V2.36.0（R-5）：每個菜單品項我點了幾份，團頁菜單標「已點 ×N」（JSON 放 data-*，坑 #37） #}
+{% set _ordered = {} %}
+{% if has_items %}{% for it in order.items if it.menu_item_id %}{% set _ = _ordered.update({(it.menu_item_id|string): (_ordered.get(it.menu_item_id|string, 0) + it.quantity)}) %}{% endfor %}{% endif %}
+<div class="bg-white rounded-2xl {% if not is_open %}shadow-sm {% endif %}p-4 {% if has_items and not is_open %}border border-green-200{% endif %}" id="my-order-card"
      data-cart-count="{{ order.total_quantity if has_items else 0 }}"
-     data-cart-total="{{ order.final_amount|money if has_items else 0 }}">
+     data-cart-total="{{ order.final_amount|money if has_items else 0 }}"
+     data-ordered="{{ _ordered | tojson | forceescape }}">
     <h2 class="font-semibold text-sela-800 mb-2 flex items-center gap-2">
         我的訂單
         {% if has_items %}<span class="text-[11px] font-normal bg-green-50 text-green-700 px-2 py-0.5 rounded-full">{% if is_open %}已點 · 截止前都能改{% else %}已點{% endif %}</span>{% endif %}
@@ -117,6 +121,10 @@
                 <span class="text-xl font-bold {% if over > 0 %}{% if group.allow_over_limit %}text-amber-600{% else %}text-red-600{% endif %}{% else %}text-sela-800{% endif %}">${{ order.final_amount|money }}</span>
             </span>
         </div>
+        {% if group.delivery_fee and group.submitted_count > 0 %}
+        {# V2.36.0（R-12b）：運費會影響個人實付，合計下寫清楚 #}
+        <div class="-mt-1.5 mb-2.5 text-xs text-sela-800/60" id="delivery-share">外送均分約 ${{ group.delivery_fee_per_person|money }}（目前 {{ group.submitted_count }} 人）</div>
+        {% endif %}
         {% if group.order_limit and over == 0 %}
         {# V2.18.0：送出後一行講清楚補助與自付（原本只有超過上限才有提示） #}
         <div class="-mt-1.5 mb-2.5 text-xs text-sela-800/50">補助 ${{ group.order_limit|money }} 內 · 自付 $0</div>

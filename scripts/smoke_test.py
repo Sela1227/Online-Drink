@@ -1298,8 +1298,9 @@ def main():
     try:
         r = _c.get(f"/groups/{_hg_new.id}")
         assert r.status_code == 200
-        assert f"scrollToItem({_niu2.id})" in r.text, "熱門／最愛要指向新版本的品項 id"
-        assert f"scrollToItem({_niu1.id})" not in r.text
+        # V2.36.0（R-4）：熱門改成品項上的火焰（data-hot），不再有「大家常點」那段
+        assert f'data-menu-item-id="{_niu2.id}" data-hot' in r.text, "熱門要標在新版本的品項上"
+        assert 'id="quick-hot"' not in r.text and "大家常點</h3>" not in r.text
         assert "你的常點" in r.text and "滷蛋" not in r.text.split("你的常點")[1][:600], "停售的不列入常點"
         check("P2-6：匯入新版本後熱門／最愛／常點按品名對到新 id，停售不列")
 
@@ -1360,11 +1361,12 @@ def main():
         assert 'x-text="selectedItem?.description"' in r.text
         check("A-2：說明列表兩行不截斷、彈窗顯示說明")
         # A-5：導覽 chip 帶品項數（只算會顯示的），全停售分類不出現，無分類品項有「其他」並進導覽
-        assert "熟成紅茶 2" in t and "鮮奶茶 2" in t and "其他 1" in t, t[:1500]
+        # V2.36.0（審核 R-10）：chip 不再帶數量（320px 多露一顆）
+        assert "熟成紅茶" in t and "鮮奶茶" in t and "熟成紅茶 2" not in t and "其他 1" not in t, t[:1500]
         assert "全停售" not in t, "整個分類都停售時不該出現標題與 chip"
         assert 'id="category-other"' in r.text and 'scrollToCategory("category-other")' in r.text
         assert "停售滷蛋" not in t
-        check("A-5：導覽 chip 帶可見品項數、全停售分類隱藏、其他有標題並進導覽")
+        check("A-5：導覽 chip 不帶數量、全停售分類隱藏、其他有標題並進導覽")
         # A-8：更新日期＋回報連結預填
         _d = (_mm.created_at.replace(tzinfo=None) + timedelta(hours=8)).strftime("%Y/%m/%d")
         assert f"更新於 {_d}" in t and "價格跟店裡不一樣？回報" in t
@@ -1883,9 +1885,10 @@ def main():
         assert 'id="remind-text"' in r.text and "截止，還沒點的快來點餐：__ORIGIN__/groups/" in r.text and "結單" not in t
         assert 'id="more-tabs"' in r.text and "提前截止" in t and "存成範本" in t and "複製開團" in t and "還沒送出的名單" not in t
         assert 'href="/groups/%d/export/order"' % ga.id in r.text and 'href="/groups/%d/export/payment"' % ga.id in r.text
-        assert "快速點餐" not in t and 'id="quick-mine"' in r.text and 'id="quick-hot"' in r.text and 'id="menu-nav"' in r.text and "ti-dice" in r.text
-        assert "詳細資訊 ›" in t and "剩 " in t
-        check("團主開放中：團主列三顆＋更多 sheet 三分頁；團主工具／快速點餐卡拿掉；常點／熱門／骰子進導覽列；結帳列在、底部導航不在")
+        # V2.36.0（R-4）：熱門那段拿掉（改品項火焰）；R-1：標頭「詳細資訊」改右上「資訊」sheet
+        assert "快速點餐" not in t and 'id="quick-hot"' not in r.text and 'id="menu-nav"' in r.text and "ti-dice" in r.text
+        assert 'id="info-btn"' in r.text and 'id="info-sheet"' in r.text and "詳細資訊 ›" not in t and "剩 " in t
+        check("團主開放中：團主列三顆＋更多 sheet 三分頁；團主工具／快速點餐卡拿掉；骰子在導覽列、熱門那段拿掉；資訊 sheet；結帳列在、底部導航不在")
 
         # 團主・已截止：下一步卡三步＋時價／缺貨入口；沒有結帳列、沒有團主列、沒有菜單
         ga.is_closed = True; db.commit()
@@ -3218,11 +3221,14 @@ def main():
         assert _row("那堤").count("label:") == 3 and _row("濃縮咖啡").count("label:") == 2 and _row("凝綠厚抹").count("label:") == 1
         assert "no_top: true" in _row("三窨十五茉") and "no_top: false" in _row("那堤")
         _vis = _re.sub(r"<script\b.*?</script>", " ", _t, flags=_re.S)
-        assert "特大杯 $155" in _vis and "Doppio $100" in _vis and "瓶裝 $105" in _vis, "多規格每個一行（驗收 1～3）"
-        assert _re.search(r"大杯</span>\s*\$45", _vis) and _re.search(r"中杯</span>\s*\$55", _vis), "只有一種規格也寫出標籤（驗收 4、5）"
-        assert "M $30" in _vis and "L $35" in _vis, "舊菜單照舊 M／L"
+        # V2.36.0（Q-2）：多規格改一行「中杯 $125 · 大杯 $140 · 特大杯 $155」，價格包 nowrap span，比對前去標籤
+        _vt = " ".join(_re.sub(r"<[^>]+>", " ", _vis).split())
+        assert "特大杯 $155" in _vt and "Doppio $100" in _vt and "瓶裝 $105" in _vt, "多規格都列出（驗收 1～3）"
+        assert _re.search(r"\$\d+ · [^$]{1,12} \$\d+ · 特大杯 \$155", _vt), "多規格同一行用 · 隔開（Q-2）"
+        assert "大杯 $45" in _vt and "中杯 $55" in _vt, "只有一種規格也寫出標籤（驗收 4、5）"
+        assert "M $30 · L $35" in _vt, "舊菜單照舊 M／L，一行"
         assert 'id="size-picker"' in _t and 'id="topping-picker"' in _t
-        check("團頁：那堤三個杯型、Solo／Doppio、L杯／瓶裝每個一行；單一規格寫「大杯 $45」；舊菜單 M／L；不加料品項帶 no_top")
+        check("團頁：那堤三個杯型、Solo／Doppio、L杯／瓶裝同一行以 · 隔開（Q-2）；單一規格寫「大杯 $45」；舊菜單 M／L；不加料品項帶 no_top")
 
         # 點餐計價
         def _add46(name, **kw):
@@ -3835,6 +3841,135 @@ def main():
         _adm.upload_image, _adm.delete_image = _up53
         _adm.get_admin_user = _orig
         _cfg53.cloudinary_cloud_name = _cloud53
+
+    # ---------- 54. V2.35.1 內部審核 V2.35.0 點餐頁：G-1／G-2／G-3 ----------
+    print("\n[54] 加點失敗不說已點好、倒數歸零重整、團主列金額不含外送")
+    from decimal import Decimal as _Dec54
+    from app.models.order import Order as _O54, OrderItem as _OI54, OrderStatus as _OS54
+    _gsrc54 = open("app/templates/group.html", encoding="utf-8").read()
+    assert '@htmx:after-request="afterAddItem($event)"' in _gsrc54 and "if (!ev || !ev.detail || !ev.detail.successful) return;" in _gsrc54, "G-1：加點失敗要留著彈窗、不能 toast 已點好"
+    _cd54 = _gsrc54[_gsrc54.index("function countdown("):]
+    assert "location.reload()" in _cd54 and "closedReload_" in _cd54 and "sessionStorage" in _cd54, "G-2：歸零要重整一次（同團只一次）"
+    check("G-1／G-2：加點回應失敗就返回（彈窗留著）；倒數歸零重新整理、同一團只重整一次（jsdom 實測在前端檢查）")
+    _who54 = {"id": _uid}
+    async def _f54(request, db_):
+        return db_.query(User).filter(User.id == _who54["id"]).first()
+    async def _f54o(request, db_):
+        return (db_.query(User).filter(User.id == _who54["id"]).first(), None)
+    import app.routers.orders as _ordm54  # _ord 這名字後面被拿去裝 Order 物件（坑 #45）
+    _o54 = (_grp.get_current_user, _grp.get_current_user_optional, _ordm54.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _ordm54.get_current_user = _f54, _f54o, _f54
+    try:
+        _s54 = Store(name="五四店", category=CategoryType.MEAL, is_active=True, is_public=True); db.add(_s54); db.commit()
+        _g54 = Group(owner_id=_uid, store_id=_s54.id, name="五四團", category=CategoryType.MEAL, deadline=taipei_now() + timedelta(hours=2),
+                     is_public=True, delivery_fee=_Dec54("60")); db.add(_g54); db.commit()
+        for _n, _amt in ((1, 150), (2, 120)):
+            _u = User(line_user_id=f"s54_{_n}", display_name=f"五四{_n}"); db.add(_u); db.commit()
+            _o = _O54(group_id=_g54.id, user_id=_u.id, status=_OS54.SUBMITTED); db.add(_o); db.flush()
+            db.add(_OI54(order_id=_o.id, item_name="便當", unit_price=_amt, quantity=1))
+        db.commit(); db.expire_all()
+        _g54 = db.get(Group, _g54.id)
+        assert _g54.food_amount == _Dec54("270") and _g54.total_amount == _Dec54("330")
+        t = _c.get(f"/groups/{_g54.id}").text
+        _bar54 = t[t.index('id="owner-bar"'):t.index('id="owner-bar"') + 800]
+        assert "2 人已點" in _bar54 and "餐點 $270" in _bar54 and "＋外送 $60" in _bar54 and "$330" not in _bar54, _bar54[:400]
+        _wall54 = _c.get(f"/groups/{_g54.id}/orders/wall").text
+        assert "$270" in _wall54, ("訂單牆同一個數字", _wall54[:300])
+        _g54.delivery_fee = None; db.commit()
+        t = _c.get(f"/groups/{_g54.id}").text
+        _bar54 = t[t.index('id="owner-bar"'):t.index('id="owner-bar"') + 800]
+        assert "餐點 $270" in _bar54 and "外送" not in _bar54.split("</span>")[0]
+        check("G-3：團主列「N 人已點 · 餐點 $X ＋外送 $Y」，餐點跟訂單牆同一個數字；沒外送就不寫")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _ordm54.get_current_user = _o54
+
+    # ---------- 55. V2.36.0 點餐頁版面（內部審核 R-1～R-12、G-4～G-9） ----------
+    print("\n[55] 點餐頁版面：菜單在前、我的訂單抽屜、資訊 sheet、已點 ×N、上限先擋、團主預設、價格一行、G-5～G-9")
+    from decimal import Decimal as _Dec55
+    import html as _html55
+    from app.models.order import Order as _O55, OrderItem as _OI55, OrderStatus as _OS55
+    from app.models.menu import Menu as _M55, MenuItem as _MI55
+    _gsrc55 = open("app/templates/group.html", encoding="utf-8").read()
+    # 靜態：orderPage 拿掉購物車時代的狀態、加上抽屜共通行為；G-5 沒有 x-collapse（沒載 collapse 外掛，等於沒動畫還多一個未知指令）
+    _js55 = _gsrc55[_gsrc55.index("function orderPage()"):]
+    for _dead in ("showCart", "showReminder", "menuOpen"):
+        assert _dead not in _gsrc55, f"{_dead} 是購物車時代的狀態，應已拿掉"
+    assert "sheetKeys" in _js55 and "history.pushState({ sheet: 1 }" in _js55 and "addEventListener('popstate'" in _js55 and "_expectPop" in _js55
+    assert '@keydown.escape.window="closeSheets()"' in _gsrc55 and "overflow-hidden" in _js55
+    assert "new CustomEvent('wallUpdated')" in _js55 and ':disabled="overLimit()"' in _gsrc55
+    _xc55 = [str(_p) for _p in Path("app/templates").rglob("*.html") if "x-collapse" in _p.read_text(encoding="utf-8")]
+    assert not _xc55, ("G-5：x-collapse 沒有外掛", _xc55)
+    assert ".order-actions" not in open("app/templates/base.html", encoding="utf-8").read(), "G-8：購物車 sheet 的 CSS 是死碼"
+    _qr55 = _gsrc55[_gsrc55.index("/qrcode"):_gsrc55.index("/qrcode") + 80]
+    assert 'hx-trigger="intersect once"' in _qr55, "G-6：QR 打開才載入"
+    check("靜態：購物車時代狀態拿掉、抽屜 Esc／返回鍵／背景鎖、加點後只刷新訂單牆、上限先擋、沒有 x-collapse、死 CSS 拿掉、QR 打開才載")
+
+    _who55 = {"id": _uid}
+    async def _f55(request, db_):
+        return db_.query(User).filter(User.id == _who55["id"]).first()
+    async def _f55o(request, db_):
+        return (db_.query(User).filter(User.id == _who55["id"]).first(), None)
+    import app.routers.orders as _ordm55
+    _o55 = (_grp.get_current_user, _grp.get_current_user_optional, _ordm55.get_current_user)
+    _grp.get_current_user, _grp.get_current_user_optional, _ordm55.get_current_user = _f55, _f55o, _f55
+    try:
+        _s55 = import_store_and_menu(db, FullImport(
+            store={"name": "五五茶", "category": "drink", "sugar_options": ["正常", "半糖", "無糖"], "ice_options": ["正常冰", "去冰"]},
+            menu={"items": [{"name": "紅茶", "price": 30}, {"name": "奶茶", "variants": [{"label": "M", "price": 45}, {"label": "L", "price": 55}]}]}))
+        _m55 = db.query(_M55).filter(_M55.store_id == _s55.id, _M55.is_active == True).first()
+        _tea55 = db.query(_MI55).filter(_MI55.menu_id == _m55.id, _MI55.name == "紅茶").first()
+        _owner55 = User(line_user_id="s55_owner", display_name="五五團主"); db.add(_owner55); db.commit()
+        _g55 = Group(owner_id=_owner55.id, store_id=_s55.id, menu_id=_m55.id, name="五五團", category=CategoryType.DRINK,
+                     deadline=taipei_now() + timedelta(hours=2), is_public=True, delivery_fee=_Dec55("60"),
+                     default_sugar="半糖", note="3F 茶水間"); db.add(_g55); db.commit()
+        _mem55 = User(line_user_id="s55_member", display_name="五五團員"); db.add(_mem55); db.commit()  # 不是管理員（管理員看得到團主區）
+        _who55["id"] = _mem55.id
+        _om55 = _O55(group_id=_g55.id, user_id=_mem55.id, status=_OS55.SUBMITTED); db.add(_om55); db.flush()
+        db.add(_OI55(order_id=_om55.id, menu_item_id=_tea55.id, item_name="紅茶", unit_price=30, quantity=2))
+        db.commit()
+
+        # 團員・開放中
+        r = _c.get(f"/groups/{_g55.id}"); t = r.text; tt = _T(r)
+        assert r.status_code == 200
+        _iM, _iW = t.index('id="menu-section"'), t.index('id="order-wall"')
+        assert _iM < _iW, "R-3：開放中菜單在前、訂單牆在菜單下面"
+        assert t.count('id="my-order-card"') == 1 and t.index('id="mine-sheet"') < t.index('id="my-order-card"'), "R-2：我的訂單只在抽屜裡"
+        _mo55 = t[t.index('id="my-order-content"'):t.index('id="my-order-content"') + 200]
+        assert 'hx-trigger="orderUpdated from:body"' in _mo55 and "load" not in _mo55.split(">")[0], "G-7：整頁已 include，不再 load 重拿"
+        _do55 = _re.search(r'data-ordered="([^"]*)"', t).group(1)
+        assert json.loads(_html55.unescape(_do55)) == {str(_tea55.id): 2}, ("R-5：data-ordered 給菜單標已點 ×N", _do55)
+        assert 'id="delivery-share"' in t and "外送均分約 $60（目前 1 人）" in tt, "R-12：我的訂單寫外送均分"
+        assert 'id="info-btn"' in t and 'id="info-sheet"' in t and 'id="fav-btn"' in t and "3F 茶水間" in tt
+        _hdr55 = t[t.index('id="group-header"'):t.index('id="info-sheet"')]
+        assert "外送 $60" in " ".join(_re.sub(r"<[^>]+>", " ", _hdr55).split()), "R-1：標頭第二行有外送"
+        assert "團主預設" in t and 'data-owner-default' in t, "R-11b／Q-3：團主預設甜度要標出來"
+        _sg55 = t[t.index('name="sugar" value="半糖"'):t.index('name="sugar" value="半糖"') + 900]
+        assert "checked" in _sg55.split(">")[0] and "團主預設" in _sg55 and 'x-show="!lastPrefNote"' in _sg55
+        assert 'id="size-summary"' in t, "R-11a：單一規格摘要"
+        assert "/qrcode" not in t, "G-6：團員頁不產 QR"
+        _wall55 = _c.get(f"/groups/{_g55.id}/orders/wall").text
+        assert "加折扣" not in _wall55 and "修改折扣" not in _wall55
+        check("團員開放中：菜單在前、訂單牆在後；我的訂單只在抽屜且不重拿；data-ordered；外送均分；資訊 sheet；團主預設甜度；團員不產 QR")
+
+        # 團主・開放中：QR 在、折扣工具不在；截止後折扣工具出現
+        _who55["id"] = _owner55.id
+        r = _c.get(f"/groups/{_g55.id}"); t = r.text
+        assert "/qrcode" in t and 'id="owner-roster"' in t and "openWall()" in t
+        _wall55 = _c.get(f"/groups/{_g55.id}/orders/wall").text
+        assert "加折扣" not in _wall55, "R-3：開放中訂單牆不放折扣工具"
+        _g55.is_closed = True; db.commit()
+        _wall55 = _c.get(f"/groups/{_g55.id}/orders/wall").text
+        assert "加折扣" in _wall55, "截止後團主照樣能按人折扣"
+        r = _c.get(f"/groups/{_g55.id}"); t = r.text
+        assert t.count('id="my-order-card"') <= 1 and 'id="mine-sheet"' not in t and 'id="checkout-bar"' not in t
+        check("團主：QR 在團主區打開才載；名單 › 跳訂單牆；按人折扣截止後才出現；截止後沒有抽屜與結帳列")
+    finally:
+        _grp.get_current_user, _grp.get_current_user_optional, _ordm55.get_current_user = _o55
+
+    # Q-2：價格一行（店家頁也共用 item_price）
+    _ip55 = open("app/templates/partials/menu_item_info.html", encoding="utf-8").read()
+    assert "{% if not loop.first %} · {% endif %}" in _ip55 and "whitespace-nowrap" in _ip55
+    check("Q-2：多規格價格一行「M $25 · L $30」，價格不拆行（團頁、店家頁共用）")
 
     print(f"\n全部通過（{len(passed)} 項）")
 

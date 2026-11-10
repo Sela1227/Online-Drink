@@ -145,6 +145,12 @@ class Group(Base):
         return (self.delivery_fee / self.submitted_count).quantize(Decimal("1"))  # 四捨五入到整數
     
     @property
+    def food_amount(self) -> Decimal:
+        """V2.35.1（內部審核 G-3）：已點訂單的折後金額，不含外送——跟訂單牆同一個數字"""
+        from app.models.order import OrderStatus
+        return sum((o.final_amount for o in self.orders if o.status == OrderStatus.SUBMITTED), Decimal("0"))
+
+    @property
     def total_amount(self) -> Decimal:
         """團單總金額（含外送費）。V2.4.1 修：改用折後金額，與收款明細/請客紀錄一致"""
         from app.models.order import OrderStatus

@@ -19,12 +19,13 @@
 {# V2.16.0 A-1：多規格一行一個（第一個大字、其餘小字）；V2.31.0（Sela 選 1A）規格標籤照菜單，
    只有一種規格但有標籤的寫「大杯 $45」，沒有標籤的照舊「$45」 #}
 {% set chs = item.size_choices %}
+{# V2.36.0（Q-2，Sela 選）：多規格改一行「M $25 · L $30」，第一個字重較粗；放不下就在 · 之間換行，「特大杯 $155」不拆開 #}
 {% if chs|length > 1 %}
-<div class="text-right leading-tight" data-sizes>{% for lb, p in chs %}{% if loop.first %}<div>{{ lb }} ${{ p|money }}</div>{% else %}<div class="text-xs text-sela-800/60">{{ lb }} ${{ p|money }}</div>{% endif %}{% endfor %}</div>
+<span class="break-words" data-sizes>{% for lb, p in chs %}{% if not loop.first %} · {% endif %}<span class="whitespace-nowrap{% if loop.first %} font-semibold text-sela-800{% endif %}">{{ lb }} ${{ p|money }}</span>{% endfor %}</span>
 {% elif chs[0][0] %}
-<span data-sizes><span class="text-xs text-sela-800/60 font-normal">{{ chs[0][0] }}</span> ${{ chs[0][1]|money }}</span>
+<span data-sizes><span class="font-semibold text-sela-800">{{ chs[0][0] }} <span class="whitespace-nowrap">${{ chs[0][1]|money }}</span></span></span>
 {% else %}
-${{ item.price|money }}
+<span class="font-semibold text-sela-800">${{ item.price|money }}</span>
 {% endif %}
 {% endif %}
 {%- endmacro %}
@@ -36,7 +37,8 @@ ${{ item.price|money }}
             <div class="font-medium text-sela-800">{{ item.name }}</div>
             {{ item_meta(item) }}
         </div>
-        <div class="text-right flex-shrink-0 text-sela-800 font-medium">{{ item_price(item) }}</div>
+        {# V2.36.0（Q-2）：三個規格一行放不下時在 · 之間換行，不擠掉品名（原本 flex-shrink-0 會把「那堤」擠成一字一行） #}
+        <div class="text-right max-w-[65%] text-sela-800 font-medium">{{ item_price(item) }}</div>
     </div>
 </div>
 {%- endmacro %}
